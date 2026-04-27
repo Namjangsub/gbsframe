@@ -207,28 +207,123 @@ public class BM14SvcImpl implements BM14Svc {
 		    for (Map<String, String> dtl : topNodeInfo) {
 
 				fileTrgtKey = Integer.toString(bm14Mapper.selectBomSeqNext(param));
-				dtl.put("FILE_TRGT_KEY",fileTrgtKey);
+				dtl.put("FILE_TRGT_KEY", fileTrgtKey);
 				dtl.put("UPPER_KEY", paramMap.get("fileTrgtKey") );
-				dtl.put("UPPER_CD", paramMap.get("lowerCd") );
+				dtl.put("upper_cd", paramMap.get("lowerCd") );
 				dtl.put("SALES_CD_TO", paramMap.get("salesCdTo"));
 				dtl.put("ORDRS_NO_TO", paramMap.get("ordrsNoTo"));
 				dtl.put("CHANGE_YN", paramMap.get("changeYn"));
 				dtl.put("USER_ID", paramMap.get("userId"));
 				dtl.put("PGM_ID", paramMap.get("pgmId"));
 
+				// 하위 노드의 도번 및 품번 정보 재계산 (상위 정보 상속)
+				// changeYn == 'Y' : 도번 채번 + 분리 규칙을 한 번에 적용
+				//  - lowerCd 끝이 R+숫자(예: 002R1, 005AR1) = unit+rev 형태이면
+				//      DSGN_NO_TO = salesCdTo + "-" + 부모lowerCd + "-" + 현재lowerCd
+				//      PART_NO_TO = 부모lowerCd
+				//      UNIT_NO_TO = 현재lowerCd 에서 끝의 R\d+ 를 뺀 부분
+				//      REV_NO_TO  = 현재lowerCd 끝의 R\d+
+				//  - 아니면
+				//      DSGN_NO_TO = salesCdTo + "-" + 현재lowerCd
+				//      PART_NO_TO = 현재lowerCd, UNIT_NO_TO = "", REV_NO_TO = ""
+				if ("Y".equals(paramMap.get("changeYn"))) {
+					String _salesCd   = paramMap.get("salesCdTo") != null ? paramMap.get("salesCdTo") : "";
+					String _targetLow = dtl.get("upperCd") != null ? dtl.get("upperCd") : "";
+					String _nodeLow   = dtl.get("lowerCd") != null ? dtl.get("lowerCd") : "";
+
+					// _nodeLow 가 unitNo(+optional revNo) 형태인지 판정
+					// unitNo : 3자리 숫자 + 선택적 알파벳 1자  (예: 001, 002, 001B, 005A)
+					// revNo  : 끝에 R+숫자                  (예: R1)
+					// 매치되면 부모lowerCd 가 partNo, 아니면 _nodeLow 자체가 partNo
+					String newDsgnNo, partNo, unitNo, revNo;
+					java.util.regex.Matcher m = java.util.regex.Pattern
+							.compile("^(\\d{3}[A-Za-z]?)(R\\d+)?$").matcher(_nodeLow);
+					if (m.matches()) {
+						newDsgnNo = _salesCd + "-" + _targetLow + "-" + _nodeLow;
+						partNo    = _targetLow;
+						unitNo    = m.group(1);
+						revNo     = m.group(2) != null ? m.group(2) : "";
+					} else {
+						newDsgnNo = _salesCd + "-" + _nodeLow;
+						partNo    = _nodeLow;
+						unitNo    = "";
+						revNo     = "";
+					}
+
+					dtl.put("DSGN_NO_TO", newDsgnNo);
+					dtl.put("PART_NO_TO", partNo);
+					dtl.put("UNIT_NO_TO", unitNo);
+					dtl.put("REV_NO_TO",  revNo);
+				} else { //도면번호 변경하지 않음
+					dtl.put("DSGN_NO_TO", dtl.get("dsgnNo"));
+					dtl.put("PART_NO_TO", "");
+					dtl.put("UNIT_NO_TO", "");
+					dtl.put("REV_NO_TO", "");
+				}
+
 				//lowerKey를 가지고 fileTrgtKey로 추가하는 작업
 				result += bm14Mapper.copyBomTree(dtl);
 
-//		    	nodeInfos.add(dtl);
-		    	// 재귀적으로 자식 노드들의 정보 가져오기
-		    	dtl.put("parentId",  fileTrgtKey);
-		    	List<Map<String, String>> grandChildNodeInfos = getAllChildNodeInfos(dtl);
-//		    	nodeInfos.addAll(grandChildNodeInfos);
+				// 재귀적으로 자식 노드들의 정보 가져오기
+				dtl.put("PARENT_ID",  fileTrgtKey);
+				List<Map<String, String>> grandChildNodeInfos = getAllChildNodeInfos(dtl);
 			}
 	    }
 
         return nodeInfos;
     }
+
+	private Map<String, String> dsgnNoSeparation(String str) {
+		// ex)
+		// 23010-99TVFTE-1000              => partNo=1000   , unitNo=''    , revNo=''
+		// 26005-02WFMHL-MESHBELT-001      => partNo=MESHBELT, unitNo='001', revNo=''
+		// 25211-18HMCUP-2100-002          => partNo=2100   , unitNo='002' , revNo=''
+		// 24073-01NVFIP-2221-001B         => partNo=2221   , unitNo='001B', revNo=''
+		// 25147-04HANDT-1104A-002R1       => partNo=1104A  , unitNo='002' , revNo='R1'
+		// 25147-04HANDT-1104A-005AR1      => partNo=1104A  , unitNo='005A', revNo='R1'
+		// 25135-01FFNUP-9000-001(KCs ...) => partNo=9000   , unitNo='001' , revNo=''
+		Map<String, String> result = new HashMap<>();
+		result.put("parts", "");
+		result.put("unitNo", "");
+		result.put("revNo", "");
+		if (str == null || str.trim().isEmpty()) return result;
+
+		// 끝부분 괄호 주석 제거: "9000-001(KCs name plate)" -> "9000-001"
+		String s = str.trim().replaceAll("\\(.*?\\)\\s*$", "").trim();
+
+		String[] rawParts = s.split("-");
+		List<String> working = new ArrayList<>();
+		for (String p : rawParts) working.add(p.trim());
+
+		String revNo = "";
+		// 마지막 segment 자체가 R+숫자 형태면 revNo (대시로 분리된 형태)
+		if (!working.isEmpty() && working.get(working.size() - 1).matches("R\\d+")) {
+			revNo = working.remove(working.size() - 1);
+		}
+
+		// salesCd 2개 segment(0,1) 이후: index 2 = partNo, index 3 = unitNo(+revNo)
+		String partNo = "";
+		String unitNo = "";
+		if (working.size() > 2) {
+			partNo = working.get(2);
+			if (working.size() > 3) {
+				String tail = working.get(3);
+				// tail 끝의 R+숫자가 붙어있는 형태(002R1, 005AR1 등) 분리
+				java.util.regex.Matcher m = java.util.regex.Pattern.compile("^(.*?)(R\\d+)$").matcher(tail);
+				if (m.matches()) {
+					unitNo = m.group(1);
+					if (revNo.isEmpty()) revNo = m.group(2);
+				} else {
+					unitNo = tail;
+				}
+			}
+		}
+
+		result.put("parts", partNo);
+		result.put("unitNo", unitNo);
+		result.put("revNo", revNo);
+		return result;
+	}
 
 	@Override
 	public int checkBomInfo(Map<String, String> paramMap) {

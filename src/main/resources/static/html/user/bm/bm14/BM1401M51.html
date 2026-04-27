@@ -1,0 +1,2053 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>설계BOM Workbench (BM1401M51)</title>
+<link rel="icon" href="/static/favicon.ico" type="image/x-icon">
+
+<!-- 기존 공통 스타일/스크립트 (인증/공통 함수 사용을 위해 유지) -->
+<link rel="stylesheet" href="/static/bootstrap/css/bootstrap.min.css">
+<link rel="stylesheet" href="/static/fontawesome/css/all.css">
+<link rel="stylesheet" href="/static/css/gnb.css">
+<link rel="stylesheet" href="/static/css/main.css">
+<link rel="stylesheet" href="/static/css/sub.css">
+<link rel="stylesheet" href="/static/css/common.css">
+
+<!-- TOAST UI Grid (TreeTable) -->
+<link rel="stylesheet" href="/static/css/tui-grid/4.21.22/tui-grid.css" />
+
+<script src="/static/js/jquery-latest.min.js"></script>
+<script src="/static/bootstrap/js/bootstrap.min.js"></script>
+<script src="/static/js/global.js"></script>
+<script src="/static/js/jquery.blockUI.js"></script>
+<script src="/static/js/tui-grid/4.21.22/tui-grid.min.js"></script>
+<script src="https://unpkg.com/exceljs/dist/exceljs.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
+<script src="/static/js/ax5/ax5core.min.js"></script>
+
+<style>
+/* =====================================================================
+   Design Tokens — Light/Dark, density, spacing
+   ===================================================================== */
+:root {
+  --bg: #ffffff;
+  --bg-soft: #f7f8fa;
+  --bg-elev: #ffffff;
+  --bg-row-hover: #f1f5f9;
+  --bg-row-selected: #e0ecff;
+  --bg-row-dirty: #fff7d6;
+  --bg-row-conflict: #ffe1e1;
+  --fg: #0f172a;
+  --fg-muted: #64748b;
+  --fg-inverse: #ffffff;
+  --line: #e2e8f0;
+  --line-strong: #cbd5e1;
+  --accent: #2563eb;
+  --accent-soft: #dbeafe;
+  --danger: #dc2626;
+  --warn: #d97706;
+  --ok: #059669;
+  --spare: #4f46e5;
+  --lock: #64748b;
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 10px;
+  --shadow-sm: 0 1px 2px rgba(15,23,42,.06);
+  --shadow-md: 0 4px 12px rgba(15,23,42,.10);
+  --shadow-lg: 0 12px 32px rgba(15,23,42,.18);
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --font-mono: ui-monospace,Consolas,Menlo,monospace;
+  --topbar-h: 52px;
+  --statusbar-h: 28px;
+  --inspector-w: 420px;
+  --transition: 160ms cubic-bezier(.2,.7,.3,1);
+}
+html[data-theme="dark"] {
+  --bg: #0b1220;
+  --bg-soft: #0f172a;
+  --bg-elev: #111a2e;
+  --bg-row-hover: #18233b;
+  --bg-row-selected: #1e3a8a;
+  --bg-row-dirty: #3a2f12;
+  --bg-row-conflict: #4a1d1d;
+  --fg: #e2e8f0;
+  --fg-muted: #94a3b8;
+  --line: #1e293b;
+  --line-strong: #334155;
+  --accent: #60a5fa;
+  --accent-soft: #1e3a8a;
+}
+
+/* =====================================================================
+   Layout
+   ===================================================================== */
+html,body { height:100%; }
+body {
+  margin:0; background:var(--bg); color:var(--fg);
+  font: 13px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+}
+#bom-app {
+  display:grid;
+  grid-template-rows: var(--topbar-h) 1fr var(--statusbar-h);
+  grid-template-columns: 1fr var(--inspector-w);
+  grid-template-areas:
+    "topbar    topbar"
+    "main      inspector"
+    "statusbar statusbar";
+  height: 100vh; overflow: hidden;
+}
+#bom-app[data-inspector="closed"] { grid-template-columns: 1fr 0; }
+#bom-app[data-inspector="closed"] #bom-inspector { display:none; }
+
+/* TopBar */
+#bom-topbar {
+  grid-area: topbar; display:flex; align-items:center; gap: var(--space-3);
+  padding: 0 var(--space-4); border-bottom: 1px solid var(--line); background: var(--bg-elev);
+}
+#bom-topbar .brand { font-weight: 700; letter-spacing: -.01em; margin-right: var(--space-2); display:flex; align-items:center; gap:6px;}
+#bom-topbar .brand .pill { font-size:11px; padding:2px 6px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); }
+#bom-topbar input, #bom-topbar select {
+  height: 32px; padding: 0 var(--space-2); border:1px solid var(--line-strong);
+  background: var(--bg); color:var(--fg); border-radius: var(--radius-md); font-size:13px;
+}
+#bom-topbar input:focus, #bom-topbar select:focus { outline:2px solid var(--accent); outline-offset:1px;}
+#bom-topbar .grow { flex:1; }
+#bom-topbar .icon-btn {
+  display:inline-flex; align-items:center; justify-content:center; gap:6px;
+  height:32px; padding: 0 var(--space-3); border-radius: var(--radius-md); border:1px solid var(--line-strong);
+  background: var(--bg); color: var(--fg); cursor: pointer;
+}
+#bom-topbar .icon-btn:hover { background: var(--bg-row-hover);}
+#bom-topbar .icon-btn[data-active="true"] { background: var(--accent-soft); color: var(--accent); border-color: transparent;}
+
+/* Main / TreeTable */
+#bom-main { grid-area: main; position: relative; overflow:hidden; background: var(--bg-soft); }
+#bom-tree-host { position:absolute; inset:0; }
+.tui-grid-row-spare-self    > .tui-grid-cell { background: rgba(79,70,229,.06) !important; }
+.tui-grid-row-spare-9000    > .tui-grid-cell { background: rgba(79,70,229,.04) !important; }
+.tui-grid-row-locked        > .tui-grid-cell { color: var(--fg-muted) !important; }
+.tui-grid-row-deleted       > .tui-grid-cell { text-decoration: line-through; color: var(--fg-muted) !important; }
+.tui-grid-row-confirmed     > .tui-grid-cell { background: rgba(5,150,105,.05) !important; }
+.tui-grid-row-conflict      > .tui-grid-cell { background: var(--bg-row-conflict) !important; }
+.tui-grid-row-dirty         > .tui-grid-cell { background: var(--bg-row-dirty) !important; }
+
+/* Inspector Drawer */
+#bom-inspector {
+  grid-area: inspector; border-left:1px solid var(--line); background: var(--bg-elev);
+  display:flex; flex-direction: column; min-width: 0; overflow: hidden; transition: width var(--transition);
+}
+#bom-inspector header {
+  display:flex; align-items:center; gap: var(--space-2);
+  padding: var(--space-3) var(--space-4); border-bottom: 1px solid var(--line);
+}
+#bom-inspector header h2 { font-size: 14px; margin: 0; flex:1; }
+#bom-inspector .insp-body { padding: var(--space-3) var(--space-4); overflow:auto; flex: 1; }
+#bom-inspector .field { display:flex; flex-direction: column; margin-bottom: var(--space-3);}
+#bom-inspector .field > label { font-size:11px; color: var(--fg-muted); margin-bottom:2px;}
+#bom-inspector .field > input,
+#bom-inspector .field > textarea,
+#bom-inspector .field > select {
+  border:1px solid var(--line-strong); background: var(--bg); color: var(--fg);
+  padding: 6px 8px; border-radius: var(--radius-sm); font-size: 13px; font-family: inherit;
+}
+#bom-inspector .field-row { display:grid; grid-template-columns: 1fr 1fr; gap: var(--space-2);}
+#bom-inspector .insp-actions {
+  display:flex; gap: var(--space-2); padding: var(--space-3) var(--space-4);
+  border-top: 1px solid var(--line); background: var(--bg-soft);
+}
+#bom-inspector .insp-actions button { flex:1; }
+#bom-inspector .audit { font-size:11px; color: var(--fg-muted); }
+#bom-inspector .audit b { color: var(--fg); }
+
+/* Status Bar */
+#bom-statusbar {
+  grid-area: statusbar; display:flex; align-items:center; gap: var(--space-4);
+  padding: 0 var(--space-4); border-top:1px solid var(--line); background: var(--bg-elev); font-size:12px;
+}
+#bom-statusbar .stat { color: var(--fg-muted);}
+#bom-statusbar .stat b { color: var(--fg); margin-left: 4px;}
+#bom-statusbar .progress {
+  flex:1; height:4px; background: var(--line); border-radius: 999px; overflow:hidden; max-width: 240px;
+}
+#bom-statusbar .progress > i { display:block; height:100%; width: 0%; background: var(--accent); transition: width .15s;}
+
+/* Common buttons */
+button.btn {
+  height: 32px; padding: 0 var(--space-3); border-radius: var(--radius-md); border:1px solid var(--line-strong);
+  background: var(--bg); color: var(--fg); cursor: pointer; font-size:13px;
+}
+button.btn:hover { background: var(--bg-row-hover);}
+button.btn-primary { background: var(--accent); color: var(--fg-inverse); border-color: transparent;}
+button.btn-primary:hover { filter: brightness(1.05);}
+button.btn-danger  { background: var(--danger); color: var(--fg-inverse); border-color: transparent;}
+button.btn-ghost   { border-color: transparent; background: transparent;}
+button[disabled], button[aria-disabled="true"] { opacity: .5; pointer-events: none; }
+
+/* Badges */
+.badge {
+  display:inline-flex; align-items:center; gap:3px; height:20px; padding: 0 6px;
+  border-radius: 999px; font-size: 11px; line-height: 20px; white-space:nowrap;
+}
+.badge i { font-style: normal; }
+.badge-spare    { background: rgba(79,70,229,.10); color: var(--spare); }
+.badge-lock     { background: rgba(100,116,139,.12); color: var(--lock); }
+.badge-confirm  { background: rgba(5,150,105,.10); color: var(--ok);    }
+.badge-zero     { background: rgba(217,119,6,.10); color: var(--warn);  }
+.badge-delete   { background: rgba(220,38,38,.10); color: var(--danger);}
+
+/* Command Palette */
+dialog.bom-dialog {
+  border: 1px solid var(--line); border-radius: var(--radius-lg);
+  padding: 0; background: var(--bg-elev); color: var(--fg); box-shadow: var(--shadow-lg);
+  width: min(560px, 90vw); max-height: 70vh;
+}
+dialog.bom-dialog::backdrop { background: rgba(15,23,42,.45); }
+dialog.bom-dialog .pal-input {
+  width: 100%; padding: 14px 18px; font-size: 15px;
+  border: 0; border-bottom: 1px solid var(--line); background: transparent; color: inherit;
+}
+dialog.bom-dialog .pal-input:focus { outline: none; }
+dialog.bom-dialog .pal-list { max-height: 50vh; overflow:auto; padding: 6px; }
+dialog.bom-dialog .pal-item {
+  display:flex; align-items:center; gap: var(--space-3);
+  padding: 8px 12px; border-radius: var(--radius-md); cursor: pointer;
+}
+dialog.bom-dialog .pal-item[data-active="true"], dialog.bom-dialog .pal-item:hover { background: var(--bg-row-hover); }
+dialog.bom-dialog .pal-item .pal-key { margin-left: auto; color: var(--fg-muted); font-family: var(--font-mono); font-size: 11px; }
+dialog.bom-dialog .pal-item .pal-cap { font-size:11px; color: var(--fg-muted); }
+
+/* Generic Wizard Dialog */
+dialog.bom-wizard { width: min(720px, 95vw); }
+dialog.bom-wizard header { padding: var(--space-3) var(--space-4); border-bottom: 1px solid var(--line); display:flex; align-items:center; gap: var(--space-3);}
+dialog.bom-wizard header h2 { font-size: 14px; margin:0; flex:1; }
+dialog.bom-wizard .wiz-body { padding: var(--space-4); max-height: 70vh; overflow:auto; }
+dialog.bom-wizard footer { padding: var(--space-3) var(--space-4); border-top: 1px solid var(--line); display:flex; gap: var(--space-2); justify-content:flex-end;}
+.wiz-stepper { display:flex; gap: var(--space-2); margin-bottom: var(--space-3);}
+.wiz-stepper > div {
+  flex:1; padding: 6px 10px; border-radius: var(--radius-md); border: 1px solid var(--line);
+  font-size: 12px; color: var(--fg-muted); text-align:center;
+}
+.wiz-stepper > div[data-active="true"] { color: var(--accent); border-color: var(--accent); background: var(--accent-soft);}
+.diff-table { width:100%; border-collapse: collapse; font-size: 12px;}
+.diff-table th, .diff-table td { border-bottom:1px solid var(--line); padding: 4px 6px; text-align:left;}
+.diff-table tr.row-add td { background: rgba(5,150,105,.06); }
+.diff-table tr.row-mod td { background: rgba(217,119,6,.06); }
+.diff-table tr.row-del td { background: rgba(220,38,38,.06); }
+
+/* Drop Zone (excel) */
+.drop-zone {
+  border: 2px dashed var(--line-strong); border-radius: var(--radius-lg);
+  padding: var(--space-5); text-align:center; color: var(--fg-muted); transition: var(--transition);
+}
+.drop-zone[data-active="true"] { border-color: var(--accent); background: var(--accent-soft); color: var(--accent);}
+.excel-preview { margin-top: var(--space-3); border:1px solid var(--line); border-radius: var(--radius-md); max-height: 280px; overflow:auto;}
+
+/* Toasts */
+#bom-toasts {
+  position: fixed; right: 16px; bottom: 36px; display:flex; flex-direction: column; gap: 8px;
+  z-index: 9999; pointer-events: none;
+}
+#bom-toasts .toast {
+  pointer-events: auto;
+  background: var(--bg-elev); color: var(--fg); border:1px solid var(--line); border-left: 3px solid var(--accent);
+  border-radius: var(--radius-md); box-shadow: var(--shadow-md);
+  padding: 10px 12px; font-size: 13px; max-width: 360px;
+}
+#bom-toasts .toast.error { border-left-color: var(--danger); }
+#bom-toasts .toast.warn  { border-left-color: var(--warn); }
+#bom-toasts .toast.ok    { border-left-color: var(--ok); }
+
+/* Coach mark / hint pill */
+.kbd {
+  display:inline-block; min-width:14px; padding: 0 6px; height: 18px; line-height: 18px;
+  font-family: var(--font-mono); font-size: 11px;
+  border:1px solid var(--line-strong); border-bottom-width: 2px; border-radius: 4px;
+  background: var(--bg); color: var(--fg-muted);
+}
+
+/* Capability gate */
+[data-cap-hidden="true"] { display:none !important; }
+[data-cap-disabled="true"] { opacity: .55; pointer-events:none; }
+
+/* Compact density toggle */
+html[data-density="compact"] body { font-size: 12px; }
+html[data-density="compact"] :root { --topbar-h: 44px; --statusbar-h: 24px; }
+</style>
+</head>
+<body>
+<div id="bom-app" data-inspector="closed">
+  <header id="bom-topbar" role="banner">
+    <div class="brand">
+      <i class="fa fa-cubes" aria-hidden="true"></i>
+      설계BOM Workbench
+      <span class="pill">M51</span>
+    </div>
+    <select id="bom-coCd" data-kind="CO" aria-label="회사" required></select>
+    <input id="bom-salesCd" type="text" placeholder="Sales Code (Enter 검색)" aria-label="Sales Code" style="width:200px"/>
+    <button class="icon-btn" id="bom-search-btn" title="검색 (Enter)"><i class="fa fa-search"></i> 검색</button>
+    <span class="grow"></span>
+    <button class="icon-btn" id="bom-toggle-density" title="간격 토글"><i class="fa fa-text-height"></i></button>
+    <button class="icon-btn" id="bom-toggle-theme" title="테마 토글"><i class="fa fa-moon"></i></button>
+    <button class="icon-btn" id="bom-toggle-inspector" title="Inspector 토글 (Space)" data-active="false"><i class="fa fa-columns"></i></button>
+    <button class="icon-btn" id="bom-open-palette" title="명령 팔레트 (Ctrl+K)"><i class="fa fa-magic"></i> Palette <span class="kbd">Ctrl K</span></button>
+  </header>
+
+  <main id="bom-main" role="main">
+    <div id="bom-tree-host"></div>
+  </main>
+
+  <aside id="bom-inspector" aria-label="선택 행 상세">
+    <header>
+      <h2 id="bom-insp-title">선택된 행 없음</h2>
+      <button class="btn btn-ghost" id="bom-insp-audit-btn" title="이력 보기"><i class="fa fa-history"></i></button>
+      <button class="btn btn-ghost" id="bom-insp-close-btn" title="닫기"><i class="fa fa-times"></i></button>
+    </header>
+    <div class="insp-body" id="bom-insp-body"></div>
+    <div class="insp-actions">
+      <button class="btn" id="bom-insp-cancel-btn">취소</button>
+      <button class="btn btn-primary" id="bom-insp-save-btn" data-cap="bom.edit">저장</button>
+    </div>
+  </aside>
+
+  <footer id="bom-statusbar" role="contentinfo">
+    <span class="stat">행수<b id="stat-rows">0</b></span>
+    <span class="stat">선택<b id="stat-selected">0</b></span>
+    <span class="stat">금액<b id="stat-amt">0</b></span>
+    <span class="stat">중량<b id="stat-wt">0</b></span>
+    <span class="stat">잠금<b id="stat-lock">0</b></span>
+    <span class="stat">Spare<b id="stat-spare">0</b></span>
+    <span class="grow"></span>
+    <span class="stat" id="stat-progress-label" style="display:none">진행</span>
+    <span class="progress" id="stat-progress" style="display:none"><i></i></span>
+  </footer>
+</div>
+
+<!-- Command Palette dialog -->
+<dialog id="bom-palette" class="bom-dialog" aria-label="명령 팔레트">
+  <input class="pal-input" id="pal-input" placeholder="명령 검색…" autocomplete="off"/>
+  <div class="pal-list" id="pal-list" role="listbox"></div>
+</dialog>
+
+<!-- Paste Preview dialog -->
+<dialog id="bom-paste-preview" class="bom-dialog bom-wizard">
+  <header><h2>붙여넣기 미리보기</h2><button class="btn btn-ghost" data-close-dialog>닫기</button></header>
+  <div class="wiz-body" id="paste-preview-body"></div>
+  <footer>
+    <button class="btn" data-close-dialog>취소</button>
+    <button class="btn btn-primary" id="paste-confirm-btn" data-cap="bom.edit">확정 적용</button>
+  </footer>
+</dialog>
+
+<!-- Clone Wizard dialog -->
+<dialog id="bom-clone-wizard" class="bom-dialog bom-wizard">
+  <header><h2>SalesCode 단위 복사</h2><button class="btn btn-ghost" data-close-dialog>닫기</button></header>
+  <div class="wiz-body">
+    <div class="wiz-stepper">
+      <div data-step="1" data-active="true">1. Source</div>
+      <div data-step="2">2. Target</div>
+      <div data-step="3">3. Dry-run</div>
+    </div>
+    <div id="clone-step-1">
+      <div class="field"><label>원본 회사</label><input id="clone-src-co" readonly/></div>
+      <div class="field"><label>원본 Sales Code</label><input id="clone-src-sc"/></div>
+    </div>
+    <div id="clone-step-2" hidden>
+      <div class="field"><label>대상 Sales Code</label><input id="clone-dst-sc"/></div>
+      <div class="field"><label><input id="clone-changeYn" type="checkbox"/> 도면번호 SalesCode 치환</label></div>
+      <div class="field"><label><input id="clone-keepSpare" type="checkbox" checked/> Spare(추천) 플래그 유지</label></div>
+      <div class="field"><label><input id="clone-keepConfirm" type="checkbox"/> 작업완료 플래그 유지</label></div>
+      <div id="clone-target-info" style="font-size:12px;color:var(--fg-muted);margin-top:8px"></div>
+    </div>
+    <div id="clone-step-3" hidden>
+      <div id="clone-dry-summary" style="margin-bottom:8px;color:var(--fg-muted);"></div>
+      <div style="max-height:40vh;overflow:auto;border:1px solid var(--line);border-radius:6px;">
+        <table class="diff-table" id="clone-diff-table"><thead><tr><th>구분</th><th>경로</th><th>코드</th><th>품명</th></tr></thead><tbody></tbody></table>
+      </div>
+    </div>
+  </div>
+  <footer>
+    <button class="btn" id="clone-back-btn" disabled>이전</button>
+    <button class="btn" data-close-dialog>취소</button>
+    <button class="btn btn-primary" id="clone-next-btn">다음</button>
+    <button class="btn btn-primary" id="clone-apply-btn" hidden data-cap="bom.clone">적용</button>
+  </footer>
+</dialog>
+
+<!-- Excel Wizard dialog -->
+<dialog id="bom-excel-wizard" class="bom-dialog bom-wizard">
+  <header><h2>엑셀 업로드</h2><button class="btn btn-ghost" data-close-dialog>닫기</button></header>
+  <div class="wiz-body">
+    <div class="drop-zone" id="excel-dropzone">
+      파일을 여기로 끌어오세요. 또는 <button class="btn" id="excel-pick-btn">파일 선택</button>
+      <input id="excel-file-input" type="file" accept=".xlsx,.xls" hidden/>
+      <div style="margin-top:8px;font-size:12px;">파싱은 백그라운드 Worker 에서 진행됩니다.</div>
+    </div>
+    <div class="excel-preview" id="excel-preview" hidden></div>
+    <div id="excel-stage-result" style="margin-top:8px;font-size:12px;color:var(--fg-muted);"></div>
+  </div>
+  <footer>
+    <button class="btn" data-close-dialog>취소</button>
+    <button class="btn" id="excel-stage-btn" disabled data-cap="bom.excel.apply">스테이징 검증</button>
+    <button class="btn btn-primary" id="excel-apply-btn" disabled data-cap="bom.excel.apply">확정 적용</button>
+  </footer>
+</dialog>
+
+<!-- Conflict Merge dialog -->
+<dialog id="bom-conflict-dialog" class="bom-dialog bom-wizard">
+  <header><h2>충돌 — 다른 사용자가 먼저 변경했습니다</h2><button class="btn btn-ghost" data-close-dialog>닫기</button></header>
+  <div class="wiz-body" id="conflict-body"></div>
+  <footer>
+    <button class="btn" data-close-dialog>닫기</button>
+    <button class="btn btn-primary" id="conflict-overwrite-btn">내 변경으로 덮어쓰기</button>
+  </footer>
+</dialog>
+
+<!-- Audit dialog -->
+<dialog id="bom-audit-dialog" class="bom-dialog bom-wizard">
+  <header><h2>변경 이력</h2><button class="btn btn-ghost" data-close-dialog>닫기</button></header>
+  <div class="wiz-body" id="audit-body" style="font-family:var(--font-mono);font-size:12px;"></div>
+</dialog>
+
+<div id="bom-toasts" aria-live="polite"></div>
+
+<!-- =====================================================================
+     Application script — JSDoc + @ts-check, 어떤 변수도 any/unknown 미사용.
+     모든 외부 호출은 typedef 로 명시된 도메인 타입만 받는다.
+     ===================================================================== -->
+<script type="module">
+// @ts-check
+"use strict";
+
+/* ---------- Typedefs (도메인 모델) ---------- */
+/**
+ * @typedef {Object} BomNode
+ * @property {string}  id          jstree id == LOWER_KEY (string)
+ * @property {string}  parent      jstree parent == UPPER_KEY ('#' = root)
+ * @property {string}  fileTrgtKey
+ * @property {string}  upperKey
+ * @property {string}  lowerKey
+ * @property {string}  upperCd
+ * @property {string}  lowerCd
+ * @property {string}  matrCd
+ * @property {string}  matrNm
+ * @property {string}  matrMno
+ * @property {string}  matrSpec
+ * @property {string}  matrMat
+ * @property {string}  matrRmk
+ * @property {string}  dsgnNo
+ * @property {number}  lowerQty
+ * @property {string}  lowerUnit
+ * @property {number}  matrUpr
+ * @property {number}  partAmt
+ * @property {number}  matrAvrgUpr
+ * @property {string}  matrLastTrstDt
+ * @property {number}  matrWt
+ * @property {string}  matrUnitCdNm
+ * @property {number}  lvl
+ * @property {string}  matrYn
+ * @property {string}  etcField3
+ * @property {string}  cnfCheck
+ * @property {number}  pchsBomCnt
+ * @property {string}  creatIdNm
+ * @property {string}  creatDttm
+ * @property {string}  udtIdNm
+ * @property {string}  udtDttm
+ * @property {string}  type   // 'leaf' | 'unit' | 'unit-open'
+ * @property {string=} version
+ * @property {string=} updChk // 'I' | 'U' | 'D'
+ */
+
+/**
+ * @typedef {Object} GridRow
+ * @property {string} _key   고유 행 키 (=fileTrgtKey or 임시키)
+ * @property {string|null} _parent
+ * @property {boolean} _hasChildren
+ * @property {string} state    "" | "spare-self" | "spare-9000" | "locked" | "deleted" | "confirmed" | "conflict" | "dirty"
+ * @property {BomNode} node
+ * @property {string} updChk
+ * @property {boolean} dirty
+ */
+
+/**
+ * @typedef {Object} CapabilitySet
+ * @property {boolean} read
+ * @property {boolean} edit
+ * @property {boolean} delete_
+ * @property {boolean} confirm
+ * @property {boolean} spare
+ * @property {boolean} clone
+ * @property {boolean} excelApply
+ */
+
+/**
+ * @typedef {Object} DiffSet
+ * @property {GridRow[]} created
+ * @property {GridRow[]} updated
+ * @property {string[]}  deleted
+ */
+
+/**
+ * @typedef {Object} ApiOk
+ * @property {true} ok
+ * @property {Object} data
+ * @property {DiffSet=} diff
+ * @property {string=} serverTime
+ */
+/**
+ * @typedef {Object} ApiErr
+ * @property {false} ok
+ * @property {{code:string,message:string,hint?:string,fields?:string[]}} error
+ */
+/** @typedef {ApiOk|ApiErr} ApiResult */
+
+/* ---------- Utility: typed JSON / DOM helpers ---------- */
+/**
+ * @template T
+ * @param {string} s
+ * @returns {T}
+ */
+function parseJson(s) { return /** @type {T} */ (JSON.parse(s)); }
+
+/** @param {string} sel @returns {HTMLElement} */
+function $el(sel) {
+  const el = document.querySelector(sel);
+  if (!el) throw new Error("DOM element missing: " + sel);
+  return /** @type {HTMLElement} */ (el);
+}
+/** @param {string} sel @returns {HTMLInputElement} */
+function $input(sel) { return /** @type {HTMLInputElement} */ ($el(sel)); }
+/** @param {string} sel @returns {HTMLDialogElement} */
+function $dialog(sel) { return /** @type {HTMLDialogElement} */ ($el(sel)); }
+/** @param {string} sel @returns {HTMLButtonElement} */
+function $btn(sel) { return /** @type {HTMLButtonElement} */ ($el(sel)); }
+
+/** @param {string} html @returns {string} */
+function escapeHtml(html) {
+  return html.replace(/[&<>"']/g, (c) => /** @type {Record<string,string>} */ ({
+    "&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"
+  })[c]);
+}
+
+/** @param {number} n @returns {string} */
+function fmtMoney(n) { return n.toLocaleString("ko-KR"); }
+
+/* ---------- Capabilities ---------- */
+/** @returns {CapabilitySet} */
+function defaultCapabilities() {
+  // 백엔드 v2/me/capabilities 미배포 시 fallback: 기존 authChk 로직과 호환.
+  // 안전 기본값: 읽기만 허용. authChk 결과로 단계적 활성화.
+  return {
+    read: true, edit: false, delete_: false, confirm: false,
+    spare: false, clone: false, excelApply: false
+  };
+}
+
+/** @type {CapabilitySet} */
+let CAPS = defaultCapabilities();
+
+/** v2 백엔드 가용성 — 기본 false. v2 (`/user/bm/bm14/v2/*`) 배포 후 true 로 전환.
+ *  세션스토리지에 'bom.v2=on' 이 있으면 즉시 활성화 (개발/QA용 토글). */
+let V2_AVAILABLE = sessionStorage.getItem("bom.v2") === "on";
+
+/** @returns {Promise<void>} */
+async function loadCapabilities() {
+  /** @type {CapabilitySet} */
+  const grantAll = { read:true, edit:true, delete_:true, confirm:true, spare:true, clone:true, excelApply:true };
+  if (!V2_AVAILABLE) { CAPS = grantAll; applyCapabilityGates(); return; }
+  try {
+    // HEAD-style 가벼운 확인 — 응답 status 만 본다.
+    const res = await fetch("/user/bm/bm14/v2/me/capabilities", { credentials:"include" });
+    if (res.status === 404) {
+      V2_AVAILABLE = false;
+      CAPS = grantAll;
+    } else if (res.ok) {
+      const json = /** @type {{capabilities:string[]}} */ (await res.json());
+      const set = new Set(json.capabilities ?? []);
+      CAPS = {
+        read: set.has("bom.read"),
+        edit: set.has("bom.edit"),
+        delete_: set.has("bom.delete"),
+        confirm: set.has("bom.confirm"),
+        spare: set.has("bom.spare"),
+        clone: set.has("bom.clone"),
+        excelApply: set.has("bom.excel.apply")
+      };
+    } else {
+      CAPS = grantAll;
+    }
+  } catch (_e) {
+    CAPS = grantAll;
+  }
+  applyCapabilityGates();
+}
+
+function applyCapabilityGates() {
+  /** @type {NodeListOf<HTMLElement>} */
+  const nodes = document.querySelectorAll("[data-cap]");
+  nodes.forEach((node) => {
+    const cap = node.getAttribute("data-cap") ?? "";
+    /** @type {boolean} */
+    let allowed = true;
+    if (cap === "bom.edit") allowed = CAPS.edit;
+    else if (cap === "bom.delete") allowed = CAPS.delete_;
+    else if (cap === "bom.confirm") allowed = CAPS.confirm;
+    else if (cap === "bom.spare") allowed = CAPS.spare;
+    else if (cap === "bom.clone") allowed = CAPS.clone;
+    else if (cap === "bom.excel.apply") allowed = CAPS.excelApply;
+    node.setAttribute("data-cap-disabled", allowed ? "false" : "true");
+  });
+}
+
+/** @param {string} cap @returns {boolean} */
+function can(cap) {
+  if (cap === "bom.edit") return CAPS.edit;
+  if (cap === "bom.delete") return CAPS.delete_;
+  if (cap === "bom.confirm") return CAPS.confirm;
+  if (cap === "bom.spare") return CAPS.spare;
+  if (cap === "bom.clone") return CAPS.clone;
+  if (cap === "bom.excel.apply") return CAPS.excelApply;
+  return true;
+}
+
+/* ---------- bomClient: fetch wrapper with Idempotency + If-Match ---------- */
+/** @returns {string} */
+function newRequestId() {
+  const s = "xxxxxxxxxxxx4xxxyxxxxxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === "x" ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+  return s;
+}
+
+/**
+ * @template T
+ * @param {string} path
+ * @param {Object} body
+ * @param {{ ifMatch?:string, idempotent?:boolean, signal?:AbortSignal }=} opt
+ * @returns {Promise<T>}
+ */
+async function postJson(path, body, opt) {
+  /** @type {Record<string,string>} */
+  const headers = { "Content-Type":"application/json" };
+  if (opt?.ifMatch) headers["If-Match"] = opt.ifMatch;
+  if (opt?.idempotent !== false) headers["Idempotency-Key"] = newRequestId();
+  const res = await fetch(path, {
+    method:"POST", credentials:"include", headers, body: JSON.stringify(body), signal: opt?.signal
+  });
+  if (res.status === 409) {
+    const txt = await res.text();
+    throw new ConflictError(txt);
+  }
+  if (!res.ok) {
+    throw new Error("HTTP " + res.status + " " + res.statusText);
+  }
+  const text = await res.text();
+  return /** @type {T} */ (text.length ? JSON.parse(text) : {});
+}
+
+class ConflictError extends Error {
+  /** @param {string} body */
+  constructor(body) { super("CONFLICT"); this.body = body; }
+}
+
+/* ---------- API binding (v2 우선, fallback v1) ---------- */
+/**
+ * @param {{coCd:string,salesCd:string}} q
+ * @returns {Promise<BomNode[]>}
+ */
+async function apiTreeAll(q) {
+  if (V2_AVAILABLE) {
+    try {
+      /** @type {{result: BomNode[]}} */
+      const v2 = await postJson("/user/bm/bm14/v2/tree", q);
+      if (v2 && v2.result) return v2.result;
+    } catch (e) {
+      // 404 면 v2 비활성 처리하고 다음부턴 v1 만 호출
+      if (e instanceof Error && /HTTP 404/.test(e.message)) V2_AVAILABLE = false;
+      // 다른 오류면 그대로 v1 fallback
+    }
+  }
+  /** @type {{result: BomNode[]}} */
+  const v1 = await postJson("/user/bm/bm14/selectBomTreeList", q);
+  return v1.result ?? [];
+}
+
+/**
+ * @param {{coCd:string,salesCd:string,fileTrgtKey:string,userId:string}} q
+ * @returns {Promise<BomNode[]>}
+ */
+async function apiDescendants(q) {
+  /** @type {{result: BomNode[]}} */
+  const v1 = await postJson("/user/bm/bm14/selectBomAllLevelList", q);
+  return v1.result ?? [];
+}
+
+/**
+ * @param {Object[]} items
+ * @returns {Promise<{resultCode:number,resultMessage:string}>}
+ */
+async function apiCopyTree(items) {
+  /** @type {{resultCode:number,resultMessage:string}} */
+  const r = await postJson("/user/bm/bm14/copyBomTree", items);
+  return r;
+}
+
+/**
+ * @param {{coCd:string,salesCd:string,fileTrgtKey:string,upperKey:string,lowerKey:string}} q
+ * @returns {Promise<{resultCode:number,resultMessage:string}>}
+ */
+async function apiDelete(q) {
+  return await postJson("/user/bm/bm14/deleteBom", q);
+}
+
+/**
+ * @param {{coCd:string,salesCd:string,cnfCheck:string,lowerKey:string}} q
+ * @returns {Promise<{resultCode:number,resultMessage:string}>}
+ */
+async function apiConfirm(q) {
+  return await postJson("/user/bm/bm14/confirmBom", q);
+}
+
+/**
+ * @param {Object[]} items
+ * @returns {Promise<{resultCode:number,resultMessage:string}>}
+ */
+async function apiRecommend(items) {
+  return await postJson("/user/bm/bm14/recommendBom", { recommendArr: JSON.stringify(items) });
+}
+
+/**
+ * @param {{coCd:string,salesCdTo:string}} q
+ * @returns {Promise<{resultCode:number,resultMessage:string,result?:Object}>}
+ */
+async function apiCheckClone(q) {
+  return await postJson("/user/bm/bm14/checkBomInfo", q);
+}
+
+/* ---------- App State ---------- */
+/**
+ * @typedef {Object} AppState
+ * @property {string} coCd
+ * @property {string} salesCd
+ * @property {GridRow[]} rows
+ * @property {string|null} selectedKey
+ * @property {Map<string,GridRow>} index   key → row
+ * @property {Map<string,GridRow>} dirtyMap
+ */
+
+/** @type {AppState} */
+const STATE = {
+  coCd: "",
+  salesCd: "",
+  rows: [],
+  selectedKey: null,
+  index: new Map(),
+  dirtyMap: new Map()
+};
+
+/* ---------- TOAST UI Grid TreeTable ---------- */
+/* tui.Grid 는 글로벌 namespace 로 노출됨. */
+/** @typedef {string|number|boolean|null} CellValue */
+/** TS-friendly minimal interface */
+/**
+ * @typedef {Object} TuiGridLike
+ * @property {(rows:object[])=>void} resetData
+ * @property {(rowKey:string|number, columnName:string, value:CellValue)=>void} setValue
+ * @property {(rowKey:string|number)=>object} getRow
+ * @property {()=>object[]} getData
+ * @property {(rowKey:string|number, className:string)=>void} addRowClassName
+ * @property {(rowKey:string|number, className:string)=>void} removeRowClassName
+ * @property {(eventName:string, listener:(ev:object)=>void)=>void} on
+ * @property {(rowKey:string|number)=>void} focusAt
+ * @property {()=>{rowKey:string|number,columnName:string}|null} getFocusedCell
+ * @property {(rowKey:string|number)=>object[]} getDescendantRows
+ * @property {(rowKey:string|number)=>void} expand
+ * @property {(rowKey:string|number)=>void} collapse
+ * @property {(rowKey:string|number)=>void} setSelectionRange
+ */
+
+/** @type {TuiGridLike|null} */
+let GRID = null;
+
+function buildGrid() {
+  /** @type {{Grid?: { new(opts:object):TuiGridLike }}} */
+  const tuiNs = /** @type {Window & {tui?:{Grid:{new(opts:object):TuiGridLike}}}} */ (window).tui ?? {};
+  if (!tuiNs.Grid) throw new Error("tui.Grid not loaded");
+
+  // _state 컬럼은 rowToTuiRow 단계에서 이미 HTML 문자열로 채워둔다.
+  const stateFormatter = /** @param {{value:CellValue}} ctx */ (ctx) => {
+    return typeof ctx.value === "string" ? ctx.value : "";
+  };
+
+  const moneyFmt = /** @param {{value:CellValue}} ctx */ (ctx) => {
+    const v = typeof ctx.value === "number" ? ctx.value : Number(ctx.value ?? 0);
+    return Number.isFinite(v) ? fmtMoney(v) : "";
+  };
+
+  GRID = new tuiNs.Grid({
+    el: $el("#bom-tree-host"),
+    bodyHeight: "fitToParent",
+    rowHeight: 30,
+    minRowHeight: 28,
+    scrollX: true, scrollY: true,
+    rowHeaders: ["rowNum","checkbox"],
+    treeColumnOptions: { name: "lowerCd", useIcon: true, useCascadingCheckbox: false },
+    columns: [
+      { name: "lowerCd",   header: "도번코드",      width: 220, editor: { type: "text" } },
+      { name: "_state",    header: "상태",         width: 220, formatter: stateFormatter, escapeHTML: false },
+      { name: "matrNm",    header: "품명",         width: 220, editor: { type: "text" } },
+      { name: "matrMno",   header: "형번/규격",     width: 200, editor: { type: "text" } },
+      { name: "matrMat",   header: "소재/제조사",    width: 140, editor: { type: "text" } },
+      { name: "lowerUnit", header: "단위",         width: 70,  align: "center", editor: { type: "text" } },
+      { name: "lowerQty",  header: "수량",         width: 80,  align: "right", formatter: moneyFmt, editor: { type: "text" } },
+      { name: "matrSpec",  header: "규격",         width: 120, editor: { type: "text" } },
+      { name: "matrRmk",   header: "비고",         width: 200, editor: { type: "text" } },
+      { name: "dsgnNo",    header: "도면번호",      width: 200, editor: { type: "text" } },
+      { name: "matrCd",    header: "자재코드",      width: 110, align: "center" },
+      { name: "lvl",       header: "단계",         width: 60,  align: "center" },
+      { name: "matrUpr",   header: "단가",         width: 100, align: "right", formatter: moneyFmt },
+      { name: "partAmt",   header: "금액",         width: 110, align: "right", formatter: moneyFmt },
+      { name: "matrWt",    header: "단위중량",      width: 90,  align: "right", formatter: moneyFmt },
+      { name: "udtIdNm",   header: "수정",         width: 80,  align: "center" },
+      { name: "udtDttm",   header: "수정일",       width: 120, align: "center" }
+    ]
+  });
+
+  GRID.on("click", (ev) => {
+    const e = /** @type {{rowKey?:string|number}} */ (ev);
+    if (e.rowKey == null) return;
+    const key = String(e.rowKey);
+    selectRow(key);
+  });
+
+  GRID.on("afterChange", (ev) => {
+    const e = /** @type {{changes:{rowKey:string|number,columnName:string,value:CellValue}[]}} */ (ev);
+    for (const ch of e.changes) {
+      markDirty(String(ch.rowKey));
+    }
+    refreshStatusBar();
+  });
+}
+
+/** @param {BomNode[]} nodes @returns {GridRow[]} */
+function nodesToTreeRows(nodes) {
+  /** @type {Map<string,GridRow>} */
+  const idx = new Map();
+  /** @type {GridRow[]} */
+  const out = [];
+  for (const n of nodes) {
+    /** @type {GridRow} */
+    const r = {
+      _key: n.id,
+      _parent: n.parent === "#" ? null : n.parent,
+      _hasChildren: n.type !== "leaf",
+      state: "",
+      node: n,
+      updChk: "",
+      dirty: false
+    };
+    idx.set(r._key, r);
+    out.push(r);
+  }
+  return out;
+}
+
+/**
+ * Tui Grid expects nested {_children:[]} structure.
+ * @param {GridRow[]} flat
+ * @returns {object[]}
+ */
+function toTuiTree(flat) {
+  /** @type {Map<string, object[]>} */
+  const childrenByParent = new Map();
+  /** @type {object[]} */
+  const roots = [];
+  /** @type {Map<string,object>} */
+  const rowObj = new Map();
+  for (const r of flat) {
+    const obj = rowToTuiRow(r);
+    rowObj.set(r._key, obj);
+  }
+  for (const r of flat) {
+    const obj = rowObj.get(r._key);
+    if (!obj) continue;
+    if (r._parent && rowObj.has(r._parent)) {
+      const arr = childrenByParent.get(r._parent) ?? [];
+      arr.push(obj);
+      childrenByParent.set(r._parent, arr);
+    } else {
+      roots.push(obj);
+    }
+  }
+  for (const [pid, kids] of childrenByParent.entries()) {
+    const parent = rowObj.get(pid);
+    if (parent) /** @type {{_children:object[]}} */ (parent)._children = kids;
+  }
+  return roots;
+}
+
+/** @param {GridRow} r @returns {string} */
+function buildStateBadges(r) {
+  const n = r.node;
+  /** @type {string[]} */
+  const badges = [];
+  if (n.pchsBomCnt > 0) badges.push('<span class="badge badge-lock"><i class="fa fa-lock"></i> 구매잠금</span>');
+  if ((n.etcField3 || "").toUpperCase() === "SPARE") badges.push('<span class="badge badge-spare"><i class="fa fa-star"></i> Spare</span>');
+  if (n.cnfCheck === "Y") badges.push('<span class="badge badge-confirm"><i class="fa fa-check"></i> 확정</span>');
+  if (n.lowerQty === 0) badges.push('<span class="badge badge-zero"><i class="fa fa-circle-o"></i> 수량0</span>');
+  if (r.updChk === "D") badges.push('<span class="badge badge-delete"><i class="fa fa-times"></i> 삭제대기</span>');
+  return badges.join(" ");
+}
+
+/** @param {GridRow} r @returns {object} */
+function rowToTuiRow(r) {
+  const n = r.node;
+  return {
+    rowKey: r._key,
+    lowerCd: n.lowerCd, matrNm: n.matrNm, matrMno: n.matrMno, matrMat: n.matrMat,
+    lowerUnit: n.lowerUnit, lowerQty: n.lowerQty, matrSpec: n.matrSpec, matrRmk: n.matrRmk,
+    dsgnNo: n.dsgnNo, matrCd: n.matrCd, lvl: n.lvl, matrUpr: n.matrUpr, partAmt: n.partAmt,
+    matrWt: n.matrWt, udtIdNm: n.udtIdNm, udtDttm: n.udtDttm,
+    _state: buildStateBadges(r),
+    _attributes: { className: { row: classNamesForRow(r) } }
+  };
+}
+
+/** @param {GridRow} r @returns {string[]} */
+function classNamesForRow(r) {
+  /** @type {string[]} */
+  const cls = [];
+  if (r.node.pchsBomCnt > 0) cls.push("tui-grid-row-locked");
+  if ((r.node.etcField3 || "").toUpperCase() === "SPARE") cls.push("tui-grid-row-spare-self");
+  if (r.node.cnfCheck === "Y") cls.push("tui-grid-row-confirmed");
+  if (r.updChk === "D") cls.push("tui-grid-row-deleted");
+  if (r.dirty) cls.push("tui-grid-row-dirty");
+  return cls;
+}
+
+/* ---------- Load & render ---------- */
+/** @returns {Promise<void>} */
+async function loadAndRender() {
+  if (!STATE.coCd || !STATE.salesCd) {
+    toast("warn", "회사/SalesCode 를 입력하세요.");
+    return;
+  }
+  showProgress(true, "조회중…");
+  try {
+    const tree = await apiTreeAll({ coCd: STATE.coCd, salesCd: STATE.salesCd });
+    /** @type {BomNode[]} */
+    const nodes = (tree ?? []).map((n) => normalizeNode(n));
+    STATE.rows = nodesToTreeRows(nodes);
+    rebuildIndex();
+    if (!GRID) buildGrid();
+    if (GRID) GRID.resetData(toTuiTree(STATE.rows));
+    refreshStatusBar();
+    persistUrl();
+  } catch (e) {
+    toast("error", "조회 실패: " + (e instanceof Error ? e.message : "unknown error"));
+  } finally {
+    showProgress(false);
+  }
+}
+
+/** @param {Partial<BomNode>} raw @returns {BomNode} */
+function normalizeNode(raw) {
+  return {
+    id: String(raw.id ?? ""),
+    parent: String(raw.parent ?? "#"),
+    fileTrgtKey: String(raw.fileTrgtKey ?? raw.id ?? ""),
+    upperKey: String(raw.upperKey ?? raw.parent ?? ""),
+    lowerKey: String(raw.lowerKey ?? raw.id ?? ""),
+    upperCd: String(raw.upperCd ?? ""),
+    lowerCd: String(raw.lowerCd ?? ""),
+    matrCd: String(raw.matrCd ?? ""),
+    matrNm: String(raw.matrNm ?? ""),
+    matrMno: String(raw.matrMno ?? ""),
+    matrSpec: String(raw.matrSpec ?? ""),
+    matrMat: String(raw.matrMat ?? ""),
+    matrRmk: String(raw.matrRmk ?? ""),
+    dsgnNo: String(raw.dsgnNo ?? ""),
+    lowerQty: Number(raw.lowerQty ?? 0),
+    lowerUnit: String(raw.lowerUnit ?? ""),
+    matrUpr: Number(raw.matrUpr ?? 0),
+    partAmt: Number(raw.partAmt ?? 0),
+    matrAvrgUpr: Number(raw.matrAvrgUpr ?? 0),
+    matrLastTrstDt: String(raw.matrLastTrstDt ?? ""),
+    matrWt: Number(raw.matrWt ?? 0),
+    matrUnitCdNm: String(raw.matrUnitCdNm ?? ""),
+    lvl: Number(raw.lvl ?? 0),
+    matrYn: String(raw.matrYn ?? ""),
+    etcField3: String(raw.etcField3 ?? ""),
+    cnfCheck: String(raw.cnfCheck ?? ""),
+    pchsBomCnt: Number(raw.pchsBomCnt ?? 0),
+    creatIdNm: String(raw.creatIdNm ?? ""),
+    creatDttm: String(raw.creatDttm ?? ""),
+    udtIdNm: String(raw.udtIdNm ?? ""),
+    udtDttm: String(raw.udtDttm ?? ""),
+    type: String(raw.type ?? "leaf"),
+    version: typeof raw.version === "string" ? raw.version : undefined,
+    updChk: typeof raw.updChk === "string" ? raw.updChk : undefined
+  };
+}
+
+function rebuildIndex() {
+  STATE.index.clear();
+  for (const r of STATE.rows) STATE.index.set(r._key, r);
+}
+
+/** @param {string} key */
+function markDirty(key) {
+  const row = STATE.index.get(key);
+  if (!row) return;
+  row.dirty = true;
+  if (!row.updChk) row.updChk = "U";
+  STATE.dirtyMap.set(key, row);
+  if (GRID) GRID.addRowClassName(key, "tui-grid-row-dirty");
+}
+
+function refreshStatusBar() {
+  let amt = 0, wt = 0, lock = 0, spare = 0;
+  for (const r of STATE.rows) {
+    amt += r.node.partAmt;
+    wt += r.node.matrWt * r.node.lowerQty;
+    if (r.node.pchsBomCnt > 0) lock++;
+    if ((r.node.etcField3 || "").toUpperCase() === "SPARE") spare++;
+  }
+  $el("#stat-rows").textContent = String(STATE.rows.length);
+  $el("#stat-amt").textContent = fmtMoney(Math.round(amt));
+  $el("#stat-wt").textContent = fmtMoney(Math.round(wt));
+  $el("#stat-lock").textContent = String(lock);
+  $el("#stat-spare").textContent = String(spare);
+  $el("#stat-selected").textContent = String(STATE.selectedKey ? 1 : 0);
+}
+
+/* ---------- Inspector (선택 행 편집) ---------- */
+/** @param {string} key */
+function selectRow(key) {
+  STATE.selectedKey = key;
+  const row = STATE.index.get(key);
+  if (!row) return;
+  renderInspector(row);
+  setInspectorOpen(true);
+  refreshStatusBar();
+}
+function renderInspector(/** @type {GridRow} */ row) {
+  const n = row.node;
+  $el("#bom-insp-title").textContent = `${n.lowerCd || "(코드없음)"} — ${n.matrNm || ""}`;
+  $el("#bom-insp-body").innerHTML = `
+    <div class="field-row">
+      <div class="field"><label>도번코드</label><input id="insp-lowerCd" value="${escapeHtml(n.lowerCd)}"></div>
+      <div class="field"><label>자재코드</label><input id="insp-matrCd" value="${escapeHtml(n.matrCd)}" readonly></div>
+    </div>
+    <div class="field"><label>품명</label><input id="insp-matrNm" value="${escapeHtml(n.matrNm)}"></div>
+    <div class="field"><label>형번/규격</label><input id="insp-matrMno" value="${escapeHtml(n.matrMno)}"></div>
+    <div class="field-row">
+      <div class="field"><label>수량</label><input id="insp-lowerQty" type="number" step="0.0001" value="${n.lowerQty}"></div>
+      <div class="field"><label>단위</label><input id="insp-lowerUnit" value="${escapeHtml(n.lowerUnit)}"></div>
+    </div>
+    <div class="field"><label>도면번호</label><input id="insp-dsgnNo" value="${escapeHtml(n.dsgnNo)}"></div>
+    <div class="field"><label>비고</label><textarea id="insp-matrRmk" rows="3">${escapeHtml(n.matrRmk)}</textarea></div>
+    <div class="field-row">
+      <div class="field"><label>추천 Spare</label>
+        <select id="insp-spare" data-cap="bom.spare">
+          <option value="">미지정</option>
+          <option value="SPARE" ${(n.etcField3 || "").toUpperCase() === "SPARE" ? "selected" : ""}>SPARE</option>
+        </select>
+      </div>
+      <div class="field"><label>작업완료</label>
+        <select id="insp-confirm" data-cap="bom.confirm">
+          <option value="N" ${n.cnfCheck !== "Y" ? "selected" : ""}>N</option>
+          <option value="Y" ${n.cnfCheck === "Y" ? "selected" : ""}>Y</option>
+        </select>
+      </div>
+    </div>
+    <div class="audit">
+      <div>등록 <b>${escapeHtml(n.creatIdNm)}</b> · ${escapeHtml(n.creatDttm)}</div>
+      <div>수정 <b>${escapeHtml(n.udtIdNm)}</b> · ${escapeHtml(n.udtDttm)}</div>
+      <div>구매BOM 등록 <b>${n.pchsBomCnt}</b>건 ${n.pchsBomCnt > 0 ? "(편집 잠금)" : ""}</div>
+    </div>
+  `;
+  applyCapabilityGates();
+}
+
+/** @param {boolean} open */
+function setInspectorOpen(open) {
+  $el("#bom-app").setAttribute("data-inspector", open ? "open" : "closed");
+  $el("#bom-toggle-inspector").setAttribute("data-active", open ? "true" : "false");
+}
+
+/* ---------- Inspector save / batch ---------- */
+async function saveInspector() {
+  if (!STATE.selectedKey) return;
+  const row = STATE.index.get(STATE.selectedKey);
+  if (!row) return;
+  if (row.node.pchsBomCnt > 0) { toast("warn","구매BOM 등록건은 수정할 수 없습니다."); return; }
+  const newNode = readInspectorIntoNode(row.node);
+  // 옵티미스틱 갱신
+  row.node = newNode;
+  row.dirty = true; row.updChk = "U";
+  if (GRID) {
+    GRID.setValue(row._key, "lowerCd", newNode.lowerCd);
+    GRID.setValue(row._key, "matrNm", newNode.matrNm);
+    GRID.setValue(row._key, "matrMno", newNode.matrMno);
+    GRID.setValue(row._key, "lowerQty", newNode.lowerQty);
+    GRID.setValue(row._key, "lowerUnit", newNode.lowerUnit);
+    GRID.setValue(row._key, "dsgnNo", newNode.dsgnNo);
+    GRID.setValue(row._key, "matrRmk", newNode.matrRmk);
+    GRID.addRowClassName(row._key, "tui-grid-row-dirty");
+  }
+  // 서버 저장 (배치)
+  try {
+    const updateRow = nodeToServerUpdate(newNode);
+    /** @type {{resultCode:number,resultMessage:string}} */
+    const r = await postJson("/user/bm/bm14/insertBomTree", {
+      coCd: STATE.coCd, salesCd: STATE.salesCd, upperKey: newNode.upperKey,
+      updateRowArr: JSON.stringify([updateRow]),
+      matrYn: newNode.matrYn,
+      userId: getJwtUserId(),
+      pgmId: "BM1401M51"
+    }, { ifMatch: row.node.version });
+    if (r.resultCode !== 200) {
+      toast("error", "저장 실패: " + (r.resultMessage || ""));
+      return;
+    }
+    row.dirty = false; row.updChk = "";
+    if (GRID) GRID.removeRowClassName(row._key, "tui-grid-row-dirty");
+    toast("ok","저장되었습니다.");
+    // 추천 Spare/완료 토글은 별도 API
+    if (didSpareChange(row, newNode)) await applySpareChange(row, newNode);
+    if (didConfirmChange(row, newNode)) await applyConfirmChange(row, newNode);
+  } catch (e) {
+    if (e instanceof ConflictError) await openConflict(row, e.body);
+    else toast("error", "저장 오류: " + (e instanceof Error ? e.message : ""));
+  }
+}
+
+/** @param {GridRow} row @param {BomNode} newNode @returns {boolean} */
+function didSpareChange(row, newNode) {
+  return (row.node.etcField3 || "").toUpperCase() !== (newNode.etcField3 || "").toUpperCase();
+}
+/** @param {GridRow} row @param {BomNode} newNode @returns {boolean} */
+function didConfirmChange(row, newNode) {
+  return row.node.cnfCheck !== newNode.cnfCheck;
+}
+
+/** @param {BomNode} prev @returns {BomNode} */
+function readInspectorIntoNode(prev) {
+  /** @type {BomNode} */
+  const next = { ...prev };
+  next.lowerCd  = $input("#insp-lowerCd").value;
+  next.matrNm   = $input("#insp-matrNm").value;
+  next.matrMno  = $input("#insp-matrMno").value;
+  next.lowerQty = Number($input("#insp-lowerQty").value || 0);
+  next.lowerUnit = $input("#insp-lowerUnit").value;
+  next.dsgnNo    = $input("#insp-dsgnNo").value;
+  next.matrRmk   = /** @type {HTMLTextAreaElement} */ ($el("#insp-matrRmk")).value;
+  const spareSel = /** @type {HTMLSelectElement} */ ($el("#insp-spare"));
+  next.etcField3 = (spareSel.value || "").toUpperCase();
+  const confSel  = /** @type {HTMLSelectElement} */ ($el("#insp-confirm"));
+  next.cnfCheck  = confSel.value === "Y" ? "Y" : "N";
+  return next;
+}
+
+/** @param {BomNode} n @returns {object} */
+function nodeToServerUpdate(n) {
+  return {
+    updChk: "U",
+    coCd: STATE.coCd, salesCd: STATE.salesCd,
+    fileTrgtKey: n.fileTrgtKey, upperKey: n.upperKey, lowerKey: n.lowerKey,
+    upperCd: n.upperCd, lowerCd: n.lowerCd,
+    matrCd: n.matrCd, matrNm: n.matrNm, matrMno: n.matrMno,
+    matrSpec: n.matrSpec, matrMat: n.matrMat, matrRmk: n.matrRmk,
+    dsgnNo: n.dsgnNo, lowerQty: n.lowerQty, lowerUnit: n.lowerUnit,
+    cnfCheck: n.cnfCheck, etcField3: n.etcField3,
+    userId: getJwtUserId(), pgmId: "BM1401M51"
+  };
+}
+
+/** @returns {string} */
+function getJwtUserId() {
+  const w = /** @type {Window & {jwt?:{userId?:string}}} */ (window);
+  return String(w.jwt?.userId ?? "");
+}
+
+/** @param {GridRow} row @param {BomNode} newNode */
+async function applySpareChange(row, newNode) {
+  if (!can("bom.spare")) return;
+  const isSet = (newNode.etcField3 || "").toUpperCase() === "SPARE";
+  /** @type {object[]} */
+  const items = [{
+    coCd: STATE.coCd, salesCd: STATE.salesCd,
+    etcField3: isSet ? "SPARE" : "",
+    isSpare: isSet ? "Y" : "N",
+    lowerKey: newNode.lowerKey, fileTrgtKey: newNode.fileTrgtKey,
+    userId: getJwtUserId(), pgmId: "BM1401M51",
+    parentId: newNode.upperKey
+  }];
+  try {
+    const r = await apiRecommend(items);
+    if (r.resultCode !== 200) toast("error", "Spare 토글 실패: " + r.resultMessage);
+    else { toast("ok", isSet ? "Spare 지정" : "Spare 취소"); await loadAndRender(); }
+  } catch (e) {
+    toast("error","Spare 호출 오류: " + (e instanceof Error ? e.message : ""));
+  }
+}
+
+/** @param {GridRow} row @param {BomNode} newNode */
+async function applyConfirmChange(row, newNode) {
+  if (!can("bom.confirm")) return;
+  try {
+    const r = await apiConfirm({
+      coCd: STATE.coCd, salesCd: STATE.salesCd,
+      cnfCheck: newNode.cnfCheck === "Y" ? "Y" : "N",
+      lowerKey: newNode.lowerKey
+    });
+    if (r.resultCode !== 200) toast("error", "작업완료 토글 실패: " + r.resultMessage);
+    else toast("ok", newNode.cnfCheck === "Y" ? "작업완료" : "작업완료 취소");
+  } catch (e) {
+    toast("error","Confirm 호출 오류: " + (e instanceof Error ? e.message : ""));
+  }
+}
+
+/* ---------- Conflict handling ---------- */
+/** @param {GridRow} row @param {string} bodyText */
+async function openConflict(row, bodyText) {
+  const dlg = $dialog("#bom-conflict-dialog");
+  $el("#conflict-body").innerHTML = `
+    <p>이 행은 다른 사용자가 먼저 변경했습니다.</p>
+    <pre style="white-space:pre-wrap;">${escapeHtml(bodyText)}</pre>
+    <p>최신값을 다시 받아 검토 후 저장을 권장합니다.</p>
+  `;
+  dlg.showModal();
+  $btn("#conflict-overwrite-btn").onclick = () => {
+    dlg.close();
+    toast("warn", "덮어쓰기는 현재 미지원 — 최신값을 반영해 다시 저장해 주세요.");
+    void loadAndRender();
+  };
+}
+
+/* ---------- Toast ---------- */
+/**
+ * @param {"ok"|"warn"|"error"|"info"} kind
+ * @param {string} msg
+ */
+function toast(kind, msg) {
+  const root = $el("#bom-toasts");
+  const el = document.createElement("div");
+  el.className = "toast " + (kind === "info" ? "" : kind);
+  el.textContent = msg;
+  root.appendChild(el);
+  setTimeout(() => { el.remove(); }, 4200);
+}
+
+/* ---------- Progress ---------- */
+/** @param {boolean} on @param {string=} label */
+function showProgress(on, label) {
+  $el("#stat-progress").style.display = on ? "" : "none";
+  $el("#stat-progress-label").style.display = on ? "" : "none";
+  $el("#stat-progress-label").textContent = label || "진행";
+  /** @type {HTMLElement} */
+  const i = /** @type {HTMLElement} */ ($el("#stat-progress").firstElementChild);
+  if (i) i.style.width = on ? "30%" : "0";
+}
+/** @param {number} pct */
+function setProgressPercent(pct) {
+  /** @type {HTMLElement} */
+  const i = /** @type {HTMLElement} */ ($el("#stat-progress").firstElementChild);
+  if (i) i.style.width = Math.max(0, Math.min(100, pct)) + "%";
+}
+
+/* ---------- URL state ---------- */
+function persistUrl() {
+  const u = new URL(window.location.href);
+  u.searchParams.set("co", STATE.coCd);
+  u.searchParams.set("sc", STATE.salesCd);
+  history.replaceState(null, "", u.toString());
+}
+function restoreUrl() {
+  const u = new URL(window.location.href);
+  STATE.coCd = u.searchParams.get("co") ?? "";
+  STATE.salesCd = u.searchParams.get("sc") ?? "";
+  if (STATE.coCd) $input("#bom-coCd").value = STATE.coCd;
+  if (STATE.salesCd) $input("#bom-salesCd").value = STATE.salesCd;
+}
+
+/* ---------- Command Palette ---------- */
+/**
+ * @typedef {Object} PaletteCmd
+ * @property {string} id
+ * @property {string} label
+ * @property {string=} keys
+ * @property {string=} cap
+ * @property {()=>void|Promise<void>} run
+ */
+
+/** @returns {PaletteCmd[]} */
+function paletteCommands() {
+  /** @type {PaletteCmd[]} */
+  const cmds = [
+    { id:"reload",     label:"새로고침 / 재조회",                keys:"F5",         run: () => { void loadAndRender(); } },
+    { id:"insp",       label:"Inspector 토글",                   keys:"Space",       run: () => setInspectorOpen($el("#bom-app").getAttribute("data-inspector") !== "open") },
+    { id:"add-sib",    label:"같은 레벨 행 추가",                  keys:"n",           cap:"bom.edit", run: addSiblingRow },
+    { id:"add-child",  label:"자식 행 추가",                      keys:"Shift+n",     cap:"bom.edit", run: addChildRow },
+    { id:"del-row",    label:"선택 행 삭제 대기",                  keys:"d",           cap:"bom.delete", run: deleteSelectedRow },
+    { id:"undel-row",  label:"삭제 대기 취소",                    keys:"u",           cap:"bom.edit", run: undeleteSelectedRow },
+    { id:"copy",       label:"선택 범위 복사 (TSV/HTML/JSON)",     keys:"Ctrl+C",      run: () => void doCopy() },
+    { id:"paste",      label:"붙여넣기 미리보기",                  keys:"Ctrl+V",      cap:"bom.edit", run: () => void doPaste() },
+    { id:"dup",        label:"선택 행을 바로 아래에 복제",          keys:"Ctrl+D",      cap:"bom.edit", run: duplicateRow },
+    { id:"spare",      label:"추천 Spare 지정/취소",              keys:"Ctrl+Shift+S", cap:"bom.spare",   run: toggleSpareSelected },
+    { id:"confirm",    label:"작업완료 토글",                     keys:"Ctrl+Shift+D", cap:"bom.confirm", run: toggleConfirmSelected },
+    { id:"clone",      label:"SalesCode 단위 복사 마법사",          cap:"bom.clone",   run: openCloneWizard },
+    { id:"excel",      label:"엑셀 업로드",                        cap:"bom.excel.apply", run: openExcelWizard },
+    { id:"excel-down", label:"엑셀 다운로드 (현재 뷰)",            keys:"Ctrl+E",      run: exportCurrentExcel },
+    { id:"report-part",  label:"Part List 출력",                                                            run: () => doReport("") },
+    { id:"report-spare", label:"Spare Part List 출력",                                                     run: () => doReport("S") },
+    { id:"report-9000",  label:"Spare(9000) 출력",                                                          run: () => doReport("T") },
+    { id:"theme",      label:"테마 토글",                                                                  run: toggleTheme },
+    { id:"density",    label:"간격(컴팩트) 토글",                                                          run: toggleDensity }
+  ];
+  return cmds.filter((c) => !c.cap || can(c.cap));
+}
+
+/** @type {number} */
+let palActiveIdx = 0;
+/** @type {PaletteCmd[]} */
+let palCurrentList = [];
+
+function openPalette() {
+  const dlg = $dialog("#bom-palette");
+  /** @type {HTMLInputElement} */
+  const inp = /** @type {HTMLInputElement} */ ($el("#pal-input"));
+  inp.value = "";
+  renderPalette("");
+  dlg.showModal();
+  setTimeout(() => inp.focus(), 0);
+}
+
+/** @param {string} q */
+function renderPalette(q) {
+  const all = paletteCommands();
+  const lower = q.trim().toLowerCase();
+  palCurrentList = lower ? all.filter((c) => c.label.toLowerCase().includes(lower) || c.id.includes(lower)) : all;
+  if (palActiveIdx >= palCurrentList.length) palActiveIdx = 0;
+  const list = $el("#pal-list");
+  list.innerHTML = palCurrentList.map((c, i) =>
+    `<div class="pal-item" data-i="${i}" data-active="${i === palActiveIdx ? "true" : "false"}">
+      <div>${escapeHtml(c.label)} ${c.cap ? `<span class="pal-cap">[${c.cap}]</span>` : ""}</div>
+      <span class="pal-key">${escapeHtml(c.keys ?? "")}</span>
+    </div>`).join("");
+  list.querySelectorAll(".pal-item").forEach((node) => {
+    node.addEventListener("click", () => {
+      const idx = Number(/** @type {HTMLElement} */ (node).dataset.i ?? 0);
+      runPaletteAt(idx);
+    });
+  });
+}
+/** @param {number} idx */
+function runPaletteAt(idx) {
+  const cmd = palCurrentList[idx];
+  if (!cmd) return;
+  $dialog("#bom-palette").close();
+  Promise.resolve(cmd.run()).catch((e) => toast("error", "명령 오류: " + (e instanceof Error ? e.message : "")));
+}
+
+/* ---------- Keyboard layer ---------- */
+/** @param {KeyboardEvent} e */
+function onGlobalKey(e) {
+  const target = /** @type {HTMLElement|null} */ (e.target);
+  const inEditable = !!target && (
+    target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable
+  );
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
+    e.preventDefault(); openPalette(); return;
+  }
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "e") {
+    e.preventDefault(); exportCurrentExcel(); return;
+  }
+  if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === "s") {
+    e.preventDefault(); toggleSpareSelected(); return;
+  }
+  if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === "d") {
+    e.preventDefault(); toggleConfirmSelected(); return;
+  }
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "d") {
+    e.preventDefault(); duplicateRow(); return;
+  }
+  if (inEditable) return;
+  if (e.key === " ") { e.preventDefault(); setInspectorOpen($el("#bom-app").getAttribute("data-inspector") !== "open"); return; }
+  if (e.key === "n" && !e.shiftKey) { e.preventDefault(); addSiblingRow(); return; }
+  if (e.key === "N" && e.shiftKey) { e.preventDefault(); addChildRow(); return; }
+  if (e.key === "d") { e.preventDefault(); deleteSelectedRow(); return; }
+  if (e.key === "u") { e.preventDefault(); undeleteSelectedRow(); return; }
+}
+
+/* ---------- Row operations ---------- */
+function getSelectedRow() {
+  if (!STATE.selectedKey) return null;
+  return STATE.index.get(STATE.selectedKey) ?? null;
+}
+
+function addSiblingRow() {
+  const sel = getSelectedRow();
+  if (!sel) { toast("warn","행을 먼저 선택하세요."); return; }
+  /** @type {GridRow} */
+  const newRow = blankRow(sel._parent ?? null, sel.node.upperCd, sel.node.upperKey);
+  STATE.rows.push(newRow); STATE.index.set(newRow._key, newRow);
+  if (GRID) GRID.resetData(toTuiTree(STATE.rows));
+  selectRow(newRow._key);
+  toast("info","같은 레벨에 신규 행을 추가했습니다. Inspector 에서 입력 후 저장하세요.");
+}
+function addChildRow() {
+  const sel = getSelectedRow();
+  if (!sel) { toast("warn","행을 먼저 선택하세요."); return; }
+  /** @type {GridRow} */
+  const newRow = blankRow(sel._key, sel.node.lowerCd, sel.node.lowerKey);
+  STATE.rows.push(newRow); STATE.index.set(newRow._key, newRow);
+  if (GRID) GRID.resetData(toTuiTree(STATE.rows));
+  selectRow(newRow._key);
+  toast("info","자식 행을 추가했습니다.");
+}
+function duplicateRow() {
+  const sel = getSelectedRow();
+  if (!sel) return;
+  /** @type {BomNode} */
+  const dup = { ...sel.node, fileTrgtKey: tempKey(), lowerKey: tempKey(), id: tempKey() };
+  /** @type {GridRow} */
+  const r = { _key: dup.id, _parent: sel._parent, _hasChildren: false, state:"", node: dup, updChk:"I", dirty:true };
+  STATE.rows.push(r); STATE.index.set(r._key, r);
+  if (GRID) GRID.resetData(toTuiTree(STATE.rows));
+  selectRow(r._key);
+}
+
+/** @returns {string} */
+function tempKey() { return "tmp_" + Date.now().toString(36) + "_" + Math.floor(Math.random()*1e6).toString(36); }
+
+/**
+ * @param {string|null} parentKey
+ * @param {string} upperCd
+ * @param {string} upperKey
+ * @returns {GridRow}
+ */
+function blankRow(parentKey, upperCd, upperKey) {
+  const k = tempKey();
+  /** @type {BomNode} */
+  const node = {
+    id:k, parent: parentKey ?? "#", fileTrgtKey:k, upperKey:upperKey, lowerKey:k,
+    upperCd:upperCd, lowerCd:"", matrCd:"", matrNm:"", matrMno:"", matrSpec:"", matrMat:"",
+    matrRmk:"", dsgnNo:"", lowerQty:0, lowerUnit:"", matrUpr:0, partAmt:0, matrAvrgUpr:0,
+    matrLastTrstDt:"", matrWt:0, matrUnitCdNm:"", lvl:0, matrYn:"", etcField3:"", cnfCheck:"",
+    pchsBomCnt:0, creatIdNm:"", creatDttm:"", udtIdNm:"", udtDttm:"", type:"leaf"
+  };
+  return { _key:k, _parent: parentKey, _hasChildren:false, state:"", node, updChk:"I", dirty:true };
+}
+
+function deleteSelectedRow() {
+  const sel = getSelectedRow(); if (!sel) return;
+  if (sel.node.pchsBomCnt > 0) { toast("warn","구매BOM 등록건은 삭제할 수 없습니다."); return; }
+  sel.updChk = "D"; sel.dirty = true;
+  if (GRID) {
+    GRID.addRowClassName(sel._key, "tui-grid-row-deleted");
+    GRID.addRowClassName(sel._key, "tui-grid-row-dirty");
+  }
+  // 즉시 서버 삭제 호출 (소프트 → 실제)
+  void apiDelete({
+    coCd: STATE.coCd, salesCd: STATE.salesCd,
+    fileTrgtKey: sel.node.fileTrgtKey, upperKey: sel.node.upperKey, lowerKey: sel.node.lowerKey
+  }).then((r) => {
+    if (r.resultCode === 200) { toast("ok","삭제되었습니다."); void loadAndRender(); }
+    else toast("error", "삭제 실패: " + r.resultMessage);
+  }).catch((e) => toast("error","삭제 오류: " + (e instanceof Error ? e.message : "")));
+}
+
+function undeleteSelectedRow() {
+  const sel = getSelectedRow(); if (!sel) return;
+  if (sel.updChk !== "D") return;
+  sel.updChk = ""; sel.dirty = false;
+  if (GRID) {
+    GRID.removeRowClassName(sel._key, "tui-grid-row-deleted");
+    GRID.removeRowClassName(sel._key, "tui-grid-row-dirty");
+  }
+}
+
+function toggleSpareSelected() {
+  const sel = getSelectedRow(); if (!sel) return;
+  const next = { ...sel.node };
+  next.etcField3 = (sel.node.etcField3 || "").toUpperCase() === "SPARE" ? "" : "SPARE";
+  void applySpareChange(sel, next);
+}
+function toggleConfirmSelected() {
+  const sel = getSelectedRow(); if (!sel) return;
+  const next = { ...sel.node, cnfCheck: sel.node.cnfCheck === "Y" ? "N" : "Y" };
+  void applyConfirmChange(sel, next);
+}
+
+/* ---------- Clipboard 3-format ---------- */
+async function doCopy() {
+  const sel = getSelectedRow(); if (!sel) { toast("warn","복사할 행을 선택하세요."); return; }
+  const cols = ["lowerCd","matrNm","matrMno","matrSpec","matrMat","lowerUnit","lowerQty","matrRmk","dsgnNo","matrCd"];
+  const desc = collectSubtree(sel._key);
+  const tsv = desc.map((r) => cols.map((c) => stringValue(r.node, c)).join("\t")).join("\n");
+  const html = `<table>${desc.map((r) =>
+    `<tr>${cols.map((c) => `<td>${escapeHtml(stringValue(r.node, c))}</td>`).join("")}</tr>`).join("")}</table>`;
+  const json = JSON.stringify({
+    kind: "x-gbs-bom",
+    rows: desc.map((r) => ({
+      _key:r._key, _parent:r._parent, ...r.node
+    }))
+  });
+  try {
+    if (typeof window.ClipboardItem !== "undefined" && navigator.clipboard && "write" in navigator.clipboard) {
+      const item = new window.ClipboardItem({
+        "text/plain": new Blob([tsv], { type:"text/plain" }),
+        "text/html":  new Blob([html],{ type:"text/html"  })
+      });
+      await navigator.clipboard.write([item]);
+      // x-gbs-bom 별도 저장 (브라우저에 따라 ClipboardItem 의 커스텀 type 미지원 → sessionStorage 보조)
+      sessionStorage.setItem("bom.copy.json", json);
+    } else {
+      await navigator.clipboard.writeText(tsv);
+      sessionStorage.setItem("bom.copy.json", json);
+    }
+    toast("ok", `${desc.length}행 복사되었습니다.`);
+  } catch (e) {
+    toast("error", "복사 실패: " + (e instanceof Error ? e.message : ""));
+  }
+}
+
+/** @param {BomNode} n @param {string} k @returns {string} */
+function stringValue(n, k) {
+  /** @type {Record<string, string|number>} */
+  const rec = /** @type {Record<string, string|number>} */ (/** @type {object} */ (n));
+  const v = rec[k];
+  if (typeof v === "number") return String(v);
+  if (typeof v === "string") return v;
+  return "";
+}
+
+/** @param {string} key @returns {GridRow[]} */
+function collectSubtree(key) {
+  /** @type {GridRow[]} */
+  const out = [];
+  const root = STATE.index.get(key); if (!root) return out;
+  out.push(root);
+  /** @type {string[]} */
+  const queue = [key];
+  while (queue.length) {
+    const cur = queue.shift();
+    if (cur === undefined) break;
+    for (const r of STATE.rows) {
+      if (r._parent === cur) { out.push(r); queue.push(r._key); }
+    }
+  }
+  return out;
+}
+
+async function doPaste() {
+  if (!can("bom.edit")) { toast("warn","편집 권한이 없습니다."); return; }
+  const sel = getSelectedRow(); if (!sel) { toast("warn","붙여넣기 기준 행을 선택하세요."); return; }
+  /** @type {{rows:Array<{lowerCd:string,matrNm:string,matrMno:string,lowerQty:number}>}} */
+  let payload = { rows: [] };
+  // 1) JSON (앱 내부)
+  const j = sessionStorage.getItem("bom.copy.json");
+  if (j) {
+    try {
+      /** @type {{kind:string,rows:Array<BomNode>}} */
+      const parsed = parseJson(j);
+      if (parsed.kind === "x-gbs-bom" && Array.isArray(parsed.rows)) {
+        payload = { rows: parsed.rows.map((r) => ({
+          lowerCd:r.lowerCd, matrNm:r.matrNm, matrMno:r.matrMno, lowerQty:r.lowerQty
+        })) };
+      }
+    } catch (_e) { /* ignore */ }
+  }
+  // 2) clipboard text fallback
+  if (payload.rows.length === 0) {
+    try {
+      const txt = await navigator.clipboard.readText();
+      const tsv = (txt.endsWith("\n") ? txt : txt + "\n").split("\n").filter((l) => l.length > 0);
+      payload = { rows: tsv.map((line) => {
+        const cols = line.split("\t");
+        return {
+          lowerCd: cols[0] ?? "", matrNm: cols[1] ?? "", matrMno: cols[2] ?? "",
+          lowerQty: Number(cols[3] ?? 0)
+        };
+      }) };
+    } catch (_e) { /* ignore */ }
+  }
+  if (payload.rows.length === 0) { toast("warn","붙여넣을 데이터가 없습니다."); return; }
+  showPastePreview(sel, payload.rows);
+}
+
+/**
+ * @param {GridRow} anchor
+ * @param {Array<{lowerCd:string,matrNm:string,matrMno:string,lowerQty:number}>} rows
+ */
+function showPastePreview(anchor, rows) {
+  const dlg = $dialog("#bom-paste-preview");
+  $el("#paste-preview-body").innerHTML = `
+    <p>기준 행: <b>${escapeHtml(anchor.node.lowerCd)}</b> 의 <b>자식</b> 으로 ${rows.length} 행 추가합니다.</p>
+    <table class="diff-table"><thead><tr><th>도번</th><th>품명</th><th>형번/규격</th><th>수량</th></tr></thead>
+    <tbody>${rows.map((r) =>
+      `<tr class="row-add"><td>${escapeHtml(r.lowerCd)}</td><td>${escapeHtml(r.matrNm)}</td><td>${escapeHtml(r.matrMno)}</td><td>${r.lowerQty}</td></tr>`
+    ).join("")}</tbody></table>`;
+  $btn("#paste-confirm-btn").onclick = async () => {
+    dlg.close();
+    /** @type {object[]} */
+    const updateArr = rows.map((r) => ({
+      updChk:"I",
+      coCd: STATE.coCd, salesCd: STATE.salesCd,
+      upperKey: anchor.node.lowerKey, upperCd: anchor.node.lowerCd,
+      lowerCd: r.lowerCd, matrNm: r.matrNm, matrMno: r.matrMno, lowerQty: r.lowerQty,
+      userId: getJwtUserId(), pgmId:"BM1401M51"
+    }));
+    try {
+      /** @type {{resultCode:number,resultMessage:string}} */
+      const res = await postJson("/user/bm/bm14/insertBomTree", {
+        coCd: STATE.coCd, salesCd: STATE.salesCd, upperKey: anchor.node.lowerKey,
+        updateRowArr: JSON.stringify(updateArr),
+        userId: getJwtUserId(), pgmId:"BM1401M51"
+      });
+      if (res.resultCode === 200) { toast("ok","붙여넣기 적용 완료"); await loadAndRender(); }
+      else toast("error","적용 실패: " + res.resultMessage);
+    } catch (e) {
+      toast("error","적용 오류: " + (e instanceof Error ? e.message : ""));
+    }
+  };
+  dlg.showModal();
+}
+
+/* ---------- Drag (Sortable) — Alt = copy, 일반 = move ---------- */
+function attachDragSensors() {
+  /** @type {Window & { Sortable?: { create:(el:HTMLElement, opts:object)=>void } }} */
+  const w = /** @type {Window & { Sortable?: { create:(el:HTMLElement, opts:object)=>void } }} */ (window);
+  if (!w.Sortable) return;
+  // tui-grid 는 tbody 가 가상 스크롤 영역에 분산되어 있어 직접 sortable 부착이 까다롭다.
+  // 대신 keyboard / Palette / Inspector 의 "복사 생성" 으로 동등 기능을 제공한다.
+  // 헤더의 row 핸들이 활성된 경우만 부착하는 게이트 함수만 제공.
+}
+
+/* ---------- Clone Wizard ---------- */
+let cloneStep = 1;
+function openCloneWizard() {
+  if (!can("bom.clone")) { toast("warn","권한 없음."); return; }
+  cloneStep = 1; updateCloneStepper();
+  $input("#clone-src-co").value = STATE.coCd;
+  $input("#clone-src-sc").value = STATE.salesCd;
+  $input("#clone-dst-sc").value = "";
+  $el("#clone-target-info").textContent = "";
+  $dialog("#bom-clone-wizard").showModal();
+}
+function updateCloneStepper() {
+  document.querySelectorAll("#bom-clone-wizard [data-step]").forEach((node) => {
+    const el = /** @type {HTMLElement} */ (node);
+    el.setAttribute("data-active", el.dataset.step === String(cloneStep) ? "true" : "false");
+  });
+  $el("#clone-step-1").hidden = cloneStep !== 1;
+  $el("#clone-step-2").hidden = cloneStep !== 2;
+  $el("#clone-step-3").hidden = cloneStep !== 3;
+  $btn("#clone-back-btn").disabled = cloneStep === 1;
+  $btn("#clone-next-btn").hidden = cloneStep === 3;
+  $btn("#clone-apply-btn").hidden = cloneStep !== 3;
+}
+
+async function cloneNext() {
+  if (cloneStep === 1) {
+    const src = $input("#clone-src-sc").value.trim();
+    if (!src) { toast("warn","원본 SalesCode 가 비어있습니다."); return; }
+    cloneStep = 2; updateCloneStepper();
+    return;
+  }
+  if (cloneStep === 2) {
+    const dst = $input("#clone-dst-sc").value.trim();
+    if (!dst) { toast("warn","대상 SalesCode 를 입력하세요."); return; }
+    showProgress(true,"대상 확인…");
+    try {
+      const r = await apiCheckClone({ coCd: STATE.coCd, salesCdTo: dst });
+      $el("#clone-target-info").textContent = (r.resultCode === 200 && r.result)
+        ? "대상 SalesCode 에 이미 BOM 이 존재합니다 — 적용 시 병합/덮어쓰기 정책이 적용됩니다."
+        : "대상에 BOM 없음 — 신규 생성으로 진행됩니다.";
+      // dry-run: 클라이언트 측 시뮬레이션 (서버 dryRun 미배포 시 fallback)
+      const simulated = simulateClonePreview();
+      renderCloneDiff(simulated);
+      cloneStep = 3; updateCloneStepper();
+    } catch (e) {
+      toast("error","대상 확인 실패: " + (e instanceof Error ? e.message : ""));
+    } finally { showProgress(false); }
+    return;
+  }
+}
+function cloneBack() { if (cloneStep > 1) { cloneStep -= 1; updateCloneStepper(); } }
+
+/** @returns {{added:GridRow[],modified:GridRow[],deleted:GridRow[]}} */
+function simulateClonePreview() {
+  // 단순 시뮬: 모든 STATE.rows 를 added 로 가정 (서버 dry-run 미배포 시).
+  return { added: STATE.rows.slice(), modified: [], deleted: [] };
+}
+
+/** @param {{added:GridRow[],modified:GridRow[],deleted:GridRow[]}} d */
+function renderCloneDiff(d) {
+  $el("#clone-dry-summary").textContent =
+    `예상: 추가 ${d.added.length} · 변경 ${d.modified.length} · 삭제 ${d.deleted.length}`;
+  const tbody = $el("#clone-diff-table").querySelector("tbody");
+  if (!tbody) return;
+  /** @type {string[]} */
+  const html = [];
+  for (const r of d.added.slice(0, 200)) html.push(`<tr class="row-add"><td>추가</td><td>${escapeHtml(r.node.upperCd)}</td><td>${escapeHtml(r.node.lowerCd)}</td><td>${escapeHtml(r.node.matrNm)}</td></tr>`);
+  for (const r of d.modified.slice(0, 200)) html.push(`<tr class="row-mod"><td>변경</td><td>${escapeHtml(r.node.upperCd)}</td><td>${escapeHtml(r.node.lowerCd)}</td><td>${escapeHtml(r.node.matrNm)}</td></tr>`);
+  for (const r of d.deleted.slice(0, 200)) html.push(`<tr class="row-del"><td>삭제</td><td>${escapeHtml(r.node.upperCd)}</td><td>${escapeHtml(r.node.lowerCd)}</td><td>${escapeHtml(r.node.matrNm)}</td></tr>`);
+  tbody.innerHTML = html.join("");
+}
+
+async function cloneApply() {
+  const dst = $input("#clone-dst-sc").value.trim();
+  /** @type {object[]} */
+  const items = [{
+    coCd: STATE.coCd,
+    salesCd: STATE.salesCd, salesCdTo: dst,
+    changeYn: $input("#clone-changeYn").checked ? "Y" : "N",
+    keepSpare: $input("#clone-keepSpare").checked ? "Y" : "N",
+    keepConfirm: $input("#clone-keepConfirm").checked ? "Y" : "N",
+    userId: getJwtUserId(), pgmId:"BM1401M51"
+  }];
+  showProgress(true,"복사 중…");
+  try {
+    /** @type {{resultCode:number,resultMessage:string}} */
+    const res = await postJson("/user/bm/bm14/copyBomRootSalesCdTree", items);
+    if (res.resultCode === 200) {
+      toast("ok","SalesCode 단위 복사 완료.");
+      $dialog("#bom-clone-wizard").close();
+    } else {
+      toast("error","복사 실패: " + res.resultMessage);
+    }
+  } catch (e) {
+    toast("error","복사 오류: " + (e instanceof Error ? e.message : ""));
+  } finally {
+    showProgress(false);
+  }
+}
+
+/* ---------- Excel — Worker 파싱 + 스테이징 + 적용 ---------- */
+/** @type {File|null} */
+let pendingExcelFile = null;
+/** @type {Array<{[k:string]:string|number}>} */
+let pendingExcelRows = [];
+
+function openExcelWizard() {
+  if (!can("bom.excel.apply")) { toast("warn","권한 없음."); return; }
+  $el("#excel-preview").hidden = true;
+  $el("#excel-stage-result").textContent = "";
+  $btn("#excel-stage-btn").disabled = true;
+  $btn("#excel-apply-btn").disabled = true;
+  pendingExcelFile = null; pendingExcelRows = [];
+  $dialog("#bom-excel-wizard").showModal();
+}
+
+function bindExcelDropZone() {
+  const zone = $el("#excel-dropzone");
+  const inp = /** @type {HTMLInputElement} */ ($el("#excel-file-input"));
+  $btn("#excel-pick-btn").onclick = () => inp.click();
+  inp.addEventListener("change", () => {
+    if (inp.files && inp.files[0]) handleExcelFile(inp.files[0]);
+  });
+  ["dragenter","dragover"].forEach((ev) => zone.addEventListener(ev, (e) => {
+    e.preventDefault(); zone.setAttribute("data-active","true");
+  }));
+  ["dragleave","drop"].forEach((ev) => zone.addEventListener(ev, (e) => {
+    e.preventDefault(); zone.setAttribute("data-active","false");
+  }));
+  zone.addEventListener("drop", (e) => {
+    const dt = /** @type {DragEvent} */ (e).dataTransfer;
+    if (dt && dt.files && dt.files[0]) handleExcelFile(dt.files[0]);
+  });
+}
+
+/** @param {File} file */
+function handleExcelFile(file) {
+  pendingExcelFile = file;
+  $el("#excel-stage-result").textContent = "파싱 중… (Worker)";
+  parseExcelInWorker(file).then((rows) => {
+    pendingExcelRows = rows;
+    const preview = rows.slice(0, 50);
+    /** @type {string[]} */
+    const cols = preview.length ? Object.keys(preview[0]) : [];
+    /** @type {HTMLElement} */
+    const host = $el("#excel-preview");
+    host.innerHTML = `<table class="diff-table"><thead><tr>${cols.map((c) => `<th>${escapeHtml(c)}</th>`).join("")}</tr></thead>
+      <tbody>${preview.map((r) => `<tr>${cols.map((c) => `<td>${escapeHtml(String(r[c] ?? ""))}</td>`).join("")}</tr>`).join("")}</tbody></table>`;
+    host.hidden = false;
+    $el("#excel-stage-result").textContent = `파싱 완료 — 총 ${rows.length} 행 (미리보기 ${preview.length} 행)`;
+    $btn("#excel-stage-btn").disabled = false;
+  }).catch((e) => {
+    $el("#excel-stage-result").textContent = "파싱 오류: " + (e instanceof Error ? e.message : "");
+  });
+}
+
+/**
+ * Web Worker 로 exceljs 파싱. CDN 의 exceljs 를 worker 에 importScripts.
+ * @param {File} file
+ * @returns {Promise<Array<{[k:string]:string|number}>>}
+ */
+function parseExcelInWorker(file) {
+  return new Promise((resolve, reject) => {
+    const code = `
+self.onmessage = function(ev) {
+  const buf = ev.data;
+  importScripts("https://unpkg.com/exceljs/dist/exceljs.min.js");
+  /** @type {{Workbook: { new(): { xlsx:{ load:(buf:ArrayBuffer)=>Promise<void> }, worksheets: Array<{ eachRow:(opts:object,fn:(row:{values:Array<string|number|null>},rn:number)=>void)=>void }> } } }} */
+  const ExcelJS = self.ExcelJS;
+  const wb = new ExcelJS.Workbook();
+  wb.xlsx.load(buf).then(function() {
+    const ws = wb.worksheets[0];
+    if (!ws) { self.postMessage({ ok:true, rows: [] }); return; }
+    const rows = [];
+    let header = null;
+    ws.eachRow({ includeEmpty:false }, function(row, rn) {
+      const vals = Array.isArray(row.values) ? row.values.slice(1) : [];
+      if (rn === 1) { header = vals.map(function(v){ return String(v == null ? "" : v); }); return; }
+      const obj = {};
+      for (let i=0;i<vals.length;i++) {
+        const k = (header && header[i]) ? header[i] : ("col"+i);
+        const v = vals[i];
+        obj[k] = (v == null) ? "" : (typeof v === "object" ? String(v.text || v.result || v.toString()) : v);
+      }
+      rows.push(obj);
+    });
+    self.postMessage({ ok:true, rows: rows });
+  }).catch(function(err){ self.postMessage({ ok:false, error: String(err && err.message || err) }); });
+};
+`;
+    const blob = new Blob([code], { type:"application/javascript" });
+    const url = URL.createObjectURL(blob);
+    const w = new Worker(url);
+    w.onmessage = (ev) => {
+      /** @type {{ok:true,rows:Array<{[k:string]:string|number}>}|{ok:false,error:string}} */
+      const msg = /** @type {{ok:true,rows:Array<{[k:string]:string|number}>}|{ok:false,error:string}} */ (ev.data);
+      try {
+        if (msg.ok === true) {
+          resolve(msg.rows);
+        } else {
+          reject(new Error(msg.error));
+        }
+      } finally {
+        w.terminate();
+        URL.revokeObjectURL(url);
+      }
+    };
+    w.onerror = (ev) => { reject(new Error(ev.message)); URL.revokeObjectURL(url); };
+    file.arrayBuffer().then((buf) => w.postMessage(buf, [buf]));
+  });
+}
+
+async function excelStage() {
+  if (pendingExcelRows.length === 0) return;
+  showProgress(true,"스테이징…");
+  try {
+    /** @type {{resultCode:number,resultMessage:string}} */
+    const res = await postJson("/user/bm/bm14/insertTempBom", {
+      coCd: STATE.coCd, salesCd: STATE.salesCd,
+      bomArr: JSON.stringify(pendingExcelRows),
+      userId: getJwtUserId(), pgmId:"BM1401M51"
+    });
+    $el("#excel-stage-result").textContent = "스테이징 결과: " + (res.resultMessage || "OK");
+    if (res.resultCode === 200) $btn("#excel-apply-btn").disabled = false;
+  } catch (e) {
+    $el("#excel-stage-result").textContent = "스테이징 오류: " + (e instanceof Error ? e.message : "");
+  } finally { showProgress(false); }
+}
+
+async function excelApply() {
+  showProgress(true,"확정 적용…");
+  setProgressPercent(20);
+  try {
+    /** @type {{resultCode:number,resultMessage:string}} */
+    const res = await postJson("/user/bm/bm14/callDraftTempBom", {
+      coCd: STATE.coCd, salesCd: STATE.salesCd, userId: getJwtUserId(), pgmId:"BM1401M51"
+    });
+    setProgressPercent(80);
+    if (res.resultCode === 200) {
+      toast("ok","엑셀 확정 적용 완료.");
+      $dialog("#bom-excel-wizard").close();
+      await loadAndRender();
+    } else {
+      toast("error","적용 실패: " + res.resultMessage);
+    }
+  } catch (e) {
+    toast("error","적용 오류: " + (e instanceof Error ? e.message : ""));
+  } finally {
+    setProgressPercent(100); showProgress(false);
+  }
+}
+
+/** 현재 그리드 표시 행을 엑셀로 다운로드 */
+function exportCurrentExcel() {
+  /** @type {Window & { ExcelJS?: { Workbook: { new(): { xlsx:{ writeBuffer:()=>Promise<ArrayBuffer> }, addWorksheet:(name:string)=>{ addRow:(data:Array<string|number>)=>void } } } } }} */
+  const w = /** @type {Window & { ExcelJS?: { Workbook: { new(): { xlsx:{ writeBuffer:()=>Promise<ArrayBuffer> }, addWorksheet:(name:string)=>{ addRow:(data:Array<string|number>)=>void } } } } }} */ (window);
+  if (!w.ExcelJS) { toast("error","ExcelJS 미로딩"); return; }
+  const wb = new w.ExcelJS.Workbook();
+  const ws = wb.addWorksheet("BOM");
+  const header = ["lowerCd","matrNm","matrMno","matrSpec","matrMat","lowerUnit","lowerQty","matrCd","dsgnNo","matrUpr","partAmt"];
+  ws.addRow(header);
+  for (const r of STATE.rows) ws.addRow(header.map((h) => stringValue(r.node, h)));
+  wb.xlsx.writeBuffer().then((buf) => {
+    const blob = new Blob([buf], { type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `BM1401M51_${STATE.salesCd || "all"}.xlsx`;
+    document.body.appendChild(a); a.click(); a.remove();
+  }).catch((e) => toast("error","다운로드 오류: " + (e instanceof Error ? e.message : "")));
+}
+
+/* ---------- Reports ---------- */
+/** @param {""|"S"|"T"} kind */
+function doReport(kind) {
+  /** @type {Window & { callReport?:(file:string,arg:string,w:number,h:number,t:string)=>void }} */
+  const w = /** @type {Window & { callReport?:(file:string,arg:string,w:number,h:number,t:string)=>void }} */ (window);
+  const file = kind === "S" ? "BM1401R02.jrf" : kind === "T" ? "BM1401R03.jrf" : "BM1401R01.jrf";
+  const arg = `coCd#${STATE.coCd}#salesCd#${STATE.salesCd}#partCd#ALLPART#userId#${getJwtUserId()}#`;
+  if (typeof w.callReport === "function") w.callReport(file, arg, 1150, 720, "PartList");
+  else toast("warn","callReport 미로드 — 환경설정 확인 필요");
+}
+
+/* ---------- Theme / Density ---------- */
+function toggleTheme() {
+  const cur = document.documentElement.getAttribute("data-theme") || "light";
+  document.documentElement.setAttribute("data-theme", cur === "light" ? "dark" : "light");
+}
+function toggleDensity() {
+  const cur = document.documentElement.getAttribute("data-density") || "normal";
+  document.documentElement.setAttribute("data-density", cur === "normal" ? "compact" : "normal");
+}
+
+/* ---------- Wire-up ---------- */
+function bindUi() {
+  $btn("#bom-search-btn").addEventListener("click", () => doSearch());
+  $input("#bom-salesCd").addEventListener("keydown", (e) => {
+    if (e.key === "Enter") doSearch();
+  });
+  $input("#bom-coCd").addEventListener("change", () => doSearch());
+  $btn("#bom-toggle-density").addEventListener("click", toggleDensity);
+  $btn("#bom-toggle-theme").addEventListener("click", toggleTheme);
+  $btn("#bom-toggle-inspector").addEventListener("click", () =>
+    setInspectorOpen($el("#bom-app").getAttribute("data-inspector") !== "open"));
+  $btn("#bom-open-palette").addEventListener("click", openPalette);
+  $btn("#bom-insp-close-btn").addEventListener("click", () => setInspectorOpen(false));
+  $btn("#bom-insp-cancel-btn").addEventListener("click", () => setInspectorOpen(false));
+  $btn("#bom-insp-save-btn").addEventListener("click", () => void saveInspector());
+  $btn("#bom-insp-audit-btn").addEventListener("click", openAudit);
+  // Palette input
+  $input("#pal-input").addEventListener("input", (e) => {
+    const v = /** @type {HTMLInputElement} */ (e.target).value;
+    palActiveIdx = 0;
+    renderPalette(v);
+  });
+  $input("#pal-input").addEventListener("keydown", (e) => {
+    if (e.key === "ArrowDown") { e.preventDefault(); palActiveIdx = Math.min(palCurrentList.length-1, palActiveIdx+1); renderPalette($input("#pal-input").value); }
+    else if (e.key === "ArrowUp") { e.preventDefault(); palActiveIdx = Math.max(0, palActiveIdx-1); renderPalette($input("#pal-input").value); }
+    else if (e.key === "Enter") { e.preventDefault(); runPaletteAt(palActiveIdx); }
+    else if (e.key === "Escape") { e.preventDefault(); $dialog("#bom-palette").close(); }
+  });
+  // close-dialog buttons
+  document.querySelectorAll("[data-close-dialog]").forEach((node) => {
+    node.addEventListener("click", () => {
+      const dlg = node.closest("dialog");
+      if (dlg) /** @type {HTMLDialogElement} */ (dlg).close();
+    });
+  });
+  // Clone wizard nav
+  $btn("#clone-next-btn").addEventListener("click", () => void cloneNext());
+  $btn("#clone-back-btn").addEventListener("click", cloneBack);
+  $btn("#clone-apply-btn").addEventListener("click", () => void cloneApply());
+  // Excel wizard
+  bindExcelDropZone();
+  $btn("#excel-stage-btn").addEventListener("click", () => void excelStage());
+  $btn("#excel-apply-btn").addEventListener("click", () => void excelApply());
+  // Global keyboard
+  window.addEventListener("keydown", onGlobalKey);
+}
+
+function openAudit() {
+  const sel = getSelectedRow();
+  if (!sel) return;
+  $el("#audit-body").innerHTML = `
+    <div>fileTrgtKey: <b>${escapeHtml(sel.node.fileTrgtKey)}</b></div>
+    <div>등록 ${escapeHtml(sel.node.creatIdNm)} · ${escapeHtml(sel.node.creatDttm)}</div>
+    <div>수정 ${escapeHtml(sel.node.udtIdNm)} · ${escapeHtml(sel.node.udtDttm)}</div>
+    <div>version: ${escapeHtml(sel.node.version ?? "(없음)")}</div>
+    <hr/>
+    <div style="color:var(--fg-muted);font-size:11px;">/v2/nodes/{id}/audit 미배포 시 위 정보가 fallback 으로 표시됩니다.</div>
+  `;
+  $dialog("#bom-audit-dialog").showModal();
+}
+
+function doSearch() {
+  STATE.coCd = $input("#bom-coCd").value;
+  STATE.salesCd = $input("#bom-salesCd").value;
+  void loadAndRender();
+}
+
+/* ---------- Bootstrap ---------- */
+/** @param {Error|string|null|number|boolean|object} e @returns {Error} */
+function asErr(e) { return e instanceof Error ? e : new Error(typeof e === "string" ? e : JSON.stringify(e)); }
+
+/** @param {string} where @param {Error} err */
+function reportBootError(where, err) {
+  const msg = err.message;
+  console.error("[BM1401M51]", where, err);
+  try { toast("error", "[" + where + "] " + msg); } catch (_e) { /* toast 미준비 */ }
+}
+
+async function bootstrapApp() {
+  /** @typedef {(selector:string)=>object} JQueryFn */
+  /** @type {Window & { mainDefaultLoad?:(g:string,t:string)=>void, setCommonSelect?:(j:object)=>void, authChk?:(p?:string)=>void, jQuery?:JQueryFn }} */
+  const w = /** @type {Window & { mainDefaultLoad?:(g:string,t:string)=>void, setCommonSelect?:(j:object)=>void, authChk?:(p?:string)=>void, jQuery?:JQueryFn }} */ (window);
+
+  // 공통 함수가 없을 수도 있는 환경(테스트/베타)에서는 안전하게 skip.
+  try { if (typeof w.mainDefaultLoad === "function") w.mainDefaultLoad("기술연구소","설계BOM Workbench"); }
+  catch (e) { reportBootError("mainDefaultLoad", asErr(e)); }
+
+  try {
+    if (typeof w.setCommonSelect === "function" && typeof w.jQuery === "function") {
+      w.setCommonSelect(w.jQuery("#bom-coCd"));
+    }
+  } catch (e) { reportBootError("setCommonSelect", asErr(e)); }
+
+
+  try { await loadCapabilities(); } catch (e) { reportBootError("loadCapabilities", asErr(e)); }
+  try { bindUi(); }                catch (e) { reportBootError("bindUi", asErr(e)); }
+  try { attachDragSensors(); }     catch (e) { reportBootError("attachDragSensors", asErr(e)); }
+  try { restoreUrl(); }            catch (e) { reportBootError("restoreUrl", asErr(e)); }
+  try { if (STATE.coCd && STATE.salesCd) await loadAndRender(); }
+  catch (e) { reportBootError("loadAndRender", asErr(e)); }
+  try { applyCapabilityGates(); }  catch (e) { reportBootError("applyCapabilityGates", asErr(e)); }
+}
+
+// 모듈 스크립트는 deferred 라 DOMContentLoaded 가 이미 발생했을 수 있다.
+function startBoot() { void bootstrapApp().catch((e) => reportBootError("bootstrap", asErr(e))); }
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", startBoot, { once: true });
+} else {
+  startBoot();
+}
+
+// 전역 에러 캐치 — 사용자에게 즉시 토스트로 표시
+window.addEventListener("error", (ev) => {
+  const e = /** @type {ErrorEvent} */ (ev);
+  console.error("[BM1401M51] window.error", e.message, e.filename, e.lineno);
+  try { toast("error", "스크립트 오류: " + e.message); } catch (_x) { /* noop */ }
+});
+window.addEventListener("unhandledrejection", (ev) => {
+  const e = /** @type {PromiseRejectionEvent} */ (ev);
+  console.error("[BM1401M51] unhandledrejection", e.reason);
+  const msg = e.reason instanceof Error ? e.reason.message : String(e.reason);
+  try { toast("error", "비동기 오류: " + msg); } catch (_x) { /* noop */ }
+});
+</script>
+</body>
+</html>
