@@ -3530,12 +3530,18 @@ function customAlert(message, appendMessage='') {
                 border-radius: 10px;
                 box-shadow: 0 4px 15px rgba(0,0,0,0.3);
                 z-index: 9999;
-                max-width: 400px;
+                max-width: 800px;
+                width: 90%;
+                max-height: 90vh;
                 font-size: 16px;
                 text-align: center;
+                display: flex;
+                flex-direction: column;
             ">
-                <div id="custom-alert-message" style="margin-bottom: 20px; font-size: 16px; color: #333;"></div>
-                <button onclick="closeCustomAlert()" style="padding: 5px 15px;">확인</button>
+                <div id="custom-alert-message" style="margin-bottom: 20px; font-size: 16px; color: #333; overflow-y: auto; max-height: 70vh; text-align: left; padding: 10px;"></div>
+                <div>
+                	<button onclick="closeCustomAlert()" style="padding: 7px 30px; cursor: pointer; font-weight: bold;">확인</button>
+                </div>
             </div>
             <div style="
                 position: fixed;
