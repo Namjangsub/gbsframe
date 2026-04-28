@@ -170,9 +170,9 @@
 	              <div class="table_list_tit">
 	                  <h5 class="tit">BOM 하위 내용</h5>
 	                  <div class="add_btn_small">
-	                      <a onclick= "insertChildList()" style="width: 90px;" authchk><i class="fas fa-folder-plus"></i> BOM추가</a>
+	                      <a id="btnAddBom" onclick= "insertChildList()" style="width: 90px;" authchk><i class="fas fa-folder-plus"></i> BOM추가</a>
 	                      <a onclick= "openMatListSearch();" style="width: 90px;" authchk><i class="fas fa-money-check"></i> 자재검색 </a>
-	                      <a onclick= "deleteChildList()" style="width: 90px;" authchk><i class="fas fa-trash"></i> BOM삭제 </a>
+	                      <a id="btnDelBom" onclick= "deleteChildList()" style="width: 90px;" authchk><i class="fas fa-trash"></i> BOM삭제 </a>
 	                  </div>
 	              </div>
 	              <div>
@@ -218,6 +218,7 @@
 	var thisGridRow=0; // 선택된 행 정보 저장할 변수
 	var thisGridCol=0; // 선택된 열 정보 저장할 변수
 	var matModalOpen = false;  //형변 변경시 자재코드 자동 실행되게 처리함
+	var isParentNodeCompleted = false;
 
 	var childGridView = {
 		initView: function() {
@@ -323,6 +324,7 @@
 						{type: 4, label: "줄삭제"},
 					],
 					popupFilter: function (item, param) {
+						if (isParentNodeCompleted) return false;
 						//console.log(item, param);
 						if(param.element) {
 							return true;
@@ -428,9 +430,36 @@
 
 	    // 그리드 내용 붙여넣기 이벤트 처리-->간헐적 실행으로 오작동~~~ 원인을 모르겠음 아래이벤트로 대체
 	    // Ctrl + V 단축키 이벤트 처리
-		childGridView.target.$target.on("paste", function (e, a) {
+		childGridView.target.$target.off("paste.bm1401p02").on("paste.bm1401p02", function (e, a) {
+			if (isParentNodeCompleted) {
+				alert("BOM 작업완료 상태이므로 수정할 수 없습니다.");
+				return false;
+			}
 			gridPaste(thisGridRow, thisGridCol);
 		});
+
+		childGridView.target.$target.off("contextmenu.bm1401p02").on("contextmenu.bm1401p02", function (e) {
+			if (isParentNodeCompleted) {
+				e.preventDefault();
+				alert("BOM 작업완료 상태이므로 수정할 수 없습니다.");
+				return false;
+			}
+		});
+
+		$(document).off("keydown.bm1401p02").on("keydown.bm1401p02", function (e) {
+			if (isParentNodeCompleted) {
+				if ((e.ctrlKey || e.metaKey) && (e.key === 'v' || e.key === 'V')) {
+					e.preventDefault();
+					alert("BOM 작업완료 상태이므로 수정할 수 없습니다.");
+					return false;
+				}
+				if ((e.ctrlKey || e.metaKey) && (e.key === 'c' || e.key === 'C')) {
+					e.preventDefault();
+					return false;
+				}
+			}
+		});
+
 		$('#rptDrgNo_T').on('input', function(){
 	        $(this).val($(this).val().toUpperCase());
 	    });
@@ -465,7 +494,11 @@
 		$('#prjctNm').val($('#clntPjtNm').val()); //M01바닥화면에서 가져오기
 		$('#lowerEqpNm').val($('#eqpNm').val()); //M01바닥화면에서 가져오기
 
-		if (parentNode.cnfCheck == 'Y') $('#actionBtn3').hide(); //작업완료 이면 수정 버튼 숨기기
+		if (parentNode.cnfCheck == 'Y') {
+			isParentNodeCompleted = true;
+			$('#actionBtn3').hide(); //작업완료 이면 수정 버튼 숨기기
+			$('#btnAddBom, #btnDelBom').css({"pointer-events": "none", "opacity": "0.5"}); //작업완료 이면 BOM추가/삭제 비활성화
+		}
 		if (pasFloatChk(parentNode.pchsBomCnt) > 0) $('#actionBtn3').hide(); //구매BOM 생성된거면 수정 버튼 숨기기
 	}
 
