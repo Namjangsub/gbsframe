@@ -824,12 +824,16 @@ SELECT (SELECT FN_CM05M01_CD_TO_NM(T.CO_CD) FROM DUAL) AS CO_NM
 		        , T.SALES_SEQ
 		        , T.LGIST_QTY
 		        , T.LGIST_REMARK
-		    FROM TB_CR11D01 T
-		    WHERE T.LGIST_NO = #{lgistNo}
+		    FROM (
+		        SELECT T.*
+		             , ROW_NUMBER() OVER (PARTITION BY T.SALES_CD ORDER BY T.SALES_SEQ) AS RN
+		        FROM TB_CR11D01 T
+		        WHERE T.LGIST_NO = #{lgistNo}
+		    ) T
+		    WHERE T.RN = 1
 		),
 		USE_INFO AS (
-		    SELECT A1.CO_CD
-		         , A1.LGIST_NO
+		    SELECT DISTINCT A1.CO_CD
 		         , B1.SALES_CD
 		      FROM TB_CR11M01 A1
 		      JOIN TB_CR11D01 B1 ON A1.LGIST_NO = B1.LGIST_NO
@@ -879,10 +883,14 @@ SELECT (SELECT FN_CM05M01_CD_TO_NM(T.CO_CD) FROM DUAL) AS CO_NM
 		    , CASE
 		          WHEN EXISTS (
 		              SELECT 1
-		              FROM USE_INFO U2
-		              WHERE U2.SALES_CD = B.SALES_CD
+		              FROM TB_CR11M01 A2
+		              JOIN TB_CR11D01 B2 ON A2.LGIST_NO = B2.LGIST_NO
+		              WHERE A2.CO_CD = #{coCd}
+		                AND A2.ORDRS_NO = #{ordrsNo}
+		                AND A2.CLAS_DIV = #{clasDiv}
+		                AND B2.SALES_CD = B.SALES_CD
 		              <if test="lgistNo != null and lgistNo != ''">
-		                AND U2.LGIST_NO != #{lgistNo}
+		                AND A2.LGIST_NO != #{lgistNo}
 		              </if>
 		          ) THEN 'Y'
 		          ELSE 'N'
