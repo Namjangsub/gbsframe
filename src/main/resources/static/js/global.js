@@ -3530,8 +3530,9 @@ function customAlert(message, appendMessage='') {
                 border-radius: 10px;
                 box-shadow: 0 4px 15px rgba(0,0,0,0.3);
                 z-index: 9999;
-                max-width: 800px;
-                width: 90%;
+				min-width: 300px;
+				max-width: 800px;
+				width: fit-content;
                 max-height: 90vh;
                 font-size: 16px;
                 text-align: center;
@@ -3718,16 +3719,48 @@ function fileUpload ($form) {
 	formData.append("comonCd", treeModule.getFileNodeId());
 	var fileUploadArr = [];
 	var tempArr = [];
-
+	var totalFileSize = 0; // 첨부파일 사이즈 처리용 변수
+		
 	tempArr = treeModule.getFileArr();
 	$.each(tempArr, function(idx, obj) {
 		if (obj.fileKey == 0) {
 			formData.append("files", obj.file);
-			obj.file = '';
-			fileUploadArr.push(obj);
+			
+			// 파일 사이즈 단위 누적 (바이트 단위)
+			if (obj.file && obj.file.size) {
+				totalFileSize += obj.file.size;
+			}
+			
+			var cloneObj = $.extend({}, obj);
+			cloneObj.file = '';
+			fileUploadArr.push(cloneObj);
 		}
 	});
 
+	// 첨부파일 자료 용량이 yml 설정값(max-file-size) 이상인 경우 경고 후 중지
+	if (totalFileSize > 0) {
+		var MAX_SIZE = 200 * 1024 * 1024; // Default fallback
+		postAjaxSync("/admin/cm/cm08/getMaxFileSize", null, null, function(data) {
+			if (data.resultCode == 200 && data.maxFileSize) {
+				var mbStr = data.maxFileSize.toUpperCase().replace("MB", "").replace("GB", "").trim();
+				var mbInt = parseInt(mbStr, 10);
+				if (!isNaN(mbInt)) {
+					if(data.maxFileSize.toUpperCase().indexOf("GB") > -1) {
+						mbInt = mbInt * 1024;
+					}
+					MAX_SIZE = mbInt * 1024 * 1024;
+				}
+			}
+		});
+		
+		if (totalFileSize >= MAX_SIZE) {
+			var limitMb = Math.round(MAX_SIZE / (1024 * 1024));
+			var attachMb = Math.round(totalFileSize / (1024 * 1024));
+			alert("첨부파일 자료 용량이 많습니다. 한도:" + limitMb + "MB < 첨부:" + attachMb + "MB\n분리해서 UPload하세요!");
+			return false;
+		}
+	}
+	
 	if (fileUploadArr.length === 0 && treeModule.getDeleteFileArr().length === 0) {
 		customAlert("첨부/삭제할 파일이 없습니다.");
 		return false;
