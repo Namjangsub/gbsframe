@@ -214,6 +214,11 @@ const STATE = {
   editMode: "PLAN" // PLAN | ACT
 };
 
+function isProjectClosed() {
+    const firstTask = Array.from(STATE.tasks.values())[0];
+    return firstTask && (firstTask.endYn === 'Y' || firstTask.END_YN === 'Y');
+}
+
 let prevFocus = { id: null, start: 0, end: 0 };
 let UNDO_STACK = [];
 
@@ -630,7 +635,8 @@ function loadWbsData(opt, callback){
         wbsPlanNo: item.wbsPlanNo,
         wbsPlanCodeKind: item.wbsPlanCodeKind,
         wbsRsltsNo: item.wbsRsltsNo || item.wbsPlanCodeId, // 기본값은 PlanCodeId 사용
-        _originalTitle: item.wbsPlanCodeNm || item.title || item.WBS_PLAN_CODE_NM || "Untitled"
+        _originalTitle: item.wbsPlanCodeNm || item.title || item.WBS_PLAN_CODE_NM || "Untitled",
+        endYn: item.endYn || 'N'
       };
       STATE.tasks.set(t.id, t);
     });
@@ -664,6 +670,16 @@ function loadWbsData(opt, callback){
     }
     
     setToast("WBS 데이터 로드 완료", {type:"ok", autoHideMs:1500});
+
+    // 과제 마감 시 편집 버튼들 숨기기
+    if (isProjectClosed()) {
+        $("#btnAddTask, #btnRemoveTask, #btnTaskTemplate, #btnBatchSave, #btnEditPlan, #btnEditAct, #btnRecalc").hide();
+        $("#btnApproveAttach, #btnAddIssue").hide();
+        $("#editModeInfo").html('<span style="color:red; font-weight:bold;">[과제 마감]</span> 모든 편집 기능이 제한됩니다.');
+    } else {
+        $("#btnAddTask, #btnRemoveTask, #btnTaskTemplate, #btnBatchSave, #btnRecalc").show();
+        $("#btnApproveAttach, #btnAddIssue").show();
+    }
 
     if(typeof callback === 'function') callback();
   });
@@ -1248,6 +1264,11 @@ function attachDualBarDragWithConfirm(barEl, handleL, handleR, taskId, baseYmd, 
   }
 
   function beginDrag(e, dragType){
+    // 과제 마감 시 드래그 차단
+    if (isProjectClosed()) {
+        alert("마감된 과제는 일정을 변경할 수 없습니다.");
+        return;
+    }
     // 0. 포커스 및 이전 알림 초기화
     prevFocus = { id: null, start: 0, end: 0 };
     hideToast();
@@ -1537,7 +1558,7 @@ function renderGantt(){
     const titleInput = $("<input>")
       .addClass("gNameInput")
       .val(t.title)
-      .prop("disabled", t.parentId === null)
+      .prop("disabled", t.parentId === null || isProjectClosed())
       .on("focus", function() {
         pushUndoSnapshot();
       })
@@ -1621,6 +1642,10 @@ function renderGantt(){
 
     // [신규] 간트 로우 빈공간 우클릭 시 드래그로 ACT 바 생성
     line.on("mousedown", (e) => {
+        // 과제 마감 시 편집 행위 차단
+        if (isProjectClosed() && e.which === 3) {
+            return;
+        }
         // 이미 생성된 간트 바(.bar)나 드래그 핸들(.handle)을 클릭한 경우는 무시 (기존 기능과 충돌 방지)
         if ($(e.target).hasClass('handle') || $(e.target).hasClass('bar') || $(e.target).closest('.bar').length > 0) return;
 
@@ -1989,6 +2014,12 @@ function renderDetail(){
     </div>
   `);
 
+  // 과제 마감 시 상세 영역의 모든 입력 및 버튼 차단
+  if (isProjectClosed()) {
+    elDetail.find("input, select, textarea").prop("disabled", true);
+    elDetail.find("button").not("#btnFocus").hide(); // '간트에서 보기' 버튼은 허용
+  }
+
   // --- Issue Double Click Handler ---
   elDetail.find(".issue").on("dblclick", function() {
     const issueId = $(this).attr("data-issue-id");
@@ -1996,7 +2027,7 @@ function renderDetail(){
     if (!issue) return;
 
     var paramObj = {
-      "actionType"     : "U4",
+      "actionType"     : isProjectClosed() ? "V" : "U4",
       "coCd"           : issue.coCd,
       "salesCd"        : issue.salesCd,
       "issFileTrgtKey" : issue.fileTrgtKey
@@ -3012,6 +3043,7 @@ function init(){
 
 /** 실적 생성 후 상태 선택 팝업 메뉴 표시 */
 function showStatusMenu(ev, taskId) {
+    if (isProjectClosed()) return;
     const t = STATE.tasks.get(taskId);
     if (!t) return;
 

@@ -165,8 +165,14 @@ onkeyup="(event.keyCode == 8 || event.keyCode == 46) ? ordrsClntCd_S.value = '' 
                 <option value="">전체</option>
               </select>
             </td>
-            <th></th>
-            <td></td>
+            <th>마감여부</th>
+			<td>
+				<select id="endYn_S" name="endYn_S" data-search="endYn">
+					<option value="" selected>전체</option>
+					<option value="Y">마감</option>
+					<option value="N">미마감</option>
+				</select>
+			</td>
 
 <!--             <th>PM계획상태</th> -->
 <!--             <td> -->
@@ -2771,9 +2777,16 @@ onkeyup="(event.keyCode == 8 || event.keyCode == 46) ? ordrsClntCd_S.value = '' 
           cancel: ".ui-resizable-handle",
           start: function(){
             const $this = $(this);
+            const rowobj = $this.data("rowobj") || {};
+
+            // 과제 마감 시 편집 불가
+            if (rowobj.endYn === 'Y') {
+              alert('마감된 과제는 일정을 변경할 수 없습니다.');
+              return false;
+            }
+
             // 실적 바: TASK 2개 이상이면 드래그 시작 자체를 차단
             if ($this.hasClass("act-bar")) {
-              const rowobj = $this.data("rowobj") || {};
               if (Number(rowobj.notWbscodeCount || 0) > 1) {
                 alert('하위 TASK가 2개 이상인 경우 Gantt에서 일괄 변경할 수 없습니다. 상세 팝업을 이용하세요.');
                 return false;
@@ -2800,9 +2813,16 @@ onkeyup="(event.keyCode == 8 || event.keyCode == 46) ? ordrsClntCd_S.value = '' 
           },
           start: function(){
             const $this = $(this);
+            const rowobj = $this.data("rowobj") || {};
+
+            // 과제 마감 시 편집 불가
+            if (rowobj.endYn === 'Y') {
+              alert('마감된 과제는 일정을 변경할 수 없습니다.');
+              return false;
+            }
+
             // 실적 바: TASK 2개 이상이면 리사이즈 시작 자체를 차단
             if ($this.hasClass("act-bar")) {
-              const rowobj = $this.data("rowobj") || {};
               if (Number(rowobj.notWbscodeCount || 0) > 1) {
                 alert('하위 TASK가 2개 이상인 경우 Gantt에서 일괄 변경할 수 없습니다. 상세 팝업을 이용하세요.');
                 return false;
@@ -2972,6 +2992,12 @@ onkeyup="(event.keyCode == 8 || event.keyCode == 46) ? ordrsClntCd_S.value = '' 
     window.callGanttAction = function(action, data) {
       $("#ganttContextMenu").remove();
 
+      // 마감 여부 체크 (새로고침 제외)
+      if (action !== 'refresh' && data.endYn === 'Y') {
+        alert("마감된 과제는 데이터를 변경할 수 없습니다.");
+        return;
+      }
+
       // ✅ 새로고침 액션 처리 (백엔드에서 최신 데이터 재조회)
       if (action === 'refresh') {
         toast("데이터를 새로고침하고 있습니다...");
@@ -3074,7 +3100,16 @@ onkeyup="(event.keyCode == 8 || event.keyCode == 46) ? ordrsClntCd_S.value = '' 
     }
 
     function applyBarChange($bar){
-
+        const rowobj = $bar.data("rowobj") || {};
+        // 과제 마감 여부 체크
+        if (rowobj.endYn === 'Y') {
+            // 취소 시 원래 위치와 크기로 복원 (안전장치)
+            const originalLeft = $bar.data("originalLeft");
+            const originalWidth = $bar.data("originalWidth");
+            if (originalLeft !== undefined) $bar.css("left", originalLeft);
+            if (originalWidth !== undefined) $bar.css("width", originalWidth);
+            return false;
+        }
         const isActBar = $bar.hasClass("act-bar");
       // 일정확정된 자료는 버전 변경 확인 (salesCd별로 한 번만)
       const salesCd = $bar.data("salescd") || $bar.closest('.wbs-row').data('salescd');
@@ -4479,7 +4514,9 @@ onkeyup="(event.keyCode == 8 || event.keyCode == 46) ? ordrsClntCd_S.value = '' 
                 problemCount: item.problemCount || '',
                 problemUncomplete: item.problemUncomplete || '',
                 scheduleStatus: item.scheduleStatus || '',
-                notWbscodeCount: item.notWbscodeCount || item.notWbscodeCount || 0,
+                notWbscodeCount: item.notWbscodeCount || 0,
+                endYn: item.endYn || 'N',
+                totalUnCnt: item.totalUnCnt || item.TOTAL_UN_CNT || 0,
                 ...item
               };
 
@@ -4765,6 +4802,7 @@ onkeyup="(event.keyCode == 8 || event.keyCode == 46) ? ordrsClntCd_S.value = '' 
           "ordrsNo": ordrsNo,
           "planVerNo": planVerNo,
           "histYn": 'N',  //최종 일정에 대한 수정반영하기
+          "endYn": (typeof window.__getWbsRows === 'function') ? (window.__getWbsRows().find(x=>x.salesCd===salesCd)||{}).endYn : 'N'
       };
       openModal("/static/html/user/wb/wb22/WB2201P01.html", 1400, 900, "WBS 계획등록", paramObj, function () {
           searchData(false); // Refresh WBS

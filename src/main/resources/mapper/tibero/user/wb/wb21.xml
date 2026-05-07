@@ -106,6 +106,7 @@
 		                           , X.UDT_ID                                                      AS UDT_ID             --
 		                           , X.UDT_PGM                                                     AS UDT_PGM            --
 		                           , TO_CHAR(X.UDT_DTTM, 'YYYY-MM-DD HH24:MI:SS')                  AS UDT_DTT            --
+		                           , X.END_YN                                                      AS END_YN             --마감여부
 		                        FROM TB_WB21M01 X
 		                             LEFT OUTER JOIN TB_BM02M01 AS BM ON X.MKER_CD = BM.CLNT_CD --거래처정보
 		                       WHERE X.CO_CD = #{coCd}
@@ -160,12 +161,16 @@
 		                     , X.UDT_ID             --수정자 ID
 		                     , X.UDT_PGM            --수정 프로그램
 		                     , X.UDT_DTT            --수정일시
+							 , X.END_YN            --마감여부
 		                  FROM SUBJ X
 		                       LEFT OUTER JOIN SJD AS CR ON X.CO_CD = CR.CO_CD AND X.SALES_CD = CR.SALES_CD 
 		                 WHERE 1=1
                            <if test="lastYn != null and !lastYn.equals('')">
 		                   AND X.VER_NO = X.MAX_VER_NO       
                            </if>
+						   <if test="endYn != null and !endYn.equals('')">
+						   AND X.END_YN = #{endYn}
+						   </if>
 		                 ORDER BY CR.CLNT_NM, X.SALES_CD, X.VER_NO DESC
                        ) X
                 WHERE  1 = 1
@@ -274,17 +279,18 @@
                          		  		     		 END
 		                           		  ELSE ''
 		                           		  END 													AS MANUAL_ELEC_CHK
+		                           , X.END_YN													AS END_YN
 		                        FROM TB_WB21M01 X
                 					 LEFT OUTER JOIN TB_WB21D02  D  ON X.SALES_CD = D.SALES_CD
 		                             LEFT OUTER JOIN TB_BM02M01 AS BM ON X.MKER_CD = BM.CLNT_CD --거래처정보
 		                       WHERE X.CO_CD = #{coCd}
                                 <if test="sjNm != null and !sjNm.equals('')">
-                                 AND X.SJ_NM LIKE '%${sjNm}%'                
-                                </if>  
-                                <if test="closeYn != null and !closeYn.equals('')">
-                                 AND CLOSE_YN LIKE '%${closeYn}%'                
+                                 AND X.SJ_NM LIKE '%${sjNm}%'
                                 </if>
-		                          AND EXISTS (SELECT 'X'    --과제등록된 SALES_CD 만 
+                                <if test="closeYn != null and !closeYn.equals('')">
+                                 AND CLOSE_YN LIKE '%${closeYn}%'
+                                </if>
+		                          AND EXISTS (SELECT 'X'    --과제등록된 SALES_CD 만
 		                                        FROM SJD P 
 		                                       WHERE P.CO_CD    = X.CO_CD
 		                                         AND P.SALES_CD = X.SALES_CD
@@ -336,12 +342,16 @@
 		                     , X.MANUAL_ELEC		--전기매뉴얼 등록번호
 		                     , X.MANUAL_MC_CHK    --매뉴얼진행상태체크
 		                     , X.MANUAL_ELEC_CHK    --매뉴얼진행상태체크
+							 , X.END_YN				--마감여부
 		                  FROM SUBJ X
 		                       LEFT OUTER JOIN SJD AS CR ON X.CO_CD = CR.CO_CD AND X.SALES_CD = CR.SALES_CD 
 		                 WHERE 1=1
                            <if test="lastYn != null and !lastYn.equals('')">
-		                   AND X.VER_NO = X.MAX_VER_NO       
+		                   AND X.VER_NO = X.MAX_VER_NO
                            </if>
+						   <if test="endYn != null and !endYn.equals('')">
+						   AND X.END_YN = #{endYn}
+						   </if>
 		                 ORDER BY CR.CLNT_NM, X.SALES_CD, X.VER_NO DESC
 		               ) X 
 		       ) X      
@@ -969,7 +979,8 @@
                     (SELECT T.FILE_NAME FROM TB_CM08M01 T WHERE T.FILE_KEY = D.MANUAL_MC) AS MANUAL_MC_FILE_NM,
                     (SELECT T.FILE_NAME FROM TB_CM08M01 T WHERE T.FILE_KEY = D.MANUAL_ELEC) AS MANUAL_ELEC_FILE_NM,
 					E.VER_NO   AS WBS_PLAN_VER_NO,
-					NVL(E.CLOSE_YN, 'N') AS WBS_PLAN_CLOSE_YN
+					NVL(E.CLOSE_YN, 'N') AS WBS_PLAN_CLOSE_YN,
+					X.END_YN		-- 과제 종료 여부
                 FROM TB_WB21M01 X
                 	LEFT OUTER JOIN TB_WB21D02  D  ON X.SALES_CD = D.SALES_CD
 					LEFT OUTER JOIN (
@@ -1197,4 +1208,16 @@
 		   AND MANUAL_MC = #{manualMc}
 		   AND MANUAL_ELEC = #{manualElec}
 	</delete>
+
+	<!-- 과제마감 - END_YN 을 'Y'로 업데이트 -->
+	<update id="endSjNo" parameterType="Map">
+		UPDATE TB_WB21M01
+		   SET END_YN   = 'Y'
+		     , UDT_ID   = #{userId}
+		     , UDT_PGM  = #{pgmId}
+		     , UDT_DTTM = SYSDATE
+		 WHERE FILE_TRGT_KEY = #{fileTrgtKey}
+		   AND SALES_CD = #{salesCd}
+		   AND END_YN   = 'N'
+	</update>
 </mapper>

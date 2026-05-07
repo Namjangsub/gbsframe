@@ -70,4 +70,7 @@ public interface WB21Svc {
 
 	// 출고일 변경 Chk
 	List<Map<String, String>> deDtChangChk(Map<String, String> paramMap);
+
+	// 과제마감
+	int endSjNo(Map<String, String> paramMap) throws Exception;
 }

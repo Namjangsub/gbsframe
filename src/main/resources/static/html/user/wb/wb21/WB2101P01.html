@@ -19,6 +19,8 @@
 			<input type="hidden" id="maxVerNo" 	name="maxVerNo">
 			<input type="hidden" id="pgmId" 	name="pgmId" value="WB2101P02">
 			<input type="hidden" id="fileTrgtKey" 	name="fileTrgtKey">
+			<input type="hidden" id="prdtGrp"  name="prdtGrp">
+			<input type="hidden" id="endYn" 	name="endYn">
 			<table class="popup_table">
 				<colgroup>
 					<col width="15%">
@@ -350,6 +352,15 @@
 		return '<img src="/static/img/'+color+'" style="width: 10px;height: 10px;"></img>';
 	};
 
+	ax5.ui.grid.formatter["bilgYn_WB22"] = function () {
+		var flag = this.value;
+		if (flag === 'Y') return '<span style="color: blue; font-size: 11px;">●</span>';
+		if (flag === 'G') return '<span style="color: orange; font-size: 11px;">●</span>';
+		if (flag === 'P') return '<span style="color: silver; font-size: 11px;">●</span>';
+		if (flag === 'N') return '<span style="color: red; font-size: 11px;">●</span>';
+		return '';
+	};
+
 	//---------------------------------------------------
 	/*  WBSPLANSTS10	미진행
 		WBSPLANSTS20	진행중
@@ -396,6 +407,9 @@
 	// 일정관리 권한에 따른 편집가능 여부 체크 함수
 	function canEditPlanRow(row) {
 		if (!row) return false;
+
+		// 과제 마감 시 수정 불가
+		if ($('#wb21_popForm #endYn').val() == 'Y') return false;
 
 		// 전기 인원은 WBSCODE06(전기완료)만 수정 가능
 		const isElectUser = jwt.userId === 'canmtb' || jwt.userId === 'tjswlssky' || jwt.userId === 'famyg80';
@@ -466,7 +480,6 @@
 							addRowArr = [];
 							
 							wbsPlanCodeKind = this.item.wbsPlanCodeId;
-							
 							// Validation 체크 총괄PM이 아니면 자기담당인TASK만 조회가능
 							var smrizeId = $('#smrizeId').val();
 							var row = gridView1.target.getList("selected")[0];
@@ -475,9 +488,13 @@
 							//  총괄PM 또는 일정관리 담당자 한동주 가능-->
 							// 등록내용은 전체 조회가 되고,  수정권한만 제거 함. 남장섭 231215 확인
 							// Validation 체크 - 2레벨 담당자 체크 버튼 보임 처리
-							if (row != undefined && row.wbsPlanMngId != jwt.userId && this.item.closeYn != "Y") {
+							if ($('#wb21_popForm #endYn').val() == 'Y') {
+								// 과제 마감 시 일정계획/TASK 버튼 모두 숨김
+								$("#wb21_popForm #addrow1").hide();
 								$("#wb21_popForm #addrow2").hide();
-							}else {
+							} else if (row != undefined && row.wbsPlanMngId != jwt.userId && this.item.closeYn != "Y") {
+								$("#wb21_popForm #addrow2").hide();
+							} else {
 								$("#wb21_popForm #addrow2").show();
 							}
 // 							if(jwt.userId == smrizeId || jwt.userId == 'ycy'){
@@ -722,6 +739,7 @@
 							return Number.isFinite(n) ? String(n) : "0";
 						},
 						styleClass: function () {return gridColor(this.item);}},
+					{key: "compFlag",     label: "실적",    align: "center",   width: 50, formatter: "bilgYn_WB22", styleClass: function () {return gridColor(this.item);}},
 					{key: "rsltssDt", label: "<span style='color: #0000FF;'>실적시작일</span>", align: "center", width: 120,
 						formatter: function () { return '<div style="color: #0000FF">' + (this.value||'') + '</div>'; }
 						, styleClass: function () {return gridColor(this.item);}},
@@ -915,6 +933,9 @@
 					},
 					onDBLClick: function () {
 						this.self.select(this.dindex);
+						if ($('#wb21_popForm #endYn').val() == 'Y') {
+							return false;
+						}
 						// Validation 체크
 						// if (this.item.rsltsCloseYn == "Y") {
 						// 	alert("확정된 상태입니다.");
@@ -1111,7 +1132,7 @@
 					}
 					// Validation 체크 - 2레벨 담당자 체크 버튼 보임 처리
 					var row1 = gridView1.target.getList("selected")[0];
-					if (row != undefined && row.wbsPlanMngId != jwt.userId || row1.closeYn == "N") {
+					if (row != undefined && row.wbsPlanMngId != jwt.userId || row1.closeYn == "N" || $('#wb21_popForm #endYn').val() == 'Y') {
 						$("#wb21_popForm #addrow2").hide();
 					} else {
 						$("#wb21_popForm #addrow2").show();
@@ -1119,7 +1140,7 @@
 					}
 
 					//전산실 관리용
-					if (jwt.userId == 'js.nam' || jwt.userId == 'ssj')  $("#wb21_popForm #addrow2").show();
+					if ((jwt.userId == 'js.nam' || jwt.userId == 'ssj') && $('#wb21_popForm #endYn').val() == 'N')  $("#wb21_popForm #addrow2").show();
 					gridResize(gridView2.target.list.length); //그리드 높이 조정
 				} catch (error) {
 					alert("오류 발생!! 전산실 연락 바랍니다", error.message);
@@ -1531,6 +1552,20 @@
 							$('#wb21_popForm #' + key + 'RemoveButton').show();
 						}
 					});
+				}
+
+				// 과제 마감(END_YN = 'Y') 시 수정 불가 안내 및 버튼 숨김
+				if ($('#wb21_popForm #endYn').val() == 'Y') {
+					customAlert("과제 마감 완료 상태입니다. 수정이 불가합니다.");
+					$('.popup_area .tit').text('과제관리 조회 (마감)');
+					$('.popup_area #actionBtn').hide();
+					$('.popup_area #copyBtn').hide();
+					$('.popup_area #confirm').hide();
+					$('.popup_area #verUp').hide();
+					$('.popup_area #addrow1').hide();
+					$('.popup_area #addrow2').hide();
+					$('.popup_area .manualButton').hide();
+					$('.popup_area #fileUpBtn').show();
 				}
 			} else {
 				var strYear = new Date().toISOString().substring(2, 4);
@@ -2865,17 +2900,29 @@
 				if(confirm("확정하시겠습니까?")){
 					var formData = new FormData();
 					formData.append("flag", flag);
+					formData.append("coCd", $("#wb21_popForm #coCd").val());
 					formData.append("rsltsFileTrgtKey", row.rsltsFileTrgtKey);
 					formData.append("userId", jwt.userId);
+					formData.append("wbsRsltsNo", row.wbsRsltsNo);
 					formData.append("pgmId", $("#pgmId").val());
 					formData.append("dwgNo", $("#salesCd").val());
 					formData.append("salesCd", $("#wb21_popForm #salesCd").val());
 					formData.append("wbsPlanCodeKind", row.wbsPlanCodeKind);
+					formData.append("prdtGrp", $("#prdtGrp").val());
+					formData.append("equipNm", $("#sjNm").val());
+					formData.append("clntCd", $("#clntCd").val());
+					formData.append("clntNm", $("#clntNm").val());
+					formData.append("dsgnEmpCd", row.wbsPlanMngId);
+					formData.append("dsgnEmpNm", row.wbsPlanMngNm);
+					formData.append("startDt", row.wbsRsltssDt);
 					formData.append("relDt", row.wbsRsltseDt);
+					formData.append("remark", "일정관리에서 자동생성");
+					formData.append("codeId", "SPECRTS05");
 
 					filePostAjax("/user/wb/wb22/wbsRsltsconfirm", formData, function(data){
 						if(data.resultCode == 200){
 //                             alert("확정 되었습니다.");
+							gridView1.setData(0);
 							gridView2.setData(0);
 						}
 					});
@@ -2884,6 +2931,8 @@
 				if(confirm("확정 취소하시겠습니까?")){
 					var formData = new FormData();
 					formData.append("flag", flag);
+					formData.append("coCd", $("#coCd").val());
+					formData.append("wbsRsltsNo", row.wbsRsltsNo);
 					formData.append("rsltsFileTrgtKey", row.rsltsFileTrgtKey);
 					formData.append("userId", jwt.userId);
 					formData.append("pgmId", $("#pgmId").val());
@@ -2895,6 +2944,7 @@
 					filePostAjax("/user/wb/wb22/wbsRsltsconfirm", formData, function(data){
 						if(data.resultCode == 200){
 //                             alert("확정 취소되었습니다.");
+							gridView1.setData(0);
 							gridView2.setData(0);
 						}
 					});

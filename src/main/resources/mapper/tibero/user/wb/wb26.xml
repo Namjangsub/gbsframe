@@ -1583,12 +1583,18 @@
 							  			LEFT OUTER JOIN TB_BM01M01 AS B1 ON C2.PRDT_CD = B1.PRDT_CD
 							  			LEFT OUTER JOIN TB_CR02M01 AS M2 ON C2.ORDRS_NO = M2.ORDRS_NO
 							  			LEFT OUTER JOIN TB_BM02M01 AS B2 ON M2.ORDRS_CLNT_CD = B2.CLNT_CD
+							  			LEFT OUTER JOIN TB_WB21M01 AS W21 ON W2.CO_CD = W21.CO_CD AND W2.SALES_CD = W21.SALES_CD
+							  				AND W21.VER_NO = (SELECT MAX(VER_NO) FROM TB_WB21M01 WHERE CO_CD = W2.CO_CD AND SALES_CD = W2.SALES_CD)
 							 WHERE 1 = 1
 					           AND W2.CO_CD = #{coCd}
 								<if test="salesCd == null or salesCd == ''">
 					           AND M2.ORDRS_DT BETWEEN TO_DATE(#{strtDt},'YYYYMMDD') AND TO_DATE(#{endDt},'YYYYMMDD')  
 								</if>
 							   AND W2.WBS_PLAN_CODE_KIND = 'WBSCODE'
+								<!-- 마감여부 -->
+								<if test="endYn != null and !endYn.equals('')">
+								AND W21.END_YN = #{endYn}
+								</if>
 								<!-- SalesCode -->
 								<if test="salesCd != null and !salesCd.equals('')">
 								AND W2.SALES_CD LIKE  '%' || #{salesCd} || '%'
@@ -1645,12 +1651,18 @@
 							  			LEFT OUTER JOIN TB_BM01M01 AS B1 ON C2.PRDT_CD = B1.PRDT_CD
 							  			LEFT OUTER JOIN TB_CR02M01 AS M2 ON C2.ORDRS_NO = M2.ORDRS_NO
 							  			LEFT OUTER JOIN TB_BM02M01 AS B2 ON M2.ORDRS_CLNT_CD = B2.CLNT_CD
+							  			LEFT OUTER JOIN TB_WB21M01 AS W21 ON W2.CO_CD = W21.CO_CD AND W2.SALES_CD = W21.SALES_CD
+							  				AND W21.VER_NO = (SELECT MAX(VER_NO) FROM TB_WB21M01 WHERE CO_CD = W2.CO_CD AND SALES_CD = W2.SALES_CD)
 							 WHERE 1 = 1
 					           AND W2.CO_CD = #{coCd}
 								<if test="salesCd == null or salesCd == ''">
 					           AND M2.ORDRS_DT BETWEEN TO_DATE(#{strtDt},'YYYYMMDD') AND TO_DATE(#{endDt},'YYYYMMDD')  
 								</if>
 							   AND W2.WBS_PLAN_CODE_KIND != 'WBSCODE'
+								<!-- 마감여부 -->
+								<if test="endYn != null and !endYn.equals('')">
+								AND W21.END_YN = #{endYn}
+								</if>
 								<!-- SalesCode -->
 								<if test="salesCd != null and !salesCd.equals('')">
 								AND W2.SALES_CD LIKE  '%' || #{salesCd} || '%'
@@ -1715,10 +1727,16 @@
 							  			LEFT OUTER JOIN TB_BM01M01 AS B1 ON C2.PRDT_CD = B1.PRDT_CD
 							  			LEFT OUTER JOIN TB_CR02M01 AS M2 ON C2.ORDRS_NO = M2.ORDRS_NO
 							  			LEFT OUTER JOIN TB_BM02M01 AS B2 ON M2.ORDRS_CLNT_CD = B2.CLNT_CD
+							  			LEFT OUTER JOIN TB_WB21M01 AS W21 ON W2.CO_CD = W21.CO_CD AND W2.SALES_CD = W21.SALES_CD
+							  				AND W21.VER_NO = (SELECT MAX(VER_NO) FROM TB_WB21M01 WHERE CO_CD = W2.CO_CD AND SALES_CD = W2.SALES_CD)
 							 WHERE 1 = 1
 					           AND W2.CO_CD = #{coCd}
 								<if test="salesCd == null or salesCd == ''">
 					           AND M2.ORDRS_DT BETWEEN TO_DATE(#{strtDt},'YYYYMMDD') AND TO_DATE(#{endDt},'YYYYMMDD')  
+								</if>
+								<!-- 마감여부 -->
+								<if test="endYn != null and !endYn.equals('')">
+								AND W21.END_YN = #{endYn}
 								</if>
 								<!-- SalesCode -->
 								<if test="salesCd != null and !salesCd.equals('')">
@@ -2591,6 +2609,19 @@
 			    FROM TB_CR02D02 P
 			    WHERE P.CO_CD              = #{coCd}
 			      AND P.SALES_CD           = #{salesCd}),
+			job as (
+				SELECT CO_CD, SALES_CD, END_YN
+				FROM (
+				    SELECT P.CO_CD
+				         , P.SALES_CD
+				         , NVL(P.END_YN, 'N') AS END_YN
+				         , ROW_NUMBER() OVER (PARTITION BY P.CO_CD,  P.SALES_CD ORDER BY TO_NUMBER(P.VER_NO) DESC) AS RN
+				      FROM TB_WB21M01 P
+				      WHERE P.CO_CD    = #{coCd}
+				        AND P.SALES_CD = #{salesCd}
+				) T
+				WHERE T.RN = 1
+			),
 			-- 1) 자식(계획/실적) base
 			child_base AS (
 			    SELECT
@@ -2747,11 +2778,13 @@
 			        0 AS ISSUE_HIGH_CNT,
 			
 			        pb.SEQ AS SEQ_SORT,
-			        eq.EQP_NM					AS EQP_NM
+			        eq.EQP_NM					AS EQP_NM,
+			        job.END_YN					AS END_YN
 			    FROM parent_base pb
 			    LEFT JOIN user_nm umP ON umP.ID = pb.WBS_PLAN_MNG_ID
 			    LEFT JOIN code_nm csP ON csP.CODE_ID = pb.WBS_PLAN_CODE_ID
 			    LEFT JOIN equp_nm eq ON eq.CO_CD = pb.CO_CD AND eq.SALES_CD = pb.SALES_CD
+			    LEFT JOIN job ON job.CO_CD = pb.CO_CD AND job.SALES_CD = pb.SALES_CD
 			
 			    UNION ALL
 			
@@ -2802,7 +2835,8 @@
 			        NVL(i.ISSUE_HIGH_CNT, 0)	AS ISSUE_HIGH_CNT,
 			
 			        cb.SEQ 						AS SEQ_SORT,
-			        eq.EQP_NM					AS EQP_NM
+			        eq.EQP_NM					AS EQP_NM,
+			        job.END_YN					AS END_YN
 			    FROM child_base cb
 			    LEFT JOIN user_nm um1 ON um1.ID = cb.WBS_PLAN_MNG_ID
 			    LEFT JOIN user_nm um2 ON um2.ID = cb.WBS_RSLTS_ID
@@ -2813,6 +2847,7 @@
 			      AND i.SALES_CD           = cb.SALES_CD
 			      AND i.WBS_PLAN_CODE_KIND = cb.WBS_PLAN_CODE_KIND
 			      AND i.WBS_PLAN_CODE_ID   = cb.WBS_PLAN_CODE_ID
+			    LEFT JOIN job ON job.CO_CD = cb.CO_CD AND job.SALES_CD = cb.SALES_CD
 			)
 			ORDER BY
 			    CASE WHEN PARENT_ID IS NULL THEN 0 ELSE 1 END,

@@ -350,4 +350,22 @@ public class WB21Ctr {
 		model.addAttribute("resultList", resultList);
 		return "jsonView";
 	}
+
+	// 과제마감
+	@PostMapping(value = "/endSjNo")
+	public String endSjNo(@RequestBody Map<String, String> paramMap, ModelMap model) throws Exception {
+		try {
+			if (wb21Svc.endSjNo(paramMap) > 0) {
+				model.addAttribute("resultCode", 200);
+				model.addAttribute("resultMessage", messageUtils.getMessage("update"));
+			} else {
+				model.addAttribute("resultCode", 500);
+				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+			}
+		} catch (Exception e) {
+			model.addAttribute("resultCode", 900);
+			model.addAttribute("resultMessage", e.getMessage());
+		}
+		return "jsonView";
+	}
 }

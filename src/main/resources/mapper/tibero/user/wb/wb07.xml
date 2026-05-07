@@ -37,7 +37,7 @@
 	                ) M ON M.VIEW_DEPT_ID = T.MNG_DEPT
 			)
 			,job as (
-				SELECT CO_CD, SALES_CD, VER_NO, CLOSE_YN, SJ_NO, FILE_TRGT_KEY, WBS_REMARK, SMRIZE_ID
+				SELECT CO_CD, SALES_CD, VER_NO, CLOSE_YN, SJ_NO, FILE_TRGT_KEY, WBS_REMARK, SMRIZE_ID, END_YN
 				FROM (
 				    SELECT P.CO_CD
 				         , P.SALES_CD
@@ -47,6 +47,7 @@
 				         , P.FILE_TRGT_KEY
 				         , P.WBS_REMARK
 				         , P.SMRIZE_ID
+				         , NVL(P.END_YN, 'N') AS END_YN
 				         , ROW_NUMBER() OVER (PARTITION BY P.CO_CD,  P.SALES_CD ORDER BY TO_NUMBER(P.VER_NO) DESC) AS RN
 				      FROM TB_WB21M01 P
 				) T
@@ -66,6 +67,7 @@
 						, job.CLOSE_YN
 						, job.SMRIZE_ID
 						, job.VER_NO						AS SJ_VER_NO
+						, job.END_YN
 				FROM TB_CR02M01 C
 					JOIN TB_CR02D02 D ON D.CO_CD = C.CO_CD AND D.ORDRS_NO = C.ORDRS_NO
 					JOIN job ON job.CO_CD = C.CO_CD AND job.SALES_CD = D.SALES_CD AND job.CLOSE_YN = 'Y'
@@ -385,7 +387,8 @@
 			NVL(W0.PROBLEM_UNCOMPLETE, 0)					AS PROBLEM_UNCOMPLETE,PROBLEM_UNCOMPLETE,
 			NVL(UN.UN_COMPLETED, 0) 						AS UN_COMPLETED,
 			NVL(LP.NOT_WBSCODE_COUNT, 0)					AS NOT_WBSCODE_COUNT,
-			upr.total_un_cnt
+			upr.total_un_cnt,
+			S.END_YN
 		FROM final_base F
 		JOIN sales S            ON S.CO_CD = F.CO_CD AND S.SALES_CD = F.SALES_CD
 		JOIN sales_range R      ON R.CO_CD = F.CO_CD AND R.SALES_CD = F.SALES_CD
@@ -399,6 +402,9 @@
 		LEFT JOIN src_act ST    ON ST.CO_CD = F.CO_CD AND ST.SALES_CD = F.SALES_CD AND ST.WBS_PLAN_CODE_KIND = F.WBS_PLAN_CODE_ID
 		LEFT JOIN un_plan_result upr ON  upr.SALES_CD = F.SALES_CD 
 		WHERE 1=1
+		<if test="endYn != null and !endYn.equals('')">
+		AND S.END_YN = #{endYn}
+		</if>
 		<choose>
 		  <!-- 1) salesCd, ordrsClntNm, clntPjt 모두 비었을 때만 "오늘 포함" 조건 적용 -->
 		  <when test="(salesCd == null or salesCd == '') 

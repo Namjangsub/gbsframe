@@ -202,7 +202,8 @@
 					(SELECT T.CODE_NM FROM TB_CM05M01 T WHERE T.CODE_ID = PLAN_EXCEPT) AS PLAN_EXCEPT_NM,
 					(SELECT T.CODE_NM FROM TB_CM05M01 T WHERE T.CODE_ID = CR.CLNT_PJT) AS CLNT_PJT_NM,
 					X.FILE_TRGT_KEY,
-					CR.PRDT_GRP
+					CR.PRDT_GRP,
+					X.END_YN		-- 과제 종료 여부
 				FROM TB_WB21M01 X
 					LEFT OUTER JOIN (
 									SELECT
@@ -904,6 +905,7 @@
 						, (SELECT FN_CM05M01_CD_TO_NM(X.PRDCTN_DIF_CODE_ID) FROM DUAL) AS PRDCTN_DIF_CODE_NM --생산난이도
 						, X.PRDCTN_PLAN_HOUR                                            AS PRDCTN_PLAN_HOUR   --생산계획공수
 						, X.SJ_RMK                                                      AS SJ_RMK             --비고
+						, X.END_YN                                                      AS END_YN             --마감여부
 					FROM TB_WB21M01 X
 						LEFT OUTER JOIN TB_BM02M01 AS BM ON X.MKER_CD = BM.CLNT_CD --거래처정보
 					WHERE X.CO_CD = #{coCd}
@@ -1061,11 +1063,12 @@
 										, X.SJ_RMK                           AS SJ_RMK            --비고
 										, X.FILE_TRGT_KEY                    AS FILE_TRGT_KEY     --FILE_TRGT_KEY
 										, PLN.CLOSE_YN                       AS PLAN_CLOSE_YN     --계획확정여부
-										, NVL(PLN.HIST_YN,'N')                   AS HIST_YN --이력여부
+										, NVL(PLN.HIST_YN,'N')               AS HIST_YN           --이력여부
 										<if test="wbsPlanCodeId != null and !wbsPlanCodeId.equals('') and completePlanCheck != null and !completePlanCheck.equals('')">
 										, FLT.PLAN_YN              AS FILTER_PLAN_YN
 										, FLT.COMPLETE_YN          AS FILTER_COMPLETE_YN
 										</if>
+										, X.END_YN							 AS END_YN
 									FROM SUBJ X
 										INNER JOIN SJD AS CR ON X.CO_CD = CR.CO_CD AND X.SALES_CD = CR.SALES_CD
 										LEFT OUTER JOIN PLAN AS PLN ON X.CO_CD = PLN.CO_CD AND X.SALES_CD = PLN.SALES_CD
@@ -1103,6 +1106,9 @@
 								</when>
 							</choose>
 							</if>
+							<if test="endYn != null and !endYn.equals('')">
+							AND T.END_YN = #{endYn}
+							</if>
 
 							) T ) T
 	</select>
@@ -1135,6 +1141,7 @@
 						, (SELECT FN_CM05M01_CD_TO_NM(X.PRDCTN_DIF_CODE_ID) FROM DUAL) AS PRDCTN_DIF_CODE_NM --생산난이도
 						, X.PRDCTN_PLAN_HOUR                                            AS PRDCTN_PLAN_HOUR   --생산계획공수
 						, X.SJ_RMK                                                      AS SJ_RMK             --비고
+						, X.END_YN                                                      AS END_YN             --마감여부
 					FROM TB_WB21M01 X
 						LEFT OUTER JOIN TB_BM02M01 AS BM ON X.MKER_CD = BM.CLNT_CD --거래처정보
 					WHERE X.CO_CD = #{coCd}
@@ -1415,6 +1422,7 @@
 										, FLT.PLAN_YN              AS FILTER_PLAN_YN
 										, FLT.COMPLETE_YN          AS FILTER_COMPLETE_YN
 										</if>
+										, X.END_YN                 AS END_YN
 									FROM SUBJ X
 										INNER JOIN SJD AS CR ON X.CO_CD = CR.CO_CD AND X.SALES_CD = CR.SALES_CD
 										LEFT OUTER JOIN PLAN AS PLN ON X.CO_CD = PLN.CO_CD AND X.SALES_CD = PLN.SALES_CD
@@ -1453,8 +1461,9 @@
 								</when>
 							</choose>
 							</if>
-
-
+							<if test="endYn != null and !endYn.equals('')">
+							AND T.END_YN = #{endYn}
+							</if>
 
 							ORDER BY CLNT_NM, ORDRS_NO, SALES_CD, TO_NUMBER(PLAN_VER_NO) DESC
 							) T ) T

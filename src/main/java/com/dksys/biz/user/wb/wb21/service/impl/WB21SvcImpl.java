@@ -557,4 +557,20 @@ public class WB21SvcImpl implements WB21Svc {
 	public List<Map<String, String>> deDtChangChk(Map<String, String> paramMap) {
 		return wb21Mapper.deDtChangChk(paramMap);
 	}
+
+	// 과제마감
+	@Override
+	public int endSjNo(Map<String, String> paramMap) throws Exception {
+		Gson gson = new Gson();
+		Type listType = new TypeToken<ArrayList<Map<String, String>>>(){}.getType();
+		List<Map<String, String>> targetList = gson.fromJson(paramMap.get("targetList"), listType);
+		
+		int result = 0;
+		for (Map<String, String> target : targetList) {
+			Map<String, String> updateParam = new HashMap<>(paramMap);
+			updateParam.putAll(target);
+			result += wb21Mapper.endSjNo(updateParam);
+		}
+		return result;
+	}
 }

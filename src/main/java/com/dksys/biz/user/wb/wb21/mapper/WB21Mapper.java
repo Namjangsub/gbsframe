@@ -83,4 +83,9 @@ public interface WB21Mapper {
 	List<Map<String, String>> selectManualRows(Map<String, String> paramMap);
 
 	int deleteManualInfo(Map<String, String> paramMap);
+
+	// 과제마감
+	List<Map<String, String>> endSjNoChk(Map<String, String> paramMap);
+
+	int endSjNo(Map<String, String> paramMap);
 }
