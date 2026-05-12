@@ -1002,9 +1002,27 @@
 					, SUM(A.ORDRG_AMT) ORDRG_AMT
 					, MIN(A.DSGN_NO)   AS DSGN_NO
 					, MAX(F.GOODS_DIV) AS GOODS_DIV
-					, SUM(CASE WHEN F.GOODS_DIV = 'GOODSDIV03' THEN A.ORDRG_AMT ELSE 0 END) AS MATR_CLNT_DIV_ELEC
+					, NVL(MAX(G.MATR_CLNT_DIV_ELEC), 0) AS MATR_CLNT_DIV_ELEC
 				FROM TB_SM02D01 A
 								LEFT OUTER JOIN TB_BM05M01 F ON A.MATR_CD = F.MATR_CD
+								LEFT OUTER JOIN (
+									SELECT I.CO_CD
+										 , I.ORDRG_NO
+										 , SUM(CASE WHEN J.GOODS_DIV = 'GOODSDIV03' THEN I.IN_DTL_AMT ELSE 0 END) AS MATR_CLNT_DIV_ELEC
+									  FROM TB_SM03D01 I
+										   INNER JOIN (
+										   	SELECT DISTINCT CO_CD
+										   		  , ORDRG_NO
+										   		  , PCHS_NO
+										   		  , PCHS_SEQ
+										   	  FROM IPGO
+										   ) P ON I.CO_CD = P.CO_CD
+										      AND I.ORDRG_NO = P.ORDRG_NO
+										      AND I.PCHS_NO = P.PCHS_NO
+										      AND I.PCHS_SEQ = P.PCHS_SEQ
+										   LEFT OUTER JOIN TB_BM05M01 J ON I.MATR_CD = J.MATR_CD
+									 GROUP BY I.CO_CD, I.ORDRG_NO
+								) G ON A.CO_CD = G.CO_CD AND A.ORDRG_NO = G.ORDRG_NO
                       WHERE 1=1
                         AND EXISTS (SELECT 1 FROM IPGO WHERE  IPGO.ORDRG_NO = A.ORDRG_NO)
                       GROUP BY A.CO_CD, A.ORDRG_NO, A.SALES_CD
