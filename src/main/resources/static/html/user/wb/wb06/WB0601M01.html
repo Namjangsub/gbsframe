@@ -24,7 +24,7 @@
 	<link rel="stylesheet" href="/static/css/main.css">
 	<link rel="stylesheet" href="/static/css/sub.css">
 	<link rel="stylesheet" href="/static/css/common.css">
-	
+
 	<script type="text/javascript" src="/static/js/jquery-latest.min.js"></script>
 	<script type="text/javascript" src="/static/js/jquery.serializeObject.js"></script>
 	<script type="text/javascript" src="/static/bootstrap/js/bootstrap.min.js"></script>
@@ -418,16 +418,22 @@
 							<select id="coCd_S" name="coCd_S" data-kind="CO" data-search="coCd" required msg="회사">
 							</select>
 						</td>
-
-						<th class="hit">수주일자</th>
+						<th>과제마감</th>
 						<td>
+							<select id="endYn_S" name="endYn_S" data-search="endYn">
+								<option value="">전체</option>
+								<option value="Y">마감완료</option>
+								<option value="N" selected>마감전</option>
+							</select>
+						</td>
+						<th id="ordrsDtTh" class="hit">수주일자</th>
+						<td id="ordrsDtTd">
 							<div class="date_input">
 								<input type="text" id="strtDt_S" name="strtDt_S" class="input_calendar" onkeyup="dateMask(this);" autocomplete="off" required data-search="strtDt" style="cursor:pointer;">
 								<span>~</span>
 								<input type="text" id="endDt_S" name="endDt_S" class="input_calendar" onkeyup="dateMask(this);" autocomplete="off" required data-search="endDt" style="cursor:pointer;">
 							</div>
 						</td>
-						
 						<th class="">기계종류</th>
 						<td>
 							<div class="">
@@ -442,15 +448,6 @@
 								<option value="">전체</option>
 							</select>
 						</td>
-						<th>과제마감</th>
-						<td>
-							<select id="endYn_S" name="endYn_S" data-search="endYn">
-								<option value="">전체</option>
-								<option value="Y">마감완료</option>
-								<option value="N" selected>마감전</option>
-							</select>
-						</td>
-
 					</tr>
 
 					<!-- 검색조건 2행 -->
@@ -615,21 +612,33 @@
 		$("#coCd_S").val(jwt.coCd);
 	
 		// 날짜 범위 선택기
-		$('#strtDt_S').val(moment().subtract(6, "months").startOf("month").format('YYYY-MM-DD'));
-		$('#endDt_S').val(moment(new Date()).endOf("month").format('YYYY-MM-DD'));
-
-		$('#strtDt_S, #endDt_S').on('click', function(){
-			DateRangePicker.open({
-				startDt: $('#strtDt_S').val() || null,
-				endDt:   $('#endDt_S').val()  || null,
-				excludeSelectors: ['#strtDt_S', '#endDt_S'],
-				onApply: function(sd, ed){
-					$('#strtDt_S').val(sd);
-					$('#endDt_S').val(ed);
-					searchData();
-				}
-			});
+		$('#strtDt_S').datepicker({
+			format : "yyyy-mm-dd",
+			language : "ko",
+			autoclose : true
+		})
+		.datepicker("setDate", moment().subtract(6, "months").startOf("month").toDate())
+		.on("changeDate", function(){
+			if($('#strtDt_S').val() > $('#endDt_S').val()){
+				alert("날짜를 확인해주세요");
+				$('#strtDt_S').datepicker("setDate", new Date($('#endDt_S').val()));
+			}
 		});
+
+		$('#endDt_S').datepicker({
+			format : "yyyy-mm-dd",
+			language : "ko",
+			autoclose : true
+		})
+		.datepicker("setDate", moment(new Date()).endOf("month").toDate())
+		.on("changeDate", function(){
+			if($('#strtDt_S').val() > $('#endDt_S').val()){
+				alert("날짜를 확인해주세요");
+				$('#endDt_S').datepicker("setDate", new Date($('#strtDt_S').val()));
+			}
+		});
+		setDefaultOrdrsDtSearch();
+		toggleOrdrsDtSearch();
 	
 	
 		// 초기 렌더
@@ -663,7 +672,7 @@
 		});
 		  
 		// 검색조건 이벤트 bind
-		$('[data-search]').on("change", function(){ searchData(); });
+		bindSearchEvents();
 		$('#multiple-checkboxes-prdtGrp').multiselect({includeSelectAllOption: true,});
 		prdrGrpMutiSelectAddIn(); //기계종류 추가하기
 		$('#multiple-checkboxes-prdtGrp').on("change", function(){ searchData(); });
@@ -1258,23 +1267,69 @@
 		renderAll();
 	}
 
+	function setDefaultOrdrsDtSearch() {
+		if (!$("#strtDt_S").val()) {
+			$("#strtDt_S").datepicker("setDate", moment().subtract(6, "months").startOf("month").toDate());
+		}
+		if (!$("#endDt_S").val()) {
+			$("#endDt_S").datepicker("setDate", moment(new Date()).endOf("month").toDate());
+		}
+	}
+
+	function toggleOrdrsDtSearch() {
+		var isEndBefore = $("#endYn_S").val() === "N";
+
+		if (isEndBefore) {
+			$("#ordrsDtTh, #ordrsDtTd").hide();
+			$("#strtDt_S, #endDt_S")
+				.removeAttr("required")
+				.removeAttr("data-search");
+			if (!$("#scdStatus_S").val()) {
+				$("#scdStatus_S").val("진행중");
+			}
+		} else {
+			$("#ordrsDtTh, #ordrsDtTd").show();
+			$("#strtDt_S")
+				.attr("required", true)
+				.attr("data-search", "strtDt");
+			$("#endDt_S")
+				.attr("required", true)
+				.attr("data-search", "endDt");
+
+			setDefaultOrdrsDtSearch();
+			if ($("#scdStatus_S").val() === "진행중") {
+				$("#scdStatus_S").val("");
+			}
+		}
+	}
+
+	function bindSearchEvents() {
+		$(".contents.search")
+			.off("change.wb06Search", "[data-search]")
+			.on("change.wb06Search", "[data-search]", function(){
+				if (this.id === "endYn_S") {
+					toggleOrdrsDtSearch();
+				}
+				searchData();
+			});
+	}
+
 
 
 
 	// 초기화 버튼
 	function initSearch() {
-		$('[data-search]').off("change");	//바인딩기능 오프
+		$(".contents.search").off("change.wb06Search", "[data-search]");	//바인딩기능 오프
 		$('.contents.search select, .contents.search input').val("");
 		// 회사 선택 상자 값 설정
 		$("#coCd_S").val(jwt.coCd);
 		// 날짜 필드 값 설정
-		$("#strtDt_S").val(dateToStr(moment().subtract(6, "months").startOf("month").toDate()));
-		$("#endDt_S").val(dateToStr(moment(new Date()).endOf("month").toDate()));
+		$("#endYn_S").val("N");
+		setDefaultOrdrsDtSearch();
+		toggleOrdrsDtSearch();
 	
 		// 검색조건 이벤트 bind
-		$('[data-search]').on("change", function(){
-			searchData ();
-		});
+		bindSearchEvents();
 	
 	}
 
