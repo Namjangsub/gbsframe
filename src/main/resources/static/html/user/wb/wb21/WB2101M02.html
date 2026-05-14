@@ -163,7 +163,8 @@
         			<span style="font-size:11px;color:#1457e7">●</span> 등록완료&nbsp;&nbsp;
         		</div>
                 <div class="add_btn_small pdl10">
-                    <a id="endSjNo" onclick="endSjNo();" style="height: 30px; line-height: 28px; width: 90px;"><i class="fas fa-lock"></i> 과제마감</a>
+                    <a id="endSjNo" onclick="endSjNo('Y');" style="height: 30px; line-height: 28px; width: 90px;"><i class="fas fa-lock"></i> 과제마감</a>
+                    <a id="endSjNo" onclick="endSjNo('N');" style="height: 30px; line-height: 28px; width: 90px;"><i class="fas fa-unlock"></i> 마감취소</a>
                     <a id="confirmBtn" onclick="wbsSjNoconfirmSearch();" style="height: 30px; line-height: 28px; width: 90px;"><i class="fas fa-folder-plus"></i> 일괄확정</a>
                     <a id="cretSjNo" onclick="cretSjNo();" style="height: 30px; line-height: 28px; width: 90px;"><i class="fas fa-folder-plus"></i> 신규과제등록</a>
                     <a onclick="deleteSjNo();" style="height: 30px; line-height: 28px;" authchk>-</a>
@@ -417,8 +418,8 @@ $(document).ready(function() {
 	excelView.initView();
 })
 
-//과제마감 버튼 클릭 시
-function endSjNo() {
+// 과제마감 / 마감취소
+function endSjNo(endYn) {
 	var selectedRows = gridView.target.getList("selected");
 	if (selectedRows.length === 0) {
 		alert("선택된 데이터가 없습니다.");
@@ -427,17 +428,22 @@ function endSjNo() {
 	
 	var row = selectedRows[0];
 	var allList = gridView.target.getList();
-	var targetList = [];       // 마감 대상 (endYn != 'Y')
-	var alreadyEndList = [];   // 이미 마감된 건
+	var targetList = [];       // 처리 대상
+	var alreadyEndList = [];   // 이미 처리된 건
 	var confirmMsg = "";
+	var actionNm = endYn === 'Y' ? "마감" : "마감 취소";
 	
 	if (lastClickedColumn === 'clntPjtNm') {
-		// ★ 고객사PJT 컬럼 선택 → 동일 그룹 전체 마감
+		// ★ 고객사PJT 컬럼 선택 → 동일 그룹 전체 마감/마감취소
 		var selectedClntPjtNm = row.clntPjtNm;
 		
 		for (var i = 0; i < allList.length; i++) {
 			if (allList[i].clntPjtNm === selectedClntPjtNm) {
-				if (allList[i].endYn === 'Y') {
+				if (allList[i].endYn === 'Y' && endYn === 'Y') {
+					if (alreadyEndList.indexOf(allList[i].salesCd) === -1) {
+						alreadyEndList.push(allList[i].salesCd);
+					}
+				} else if (allList[i].endYn === 'N' && endYn === 'N') {
 					if (alreadyEndList.indexOf(allList[i].salesCd) === -1) {
 						alreadyEndList.push(allList[i].salesCd);
 					}
@@ -452,33 +458,44 @@ function endSjNo() {
 		}
 		
 		if (targetList.length === 0) {
-			alert("고객사PJT [" + selectedClntPjtNm + "] 에 속한 과제는 이미 모두 마감되었습니다.");
+			alert("고객사PJT [" + selectedClntPjtNm + "] 에 속한 과제는 이미 모두 " + actionNm + " 상태입니다.");
 			return;
 		}
 		
 		confirmMsg = "고객사PJT [" + selectedClntPjtNm + "] 에 속한 "
-				   + targetList.length + "건의 과제를 마감하시겠습니까?";
+				   + targetList.length + "건의 과제를 " + actionNm + "하시겠습니까?";
 		if (alreadyEndList.length > 0) {
-			confirmMsg += "\n\n※ 이미 마감된 " + alreadyEndList.length + "건은 제외됩니다.";
+			confirmMsg += "\n\n※ 이미 " + actionNm + " 상태인 " + alreadyEndList.length + "건은 제외됩니다.";
 		}
 	} else {
-		// ★ 다른 컬럼 선택 → 선택된 1건만 마감
-		if (row.endYn === 'Y') {
+		// ★ 다른 컬럼 선택 → 선택된 1건만 마감/마감취소
+		if (row.endYn === 'Y' && endYn === 'Y') {
 			alert("이미 마감된 과제입니다.");
 			return;
 		}
+		if (row.endYn === 'N' && endYn === 'N') {
+			alert("이미 마감 취소된 과제입니다.");
+			return;
+		}
+		
 		targetList.push({
 			"salesCd"      : row.salesCd,
 			"fileTrgtKey"  : row.fileTrgtKey,
 			"coCd"         : row.coCd
 		});
-		confirmMsg = "SALES CD [" + row.salesCd + "] 과제를 마감하시겠습니까?";
+		
+		if (endYn === 'Y') {
+			confirmMsg = "SALES CD [" + row.salesCd + "] 과제를 마감하시겠습니까?";
+		} else if (endYn === 'N') {
+			confirmMsg = "SALES CD [" + row.salesCd + "] 과제의 마감을 취소하시겠습니까?";
+		}
 	}
 	
 	if (confirm(confirmMsg)) {
 		var formData = {
 			"userId"        : jwt.userId,
 			"pgmId"         : "WB2101M02",
+			"endYn"         : endYn,
 			"targetList"    : JSON.stringify(targetList)
 		};
 		
