@@ -641,20 +641,9 @@
 							recalcSortOrder();
 						}
 						this.self.repaint(true);
-						if (this.key === 'mnSubject') {
-							// 틀고정 패널이라 DOM으로 높이 감지 불가 → 무조건 syncRowHeights 실행
-							setTimeout(syncRowHeights, 0);
-						} else {
-							// 다른 컬럼: 스크롤 패널이 실제로 커진 경우에만 실행 (스크롤 위치 보존)
-							var curColH = (mnGridView.target.config.body || {}).columnHeight || 50;
-							var maxH = 0;
-							$('[data-ax5grid="mnGrid-grid"]').find('[data-ax5grid-panel-scroll="body"] tr').each(function () {
-								maxH = Math.max(maxH, $(this).outerHeight() || 0);
-							});
-							if (maxH > curColH) {
-								setTimeout(syncRowHeights, 0);
-							}
-						}
+						// 주제·부서 구분 없이 항상 높이 동기화 실행
+						// (부서 컬럼도 repaint 직후 TR 높이 감지가 불안정할 수 있으므로 무조건 호출)
+						setTimeout(syncRowHeights, 0);
 					},
 					inlineEdit: {
 						active: function () {
@@ -1044,6 +1033,7 @@
 						focusLastEditedCell();
 					} else if (hasLockChange) {
 						mnGridView.target.repaint();
+						setTimeout(syncRowHeights, 0);
 					}
 				} catch (error) {
 				}
@@ -1721,11 +1711,14 @@
 			grid.repaint();
 			$gridEl.css('visibility', '');
 		} else {
-			// 다른 컬럼: 스크롤 위치 유지하며 높이만 적용
-			grid.setConfig({
-				body: $.extend({}, oldConfig, { columnHeight: maxHeight })
-			});
-			grid.repaint();
+			// 다른 컬럼: 높이가 실제로 변경된 경우에만 setConfig + repaint 실행 (불필요한 깜빡임 방지)
+			var currentColH = oldConfig.columnHeight || 50;
+			if (maxHeight !== currentColH) {
+				grid.setConfig({
+					body: $.extend({}, oldConfig, { columnHeight: maxHeight })
+				});
+				grid.repaint();
+			}
 		}
 	}
 
