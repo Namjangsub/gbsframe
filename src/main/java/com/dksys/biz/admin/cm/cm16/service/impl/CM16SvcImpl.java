@@ -227,6 +227,17 @@ public class CM16SvcImpl implements CM16Svc {
     
     @Override
     public int deleteItoaIssue(Map<String, String> paramMap) throws Exception {
+        
+        paramMap.put("reqNo", paramMap.get("fileTrgtKey"));
+        List<Map<String, String>> signList = wb20Svc.selectSignResUserlst(paramMap);
+        if (signList != null) {
+            for (Map<String, String> sign : signList) {
+                if ("Y".equals(sign.get("sanctnSttus"))) {
+                    throw new Exception("1명이라도 결재처리가 완료된 건은 삭제할 수 없습니다.");
+                }
+            }
+        }
+
         //---------------------------------------------------------------  
 		//첨부 화일 권한체크  시작 -->삭제 권한 없으면 Exception, 관련 화일 전체 체크
 	  	//   필수값 :  jobType, userId, comonCd
