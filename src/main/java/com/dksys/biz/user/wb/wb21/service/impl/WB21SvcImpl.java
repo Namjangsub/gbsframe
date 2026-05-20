@@ -292,6 +292,7 @@ public class WB21SvcImpl implements WB21Svc {
 		List<Map<String, String>> sharngArr = gson.fromJson(paramMap.get("rowSharngListArr"), stringList);
 		if (sharngArr != null && sharngArr.size() > 0 ) {
 			int i = 0;
+			QM01Mapper.deleteSJApprovalList1(sharngArr.get(0));
 			for (Map<String, String> sharngMap : sharngArr) {
 				try {	 
 					sharngMap.put("fileTrgtKey", paramMap.get("fileTrgtKey"));
@@ -299,7 +300,6 @@ public class WB21SvcImpl implements WB21Svc {
 					sharngMap.put("userId", paramMap.get("userId"));
 					sharngMap.put("sanCtnSn",Integer.toString(i+1));
 					sharngMap.put("pgParam", pgParam1);
-					QM01Mapper.deleteSJApprovalList1(sharngMap); 
 					QM01Mapper.insertWbsSharngList(sharngMap);       		
 					i++;
 				} catch (Exception e) {

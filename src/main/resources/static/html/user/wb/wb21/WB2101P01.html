@@ -346,6 +346,7 @@
 	var beforeGridSize = 0; //수주상세그리드의 갯수용 그리드컨텐츠 높이조절용
 	var SPECRTS01 = ""; //생산관리 권한 소유자
 	var prdMngIds = "";
+	var SPECRTS07 = "";	//일정관리 권한 소유자
 
 	ax5.ui.grid.formatter["chkYn"] = function () {
 		var color = this.value == "Y" ? "color-circle_02.png" : "color-circle_01.png";
@@ -1183,6 +1184,10 @@
 			prdMngIds = SPECRTS01.replace(/\s/g, '').split(',').filter(Boolean);
 		});
 
+		// 일정관리 권한자 조회
+		postAjaxSync("/admin/cm/cm05/selectChildCodeList", {"codeId":"SPECRTS07"}, null, function(data){
+			SPECRTS07 = data.childCodeList[0].codeEtc || "";
+		});
 
 		$("#wb21_popForm #fileUpBtn").hide(); //첨부파일 저장버튼 숨김
 // 		$('#sjNm').prop('readonly', true);
@@ -1766,13 +1771,12 @@
 		if (inputValidation($('.popup_area [required]'))) {
 			if(confirm("확정하시겠습니까?")) {
 				var formData = new wb21MakeFormData();
-				let sharManager = (jwt.userId == 'js.nam') ? 'js.nam' : 'jwc'; //공유 또는 결재대상 (ycy: 윤치영부장) => cyh: 조영희부장  => pwj: 박원제부장 => kcg3190 : 강춘기실장 => 'jwc : 조완철차장
 				formData.append("fileTrgtKey", fileTrgtKey);
 				var rowSharngListArr = []; //공유정보
-				var rowSharngListObj = {};
-				// if (elem.gb == '공유'){
+				SPECRTS07.replace(/\s/g, '').split(',').filter(Boolean).forEach(function(sharManager, idx) {
+					var rowSharngListObj = {};
 					rowSharngListObj["gb"] = '공유';
-					rowSharngListObj["sanCtnSn"] = '1';
+					rowSharngListObj["sanCtnSn"] = String(idx + 1);
 					rowSharngListObj["coCd"] = $("#wb21_popForm #coCd").val() ;
 					rowSharngListObj["todoDiv1CodeId"] = "TODODIV10";
 					rowSharngListObj["todoDiv2CodeId"] = "TODODIV1110";
@@ -1780,7 +1784,7 @@
 					rowSharngListObj["pgPath"] = "/user/wb/wb21/WB2101P01.html";
 					rowSharngListObj["fileTrgtKey"] = fileTrgtKey;
 					rowSharngListObj["reqNo"] = $("#wb21_popForm #sjNo").val();
-					rowSharngListObj["usrNm"] = sharManager;	//공유 또는 결재대상 ycy: 윤치영부장
+					rowSharngListObj["usrNm"] = sharManager;	//공유 대상 (일정관리자)
 					rowSharngListObj["userId"] = jwt.userId;
 					rowSharngListObj["pgmId"] = "WB2101P01";
 					rowSharngListObj["todoCoCd"] = $("#wb21_popForm #coCd").val() ;
@@ -1788,7 +1792,7 @@
 				//TITLE 추가
 					rowSharngListObj['todoTitle'] = $("#wb21_popForm #salesCd").val() + "과제관리 등록 확인용"
 					rowSharngListArr.push(rowSharngListObj);
-				// }
+				});
 				formData.append("rowSharngListArr", JSON.stringify(rowSharngListArr));
 
 				filePutAjax("/user/wb/wb21/sjConfirmY", formData, function(data) {
