@@ -1,0 +1,267 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.dksys.biz.user.wb.wb27.mapper.WB27Mapper">
+
+    <!-- =========================================================
+         WB27 KPI 대시보드 공통 패턴
+         - TB_WB22M01 기준 (WBS_PLAN_CODE_KIND = 'WBSCODE')
+         - TB_WB23M01 실적 조인: WBS_PLAN_CODE_KIND 기준
+         - TB_WB24M02 이슈 조인: WBS_PLAN_CODE_KIND 기준
+         - TB_WB21M01 마감여부 조인: CO_CD + SALES_CD 기준 (최신 VER_NO)
+         - 날짜 필터: 기간 겹침 조건 (WBS_PLANE_DT >= 시작일 AND WBS_PLANS_DT <= 종료일)
+         ========================================================= -->
+
+    <!-- 1. 계획 기간 분포 파이 + 실적 공수 분포 파이 -->
+    <select id="selectResourceKpi" parameterType="Map" resultType="Map">
+        SELECT
+            CD.CODE_NM AS WBS_PLAN_CODE_NM,
+            A.WBS_PLAN_CODE_ID,
+            NVL(SUM(A.EXPECT_MH), 0)       AS PLAN_MH,
+            NVL(SUM(B.WBS_RSLTS_MH), 0)    AS RSLTS_MH,
+            NVL(SUM(CASE WHEN A.WBS_PLANS_DT IS NOT NULL AND A.WBS_PLANE_DT IS NOT NULL
+                         THEN (TO_DATE(A.WBS_PLANE_DT, 'YYYY-MM-DD')
+                               - TO_DATE(A.WBS_PLANS_DT, 'YYYY-MM-DD') + 1)
+                         ELSE 0 END), 0)   AS PLAN_DAYS,
+            MIN(CD.SORT_NO)                AS SORT_NO
+        FROM TB_WB22M01 A
+        LEFT OUTER JOIN (
+            SELECT CO_CD, SALES_CD, WBS_PLAN_CODE_KIND, SUM(NVL(WBS_RSLTS_MH, 0)) AS WBS_RSLTS_MH
+            FROM TB_WB23M01
+            GROUP BY CO_CD, SALES_CD, WBS_PLAN_CODE_KIND
+        ) B ON A.CO_CD = B.CO_CD AND A.SALES_CD = B.SALES_CD AND A.WBS_PLAN_CODE_ID = B.WBS_PLAN_CODE_KIND
+        LEFT OUTER JOIN TB_CM05M01 CD ON CD.CODE_KIND = 'WBSCODE'
+                                     AND CD.CODE_ID   = A.WBS_PLAN_CODE_ID
+        LEFT OUTER JOIN (
+            SELECT SJ.CO_CD, SJ.SALES_CD, SJ.END_YN
+            FROM TB_WB21M01 SJ
+            WHERE TO_NUMBER(SJ.VER_NO) = (
+                SELECT MAX(TO_NUMBER(SJ2.VER_NO)) FROM TB_WB21M01 SJ2
+                WHERE SJ2.CO_CD = SJ.CO_CD AND SJ2.SALES_CD = SJ.SALES_CD
+            )
+        ) SJ ON A.CO_CD = SJ.CO_CD AND A.SALES_CD = SJ.SALES_CD
+        WHERE A.CO_CD = #{coCd}
+          AND A.WBS_PLAN_CODE_KIND = 'WBSCODE'
+		  AND A.WBS_PLAN_MNG_ID IS NOT NULL
+        <if test="salesCd != null and !salesCd.equals('')">
+          AND A.SALES_CD = #{salesCd}
+        </if>
+        <if test="!'N'.equals(endYn) and wbsRsltssDt != null and !wbsRsltssDt.equals('')">
+          AND A.WBS_PLANE_DT &gt;= #{wbsRsltssDt}
+        </if>
+        <if test="!'N'.equals(endYn) and wbsRsltseDt != null and !wbsRsltseDt.equals('')">
+          AND A.WBS_PLANS_DT &lt;= #{wbsRsltseDt}
+        </if>
+        <if test="endYn != null and !endYn.equals('')">
+          AND SJ.END_YN = #{endYn}
+        </if>
+        GROUP BY A.WBS_PLAN_CODE_ID, CD.CODE_NM
+        ORDER BY MIN(CD.SORT_NO), CD.CODE_NM
+    </select>
+
+    <!-- 2. 게이지 5개 (진행현황, 일정준수율, 일정지연율, 공수일치율, 리스크율) -->
+    <select id="selectGaugeKpi" parameterType="Map" resultType="Map">
+	    WITH PL AS (
+			SELECT A.CO_CD, A.SALES_CD, MIN(A.WBS_PLANS_DT) WBS_PLANS_DT, MAX(A.WBS_PLANE_DT) WBS_PLANE_DT
+			FROM TB_WB22M01 A
+			        LEFT OUTER JOIN (
+		            SELECT SJ.CO_CD, SJ.SALES_CD, SJ.END_YN
+		            FROM TB_WB21M01 SJ
+		            WHERE TO_NUMBER(SJ.VER_NO) = (
+		                SELECT MAX(TO_NUMBER(SJ2.VER_NO)) FROM TB_WB21M01 SJ2
+		                WHERE SJ2.CO_CD = SJ.CO_CD AND SJ2.SALES_CD = SJ.SALES_CD
+		            )
+		        ) SJ ON A.CO_CD = SJ.CO_CD AND A.SALES_CD = SJ.SALES_CD
+		    WHERE A.CO_CD = #{coCd}
+		      AND A.WBS_PLAN_CODE_KIND = 'WBSCODE'
+		      AND A.WBS_PLAN_MNG_ID IS NOT NULL
+	        <if test="salesCd != null and !salesCd.equals('')">
+	          AND A.SALES_CD = #{salesCd}
+	        </if>
+	        <if test="endYn != null and !endYn.equals('')">
+		      AND SJ.END_YN = #{endYn}
+	        </if>
+		    GROUP BY A.CO_CD, A.SALES_CD
+	        <if test="!'N'.equals(endYn) and wbsRsltssDt != null and !wbsRsltssDt.equals('')">
+			HAVING MIN(A.WBS_PLANS_DT) &lt;= #{wbsRsltseDt}   -- 과제 시작일이 검색 종료일 이전
+			   AND MAX(A.WBS_PLANE_DT) &gt;= #{wbsRsltssDt}   -- 과제 종료일이 검색 시작일 이후
+	        </if>
+		)
+		SELECT
+            ROUND(NVL(AVG(B.WBS_RSLTS_RATE), 0), 1)                                   AS STATUS_VAL,
+            ROUND(
+                CASE WHEN COUNT(A.WBS_PLAN_CODE_KIND) = 0 THEN 0
+                     ELSE (1 - SUM(CASE WHEN B.WBS_RSLTSE_DT > A.WBS_PLANE_DT
+                                        AND B.WBS_RSLTSE_DT IS NOT NULL
+                                        AND A.WBS_PLANE_DT IS NOT NULL
+                                   THEN 1 ELSE 0 END)
+                           / NULLIF(COUNT(CASE WHEN B.WBS_RSLTSE_DT IS NOT NULL THEN 1 END), 0)
+                          ) * 100
+                END, 1)                                                                 AS SCHEDULE_VAL,
+            ROUND(
+                NVL(SUM(CASE WHEN A.WBS_PLANE_DT IS NOT NULL
+                              AND (A.WBS_PLANE_DT &lt; TO_CHAR(SYSDATE, 'YYYY-MM-DD') AND NVL(B.WBS_RSLTS_RATE, 0) &lt; 100)
+                              OR (A.WBS_PLANE_DT &lt; TO_CHAR(B.WBS_RSLTSE_DT, 'YYYY-MM-DD'))
+                         THEN 1 ELSE 0 END)
+                    / NULLIF(COUNT(A.WBS_PLAN_CODE_KIND), 0) * 100, 0), 1)                  AS DELAY_VAL,
+            ROUND(
+                NVL(AVG(CASE WHEN A.EXPECT_MH > 0
+                             THEN LEAST(B.WBS_RSLTS_MH / A.EXPECT_MH * 100, 150)
+                             ELSE NULL END), 0), 1)                                     AS ALIGNMENT_VAL,
+            ROUND(
+                NVL(SUM(CASE WHEN C.ISS_CNT > 0 THEN 1 ELSE 0 END)
+                    / NULLIF(COUNT(A.WBS_PLAN_CODE_KIND), 0) * 100, 0), 1)                  AS RISK_VAL
+        FROM TB_WB22M01 A
+        LEFT OUTER JOIN (
+            SELECT CO_CD, SALES_CD, WBS_PLAN_CODE_KIND,
+                   MAX(WBS_RSLTS_RATE)   AS WBS_RSLTS_RATE,
+                   SUM(WBS_RSLTS_MH)     AS WBS_RSLTS_MH,
+                   MAX(NVL(WBS_RSLTSE_DT, WBS_RSLTSS_DT))    AS WBS_RSLTSE_DT
+            FROM TB_WB23M01
+            GROUP BY CO_CD, SALES_CD, WBS_PLAN_CODE_KIND
+        ) B ON A.CO_CD = B.CO_CD AND A.SALES_CD = B.SALES_CD AND A.WBS_PLAN_CODE_ID = B.WBS_PLAN_CODE_KIND
+        LEFT OUTER JOIN (
+            SELECT CO_CD, SALES_CD, WBS_PLAN_CODE_KIND, COUNT(*) AS ISS_CNT
+            FROM TB_WB24M02
+            GROUP BY CO_CD, SALES_CD, WBS_PLAN_CODE_KIND
+        ) C ON A.CO_CD = C.CO_CD AND A.SALES_CD = C.SALES_CD AND A.WBS_PLAN_CODE_ID = C.WBS_PLAN_CODE_KIND
+        INNER JOIN PL ON A.CO_CD = PL.CO_CD AND A.SALES_CD = PL.SALES_CD
+        WHERE A.CO_CD = #{coCd}
+          AND A.WBS_PLAN_CODE_KIND = 'WBSCODE'
+          AND A.WBS_PLAN_MNG_ID IS NOT NULL
+    </select>
+
+    <!-- 3. 이슈 현황 스택 바 차트 (중요도별: 비상빈상/비하빈상/비상빈하/비하빈하) -->
+    <select id="selectIssueKpi" parameterType="Map" resultType="Map">
+        SELECT
+            CD.CODE_NM                                                             AS WBS_PLAN_CODE_NM,
+            C.WBS_PLAN_CODE_KIND,
+            SUM(CASE WHEN IMP.CODE_NM = '비상빈상' THEN 1 ELSE 0 END)                          AS CNT_HH,
+            SUM(CASE WHEN IMP.CODE_NM = '비하빈상' THEN 1 ELSE 0 END)                          AS CNT_LH,
+            SUM(CASE WHEN IMP.CODE_NM = '비상빈하' THEN 1 ELSE 0 END)                          AS CNT_HL,
+            SUM(CASE WHEN IMP.CODE_NM = '비하빈하' OR C.IMPORTANT_CD IS NULL THEN 1 ELSE 0 END) AS CNT_LL,
+            COUNT(C.ISS_NO)                                                        AS TOTAL_CNT
+        FROM TB_WB22M01 A
+        LEFT OUTER JOIN TB_WB24M02 C   ON A.CO_CD = C.CO_CD AND A.SALES_CD = C.SALES_CD AND A.WBS_PLAN_CODE_ID = C.WBS_PLAN_CODE_KIND
+        LEFT OUTER JOIN TB_CM05M01 IMP ON IMP.CODE_KIND = 'IMPORTANTCD'
+                                      AND IMP.CODE_ID   = C.IMPORTANT_CD
+        LEFT OUTER JOIN TB_CM05M01 CD  ON CD.CODE_KIND  = 'WBSCODE'
+                                      AND CD.CODE_ID    = A.WBS_PLAN_CODE_ID
+        LEFT OUTER JOIN (
+            SELECT SJ.CO_CD, SJ.SALES_CD, SJ.END_YN
+            FROM TB_WB21M01 SJ
+            WHERE TO_NUMBER(SJ.VER_NO) = (
+                SELECT MAX(TO_NUMBER(SJ2.VER_NO)) FROM TB_WB21M01 SJ2
+                WHERE SJ2.CO_CD = SJ.CO_CD AND SJ2.SALES_CD = SJ.SALES_CD
+            )
+        ) SJ ON A.CO_CD = SJ.CO_CD AND A.SALES_CD = SJ.SALES_CD
+        WHERE A.CO_CD = #{coCd}
+          AND A.WBS_PLAN_CODE_KIND = 'WBSCODE'
+          AND A.WBS_PLAN_MNG_ID IS NOT NULL
+        <if test="salesCd != null and !salesCd.equals('')">
+          AND A.SALES_CD = #{salesCd}
+        </if>
+        <if test="!'N'.equals(endYn) and wbsRsltssDt != null and !wbsRsltssDt.equals('')">
+          AND A.WBS_PLANE_DT &gt;= #{wbsRsltssDt}
+        </if>
+        <if test="!'N'.equals(endYn) and wbsRsltseDt != null and !wbsRsltseDt.equals('')">
+          AND A.WBS_PLANS_DT &lt;= #{wbsRsltseDt}
+        </if>
+        <if test="endYn != null and !endYn.equals('')">
+          AND SJ.END_YN = #{endYn}
+        </if>
+        GROUP BY C.WBS_PLAN_CODE_KIND, CD.CODE_NM
+        ORDER BY MIN(CD.SORT_NO), CD.CODE_NM
+    </select>
+
+    <!-- 4. 브레이크다운 바 차트 (Critical/일정지연/공수일치/고위험 %) -->
+    <select id="selectBreakdownKpi" parameterType="Map" resultType="Map">
+	    WITH PL AS (
+			SELECT A.CO_CD, A.SALES_CD, MIN(A.WBS_PLANS_DT) WBS_PLANS_DT, MAX(A.WBS_PLANE_DT) WBS_PLANE_DT
+			FROM TB_WB22M01 A
+			        LEFT OUTER JOIN (
+		            SELECT SJ.CO_CD, SJ.SALES_CD, SJ.END_YN
+		            FROM TB_WB21M01 SJ
+		            WHERE TO_NUMBER(SJ.VER_NO) = (
+		                SELECT MAX(TO_NUMBER(SJ2.VER_NO)) FROM TB_WB21M01 SJ2
+		                WHERE SJ2.CO_CD = SJ.CO_CD AND SJ2.SALES_CD = SJ.SALES_CD
+		            )
+		        ) SJ ON A.CO_CD = SJ.CO_CD AND A.SALES_CD = SJ.SALES_CD
+		    WHERE A.CO_CD = #{coCd}
+		      AND A.WBS_PLAN_CODE_KIND = 'WBSCODE'
+		      AND A.WBS_PLAN_MNG_ID IS NOT NULL
+	        <if test="salesCd != null and !salesCd.equals('')">
+	          AND A.SALES_CD = #{salesCd}
+	        </if>
+	        <if test="endYn != null and !endYn.equals('')">
+		      AND SJ.END_YN = #{endYn}
+	        </if>
+		    GROUP BY A.CO_CD, A.SALES_CD
+	        <if test="!'N'.equals(endYn) and wbsRsltssDt != null and !wbsRsltssDt.equals('')">
+			HAVING MIN(A.WBS_PLANS_DT) &lt;= #{wbsRsltseDt}   -- 과제 시작일이 검색 종료일 이전
+			   AND MAX(A.WBS_PLANE_DT) &gt;= #{wbsRsltssDt}   -- 과제 종료일이 검색 시작일 이후
+	        </if>
+		)
+        SELECT
+            (SELECT FN_CM05M01_CD_TO_NM(A.WBS_PLAN_CODE_ID) FROM DUAL) AS WBS_PLAN_CODE_NM,
+            A.WBS_PLAN_CODE_ID,
+            COUNT(A.FILE_TRGT_KEY) AS TOTAL_CNT,
+            -- Critical: 진행률 0%이면서 계획종료일 초과
+            ROUND(SUM(CASE WHEN NVL(B.WBS_RSLTS_RATE, 0) = 0
+                            AND A.WBS_PLANE_DT &lt; TO_CHAR(SYSDATE, 'YYYY-MM-DD')
+                       THEN 1 ELSE 0 END)
+                  / NULLIF(COUNT(A.FILE_TRGT_KEY), 0) * 100, 1) AS CRITICAL_RATE,
+            -- 일정지연(실적): 실적종료일 > 계획종료일
+            SUM(CASE WHEN B.WBS_RSLTSE_DT IS NOT NULL
+                      AND A.WBS_PLANE_DT   IS NOT NULL
+                      AND B.WBS_RSLTSE_DT  > A.WBS_PLANE_DT
+                 THEN 1 ELSE 0 END)                                AS LATE_CNT,
+            ROUND(SUM(CASE WHEN B.WBS_RSLTSE_DT IS NOT NULL
+                            AND A.WBS_PLANE_DT   IS NOT NULL
+                            AND B.WBS_RSLTSE_DT  > A.WBS_PLANE_DT
+                       THEN 1 ELSE 0 END)
+                  / NULLIF(COUNT(A.FILE_TRGT_KEY), 0) * 100, 1)   AS LATE_RATE,
+            -- 일정지연(계획): 계획종료일 초과 &amp; 미완료
+            SUM(CASE WHEN A.WBS_PLANE_DT IS NOT NULL
+                      AND A.WBS_PLANE_DT &lt; TO_CHAR(SYSDATE, 'YYYY-MM-DD')
+                      AND NVL(B.WBS_RSLTS_RATE, 0) &lt; 100
+                 THEN 1 ELSE 0 END)                                AS DELAY_CNT,
+            ROUND(SUM(CASE WHEN A.WBS_PLANE_DT IS NOT NULL
+                            AND A.WBS_PLANE_DT &lt; TO_CHAR(SYSDATE, 'YYYY-MM-DD')
+                            AND NVL(B.WBS_RSLTS_RATE, 0) &lt; 100
+                       THEN 1 ELSE 0 END)
+                  / NULLIF(COUNT(A.FILE_TRGT_KEY), 0) * 100, 1)   AS DELAY_RATE,
+            -- 공수일치: 실적/계획 공수 90~110% 구간
+            ROUND(SUM(CASE WHEN A.EXPECT_MH > 0
+                            AND B.WBS_RSLTS_MH / A.EXPECT_MH BETWEEN 0.9 AND 1.1
+                       THEN 1 ELSE 0 END)
+                  / NULLIF(COUNT(A.FILE_TRGT_KEY), 0) * 100, 1)   AS ALIGN_RATE,
+            -- 고위험: 미완료 이슈 보유
+            SUM(CASE WHEN C.ISS_CNT > 0 THEN 1 ELSE 0 END)        AS RISK_CNT,
+            ROUND(SUM(CASE WHEN C.ISS_CNT > 0 THEN 1 ELSE 0 END)
+                  / NULLIF(COUNT(A.FILE_TRGT_KEY), 0) * 100, 1)   AS RISK_RATE
+        FROM TB_WB22M01 A
+        INNER JOIN PL ON A.CO_CD = PL.CO_CD AND A.SALES_CD = PL.SALES_CD
+        LEFT OUTER JOIN (
+            SELECT CO_CD, SALES_CD, WBS_PLAN_CODE_KIND,
+                   MAX(WBS_RSLTS_RATE) AS WBS_RSLTS_RATE,
+                   SUM(WBS_RSLTS_MH)   AS WBS_RSLTS_MH,
+                   MAX(WBS_RSLTSE_DT)  AS WBS_RSLTSE_DT
+            FROM TB_WB23M01
+            GROUP BY CO_CD, SALES_CD, WBS_PLAN_CODE_KIND
+        ) B ON A.CO_CD = B.CO_CD AND A.SALES_CD = B.SALES_CD AND A.WBS_PLAN_CODE_ID = B.WBS_PLAN_CODE_KIND
+        LEFT OUTER JOIN (
+            SELECT CO_CD, SALES_CD, WBS_PLAN_CODE_KIND, COUNT(*) AS ISS_CNT
+            FROM TB_WB24M02
+            GROUP BY CO_CD, SALES_CD, WBS_PLAN_CODE_KIND
+        ) C ON A.CO_CD = C.CO_CD AND A.SALES_CD = C.SALES_CD AND A.WBS_PLAN_CODE_ID = C.WBS_PLAN_CODE_KIND
+        LEFT OUTER JOIN TB_CM05M01 CD ON CD.CODE_KIND = 'WBSCODE'
+                                     AND CD.CODE_ID   = A.WBS_PLAN_CODE_ID
+        WHERE A.CO_CD = #{coCd}
+          AND A.WBS_PLAN_CODE_KIND = 'WBSCODE'
+          AND A.WBS_PLAN_MNG_ID IS NOT NULL
+        GROUP BY A.WBS_PLAN_CODE_ID
+        ORDER BY MIN(CD.SORT_NO), A.WBS_PLAN_CODE_ID
+    </select>
+
+</mapper>
