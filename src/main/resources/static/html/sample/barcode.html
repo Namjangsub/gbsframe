@@ -1,28 +1,356 @@
 <!DOCTYPE html>
 <html lang="ko">
+
 <head>
 	<meta charset="utf-8">
 	<meta http-equiv="X-UA-Compatible" content="IE=edge">
-	<meta name="viewport" content="width=device-width, initial-scale=0.6, user-scalable=no">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+	<title>GBS 시스템 - 표준 바코드 및 QR코드 검증 센터</title>
+	<!-- Google Fonts (Inter) 추가로 모던한 타이포그래피 구현 -->
+	<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 	<script src="/static/js/jquery-3.5.1.min.js"></script>
-	<script type="text/javascript" src="jquery-barcode.js"></script>   
-	<title>Bar Code Display</title>
+	<!-- 기존 샘플 경로 유지 -->
+	<script type="text/javascript" src="jquery-barcode.js"></script>
+	<!-- 모바일 카메라 연동 매뉴얼 조회를 위한 범용 QR Code 라이브러리 CDN 추가 -->
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+
+	<style>
+		:root {
+			--bg-color: #0f172a;
+			--card-bg: #1e293b;
+			--text-main: #f8fafc;
+			--text-sub: #94a3b8;
+			--accent: #38bdf8;
+			--accent-qr: #10b981;
+			/* QR 코드 강조색 (초록) */
+			--border: #334155;
+			--barcode-paper: #ffffff;
+			/* 바코드 스캔 최적화를 위한 순백색 배경 */
+		}
+
+		* {
+			box-sizing: border-box;
+			margin: 0;
+			padding: 0;
+		}
+
+		body {
+			font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+			background-color: var(--bg-color);
+			color: var(--text-main);
+			padding: 40px 20px;
+			display: flex;
+			flex-direction: column;
+			align-items: center;
+			min-height: 100vh;
+		}
+
+		header {
+			text-align: center;
+			margin-bottom: 40px;
+			max-width: 800px;
+		}
+
+		header h1 {
+			font-size: 2.2rem;
+			font-weight: 700;
+			background: linear-gradient(135deg, #38bdf8, #10b981);
+			-webkit-background-clip: text;
+			-webkit-text-fill-color: transparent;
+			margin-bottom: 12px;
+		}
+
+		header p {
+			color: var(--text-sub);
+			font-size: 0.95rem;
+			line-height: 1.6;
+		}
+
+		.section-title {
+			width: 100%;
+			max-width: 1200px;
+			font-size: 1.4rem;
+			font-weight: 600;
+			margin: 30px 0 15px 0;
+			color: var(--accent);
+			border-left: 4px solid var(--accent);
+			padding-left: 12px;
+			display: flex;
+			align-items: center;
+			justify-content: space-between;
+		}
+
+		.container {
+			display: grid;
+			grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+			gap: 24px;
+			width: 100%;
+			max-width: 1200px;
+		}
+
+		.barcode-card {
+			background-color: var(--card-bg);
+			border: 1px solid var(--border);
+			border-radius: 16px;
+			padding: 24px;
+			display: flex;
+			flex-direction: column;
+			align-items: center;
+			transition: transform 0.2s ease, box-shadow 0.2s ease;
+			position: relative;
+			overflow: hidden;
+		}
+
+		.barcode-card::before {
+			content: '';
+			position: absolute;
+			top: 0;
+			left: 0;
+			width: 100%;
+			height: 4px;
+			background: linear-gradient(90deg, var(--accent), #818cf8);
+			opacity: 0.8;
+		}
+
+		.barcode-card.qr-card::before {
+			background: linear-gradient(90deg, var(--accent-qr), #34d399);
+		}
+
+		.barcode-card:hover {
+			transform: translateY(-4px);
+			box-shadow: 0 10px 20px rgba(0, 0, 0, 0.3);
+		}
+
+		.card-info {
+			width: 100%;
+			margin-bottom: 20px;
+			text-align: left;
+		}
+
+		.card-title {
+			font-size: 1.1rem;
+			font-weight: 600;
+			color: var(--text-main);
+			margin-bottom: 4px;
+			display: flex;
+			align-items: center;
+			justify-content: space-between;
+		}
+
+		.badge {
+			font-size: 0.75rem;
+			padding: 4px 8px;
+			background-color: rgba(56, 189, 248, 0.1);
+			color: var(--accent);
+			border-radius: 6px;
+			font-weight: 600;
+			text-transform: uppercase;
+		}
+
+		.badge.qr-badge {
+			background-color: rgba(16, 185, 129, 0.1);
+			color: var(--accent-qr);
+		}
+
+		.card-desc {
+			font-size: 0.85rem;
+			color: var(--text-sub);
+		}
+
+		/* 스캐너 인식을 위한 극대비 바코드 영역 */
+		.barcode-wrapper {
+			background-color: var(--barcode-paper);
+			padding: 20px 28px;
+			/* 바코드 주변 스캔 여백 (Quiet Zone) 극대화 */
+			border-radius: 12px;
+			box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.05), 0 4px 12px rgba(0, 0, 0, 0.1);
+			display: flex;
+			justify-content: center;
+			align-items: center;
+			width: 100%;
+			min-height: 160px;
+		}
+
+		.barcode-target {
+			display: flex;
+			flex-direction: column;
+			align-items: center;
+		}
+	</style>
 </head>
 
 <body>
-<div id="bcTarget1" style="margin-top:30px;"></div>
-<div id="bcTarget2" style="margin-top:30px;"></div>
-<div id="bcTarget3" style="margin-top:30px;"></div>
-<div id="bcTarget4" style="margin-top:30px;"></div><br>
-<div id="bcTarget5" style="margin-top:30px;"></div>
-<div id="bcTarget6" style="margin-top:30px;"></div>
+	<header>
+		<h1>GBS 표준 인식성 검증 센터</h1>
+		<p>
+			온프레미스 기기, 산업용 PDA, 일반 스마트폰 카메라 연동을 위한 규격 설계 검증 도구입니다.<br>
+			<strong>매뉴얼/정보조회 최적화</strong>: 스마트폰 카메라와 기본 브라우저를 연동하려면 1차원/DataMatrix 대신 <strong>QR Code</strong>와
+			<strong>단축 Dynamic Link 아키텍처</strong>를 결합하는 것이 최선입니다.
+		</p>
+	</header>
+
+	<!-- 정보조회 및 매뉴얼 전용 QR Code 섹션 -->
+	<div class="section-title">
+		<span>모바일 카메라 연동 (매뉴얼 & 정보 조회용 QR)</span>
+		<span class="badge qr-badge" style="text-transform:none;">모바일 카메라 스캔 가능</span>
+	</div>
+
+	<div class="container" style="margin-bottom: 30px;">
+		<!-- 1. 설비 매뉴얼 바로가기 (Dynamic Link) -->
+		<div class="barcode-card qr-card">
+			<div class="card-info">
+				<div class="card-title">설비 매뉴얼 QR <span class="badge qr-badge">QR CODE</span></div>
+				<div class="card-desc">스캔 시 해당 기기(예: 펌프-01)의 통합 PDF 매뉴얼로 라우팅</div>
+			</div>
+			<div class="barcode-wrapper">
+				<!-- QR은 스캔 전용 여백 안에서 렌더링 -->
+				<div id="qrManual" class="barcode-target"></div>
+			</div>
+		</div>
+
+		<!-- 2. 부품 실시간 재고/정보 조회 (API 파라미터) -->
+		<div class="barcode-card qr-card">
+			<div class="card-info">
+				<div class="card-title">실시간 정보 조회 QR <span class="badge qr-badge">MOBILE API</span></div>
+				<div class="card-desc">모바일 기기 내부망 웹뷰(Webview) 연동용 파라미터 라우팅</div>
+			</div>
+			<div class="barcode-wrapper">
+				<div id="qrInfo" class="barcode-target"></div>
+			</div>
+		</div>
+	</div>
+
+	<!-- 산업용 물류/부품 표준 바코드 섹션 -->
+	<div class="section-title">
+		<span>산업용 물류 & 부품 표준 바코드</span>
+	</div>
+
+	<div class="container">
+		<!-- 1. Code 128 (기본형) -->
+		<div class="barcode-card">
+			<div class="card-info">
+				<div class="card-title">Code 128 <span class="badge">고인식</span></div>
+				<div class="card-desc">산업용 표준 1D 코드, 영문/숫자 혼용 가능</div>
+			</div>
+			<div class="barcode-wrapper">
+				<div id="bcTarget1" class="barcode-target"></div>
+			</div>
+		</div>
+
+		<!-- 2. EAN-13 -->
+		<div class="barcode-card">
+			<div class="card-info">
+				<div class="card-title">EAN-13 <span class="badge">유통 표준</span></div>
+				<div class="card-desc">국제 유통 및 상품 등록용 표준 13자리 코드</div>
+			</div>
+			<div class="barcode-wrapper">
+				<div id="bcTarget2" class="barcode-target"></div>
+			</div>
+		</div>
+
+		<!-- 3. Interleaved 2 of 5 (int25) -->
+		<div class="barcode-card">
+			<div class="card-info">
+				<div class="card-title">ITF (Int 2 of 5) <span class="badge">물류 표준</span></div>
+				<div class="card-desc">고밀도 숫자 전용 코드, 박스/물류 라벨에 주로 사용</div>
+			</div>
+			<div class="barcode-wrapper">
+				<div id="bcTarget3" class="barcode-target"></div>
+			</div>
+		</div>
+
+		<!-- 4. Code 128 (대형/HRI 활성화) -->
+		<div class="barcode-card">
+			<div class="card-info">
+				<div class="card-title">Code 128 (대형) <span class="badge">최적 대비</span></div>
+				<div class="card-desc">대비 극대화를 위해 불필요한 적색 배경을 백색으로 치환</div>
+			</div>
+			<div class="barcode-wrapper">
+				<div id="bcTarget4" class="barcode-target"></div>
+			</div>
+		</div>
+
+		<!-- 5. Data Matrix (2D 표준 - 영숫자 최적화) -->
+		<div class="barcode-card">
+			<div class="card-info">
+				<div class="card-title">Data Matrix (2D) <span class="badge">고밀도</span></div>
+				<div class="card-desc">가독성 극대화를 위해 한글을 표준 영숫자 포맷으로 정규화</div>
+			</div>
+			<div class="barcode-wrapper">
+				<div id="bcTarget5" class="barcode-target"></div>
+			</div>
+		</div>
+
+		<!-- 6. Data Matrix (2D - 초소형) -->
+		<div class="barcode-card">
+			<div class="card-info">
+				<div class="card-title">Data Matrix Mini <span class="badge">초소형</span></div>
+				<div class="card-desc">스페이스 제약이 큰 부품 태그 등에 사용되는 마이크로 코드</div>
+			</div>
+			<div class="barcode-wrapper">
+				<div id="bcTarget6" class="barcode-target"></div>
+			</div>
+		</div>
+	</div>
+
+	<script type="text/javascript">
+		$(document).ready(function () {
+			/* ==========================================
+			   [1] 2D QR Code 매뉴얼/정보조회 연동 영역 (신규 구성)
+			   - 스마트폰 카메라 기본 스캔을 통한 Web 연결을 최적화하기 위해
+				 qrcode.js 플러그인을 사용하여 완벽한 크기와 오차 복원(Error Correction)을 적용합니다.
+			   ========================================== */
+
+			// 설비 매뉴얼 QR 생성 (단축 주소 연동 추천)
+			// 실제 운영시에는: "https://gbs.gunyangitt.co.kr/static/manual/productList.html" 형태로 스케줄링 리다이렉트 서버와 연동
+			var qrM = new QRCode(document.getElementById("qrManual"), {
+				text: "https://gbs.gunyangitt.co.kr/static/manual/productList.html",
+				width: 120,
+				height: 120,
+				colorDark: "#0f172a",
+				colorLight: "#ffffff",
+				correctLevel: QRCode.CorrectLevel.H // [중요] H레벨 지정으로 로고 가림 영역(30%)에 대한 완벽한 복구 보장
+			});
+			// 건양 마크(CI 심볼) 동적 오버레이 삽입 (30% 확대 및 정중앙 재정렬)
+			$("#qrManual").css("position", "relative");
+			$("#qrManual").append('<div style="position: absolute; width: 94px; height: 24px; top: 48px; left: 13px; background: #0f172a; color: #38bdf8; border: 2px solid #ffffff; border-radius: 5px; font-size: 10px; font-weight: 800; letter-spacing: 0.5px; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 6px rgba(0,0,0,0.2); font-family: \'Inter\', sans-serif;">GUNYANGITT</div>');
+
+			// 부품 실시간 상태 조회 QR 생성
+			var qrI = new QRCode(document.getElementById("qrInfo"), {
+				text: "https://gbs.gunyangitt.co.kr/static/mobile/gunyang00?partCd=GBS-PT-998A",
+				width: 120,
+				height: 120,
+				colorDark: "#0f172a",
+				colorLight: "#ffffff",
+				correctLevel: QRCode.CorrectLevel.H // [중요] 텍스트 가림 면적에 대응하기 위해 최고 수준 오차 복원 설정
+			});
+			// 텍스트 기반 "GUNYANGITT" 엠블럼 동적 오버레이 삽입 (30% 확대 및 정중앙 재정렬)
+			$("#qrInfo").css("position", "relative");
+			$("#qrInfo").append('<div style="position: absolute; width: 94px; height: 24px; top: 48px; left: 13px; background: #0f172a; color: #38bdf8; border: 2px solid #ffffff; border-radius: 5px; font-size: 10px; font-weight: 800; letter-spacing: 0.5px; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 6px rgba(0,0,0,0.2); font-family: \'Inter\', sans-serif;">GUNYANGITT</div>');
+
+
+			/* ==========================================
+			   [2] 산업용 물류/부품 1D & 2D(Data Matrix) 바코드 영역
+			   ========================================== */
+			// bcTarget1: Code128 표준형 (높이 및 선 두께 최적화)
+			$("#bcTarget1").barcode("1234567890128", "code128", { barWidth: 2, barHeight: 60, showHRI: true });
+
+			// bcTarget2: EAN13 표준형 (EAN-13은 체크디지트 포함 필수이며 규격에 최적화)
+			$("#bcTarget2").barcode("1234567890128", "ean13", { barWidth: 2, barHeight: 60, showHRI: true });
+
+			// bcTarget3: Interleaved 2 of 5 (숫자 전용 고밀도, 홀수 자리수 입력 오류 해결을 위해 짝수 8자리 "12345678" 변경)
+			$("#bcTarget3").barcode("12345678", "int25", { barWidth: 2, barHeight: 60, showHRI: true });
+
+			// bcTarget4: 기존 Red 배경을 백색 배경으로 전환하고 선 두께를 1px에서 2px로 확장하여 완벽 스캔 구현
+			$("#bcTarget4").barcode("1234567890128", "code128", { barWidth: 2, barHeight: 70, showHRI: true, bgColor: "#FFFFFF" });
+
+			// bcTarget5: 기존 Yellow 배경을 백색 배경으로 전환하고, 일반 스캐너 호환성을 위해 한글 문자열을 ASCII 표준 영문/숫자로 정규화
+			$("#bcTarget5").barcode("GBS-ITSM-20260520-01", "datamatrix", { barWidth: 3, barHeight: 30, showHRI: false, bgColor: "#FFFFFF" });
+
+			// bcTarget6: 초소형 Data Matrix 최적화 설정
+			$("#bcTarget6").barcode("GBS-PARTS-998A", "datamatrix", { barWidth: 3, barHeight: 30, showHRI: false, bgColor: "#FFFFFF" });
+		});
+	</script>
 </body>
-<script type="text/javascript">
-	$("#bcTarget1").barcode("1234567890128", "code128");
-	$("#bcTarget2").barcode("1234567890128", "ean13",{barWidth:2, barHeight:30});
-	$("#bcTarget3").barcode("1234567", "int25",{barWidth:2, barHeight:30});	
-	$("#bcTarget6").barcode("가나다라11232131abcd", "datamatrix",{showHRI:false});
-	$("#bcTarget4").barcode("1234567890128", "code128",{barWidth:1, barHeight:70,showHRI:true,bgColor:"red"});
-	$("#bcTarget5").barcode("가나다라11232131abcd", "datamatrix",{showHRI:false,bgColor:"yellow"});
-</script>
+
 </html>
