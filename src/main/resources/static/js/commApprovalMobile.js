@@ -369,19 +369,20 @@ function Approval(htmlParam, param, popParam) {
 				var todoCfOpn = $("#appLine tr").find("font").closest("tr").find("textarea[name=todoCfOpn]").val();
 				//입력값 set
 				var paramMap = {
-						"todoId" : jwt.userId
-						, "todoCfOpn" : todoCfOpn
-						, "issNo" 		: $('#issNo').val()
-						, "etcField1"	: actMh			//팀장 작업공수 입력용으로 활용 2025.07.22
-						, "actTeamManager"		:  actTeamManager
-						, "issNo" 		: $('#issNo').val()
-						, "reqNo" 		: $('#reqNo').val()
-						, "actDngEval"	: $('#actDngEvalTodo').val()
-						, "deptId"		: jwt.deptId.slice(0,5)
+						"todoId" 			: jwt.userId
+						, "todoCfOpn" 		: todoCfOpn
+						, "issNo" 			: $('#issNo').val() || this.param.issNo || this.param.todoNo || $('#todoNo').val()
+						, "etcField1"		: actMh			//팀장 작업공수 입력용으로 활용 2025.07.22
+						, "actTeamManager"	:  actTeamManager
+						, "reqNo" 			: $('#reqNo').val() || this.param.reqNo || this.param.todoNo || $('#todoNo').val()
+						, "actDngEval"		: $('#actDngEvalTodo').val()
+						, "deptId"			: jwt.deptId.slice(0,5)
 						, "sameTimeResultChk" : this.param.sameTimeResultChk || ''
 				}
 
 				Object.assign(paramMap, this.param);
+				paramMap.issNo = paramMap.issNo || paramMap.todoNo || $('#todoNo').val();
+				paramMap.reqNo = paramMap.reqNo || paramMap.todoNo || $('#todoNo').val();
 				postAjaxSync("/user/wb/wb20/insertApprovalLine", paramMap, null, function(data){
 					if(data.resultCode == 200){
 						confirmYn = true;

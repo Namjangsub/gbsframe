@@ -193,7 +193,7 @@ public class WB20SvcImpl implements WB20Svc {
 			// 조치 결재시 문제에 결재 미완료를 완료로 변경
 			result += wb20Mapper.updateWbsIssueApprovalSync(paramMap);
 		} else if ("TODODIV2130".equals(todoDiv2CodeId)) {
-			// ISS_STS: ISSSTS01 --> ISSSTS02 로 상태 변경처리
+			// ISS_STS: ISSSTS02(진행중)으로 상태 변경처리
 			result += cm16Mapper.updateItoaIssueStChk(paramMap);
 		} else if ("TODODIV2120".equals(todoDiv2CodeId)) {
 			pfuShareTarget = true;
@@ -379,6 +379,9 @@ public class WB20SvcImpl implements WB20Svc {
 					}
 				}
 			}
+		}
+		if ("TODODIV2130".equals(paramMap.get("todoDiv2CodeId"))) {
+			result += cm16Mapper.updateItoaIssueStCancelChk(paramMap);
 		}
 		/***************************************************************************************
 		 * 결재 취소 처리시 팀장인경우에만 투입공수 Clear 처리 가능함 -- 처리종료

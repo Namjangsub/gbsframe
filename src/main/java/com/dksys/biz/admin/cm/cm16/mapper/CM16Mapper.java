@@ -24,6 +24,8 @@ public interface CM16Mapper {
 
     int updateItoaIssueStChk(Map<String, String> paramMap);
 
+    int updateItoaIssueStCancelChk(Map<String, String> paramMap);
+
     int deleteItoaIssue(Map<String, String> paramMap);
 
 	List<Map<String, String>> select_reqId_code(Map<String, String> paramMap);

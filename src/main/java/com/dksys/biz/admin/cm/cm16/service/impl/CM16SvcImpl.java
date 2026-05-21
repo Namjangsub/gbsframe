@@ -191,7 +191,7 @@ public class CM16SvcImpl implements CM16Svc {
         Type dtlMap = new TypeToken<ArrayList<Map<String, String>>>(){}.getType();
 
         int result = cm16Mapper.updateItoaIssue(paramMap);
-        result += cm16Mapper.updateItoaIssueStChk(paramMap);
+        // result += cm16Mapper.updateItoaIssueStChk(paramMap);
 
         // 파일이 존재할 때만 파일 업로드 로직 실행
         if (mRequest != null && mRequest.getFileNames().hasNext()) {

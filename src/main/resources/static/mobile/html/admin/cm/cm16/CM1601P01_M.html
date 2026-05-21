@@ -204,9 +204,14 @@
 			<div id="fileList_area"></div>
 
 			<!-- 하단 버튼 -->
-			<div style="text-align:center;padding:15px;">
+			<div id="bottomActionArea" style="text-align:center;padding:15px;">
 				<button type="button" id="actionBtn" class="btn btn-primary" style="width:45%;height:40px;font-size:14px;" authchk>등록</button>
 				<button type="button" class="btn btn-default" style="width:45%;height:40px;font-size:14px;" onclick="history.back(-1);">닫기</button>
+			</div>
+			<div id="approvalWrapper" style="display:none;text-align:center;width:100%;height:30%;">
+				<div id="wbsPopup">
+					<div id="approval_area"></div>
+				</div>
 			</div>
 		</div>
 	</div>
@@ -218,12 +223,62 @@
 	var kakaoCnt = 0;
 	var kakaoErr = [];
 
+	function getParams() {
+		var url = window.location.search.replace('?', '');
+		var params = {};
+		var urlArray = url.split('&');
+
+		for ( var i in urlArray) {
+			var param = urlArray[i].split('=');
+			params[param[0]] = param[1];
+		}
+		return params;
+	}
+
+	/*todo 결재*/
+	var btnApproval = null;
+	//div area id 
+	var htmlParam = {
+		htmlArea : "approval_area"
+	};
+
+	//세션에 정보를 활용하여 승인처리3
+	//JSON.parse : JSON.stringify를 받을 때 / 문자열-> 자바스크립트로 변환
+	var paramObj = JSON.parse(sessionStorage.getItem('paramObj') || '{}');
+	var isTodoApprovalView = paramObj && (
+		paramObj.actionType == 'S' ||
+		paramObj.actionType == 'T' ||
+		(!paramObj.actionType && (
+			paramObj.todoDiv2CodeId == 'TODODIV2130' ||
+			paramObj.todoDiv2CodeId == 'TODODIV1130'
+		))
+	);
+	//sessionStorage.removeItem('paramObj');
+	if (isTodoApprovalView) {
+		$('#approvalWrapper').show();
+		//to-do 에서 넘어온 param;
+		var popParam = $.extend({}, paramObj);
+		//추가로 넣어줄 param
+		var approvalParam = {
+			coCd : paramObj.coCd,
+			todoDiv1CodeId : paramObj.todoDiv1CodeId,
+			todoDiv2CodeId : paramObj.todoDiv2CodeId,
+			pgmId : paramObj.pgmId
+		};
+		//삭제할 키가 있으면 쓴다.
+		delete popParam.sanctnSn;
+		delete popParam.pgmId;
+		//결재/승인버튼 생성하기
+		var commApproval = new Approval(htmlParam, approvalParam, popParam);
+		commApproval.makeHtml();
+	}
+
 	$(document).ready(function() {
 		setCommonSelect($(".popup_area select[data-kind]"));
 
 		// sessionStorage에서 파라미터 수신
 		var paramObj = JSON.parse(sessionStorage.getItem('paramObj') || '{}');
-		actionType = paramObj.actionType || 'C';
+		actionType = paramObj.actionType || (paramObj.todoDiv2CodeId == 'TODODIV2130' ? 'S' : (paramObj.todoDiv2CodeId == 'TODODIV1130' ? 'T' : 'C'));
 		fileTrgtKey = paramObj.fileTrgtKey || '';
 
 		// 첨부파일 초기화
@@ -337,7 +392,7 @@
 			} else {
 				// S, T (결재/공유 조회)
 				$('.tit').text('업무 요청 조회');
-				$('#actionBtn').remove();
+				$('#bottomActionArea').hide();
 				$('.i_search_w').remove();
 
 				$.each($('#popForm select, #popForm input, #popForm textarea'), function(idx, elem) {
@@ -673,6 +728,27 @@
 			});
 		}
 
+		if (!$("#reqId").val().includes('gyrsult') && jwt.userId != $("#reqId").val()) {
+			addParam["todoId"] = $("#reqId").val();
+			addParam["usrNm"] = $("#reqId").val();
+			addParam["empNo"] = $("#reqId").val();
+			addParam["name"] = $('#reqIdNm').val();
+			addParam["telNo"] = '';
+			addParam["email"] = '';
+			addParam["gb"] = '공유';
+			paramObj["actionType"] = "T";
+			addParam["pgParam"] = JSON.stringify(paramObj);
+
+			var approvalListObj = {};
+			shareSn += 1;
+			approvalListObj["sanctnSn"] = shareSn;
+			approvalListObj["todoDiv1CodeId"] = "TODODIV10";
+			approvalListObj["todoDiv2CodeId"] = "TODODIV1130";
+
+			var mergedParam = $.extend({}, addParam, approvalListObj);
+			approvalArr.push(mergedParam);
+		}
+
 		formData.append("approvalArr", JSON.stringify(approvalArr));
 		formData.append("S_todoDiv1CodeId", "TODODIV10");
 		formData.append("S_todoDiv2CodeId", "TODODIV1130");
@@ -913,13 +989,24 @@
 		var paramObj = {
 			"coCd": $('#coCd').val(),
 			"userId": $('#reqId').val(),
-			"userNm": $('#reqIdNm').val(),
-			"callbackType": "reqUser"
+			"userNm": $('#reqIdNm').val()
 		};
-		sessionStorage.setItem('userSearchParam', JSON.stringify(paramObj));
-		var nextUrl = '/static/mobile/modal/userSearchMobile.html';
-		insertPgmHistory(nextUrl);
-		location.href = nextUrl;
+		openSecondModal("/static/html/cmn/modal/userSearch.html", 450, 650, "요청자 검색", paramObj, function(tree) {
+			var checkedId = tree.get_checked()[0];
+			var checkedNode = tree.get_node(checkedId);
+			var deptName = checkedNode.original.deptNm;
+			var coCd = checkedNode.original.coCd;
+
+			$('#reqId').val(checkedNode.id);
+			$('#reqIdNm').val(checkedNode.text);
+
+			if (deptName) {
+				$('#reqDept').val(deptName);
+			}
+			if (coCd) {
+				$('#coCd').val(coCd);
+			}
+		});
 	}
 
 	// ── 처리자 검색 (모바일) ──
@@ -927,13 +1014,20 @@
 		var paramObj = {
 			"coCd": $('#coCd').val(),
 			"userId": $('#actId').val(),
-			"userNm": $('#actIdNm').val(),
-			"callbackType": "actUser"
+			"userNm": $('#actIdNm').val()
 		};
-		sessionStorage.setItem('userSearchParam', JSON.stringify(paramObj));
-		var nextUrl = '/static/mobile/modal/userSearchMobile.html';
-		insertPgmHistory(nextUrl);
-		location.href = nextUrl;
+		openSecondModal("/static/html/cmn/modal/userSearch.html", 450, 650, "처리자 검색", paramObj, function(tree) {
+			var checkedId = tree.get_checked()[0];
+			var checkedNode = tree.get_node(checkedId);
+			var deptName = checkedNode.original.deptNm;
+
+			if (deptName) {
+				$('#reqDept').val(deptName);
+			}
+
+			$('#actId').val(checkedNode.id);
+			$('#actIdNm').val(checkedNode.text);
+		});
 	}
 
 	// ── 유틸리티 함수 ──
