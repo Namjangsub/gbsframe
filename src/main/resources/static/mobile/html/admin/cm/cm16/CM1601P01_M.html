@@ -222,6 +222,7 @@
 	var teleNo = "";
 	var kakaoCnt = 0;
 	var kakaoErr = [];
+	var lastPosition = 0;
 
 	function getParams() {
 		var url = window.location.search.replace('?', '');
@@ -289,6 +290,8 @@
 		};
 		if (typeof treeModule !== 'undefined') {
 			treeModule.initAll('deptTreeOrdars', 'file-grid', 'FILETREE', fileParam, 'fileList_area');
+			$('#fileList_area #button_file').attr('onclick', 'fromWebToApp(1);');
+			$('#fileList_area #button_file').text('파일선택');
 		}
 
 		// 조치상태 변경 이벤트
@@ -365,12 +368,12 @@
 			selectItoaIssueInfo();
 
 			if (actionType == "U") {
-				if (jwt.userId !== $('#actId').val() && jwt.userId !== $('#reqId').val()) {
+				if (!canUpdateItoaIssue()) {
 					$('#popForm select, #popForm input, #popForm textarea').each(function() {
 						$(this).attr('readonly', true);
 						$(this).css({'background-color': '#e6e6e6', 'pointer-events': 'none'});
 					});
-					$('#actionBtn').remove();
+					$('#actionBtn').hide();
 					$('#btn_plus1, #btn_minus1').hide();
 				} else {
 					$('#popForm select, #popForm input, #popForm textarea').each(function() {
@@ -380,7 +383,7 @@
 							$('#actCd').addClass('no-click');
 						}
 					});
-					$('#actionBtn').removeAttr('disabled');
+					$('#actionBtn').show().removeAttr('disabled');
 				}
 
 				$('#actCd').change();
@@ -430,7 +433,7 @@
 			$('#actDesc').css({'background-color': '', 'pointer-events': ''});
 			$('#btn_plus1').show();
 			$('#btn_minus1').show();
-			if (actionType == 'T') {
+			if (actionType == 'T' || (actionType == 'U' && !canUpdateItoaIssue())) {
 				$('#actionBtn').hide();
 			} else {
 				$('#actionBtn').show();
@@ -448,7 +451,7 @@
 			$('#actDesc').css({'background-color': '#e6e6e6', 'pointer-events': 'none'});
 			$('#btn_plus1').hide();
 			$('#btn_minus1').hide();
-			if (actionType == 'T') {
+			if (actionType == 'T' || (actionType == 'U' && !canUpdateItoaIssue())) {
 				$('#actionBtn').hide();
 			} else {
 				$('#actionBtn').show();
@@ -785,8 +788,8 @@
 
 	// ── 수정 ──
 	function updateItoaIssue() {
-		if (approvalYn()) {
-			alert("결재가 이미 진행중입니다.");
+		if (!canUpdateItoaIssue()) {
+			alert($("#actCd").val() == "ISSSTS02" ? "진행중 상태에서는 업무처리자만 수정할 수 있습니다." : "수정 권한이 없습니다.");
 			return;
 		}
 		if (inputValidation($('.popup_area [required]'))) {
@@ -802,13 +805,50 @@
 		}
 	}
 
+	function canUpdateItoaIssue() {
+		var actCd = $("#actCd").val();
+		var loginUserId = jwt.userId;
+		var actId = $("#actId").val();
+		var reqId = $("#reqId").val();
+
+		if (actCd == "ISSSTS02") {
+			return loginUserId == actId;
+		}
+		return loginUserId == actId || loginUserId == reqId;
+	}
+
+	function uploadFile(fileName, base64ImageData, fileObj, type) {
+		if (typeof treeModule !== 'undefined' && typeof treeModule.uploadFile === 'function') {
+			treeModule.uploadFile(fileName, base64ImageData, fileObj, type);
+		}
+	}
+
+	// 파일첨부
+	function fromWebToApp(select, fileTrgtKey = "112233", rptPosition = 0) {
+		lastPosition = rptPosition;
+		var paramMsg = select + ',' + fileTrgtKey;
+		// webview_flutter: JavascriptChannel(name: 'toApp') => window.toApp.postMessage(...)
+		if (window.toApp && typeof window.toApp.postMessage === 'function') {
+			try {
+				window.toApp.postMessage(paramMsg);
+			} catch (e) {
+				console.error('toApp 호출 중 오류, 파일 선택으로 대체합니다.', e);
+				$('#deptTreeOrdarsfile').trigger('click');
+			}
+		} else {
+			$('#deptTreeOrdarsfile').trigger('click');
+		}
+	}
+
 	// ── 결재 진행 여부 확인 ──
 	function approvalYn() {
+		if (jwt.userId == $("#actId").val()) return 0;
+
 		var inCnt = 0;
 		var appshaList = gridViewPop.target.list;
 		if (appshaList && appshaList.length > 0) {
 			$.each(appshaList, function(idx, elem) {
-				if (elem.todoId != jwt.userId && elem.sanctnSttus == "Y") inCnt++;
+				if ((elem.gb == "결재" || elem.todoDiv1CodeId == "TODODIV20") && elem.todoId != jwt.userId && elem.sanctnSttus == "Y") inCnt++;
 			});
 		}
 		return inCnt;

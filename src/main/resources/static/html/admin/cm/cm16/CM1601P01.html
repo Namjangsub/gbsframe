@@ -292,7 +292,7 @@
 				$('#actDesc').css({'background-color': '', 'pointer-events': ''});
 				$('#btn_plus1').show();
 				$('#btn_minus1').show();
-				if (actionType == 'T') {
+				if (actionType == 'T' || (actionType == 'U' && !canUpdateItoaIssue())) {
 					$('#popForm #actionBtn').hide();
 				} else {
 					$('#popForm #actionBtn').show();
@@ -312,7 +312,7 @@
 				$('#actDesc').css({'background-color': '#e6e6e6', 'pointer-events': 'none'})
 				$('#btn_plus1').hide();
 				$('#btn_minus1').hide();
-				if (actionType == 'T') {
+				if (actionType == 'T' || (actionType == 'U' && !canUpdateItoaIssue())) {
 					$('#popForm #actionBtn').hide();
 				} else {
 					$('#popForm #actionBtn').show();
@@ -404,13 +404,13 @@
 			selectItoaIssueInfo(); // ITSM 정보 불러오기
 
 			if (actionType == "U" ) {
-				// 처리자 또는 요청자와 로그인한 사용자가 일치하는지 확인
-				if (jwt.userId !== $('#actId').val() && jwt.userId !== $('#reqId').val()) {
+				// 접수는 요청자/처리자 수정 가능, 진행중은 처리자만 수정 가능
+				if (!canUpdateItoaIssue()) {
 					// 처리자나 요청자가 아닌 경우, 모든 필드를 비활성화
 					$('#popForm select, #popForm input, #popForm textarea', ).each(function() {
 						$(this).attr('readonly', true);
 						$(this).css({'background-color': '#e6e6e6', 'pointer-events': 'none'});
-						$('#actionBtn').remove();
+						$('#actionBtn').hide();
 					});
 					$('#btn_plus1, #btn_minus1').hide();
 				} else {
@@ -425,7 +425,7 @@
 					});
 
 					// 수정 버튼 활성화
-					$('#actionBtn').removeAttr('disabled');
+					$('#actionBtn').show().removeAttr('disabled');
 				}
 
 				$('#actCd').change();
@@ -796,8 +796,8 @@
 
 	// 수정
 	function updateItoaIssue() {
-		if( approvalYn() ) {
-			alert("결재가 이미 진행중입니다.");
+		if (!canUpdateItoaIssue()) {
+			alert($("#actCd").val() == "ISSSTS02" ? "진행중 상태에서는 업무처리자만 수정할 수 있습니다." : "수정 권한이 없습니다.");
 			return;
 		}
 		if (inputValidation($('.popup_area [required]'))) {
@@ -813,6 +813,18 @@
 				});
 			}
 		}
+	}
+
+	function canUpdateItoaIssue() {
+		var actCd = $("#actCd").val();
+		var loginUserId = jwt.userId;
+		var actId = $("#actId").val();
+		var reqId = $("#reqId").val();
+
+		if (actCd == "ISSSTS02") {
+			return loginUserId == actId;
+		}
+		return loginUserId == actId || loginUserId == reqId;
 	}
 
 	// 구분과 상세구분을 처리하는 함수
@@ -1039,13 +1051,15 @@
 
 	//결재 여부
 	function approvalYn() {
+		if (jwt.userId == $("#actId").val()) return 0;
+
 		var gridList = gridViewPop.target.getList();
 		var inCnt = 0;
 		if( gridList.length > 0 ) {
 			var msgArr = [];
 			$.each(gridList, function (idx, elem) {
 				//결재자가 본인이 아니면서 상태가 Y인 경우
-				if( elem.todoId != jwt.userId && elem.sanctnSttus == "Y" ) inCnt++;
+				if( (elem.gb == "결재" || elem.todoDiv1CodeId == "TODODIV20") && elem.todoId != jwt.userId && elem.sanctnSttus == "Y" ) inCnt++;
 			})
 		}
 		return inCnt;
