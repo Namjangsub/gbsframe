@@ -37,4 +37,9 @@ public class WB27SvcImpl implements WB27Svc {
         return wb27Mapper.selectBreakdownKpi(paramMap);
     }
 
+    @Override
+    public List<Map<String, Object>> selectPrdtGrpList(Map<String, String> paramMap) {
+        return wb27Mapper.selectPrdtGrpList(paramMap);
+    }
+
 }

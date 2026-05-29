@@ -55,4 +55,12 @@ public class WB27Ctr {
         return "jsonView";
     }
 
+    /* 제품그룹 동적 조회 (제품그룹을 제외한 타 검색조건 필터링 결과 기준) */
+    @PostMapping(value = "/selectPrdtGrpList")
+    public String selectPrdtGrpList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+        List<Map<String, Object>> resultList = wb27Svc.selectPrdtGrpList(paramMap);
+        model.addAttribute("resultList", resultList);
+        return "jsonView";
+    }
+
 }

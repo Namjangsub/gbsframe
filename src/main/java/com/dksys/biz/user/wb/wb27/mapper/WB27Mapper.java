@@ -16,4 +16,6 @@ public interface WB27Mapper {
 
     List<Map<String, Object>> selectBreakdownKpi(Map<String, String> paramMap);
 
+    List<Map<String, Object>> selectPrdtGrpList(Map<String, String> paramMap);
+
 }
