@@ -642,7 +642,7 @@
 
 				// 발주요청서, 구매발주서, 외주관리에 등록되어 있으면 변경 불가, 메세지
 				if (tempOrdrsDiv == "ORDRSDIV8") {
-					paramObj={"" : $("#ordrsNo").val()};
+					paramObj={"ordrsNo" : $("#ordrsNo").val()};
 					postAjaxSync("/user/cr/cr02/ordrsDivChangeChk", paramObj, null, function(data){
 						if(data.result) {
 							let msg = data.result.msg;
@@ -1038,6 +1038,14 @@
 		}
 
 		// 금액 콤마 제거
+		var saveOrdrsDiv = $("#ordrsDiv").val();
+		var isCancelOrTempOrdrs = (saveOrdrsDiv == "ORDRSDIV8" || saveOrdrsDiv == "ORDRSDIV9");
+		if (isCancelOrTempOrdrs) {
+			if (!confirm("수주가의 기계PART, 전기PART, 합계가 모두 0원으로 변경됩니다.\n계속 진행하시겠습니까?")) {
+				return false;
+			}
+		}
+
 		$.each($('.popup_area input[comma],#exrate,#ordrsAmt,#exchangeAmt'), function (idx, elem) {
 			deleteComma(elem);
 		});
@@ -1292,9 +1300,15 @@
 			const seenNo2 = new Set(); 	//정산수주번호+순번 중복체크용
 			let seenNoDup = false;		//정산수주번호+순번 중복체크용
 			$.each(rowListDetail, function (idx, elem) {
+				var ordrsPrcMach = isCancelOrTempOrdrs ? 0 : pasIntChk(elem.ordrsPrcMach);
+				var ordrsPrcElcty = isCancelOrTempOrdrs ? 0 : pasIntChk(elem.ordrsPrcElcty);
+				var cudCheck = elem.cudCheck;
+				if (isCancelOrTempOrdrs && cudCheck != "C") {
+					cudCheck = "U";
+				}
 				var detailObj = {
 					"ordrsSeq"				: elem.ordrsSeq,
-					"cudCheck"				: elem.cudCheck,
+					"cudCheck"				: cudCheck,
 					"devDiv"				: elem.devDiv,
 					"ordrsDtlDiv10"			: elem.ordrsDtlDiv10,
 					"ordrsDtlDiv20"			: elem.ordrsDtlDiv20,
@@ -1307,9 +1321,9 @@
 					"eqpNm"					: elem.eqpNm,
 					"dudtIntendDt"			: elem.dudtIntendDt,
 					"dtlRmk"				: elem.dtlRmk,
-					"ordrsPrcMach"			: pasIntChk(elem.ordrsPrcMach),
-					"ordrsPrcElcty"			: pasIntChk(elem.ordrsPrcElcty),
-					"ordrsPrc"				: pasIntChk(elem.ordrsPrcMach) + pasIntChk(elem.ordrsPrcElcty),
+					"ordrsPrcMach"			: ordrsPrcMach,
+					"ordrsPrcElcty"			: ordrsPrcElcty,
+					"ordrsPrc"				: ordrsPrcMach + ordrsPrcElcty,
 					"ordrsQty"				: pasIntChk(elem.ordrsQty),
 					"estEpctMatPrc"			: pasIntChk(elem.estEpctMatPrc),
 					"trgtPchsPcostMach"		: pasIntChk(elem.trgtPchsPcostMach),
@@ -1388,8 +1402,8 @@
 				totalLaborCostMfgCost += laborCostMfgCost; //노무비 제조걍비
 				totalMachineValueAfterDeduction += machineValueAfterDeduction;
 
-				totalClmnAmt += pasFloatChk(elem.ordrsPrcMach);
-				totalClmnAmt += pasFloatChk(elem.ordrsPrcElcty);
+				totalClmnAmt += pasFloatChk(detailObj.ordrsPrcMach);
+				totalClmnAmt += pasFloatChk(detailObj.ordrsPrcElcty);
 
 				detailArr.push(detailObj);  //설비정보
 			});
@@ -1587,7 +1601,8 @@
 				}
 			},
 			{key: "clmnDivSeq", label: "차수", width: 50, align: "center", editor: {type: "text"}},
-			{key: "clmnRate", label: "비율", width: 50, align: "center", editor: {type: "number"}},
+			{key: "clmnRate", label: "비율", width: 50, align: "center", editor: {type: "number"},
+				formatter: function () { return round2(this.value); }},
 			{key: "clmnAmt",label: "수금계획금액", width: 110, align: "right", editor: {type: "number"}, formatter: "money"},
 			{key: "clmnDt", label: "수금예정일자", width: 100, align: "center",
 				editor: {
@@ -1639,7 +1654,7 @@
 		footSum: [
 			[
 				{label: "수금합계", align: "center", colspan: 3},
-				{key: "clmnRate", collector: "sum", formatter: "money", align: "right"},
+				{key: "clmnRate", collector: "sum", formatter: function () { return round2(this.value); }, align: "right"},
 				{key: "clmnAmt", collector: "sum", formatter: "money", align: "right"},
 				{colspan: 3},
 				{key: "매출확정합계", collector: "sum", formatter: "money", align: "right"},
@@ -1676,17 +1691,17 @@
 
 						if (!isNaN(clmnAmt) && !isNaN(ordrsAmt)) {
 							// this.item.clmnRate = ordrsAmt !== 0 ? pasFloatChk((clmnAmt / ordrsAmt * 100 + 0.5) ) : 0;
-							this.item.clmnRate = ordrsAmt !== 0 ? pasFloatChk((clmnAmt / ordrsAmt * 100) ) : 0;
+							this.item.clmnRate = ordrsAmt !== 0 ? round2(clmnAmt / ordrsAmt * 100) : 0;
 						}
 					}
 
 					if( this.key == "clmnRate" ) {
-						const clmnRate = pasIntChk(this.value);
+						const clmnRate = round2(pasFloatChk(this.value));
 						this.value = clmnRate;
 
 						if (!isNaN(clmnRate) && !isNaN(ordrsAmt)) {
 							// this.item.clmnAmt = pasFloatChk(clmnRate * ordrsAmt / 100 + 0.5);
-							this.item.clmnAmt = pasFloatChk(clmnRate * ordrsAmt / 100);
+							this.item.clmnAmt = Math.round(clmnRate * ordrsAmt / 100);
 						}
 					}
 
@@ -1695,7 +1710,7 @@
 					var totalAmt = 0;
 
 					for (var i = 0; i < data.length; i++) {
-						totalRate += pasIntChk(data[i].clmnRate);
+						totalRate += pasFloatChk(data[i].clmnRate);
 						totalAmt += pasFloatChk(data[i].clmnAmt);
 					}
 
@@ -1775,7 +1790,7 @@
 		var data = gridOrdrsPlan.getList();
 		var totClmnAmt = 0;
 		for (var i = 0; i < data.length; i++) {
-			data[i].clmnAmt = Math.round(ordrsAmt * pasIntChk(data[i].clmnRate) / 100);
+			data[i].clmnAmt = Math.round(ordrsAmt * pasFloatChk(data[i].clmnRate) / 100);
 			totClmnAmt += data[i].clmnAmt;
 		}
 		if (data.length > 0){
@@ -3175,6 +3190,10 @@
 		let value = ivalue +' ';
 		const cvtValue = parseFloat(value.replace(/[^0-9.-]/g, '')); //숫자(0-9), 빼기 기호(-)가 아닌 모든 문자를 바꿉니다.
 		return isNaN(cvtValue) ? 0 : cvtValue; //NaN이면 0로 대체 --> minus기호만 있는경우
+	}
+
+	function round2(ivalue) {
+		return Number((pasFloatChk(ivalue)).toFixed(2));
 	}
 
 	//그리드 수정후 현재 위치로 이동하기 위한 함수
