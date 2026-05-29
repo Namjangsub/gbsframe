@@ -1,0 +1,277 @@
+<style>
+	.auth-user-toolbar {
+		margin: 8px 0;
+		text-align: right;
+	}
+
+	.auth-user-summary {
+		display: inline-block;
+		float: left;
+		line-height: 30px;
+		font-weight: bold;
+	}
+</style>
+
+<div class="container-fluid">
+	<div class="row">
+		<div class="form-group">
+			<form id="codeForm">
+				<input type="hidden" class="form-control" id="pgmId" name="pgmId">
+				<input type="hidden" class="form-control" id="codeEtc" name="codeEtc">
+				<table class="popup_table">
+					<colgroup>
+						<col width="18%">
+						<col width="32%">
+						<col width="18%">
+						<col width="32%">
+					</colgroup>
+					<tr>
+						<th>권한ID</th>
+						<td><input type="text" class="form-control" id="codeId" name="codeId" required></td>
+						<th>상위코드ID</th>
+						<td><input type="text" class="form-control" id="codeKind" name="codeKind" required></td>
+					</tr>
+					<tr>
+						<th>권한명</th>
+						<td><input type="text" class="form-control" id="codeNm" name="codeNm" required></td>
+						<th>설명</th>
+						<td><input type="text" class="form-control" id="codeDesc" name="codeDesc"></td>
+					</tr>
+					<tr>
+						<th>부모코드ID</th>
+						<td><input type="text" class="form-control" id="codeRprc" name="codeRprc"></td>
+						<th>정렬값</th>
+						<td><input type="text" class="form-control" id="sortNo" name="sortNo" onkeyup="onlyNumber(this)"></td>
+					</tr>
+					<tr>
+						<th>사용여부</th>
+						<td>
+							<select class="form-control input-sm" id="useYn" name="useYn">
+								<option value="Y">사용</option>
+								<option value="N">미사용</option>
+							</select>
+						</td>
+						<th>더존코드</th>
+						<td><input type="text" class="form-control" id="dzCode" name="dzCode"></td>
+					</tr>
+				</table>
+			</form>
+		</div>
+	</div>
+	<div class="row">
+		<div class="auth-user-toolbar">
+			<span class="auth-user-summary">등록 사용자 <span id="authUserCnt">0</span>명</span>
+			<button type="button" class="btn btn-default btn-sm" onclick="openUserSearch();">사용자 추가</button>
+			<button type="button" class="btn btn-default btn-sm" onclick="deleteAuthUser();">선택 삭제</button>
+		</div>
+		<div data-ax5grid="auth-user-grid" data-ax5grid-config="{}" style="height: 320px; width: 100%"></div>
+	</div>
+</div>
+<div style="margin-top: 10px;">
+	<button type="button" class="btn btn-default btn-sm" id="actionBtn" onclick="insertCode();"></button>
+	<button type="button" class="btn btn-default btn-sm" onclick="modalStack.close();">닫기</button>
+</div>
+
+<script type="text/javascript">
+	var userMap = {};
+
+	var authUserGrid = {
+		initView: function(){
+			this.target = new ax5.ui.grid();
+			this.target.setConfig({
+				target: $('[data-ax5grid="auth-user-grid"]'),
+				showRowSelector: true,
+				multipleSelect: true,
+				sortable: true,
+				header: { align: "center", selector: false },
+				body: {
+					onClick: function () {
+						this.self.select(this.dindex);
+					}
+				},
+				columns: [
+					{key: "userId", label: "사용자ID", align: "center", width: 120},
+					{key: "userNm", label: "사용자명", align: "center", width: 120},
+					{key: "deptNm", label: "부서", align: "left", width: 160},
+					{key: "levelNm", label: "직급", align: "center", width: 100}
+				]
+			});
+		},
+		setData: function(list){
+			var targetObj = this.target;
+			var gridList = list || [];
+			targetObj.setData({
+				list: gridList,
+				page: {
+					totalElements: gridList.length
+				}
+			});
+			setAuthUserCount();
+		}
+	};
+
+	$(document).ready(function() {
+		var actionType = modalStack.last().paramObj.actionType;
+
+		authUserGrid.initView();
+		loadUserMap();
+
+		$('#codeForm #pgmId').val("CM0502P02");
+		if(actionType == "C"){
+			$('#codeKind').val(getCodeKind());
+			$("#codeDesc").val("특정권한");
+			$("#sortNo").val(modalStack.last().paramObj.sortNo);
+			$('#codeKind').prop("readOnly", true);
+			$('#actionBtn').text("등록");
+			authUserGrid.setData([]);
+		}else if(actionType == "U"){
+			selectCodeInfo();
+			$('#codeId').prop("readOnly", true);
+			$('#codeKind').prop("readOnly", true);
+			$('#actionBtn').text("저장");
+		}
+	});
+	
+	function loadUserMap(){
+		var paramObj = {"coCd": "", "useYn": "Y"};
+		postAjaxSync("/admin/cm/cm06/selectUserTree", paramObj, null, function(data){
+			var userTree = data.userTree || [];
+			$.each(userTree, function(index, item){
+				if(item.type == "person"){
+					userMap[item.id] = {
+						userId: item.id,
+						userNm: item.text,
+						deptNm: item.deptNm || "",
+						levelNm: item.levelNm || ""
+					};
+				}
+			});
+		});
+	}
+	
+	function selectCodeInfo(){
+		var row = gridView.target.getList("selected")[0];
+		var paramObj = {"codeId": row.codeId};
+		postAjax("/admin/cm/cm05/selectCodeInfo", paramObj, null, function(data){
+			setCodeInfo(data.codeInfo);
+		});
+	}
+	
+	function setCodeInfo(codeInfo){
+		$.each(codeInfo, function(key, value){
+			$('#'+key).val(value);
+		});
+		authUserGrid.setData(getUserListByCodeEtc(codeInfo.codeEtc));
+	}
+
+	function getUserListByCodeEtc(codeEtc){
+		var userList = [];
+		var added = {};
+		var userIds = String(codeEtc || "").split(",");
+
+		$.each(userIds, function(index, userId){
+			userId = $.trim(userId);
+			if(userId == "" || added[userId]) return true;
+
+			added[userId] = true;
+			if(userMap[userId]){
+				userList.push(userMap[userId]);
+			}else{
+				userList.push({
+					userId: userId,
+					userNm: userId,
+					deptNm: "",
+					levelNm: ""
+				});
+			}
+		});
+
+		return userList;
+	}
+
+	function openUserSearch(){
+		var paramObj = {
+			"userId": "",
+			"userNm": "",
+			"pm20Flag": "Y"
+		};
+
+		openSecondModal("/static/html/cmn/modal/userSearch.html", 450, 650, "사용자 검색", paramObj, function(userTree, personNodes){
+			var addList = [];
+			var currentMap = getCurrentUserMap();
+
+			$.each(personNodes || [], function(index, node){
+				var origin = node.original || {};
+				var userId = node.id;
+
+				if(currentMap[userId]) return true;
+				currentMap[userId] = true;
+
+				addList.push({
+					userId: userId,
+					userNm: node.text,
+					deptNm: origin.deptNm || "",
+					levelNm: origin.levelNm || ""
+				});
+			});
+
+			if(addList.length == 0){
+				alert("추가할 사용자가 없습니다.");
+				return false;
+			}
+
+			authUserGrid.setData(authUserGrid.target.getList().concat(addList));
+		});
+	}
+
+	function getCurrentUserMap(){
+		var currentMap = {};
+		$.each(authUserGrid.target.getList(), function(index, item){
+			currentMap[item.userId] = true;
+		});
+		return currentMap;
+	}
+
+	function deleteAuthUser(){
+		var selectedList = authUserGrid.target.getList("selected");
+		if(selectedList.length == 0){
+			alert("삭제할 사용자를 선택하세요.");
+			return false;
+		}
+
+		for(var i = selectedList.length - 1; i >= 0; i--){
+			authUserGrid.target.removeRow(selectedList[i].__index);
+		}
+		setAuthUserCount();
+	}
+
+	function setCodeEtcByGrid(){
+		var userIds = [];
+		$.each(authUserGrid.target.getList(), function(index, item){
+			userIds.push(item.userId);
+		});
+		$('#codeEtc').val(userIds.join(","));
+	}
+
+	function setAuthUserCount(){
+		$('#authUserCnt').text(authUserGrid.target.getList().length);
+	}
+	
+	function insertCode() {
+		setCodeEtcByGrid();
+
+		var formData = $('#codeForm').serializeObject();
+		formData.actionType = modalStack.last().paramObj.actionType;
+		formData.userId = jwt.userId;
+		
+		if(inputValidation($('#codeForm input[required]'))){
+			postAjax("/admin/cm/cm05/insertCode", formData, null, function(data){
+				alert(data.resultMessage);
+				if(data.resultCode == 200){
+					gridView.setData(0);
+					modalStack.close();
+				}
+			});
+		}
+	}
+</script>
