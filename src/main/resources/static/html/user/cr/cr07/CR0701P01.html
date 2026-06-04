@@ -54,8 +54,13 @@
 						<select id="currCd" name="currCd" data-kind="CURR" class="form-control input-sm" onchange="Chk_currCd();">
 						</select>
 					</td>
+					<th class="">부가세</th>
+					<td><select id="vatCd" name="vatCd" data-kind="VAT" class="form-control">
+							<option value="">선택</option>
+						</select>
+					</td>
 
-					<th colspan="2"></th>
+					<!-- <th colspan="2"></th> -->
 <!-- 					<td> -->
 <!-- 						<input type="text" id="exrate" name="exrate" class="form-control" maxlength="10" onkeyup="onlyNumber(this)" comma onchange="Chk_Exrate();"> -->
 <!-- 					</td> -->
@@ -137,7 +142,20 @@
 						var paramObj = {"row" : row};
 						//체크박스일 경우 실행
 						if( key == "chk" ) {
-							setAmt(ModalgridView, this.item.chk , this.item.miConfAmt, row);                        		
+							var beforeVatCd = $("#vatCd").val();
+							if (this.item.chk == "Y" && !validateVatSelection()) {
+								this.self.setValue(row, "chk", "N");
+								this.self.setValue(row, "confAmt", 0);
+								setSumAmt();
+								syncVatCdBySelection(beforeVatCd);
+								return;
+							}
+							setAmt(ModalgridView, this.item.chk , this.item.miConfAmt, row);
+							if (this.item.chk == "Y") {
+								$("#vatCd").val(this.item.vatCd);
+							} else {
+								syncVatCdBySelection(beforeVatCd);
+							}
 						}
 					},
 					onDBLClick: function () {
@@ -200,6 +218,7 @@
 				
 				columns : [
 					{key: "ordrsFileTrgtKey", label: "파일대상KEY", align: "center", width: 50 , hidden: true},
+					{key: "vatCd"      , label: "부가세코드" , align: "center", width: 70 , hidden: true},
 					{key: "coCd"       , label: "회사코드"   , align: "center", width: 70 , hidden: true},
 					{key: "coNm"       , label: "회사"      , align: "center", width: 80 , hidden: true},
 					{key: "ordrsClntCd", label: "고객사"     , align: "center", width: 100, hidden: true},
@@ -294,6 +313,7 @@
 								totalElements: list.length
 							}
 						});
+						syncVatCdBySelection("");
 					} catch (error) {
 						alert("오류 발생!! 전산실 연락 바랍니다", error.message);
 						return null; // 오류 발생 시 null 반환
@@ -317,6 +337,7 @@
 								totalElements: list.length
 							}
 						});
+						syncVatCdBySelection("");
 						monthCloseChk($('#sellDcsnDt').val());
 					} catch (error) {
 						alert("오류 발생!! 전산실 연락 바랍니다", error.message);
@@ -332,6 +353,7 @@
 	//화면 초기 설정
 	$(document).ready(function() {
 		setCommonSelect($(".popup_area select[data-kind]"));
+		$("#vatCd").prop("disabled", true);
 		setByCoCd(modalStack.last().paramObj.coCd);
 
 		$("#popForm #userId").val(jwt.userId);
@@ -495,6 +517,9 @@
 				customAlert("매출확정 대상과 금액을 입력하세요!")
 				return;
 			}
+			if (!validateVatSelection()) {
+				return;
+			}
 			//상세대상이 없는 경우 저장 안되게 처리 끝
 
 			var formData = makeFormData();						// 요청이 통과하면 makeFormData() 함수를 이용해 formData를 생성
@@ -517,6 +542,9 @@
 	// 수정
 	function update_cr07() {
 		if (inputValidation($('.popup_area [required]'))) {						// 필수 필드의 유효성 검사
+			if (!validateVatSelection()) {
+				return;
+			}
 			var formData = makeFormData();										// 요청이 통과하면 makeFormData() 함수를 이용해 formData를 생성
 			if (formData) {
 				filePostAjax("/user/cr/cr07/update_cr07", formData,function(data) {
@@ -529,6 +557,67 @@
 				});
 			}
 		}
+	}
+
+	// 부가세 선택 검증 함수
+	function validateVatSelection() {
+		var hasGeneralVat = false;
+		var hasZeroOrExemptVat = false;
+		var list = ModalgridView.target.list;
+
+		$.each(list,function(idx, obj) {
+			if (!isVatValidationTarget(obj)) {
+				return true;
+			}
+
+			if (obj.vatCd == "VAT01") {
+				hasGeneralVat = true;
+			} else if (obj.vatCd == "VAT02" || obj.vatCd == "VAT03") {
+				hasZeroOrExemptVat = true;
+			}
+
+			if (hasGeneralVat && hasZeroOrExemptVat) {
+				return false;
+			}
+		});
+
+		if (hasGeneralVat && hasZeroOrExemptVat) {
+			alert("영세율과 일반과세 항목이 함께 포함되어 있어 계산서를 발급할 수 없습니다");
+			return false;
+		}
+
+		return true;
+	}
+
+	// 부가세 선택 검증 대상 여부 판단 함수
+	function isVatValidationTarget(obj) {
+		if (actionType == "C") {
+			return obj.chk == "Y";
+		}
+
+		return parseFloat(obj.confAmt) > 0;
+	}
+
+	function syncVatCdBySelection(preferredVatCd) {
+		var vatCd = "";
+		var list = ModalgridView.target.list;
+
+		$.each(list,function(idx, obj) {
+			if (!isVatValidationTarget(obj)) {
+				return true;
+			}
+
+			if (vatCd == "") {
+				vatCd = obj.vatCd || "";
+			}
+
+			if (preferredVatCd && obj.vatCd == preferredVatCd) {
+				vatCd = preferredVatCd;
+				return false;
+			}
+		});
+
+		$("#vatCd").val(vatCd);
 	}
 	
 	function makeFormData() {

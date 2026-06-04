@@ -59,6 +59,7 @@
 					<td>
 						<input type="hidden" id="sellVatVal" name="sellVatVal">
 						<select class="form-control input-sm" id="sellVatCd" name="sellVatCd" data-kind="VAT">
+							<option value="">선택</option>
 						</select>
 					</td>
 
@@ -164,6 +165,18 @@
 						var paramObj = {"row" : row};
 						//체크박스일 경우 실행
 						if( key == "chk" ) {
+							var beforeVatCd = $("#popForm #sellVatCd").val();
+							if (this.item.chk == "Y") {
+								if (!validateVatSelection()) {
+									this.self.setValue(row, "chk", "N");
+									setAmt(ModalgridView, "N", this.item.miClmnAmt, row);
+									syncVatInfoBySelection(beforeVatCd);
+									return;
+								}
+								setHeaderVatInfo(this.item);
+							} else {
+								syncVatInfoBySelection(beforeVatCd);
+							}
 							setAmt(ModalgridView, this.item.chk , this.item.miClmnAmt, row);                        		
 						}
 					},
@@ -261,6 +274,7 @@
 				columns : [
 					{key: "ordrsFileTrgtKey", label: "파일대상KEY", align: "center", width: 50 , hidden: true},
 					{key: "coCd"       , label: "회사코드"   , align: "center", width: 70 , hidden: true},
+					{key: "vatCd"       , label: "부가세코드"   , align: "center", width: 70 , hidden: true},
 					{key: "coNm"       , label: "회사"      , align: "center", width: 80 , hidden: true},
 					{key: "ordrsClntCd", label: "고객사"     , align: "center", width: 100, hidden: true},
 					{key: "ordrsClntNm", label: "고객사"     , align: "left"  , width: 120, hidden: true},
@@ -818,6 +832,95 @@
 	}
 	
 	// 금액지정
+	function getRowVatCd(item) {
+		return $.trim((item && (item.vatCd || item.sellVatCd)) || "");
+	}
+
+	function getRowVatVal(item) {
+		var vatCd = getRowVatCd(item);
+		var vatVal = $.trim((item && item.sellVatVal) || "");
+		if (vatVal == "" && vatCd == "VAT01") {
+			vatVal = "10";
+		} else if (vatVal == "" && (vatCd == "VAT02" || vatCd == "VAT03")) {
+			vatVal = "0";
+		}
+		return vatVal;
+	}
+
+	function setHeaderVatInfo(item) {
+		var vatCd = getRowVatCd(item);
+		var vatVal = getRowVatVal(item);
+
+		$("#popForm #sellVatCd").val(vatCd);
+		$("#popForm #sellVatVal").val(vatVal);
+		sellVatVal = vatVal;
+	}
+
+	function isVatValidationTarget(obj) {
+		return obj.chk == "Y";
+	}
+
+	function validateVatSelection() {
+		var vatCd = "";
+		var hasDifferentVat = false;
+		var list = ModalgridView.target.list;
+
+		$.each(list, function(idx, obj) {
+			if (!isVatValidationTarget(obj)) {
+				return true;
+			}
+
+			var rowVatCd = getRowVatCd(obj);
+			if (rowVatCd == "") {
+				return true;
+			}
+
+			if (vatCd == "") {
+				vatCd = rowVatCd;
+			} else if (vatCd != rowVatCd) {
+				hasDifferentVat = true;
+				return false;
+			}
+		});
+
+		if (hasDifferentVat) {
+			alert("부가세 정보가 다른 항목은 함께 선택할 수 없습니다.");
+			return false;
+		}
+
+		return true;
+	}
+
+	function getSelectedVatItem(preferredVatCd) {
+		var selectedItem = null;
+		$.each(ModalgridView.target.list, function(idx, obj) {
+			if (!isVatValidationTarget(obj)) {
+				return true;
+			}
+
+			if (selectedItem == null) {
+				selectedItem = obj;
+			}
+
+			if (preferredVatCd && getRowVatCd(obj) == preferredVatCd) {
+				selectedItem = obj;
+				return false;
+			}
+		});
+		return selectedItem;
+	}
+
+	function syncVatInfoBySelection(preferredVatCd) {
+		var selectedItem = getSelectedVatItem(preferredVatCd);
+		if (selectedItem) {
+			setHeaderVatInfo(selectedItem);
+		} else {
+			$("#popForm #sellVatCd").val("");
+			$("#popForm #sellVatVal").val("");
+			sellVatVal = "";
+		}
+	}
+
 	function setAmt(gridObj, chkVal, Amt, row) {
 		//등록일 경우만 처리
 		if (actionType == "C") {

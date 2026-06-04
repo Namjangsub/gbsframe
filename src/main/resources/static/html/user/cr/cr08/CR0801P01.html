@@ -54,8 +54,17 @@
 						<select id="currCd" name="currCd" data-kind="CURR" class="form-control input-sm" onchange="Chk_currCd();">
 						</select>
 					</td>
-
-					<th colspan="2"></th>
+					<th class="">부가세</th>
+					<td><select id="vatCd" name="vatCd" data-kind="VAT" class="form-control">
+							<option value="">선택</option>
+						</select>
+					</td>
+					<!-- <th colspan="2"></th>
+					<td>
+						<select id="vatCd" name="vatCd" data-kind="VAT" class="form-control">
+							<option value="">선택</option>
+						</select>
+					</td> -->
 <!-- 					<td> -->
 <!-- 						<input data-number type="text" id="exrate" name="exrate" class="form-control" maxlength="10" onchange="Chk_Exrate();" readonly="readonly"> -->
 <!-- 					</td> -->
@@ -224,7 +233,31 @@
 					    var vatRate = this.item.vatRate;
 						//체크박스일 경우 실행
 						if( key == "chk" ) {
-							setAmt(ModalgridView, this.item.chk , this.item.sellDcsnDtlAmt, row, vatRate);                        		
+							var beforeVatCd = $("#vatCd").val();
+							var sellDcsnNo = this.item.sellDcsnNo;
+							if (this.item.chk == "Y" && (sellDcsnNo == undefined || sellDcsnNo == null || $.trim(sellDcsnNo) == "")) {
+								alert("매출확정이 안된 수주건입니다");
+								this.self.setValue(row, "chk", "N");
+								this.self.setValue(row, "billAmt", 0);
+								this.self.setValue(row, "sellVatAmt", 0);
+								setSumAmt();
+								syncVatCdBySelection(beforeVatCd);
+								return;
+							}
+							if (this.item.chk == "Y" && !validateVatSelection()) {
+								this.self.setValue(row, "chk", "N");
+								this.self.setValue(row, "billAmt", 0);
+								this.self.setValue(row, "sellVatAmt", 0);
+								setSumAmt();
+								syncVatCdBySelection(beforeVatCd);
+								return;
+							}
+							setAmt(ModalgridView, this.item.chk , this.item.sellDcsnDtlAmt, row, vatRate);
+							if (this.item.chk == "Y") {
+								$("#vatCd").val(this.item.vatCd);
+							} else {
+								syncVatCdBySelection(beforeVatCd);
+							}
 						}
 					},
 					onDBLClick: function () {
@@ -306,7 +339,8 @@
 					{key: "currNm"     , label: "통화"       , align: "center", width: 50},
 					{key: "exrate"     , label: "환율"       , align: "right" , width: 50, formatter: "money"},
 					{key: "vatRate", label: "부가세율", hidden:true},
-					{key: "sellVatAmt", label: "부가세", hidden:true}
+					{key: "sellVatAmt", label: "부가세", hidden:true},
+					{key: "vatCd"      , label: "부가세코드" , align: "center", width: 70 , hidden: true}
 					// {key: "billAmt",      label: "발행금액",   align: "right",  width: 80, formatter: "money",
 					// 	editor: {
 					// 		type: "number",
@@ -342,6 +376,7 @@
 								totalElements: list.length
 							}
 						});
+						syncVatCdBySelection("");
 					} catch (error) {
 						alert("오류 발생!! 전산실 연락 바랍니다", error.message);
 						return null; // 오류 발생 시 null 반환
@@ -366,6 +401,7 @@
 								totalElements: list.length
 							}
 						});
+						syncVatCdBySelection("");
 						monthCloseChk($('#sellBillDt').val());
 					} catch (error) {
 						alert("오류 발생!! 전산실 연락 바랍니다", error.message);
@@ -389,6 +425,7 @@
 	$(document).ready(function() {
 		
 		setCommonSelect($(".popup_area select[data-kind]"));
+		$("#vatCd").prop("disabled", true);
 		setByCoCd(modalStack.last().paramObj.coCd);
 
 		$("#popForm #userId").val(jwt.userId);
@@ -560,6 +597,9 @@
 				customAlert("계산서 발행 대산과 금액, 발행일자를 확인하세요!");
 				return;
 			}
+			if (!validateVatSelection()) {
+				return;
+			}
 			//상세대상이 없는 경우 저장 안되게 처리 끝
 			
 			var formData = makeFormData();						// 요청이 통과하면 makeFormData() 함수를 이용해 formData를 생성
@@ -578,6 +618,9 @@
 	// 수정
 	function update_cr08() {
 		if (inputValidation($('.popup_area [required]'))) {						// 필수 필드의 유효성 검사
+			if (!validateVatSelection()) {
+				return;
+			}
 			var formData = makeFormData();										// 요청이 통과하면 makeFormData() 함수를 이용해 formData를 생성
 			
 			if (formData) {
@@ -590,6 +633,65 @@
 				});
 			}
 		}
+	}
+
+	function validateVatSelection() {
+		var hasGeneralVat = false;
+		var hasZeroOrExemptVat = false;
+		var list = ModalgridView.target.list;
+
+		$.each(list,function(idx, obj) {
+			if (!isVatValidationTarget(obj)) {
+				return true;
+			}
+
+			if (obj.vatCd == "VAT01") {
+				hasGeneralVat = true;
+			} else if (obj.vatCd == "VAT02" || obj.vatCd == "VAT03") {
+				hasZeroOrExemptVat = true;
+			}
+
+			if (hasGeneralVat && hasZeroOrExemptVat) {
+				return false;
+			}
+		});
+
+		if (hasGeneralVat && hasZeroOrExemptVat) {
+			alert("영세율과 일반과세 항목이 함께 포함되어 있어 계산서를 발급할 수 없습니다");
+			return false;
+		}
+
+		return true;
+	}
+
+	function isVatValidationTarget(obj) {
+		if (actionType == "C") {
+			return obj.chk == "Y";
+		}
+
+		return parseFloat(obj.billAmt) > 0;
+	}
+
+	function syncVatCdBySelection(preferredVatCd) {
+		var vatCd = "";
+		var list = ModalgridView.target.list;
+
+		$.each(list,function(idx, obj) {
+			if (!isVatValidationTarget(obj)) {
+				return true;
+			}
+
+			if (vatCd == "") {
+				vatCd = obj.vatCd || "";
+			}
+
+			if (preferredVatCd && obj.vatCd == preferredVatCd) {
+				vatCd = preferredVatCd;
+				return false;
+			}
+		});
+
+		$("#vatCd").val(vatCd);
 	}
 	
 	function makeFormData() {
@@ -749,9 +851,11 @@
 					gridObj.target.setValue(row, "sellVatAmt", Amt * vatRate_s);
 				} else if( isNaN(Amt) ) {
 					gridObj.target.setValue(row, "billAmt", 0);
+					gridObj.target.setValue(row, "sellVatAmt", 0);
 				}
 			} else if(chkVal == "N") {
 				gridObj.target.setValue(row, "billAmt", 0);
+				gridObj.target.setValue(row, "sellVatAmt", 0);
 			}
 			setSumAmt();
 		}
