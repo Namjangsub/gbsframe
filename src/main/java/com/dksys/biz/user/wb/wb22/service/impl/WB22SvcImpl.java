@@ -1195,10 +1195,11 @@ public class WB22SvcImpl implements WB22Svc {
 				String pgParam = "{\"coCd\":\"" + sharngMap.get("coCd") + "\",";
 				pgParam += "\"salesCd\":\"" + sharngMap.get("salesCd") + "\",";
 				pgParam += "\"planVerNo\":\"" + sharngMap.get("verNo") + "\",";
-				pgParam += "\"histYn\":\"" + sharngMap.get("histYn") + "\",";
+				pgParam += "\"histYn\":\"" + sharngMap.get("histYn") + "\"";
 				if ("WB2101P01".equals(sharngMap.get("pgmId"))) {
-					pgParam += "\"fileTrgtKey\":\"" + sharngMap.get("fileTrgtKey") + "\"}";
+					pgParam += ",\"fileTrgtKey\":\"" + sharngMap.get("fileTrgtKey") + "\"";
 				}
+				pgParam += "}";
 				sharngMap.put("sanCtnSn", Integer.toString(i + 1));
 				sharngMap.put("pgParam", pgParam);
 				result = QM01Mapper.insertWbsSharngList(sharngMap);
