@@ -135,19 +135,45 @@ public class PM10Svcimpl implements PM10Svc {
 	}
 
 	@Override
+	public Map<String, String> ensureNoticeRow(Map<String, String> param) throws Exception {
+		param.put("mnSubject", "공지사항");
+
+		// 같은 회의일자의 최초 공지 생성 경합을 M01 갱신 트랜잭션으로 직렬화한다.
+		pm10Mapper.pm10_main_update(param);
+
+		Integer existSeq = pm10Mapper.selectNoticeSubSeq(param);
+		Integer sortNo;
+		if (existSeq != null && existSeq > 0) {
+			param.put("mnSubSeq", String.valueOf(existSeq));
+			sortNo = pm10Mapper.selectNoticeSortNo(param);
+		} else {
+			Integer newSeq = pm10Mapper.selectNextSubSeq();
+			sortNo = pm10Mapper.selectNextNoticeSortNo(param);
+			param.put("mnSubSeq", String.valueOf(newSeq));
+			param.put("mnSortNo", String.valueOf(sortNo != null ? sortNo : 1));
+			pm10Mapper.insertNoticeRow(param);
+		}
+
+		if (sortNo != null) {
+			param.put("mnSortNo", String.valueOf(sortNo));
+		}
+
+		Map<String, String> result = new HashMap<>();
+		result.put("mnSubSeq", param.get("mnSubSeq"));
+		result.put("mnSortNo", param.get("mnSortNo"));
+		return result;
+	}
+
+	@Override
 	public int pm10_d01_update(Map<String, String> param) throws Exception {
 		String mnSubSeqStr = param.get("mnSubSeq");
 		if (mnSubSeqStr == null || "".equals(mnSubSeqStr) || "0".equals(mnSubSeqStr)) {
 			// 공지사항인 경우 동시 생성 방지를 위해 기존 번호가 있는지 한 번 더 확인
 			String mnSubject = param.get("mnSubject");
 			if ("공지사항".equals(mnSubject)) {
-				Integer existSeq = pm10Mapper.selectNoticeSubSeq(param);
-				if (existSeq != null && existSeq > 0) {
-					param.put("mnSubSeq", String.valueOf(existSeq));
-				} else {
-					Integer newSeq = pm10Mapper.selectNextSubSeq();
-					param.put("mnSubSeq", String.valueOf(newSeq));
-				}
+				Map<String, String> noticeRow = ensureNoticeRow(param);
+				param.put("mnSubSeq", noticeRow.get("mnSubSeq"));
+				param.put("mnSortNo", noticeRow.get("mnSortNo"));
 			} else {
 				Integer newSeq = pm10Mapper.selectNextSubSeq();
 				param.put("mnSubSeq", String.valueOf(newSeq));
@@ -164,13 +190,9 @@ public class PM10Svcimpl implements PM10Svc {
 			// 공지사항인 경우 동시 생성 방지를 위해 기존 번호가 있는지 한 번 더 확인
 			String mnSubject = param.get("mnSubject");
 			if ("공지사항".equals(mnSubject)) {
-				Integer existSeq = pm10Mapper.selectNoticeSubSeq(param);
-				if (existSeq != null && existSeq > 0) {
-					param.put("mnSubSeq", String.valueOf(existSeq));
-				} else {
-					Integer newSeq = pm10Mapper.selectNextSubSeq();
-					param.put("mnSubSeq", String.valueOf(newSeq));
-				}
+				Map<String, String> noticeRow = ensureNoticeRow(param);
+				param.put("mnSubSeq", noticeRow.get("mnSubSeq"));
+				param.put("mnSortNo", noticeRow.get("mnSortNo"));
 			} else {
 				Integer newSeq = pm10Mapper.selectNextSubSeq();
 				param.put("mnSubSeq", String.valueOf(newSeq));
@@ -193,6 +215,12 @@ public class PM10Svcimpl implements PM10Svc {
 
 		Object mnSubSeq = paramMap.get("mnSubSeq");
 		if (mnSubSeq != null && !"".equals(mnSubSeq)) {
+			// 삭제 대상 행에 락이 걸려 있는지 검증
+			String lockUserNm = pm10Mapper.selectMnLockUser(paramMap);
+			if (lockUserNm != null && !"".equals(lockUserNm)) {
+				throw new RuntimeException(lockUserNm + "님이 편집 중인 행은 삭제할 수 없습니다.");
+			}
+
 			// D01 삭제 (주제)
 			result += pm10Mapper.deleteMnD01(paramMap);
 			// D02 삭제 (참석자)

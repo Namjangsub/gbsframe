@@ -212,6 +212,65 @@
 		  AND MN_SUBJECT = '공지사항'
 	</select>
 
+	<select id="selectNoticeSortNo" parameterType="Map" resultType="java.lang.Integer">
+		SELECT MN_SORT_NO
+		FROM TB_PM10D01
+		WHERE MN_DATE = #{mnDate}
+		  AND MN_SUBJECT = '공지사항'
+		  AND MN_SUB_SEQ = (
+			SELECT MAX(MN_SUB_SEQ)
+			FROM TB_PM10D01
+			WHERE MN_DATE = #{mnDate}
+			  AND MN_SUBJECT = '공지사항'
+		  )
+	</select>
+
+	<select id="selectNextNoticeSortNo" parameterType="Map" resultType="java.lang.Integer">
+		SELECT NVL(MAX(MN_SORT_NO), 0) + 1
+		FROM TB_PM10D01
+		WHERE MN_DATE = #{mnDate}
+		  AND MN_SUBJECT != '공지사항'
+	</select>
+
+	<insert id="insertNoticeRow" parameterType="Map">
+		INSERT INTO TB_PM10D01
+		(
+				  MN_DATE
+				, MN_SUB_SEQ
+				, MN_SORT_NO
+				, MN_SUBJECT
+				, CLNT_PJT
+				, CLNT_CD
+				, ORDRS_NO
+				, MN_ETC_ALL
+				, MN_STATUS
+				, LOCK_YN
+				, LOCK_USER
+				, LOCK_DTTM
+				, CREAT_ID
+				, CREAT_DTTM
+				, CREAT_PGM
+		)
+		VALUES
+		(
+				  #{mnDate}
+				, #{mnSubSeq}
+				, #{mnSortNo}
+				, '공지사항'
+				, #{clntPjt, jdbcType=VARCHAR}
+				, #{clntCd, jdbcType=VARCHAR}
+				, #{ordrsNo, jdbcType=VARCHAR}
+				, #{mnEtcAll, jdbcType=VARCHAR}
+				, #{mnStatus, jdbcType=VARCHAR}
+				, 'N'
+				, NULL
+				, NULL
+				, #{userId}
+				, SYSDATE
+				, #{pgmId}
+		)
+	</insert>
+
 	<update id="pm10_d01_update" parameterType="Map">
 		MERGE INTO TB_PM10D01 A
 			USING DUAL
@@ -273,22 +332,9 @@
 	</update>
 
 
-	<!-- D03 저장 시 사용하는 안전 D01 Upsert: LOCK 컬럼을 건드리지 않아 타 사용자 잠금 해제 부작용 방지 -->
-	<update id="pm10_d01_upsert_safe" parameterType="Map">
-		MERGE INTO TB_PM10D01 A
-			USING DUAL
-			ON (
-					MN_DATE 	= #{mnDate}
-				AND MN_SUB_SEQ 	= #{mnSubSeq}
-			   )
-		WHEN MATCHED THEN
-			UPDATE SET
-					  MN_SORT_NO	= #{mnSortNo}
-					, UDT_ID		= #{userId}
-					, UDT_DTTM		= SYSDATE
-					, UDT_PGM		= #{pgmId}
-		WHEN NOT MATCHED THEN
-		INSERT
+	<!-- D03 저장 시 D01 주제 행이 없을 때만 보장한다. 기존 D01 row는 셀 저장에서 건드리지 않는다. -->
+	<insert id="pm10_d01_upsert_safe" parameterType="Map">
+		INSERT INTO TB_PM10D01
 		(
 				  MN_DATE
 				, MN_SUB_SEQ
@@ -306,7 +352,7 @@
 				, CREAT_DTTM
 				, CREAT_PGM
 		)
-		VALUES(
+		SELECT
 				  #{mnDate}
 				, #{mnSubSeq}
 				, #{mnSortNo}
@@ -322,8 +368,14 @@
 				, #{userId}
 				, SYSDATE
 				, #{pgmId}
+		FROM DUAL
+		WHERE NOT EXISTS (
+			SELECT 1
+			FROM TB_PM10D01
+			WHERE MN_DATE = #{mnDate}
+			  AND MN_SUB_SEQ = #{mnSubSeq}
 		)
-	</update>
+	</insert>
 
 
 	<update id="pm10_d03_update" parameterType="Map">
@@ -621,5 +673,15 @@
 							WHERE B.MN_DATE = #{mnDate}
 					)
 	</update>
+
+	<select id="selectMnLockUser" parameterType="Map" resultType="String">
+		SELECT (SELECT FN_CM06M01_ID_TO_NM(LOCK_USER) FROM DUAL) AS LOCK_USER_NM
+		  FROM (
+				SELECT LOCK_USER FROM TB_PM10D01 WHERE MN_DATE = #{mnDate} AND MN_SUB_SEQ = #{mnSubSeq} AND LOCK_YN = 'Y'
+				UNION ALL
+				SELECT LOCK_USER FROM TB_PM10D03 WHERE MN_DATE = #{mnDate} AND MN_SUB_SEQ = #{mnSubSeq} AND LOCK_YN = 'Y'
+		  )
+		 WHERE ROWNUM = 1
+	</select>
     
 </mapper>

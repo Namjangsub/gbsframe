@@ -61,6 +61,17 @@ public interface PM10Mapper {
 	/** 공지사항 기존 행 존재 여부 확인 */
 	Integer selectNoticeSubSeq(Map<String, String> param);
 
+	/** 공지사항 기존 정렬순서 조회 */
+	Integer selectNoticeSortNo(Map<String, String> param);
+
+	/** 공지사항 신규 생성 시 정렬순서 계산 */
+	Integer selectNextNoticeSortNo(Map<String, String> param);
+
+	/** 공지사항 D01 행 생성 */
+	int insertNoticeRow(Map<String, String> param);
+
 	int deleteEmptyMnD03(Map<String, String> param);
+
+	String selectMnLockUser(Map<String, String> paramMap);
 
 }

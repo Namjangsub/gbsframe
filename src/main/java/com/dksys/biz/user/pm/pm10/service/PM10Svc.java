@@ -15,6 +15,8 @@ public interface PM10Svc {
 
 	int pm10_main_update(Map<String, String> param) throws Exception;
 
+	Map<String, String> ensureNoticeRow(Map<String, String> param) throws Exception;
+
 	int pm10_d01_update(Map<String, String> param) throws Exception;
 
 	int pm10_d03_update(Map<String, String> param) throws Exception;

@@ -57,6 +57,23 @@ public class PM10Ctr {
 		return "jsonView";
 	}
 
+	// 공지사항 행 보장
+	@PostMapping(value = "/pm10_ensure_notice_row")
+	public String pm10_ensure_notice_row(@RequestBody Map<String, String> param, ModelMap model) throws Exception {
+		try {
+			Map<String, String> noticeRow = pm10Svc.ensureNoticeRow(param);
+			model.addAttribute("mnSubSeq", noticeRow.get("mnSubSeq"));
+			model.addAttribute("newSubSeq", noticeRow.get("mnSubSeq"));
+			model.addAttribute("mnSortNo", noticeRow.get("mnSortNo"));
+			model.addAttribute("resultCode", 200);
+			model.addAttribute("resultMessage", messageUtils.getMessage("save"));
+		}catch(Exception e){
+			model.addAttribute("resultCode", 900);
+			model.addAttribute("resultMessage", e.getMessage());
+		}
+		return "jsonView";
+	}
+
 	// 주제
 	@PostMapping(value = "/pm10_d01_update")
 	public String pm10_d01_update(@RequestBody Map<String, String> param, ModelMap model) throws Exception {

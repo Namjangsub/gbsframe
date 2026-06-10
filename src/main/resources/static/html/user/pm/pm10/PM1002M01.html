@@ -284,13 +284,32 @@
 		return listHtml + btnHtml;
 	}
 
+	function isCellFocused(ctx) {
+		const grid = mnGridView && mnGridView.target ? mnGridView.target : null;
+		if (!ctx || !grid || !grid.focusedColumn) return false;
+		const focusedMap = grid.focusedColumn;
+		const keys = Object.keys(focusedMap);
+		if (keys.length === 0) return false;
+		const focused = focusedMap[keys[0]];
+		if (!focused) return false;
+
+		const colGroup = grid.colGroup;
+		const focusedColKey = colGroup && colGroup[focused.colIndex] ? colGroup[focused.colIndex].key : null;
+
+		return ctx.key === focusedColKey && ctx.dindex === focused.dindex;
+	}
+
 	const baseFileCol = {
 		editor: {
 			type: "textarea",
 			disabled: function () {
-				return this.item.isFileRow
-					|| $('#mnDiv_S').val() === 'MNDIV99'
-					|| !lockCellForEdit(this.item, this.key);
+				const isReadonly = this.item.isFileRow || $('#mnDiv_S').val() === 'MNDIV99';
+				if (isReadonly) return true;
+
+				if (isCellFocused(this)) {
+					return !lockCellForEdit(this.item, this.key);
+				}
+				return false;
 			}
 		},
 		formatter: fileCellFormatter
@@ -414,8 +433,36 @@
 		mnGridView.target.repaint();
 	}
 
+	function ensureNoticeRowSync(item) {
+		if (!item || !item.isNoticeRow) return true;
+		if (item.mnSubSeq && Number(item.mnSubSeq) > 0) return true;
+
+		const paramObj = {
+			mnDate: $('#mnDate_S').val(),
+			mnWeeks: $('#mnWeeks_S').val(),
+			userId: $('#userId').val(),
+			pgmId: $('#pgmId').val()
+		};
+
+		let ensured = false;
+		postAjaxSync('/user/pm/pm10/pm10_ensure_notice_row', paramObj, null, function (data) {
+			if (data && data.resultCode === 200) {
+				const subSeq = data.mnSubSeq || data.newSubSeq;
+				if (subSeq) {
+					item.mnSubSeq = parseInt(subSeq, 10);
+					item.mnDate = $('#mnDate_S').val();
+					item.mnWeeks = $('#mnWeeks_S').val();
+					if (data.mnSortNo !== undefined && data.mnSortNo !== null && data.mnSortNo !== '') {
+						item.mnSortNo = parseInt(data.mnSortNo, 10);
+					}
+					ensured = true;
+				}
+			}
+		});
+		return ensured;
+	}
+
 	function lockCellForEdit(item, colKey) {
-		// [추가] 주제(mnSubject)가 비어있는데 부서 내용(D03)을 먼저 편집하려 하면 차단 (부모 없는 자식 데이터 방지)
 		if (deptCodeMap[colKey]) {
 			if (!item.mnSubject || item.mnSubject.trim() === '') {
 				alert("주제를 먼저 입력해야 부서 내용을 작성할 수 있습니다.");
@@ -423,9 +470,20 @@
 			}
 		}
 
+		if (item && item.isNoticeRow && (!item.mnSubSeq || Number(item.mnSubSeq) <= 0)) {
+			if (!ensureNoticeRowSync(item)) {
+				alert("공지사항 행을 생성할 수 없습니다.");
+				return false;
+			}
+		}
+
 		const lockTarget = getLockTarget(item, colKey);
 		if (!lockTarget) return true;
 		if (!lockTarget.mnSubSeq || lockTarget.mnSubSeq <= 0) return true;
+
+		if (currentLockInfo && isSameLock(currentLockInfo, lockTarget)) {
+			return true;
+		}
 
 		if (currentLockInfo && !isSameLock(currentLockInfo, lockTarget)) {
 			unlockCell(currentLockInfo);
@@ -442,29 +500,28 @@
 
 		let lockOk = false;
 		postAjaxSync("/user/pm/pm10/pm10_lock_cell", paramObj, null, function (data) {
-			if (data.resultCode === 200) {
+			if (data && data.resultCode === 200) {
 				lockOk = true;
 				currentLockInfo = { ...lockTarget, colKey };
-				isEditing = true;		// 1. 편집 시작 → 폴링 중단
-				startIdleTimer();		// 3. 유휴 타이머 시작
+				isEditing = true;
+				startIdleTimer();
 				applyCellDataFromLock(item, colKey, data.cellData);
-			} else if (data.resultCode === 409) {
+			} else if (data && data.resultCode === 409) {
 				alert((data.resultMessage || '다른 사용자') + "님이 수정 중인 셀입니다.");
-				// 현재 편집 중인 내용이 없을 때만 재조회 (편집 중 내용 보호)
 				if (!currentLockInfo) {
 					mnGridView.setData(0);
 				}
 				lockOk = false;
-				return false;
 			} else {
-				alert("락 처리 실패: " + (data.resultMessage || ""));
+				const errMsg = (data && data.resultMessage) || '';
+				alert("락 처리 실패: " + errMsg);
 				lockOk = false;
 			}
 		});
 		return lockOk;
 	}
 
-	function unlockCell(lockInfo) {
+	function unlockCell(lockInfo, refreshAfterUnlock = true) {
 		if (!lockInfo) return;
 		const paramObj = {
 			targetType: lockInfo.targetType,
@@ -474,7 +531,9 @@
 			userId: $('#userId').val()
 		};
 		postAjax("/user/pm/pm10/pm10_unlock_cell", paramObj, null, function () {
-			mnGridView.updateData(true);	// unlock 완료 후 다른 사용자 변경사항 반영
+			if (refreshAfterUnlock && !isSaving && !isEditing) {
+				mnGridView.updateData(true);	// unlock 완료 후 다른 사용자 변경사항 반영
+			}
 		});
 		currentLockInfo = null;
 		isEditing = false;			// 1. 편집 종료 → 폴링 재개
@@ -487,7 +546,7 @@
 			mnDate: $('#mnDate_S').val(),
 			userId: $('#userId').val()
 		};
-		postAjaxSync("/user/pm/pm10/pm10_unlock_user_cells", paramObj, null, function () { });
+		postAjax("/user/pm/pm10/pm10_unlock_user_cells", paramObj, null, function () { }, false);
 		currentLockInfo = null;
 	}
 
@@ -501,16 +560,18 @@
 
 		const grid = mnGridView.target;
 		let item = null;
-		if (lock.targetType === 'D01') {
-			item = grid.list.find(r =>
-				!r.isFileRow && String(r.mnSubSeq) === String(lock.mnSubSeq)
-			);
-		} else {
-			item = grid.list.find(r =>
-				!r.isFileRow && !r.isNoticeRow &&
-				String(r.mnSubSeq) === String(lock.mnSubSeq)
-			);
-		}
+		
+		const targetIsNotice = !!lock.isNoticeRow;
+
+		item = grid.list.find(r => {
+			if (r.isFileRow) return false;
+			if (targetIsNotice) {
+				return r.isNoticeRow === true;
+			} else {
+				return !r.isNoticeRow && String(r.mnSubSeq) === String(lock.mnSubSeq);
+			}
+		});
+
 		if (!item) return false;
 
 		if (lock.targetType === 'D01') {
@@ -638,7 +699,7 @@
 						}
 						// 공지사항(isNoticeRow)이면 순번 재계산 건너뛰기
 						if (!this.item.isNoticeRow) {
-							recalcSortOrder();
+							recalcSortOrder(false);
 						}
 						this.self.repaint(true);
 						// 주제·부서 구분 없이 항상 높이 동기화 실행
@@ -647,9 +708,12 @@
 					},
 					inlineEdit: {
 						active: function () {
-
+							// 락 획득은 onDBLClick 시점에 동기식으로 진행 완료됨
 						},
 						deActive: function () {
+							if (this.item) {
+								this.item._lockOk = false;
+							}
 							if (currentLockInfo) {
 								unlockCell(currentLockInfo);
 							}
@@ -670,7 +734,14 @@
 					}
 				},
 				columns: [
-					{ key: "mnSubject", label: "PROJECT<br>/<br>주제", align: "left", width: 100, editor: { type: "textarea", disabled: function () { return this.item.isFileRow || this.item.isNoticeRow || !lockCellForEdit(this.item, 'mnSubject'); } }, formatter: valueFormatter },
+					{ key: "mnSubject", label: "PROJECT<br>/<br>주제", align: "left", width: 100, editor: { type: "textarea", disabled: function () {
+						const isReadonly = this.item.isFileRow || this.item.isNoticeRow || $('#mnDiv_S').val() === 'MNDIV99';
+						if (isReadonly) return true;
+						if (isCellFocused(this)) {
+							return !lockCellForEdit(this.item, 'mnSubject');
+						}
+						return false;
+					} }, formatter: valueFormatter },
 					{ key: "mnSubSeq", label: "순번", align: "left", width: 100, hidden: true },
 					{ key: "gun30MnCnts", label: "영업<br>국내/해외", align: "left", width: 220, ...baseFileCol },
 					// { key: "gun60MnCnts", label: "생산", align: "left", width: 220, ...baseFileCol },
@@ -686,7 +757,13 @@
 					{ key: "gun80MnCnts", label: "전산", align: "left", width: 220, ...baseFileCol },
 					{ key: "gun10MnCnts", label: "경영지원,회계", align: "left", width: 220, ...baseFileCol },
 					{ key: "gun00MnCnts", label: "임원", align: "left", width: 220, ...baseFileCol },
-					{ key: "mnEtcAll", label: "비고", align: "left", width: 220, editor: { type: "textarea", disabled: function () { return !lockCellForEdit(this.item, 'mnEtcAll'); } }, formatter: valueFormatter },
+					{ key: "mnEtcAll", label: "비고", align: "left", width: 220, editor: { type: "textarea", disabled: function () {
+						if ($('#mnDiv_S').val() === 'MNDIV99') return true;
+						if (isCellFocused(this)) {
+							return !lockCellForEdit(this.item, 'mnEtcAll');
+						}
+						return false;
+					} }, formatter: valueFormatter },
 					{ key: "mnSortNo", label: "정렬순서", align: "center", width: 80, hidden: true },
 					{ key: "mnWeeks", label: "주차", align: "center", width: 80, hidden: true },
 
@@ -992,11 +1069,30 @@
 
 							if (isItemLockChanged) {
 								hasLockChange = true;
+								
+								// 락 상태가 변경된 부서 및 D01 컬럼들에 대해 setValue를 강제 호출하여 화면 갱신 유도
+								if ((oldItem.d01LockYn !== newItem.d01LockYn) || (oldItem.d01LockUserNm !== newItem.d01LockUserNm)) {
+									isSyncing = true;
+									try {
+										mnGridView.target.setValue(oldItemIndex, 'mnSubject', newItem.mnSubject);
+										mnGridView.target.setValue(oldItemIndex, 'mnEtcAll', newItem.mnEtcAll);
+									} finally {
+										isSyncing = false;
+									}
+								}
+								for (var colKey of deptCols) {
+									const keys = deptLockKeys[colKey];
+									if ((oldItem[keys.yn] !== newItem[keys.yn]) || (oldItem[keys.nm] !== newItem[keys.nm])) {
+										isSyncing = true;
+										try {
+											mnGridView.target.setValue(oldItemIndex, colKey, newItem[colKey]);
+										} finally {
+											isSyncing = false;
+										}
+									}
+								}
+
 								Object.assign(oldItem, newItem); // 데이터 전체 동기화
-							} else {
-								// 락 변경이 없으면 값 변경 체크 (락 변경 시엔 repaint 하므로 setValue 불필요하거나, 스크롤 유지를 위해 둘다 해도 됨)
-								// 여기선 효율성을 위해 락 변경 없을 때만 setValue (어차피 repaint되면 값도 갱신됨)
-								// 하지만 repaint가 비동기거나 깜빡임을 줄이기 위해 setValue도 호출하는 게 안전.
 							}
 
 							// 값 변경 체크 및 setValue (isSyncing으로 onDataChanged 트리거 방지)
@@ -1194,6 +1290,7 @@
 			};
 			openThirdModal("/static/html/cmn/modal/attachImageView.html",$('body').width() - 40, $('body').height() - 50, fileName, paramObj,function () {
 				isEditing = false;
+				isPopupView = false;
 			});
 		});
 
@@ -1212,13 +1309,10 @@
 		// 5. beforeunload: 브라우저 이탈 시 즉시 락 해제
 		window.addEventListener('beforeunload', function () {
 			if (currentLockInfo) {
-				navigator.sendBeacon(
-					'/user/pm/pm10/pm10_unlock_user_cells',
-					new Blob([JSON.stringify({
-						mnDate: $('#mnDate_S').val(),
-						userId: $('#userId').val()
-					})], { type: 'application/json' })
-				);
+				const params = new URLSearchParams();
+				params.append("mnDate", $('#mnDate_S').val());
+				params.append("userId", $('#userId').val());
+				navigator.sendBeacon('/user/pm/pm10/pm10_unlock_user_cells', params);
 			}
 		});
 
@@ -1310,8 +1404,8 @@
 			insertIndex = defaultInsertIndex;
 		}
 
-		postAjaxSync('/user/pm/pm10/getNextSubSeq', {}, null, function(data) {
-			if (data.resultCode === 200) {
+		postAjax('/user/pm/pm10/getNextSubSeq', {}, null, function(data) {
+			if (data && data.resultCode === 200) {
 				// 새 행 객체 생성
 				const newRow = {
 					mnDate: $('#mnDate_S').val(),
@@ -1326,10 +1420,12 @@
 				// 행 추가 및 리페인트
 				grid.addRow(newRow, insertIndex);
 				grid.repaint();
+				recalcSortOrder(true);
 			} else {
-				alert('행 번호 채번 실패: ' + data.resultMessage);
+				const errMsg = (data && data.resultMessage) || '알 수 없는 서버 오류';
+				alert('행 번호 채번 실패: ' + errMsg);
 			}
-		});
+		}, false);
 	}
 
 	// 행 삭제
@@ -1350,6 +1446,25 @@
 			return false;
 		}
 
+		// 삭제 대상 행의 잠금(Lock) 상태 체크
+		if (sel.d01LockYn === 'Y') {
+			const lockUser = sel.d01LockUserNm || '다른 사용자';
+			alert(`${lockUser}님이 편집 중인 행은 삭제할 수 없습니다.`);
+			return false;
+		}
+		const deptCols = Object.keys(deptCodeMap);
+		for (const colKey of deptCols) {
+			const deptCd = deptCodeMap[colKey];
+			const prefix = deptCd.toLowerCase().replace(/([a-z])(\d)/g, '$1$2');
+			const lockYnKey = prefix + 'LockYn';
+			const lockNmKey = prefix + 'LockUserNm';
+			if (sel[lockYnKey] === 'Y') {
+				const lockUser = sel[lockNmKey] || '다른 사용자';
+				alert(`${lockUser}님이 편집 중인 행은 삭제할 수 없습니다.`);
+				return false;
+			}
+		}
+
 		// 빈행(mnSubSeq===0) 삭제
 		if (!sel.mnSubSeq) {
 			const idx = grid.list.findIndex(r =>
@@ -1367,7 +1482,6 @@
 		}
 
 		// 행(mnSubSeq > 0) 삭제
-		const deptCols = Object.keys(deptCodeMap);
 		const hasResult = deptCols.some(colKey => {
 			const resultKey = colKey.replace('MnCnts', 'MnResult');
 			return sel[resultKey] && sel[resultKey].toString().trim() !== '';
@@ -1385,10 +1499,13 @@
 			fileInfoJson: JSON.stringify(fileRow.filesByColumn)
 		}
 		postAjax("/user/pm/pm10/deleteMn", paramObj, null, function (data) {
-			if (data.resultCode == 200) {
+			if (data && data.resultCode == 200) {
 				mnGridView.setData();
 			} else {
-				alert("삭제 실패: " + data.resultMessage);
+				const errMsg = (data && data.resultMessage) || '알 수 없는 오류';
+				alert("삭제 실패: " + errMsg);
+				// 삭제 실패 시 즉시 폴링을 강제 실행하여 최신 편집 락 뱃지 화면 갱신
+				mnGridView.updateData(true);
 			}
 		});
 	}
@@ -1436,18 +1553,23 @@
 			pgmId: $('#pgmId').val()
 		};
 
+		isSaving = true;
 		postAjax('/user/pm/pm10/pm10_d01_update', paramObj, null, function (data) {
-			if (currentLockInfo) unlockCell(currentLockInfo);
-			if (data.resultCode !== 200) {
-				alert('수정 실패: ' + data.resultMessage);
-				mnGridView.setData(); // 실패 시에만 전체 리로드
+			const lockToRelease = currentLockInfo;
+			if (lockToRelease) unlockCell(lockToRelease, false);
+			isSaving = false;
+			if (!data || data.status || data.resultCode !== 200) {
+				const errMsg = (data && data.responseJSON && data.responseJSON.resultMessage) 
+					|| (data && data.resultMessage) 
+					|| '알 수 없는 서버 오류';
+				alert('수정 실패: ' + errMsg);
+				mnGridView.setData();
 			} else {
 				if (data.newSubSeq) {
 					item.mnSubSeq = parseInt(data.newSubSeq);
-					// 동기화 후 다시 렌더링이나 findIndex 처리를 원활하게 하기 위함
 				}
 			}
-		});
+		}, false);
 	}
 
 	//팀별 회의 내용 Insert, Update
@@ -1488,22 +1610,29 @@
 			userId: $('#userId').val(),
 			pgmId: $('#pgmId').val()
 		};
+		isSaving = true;
 		postAjax('/user/pm/pm10/pm10_d03_update', paramObj, null, function (data) {
-			if (currentLockInfo) unlockCell(currentLockInfo);
-			if (data.resultCode !== 200) {
-				alert('수정 실패: ' + data.resultMessage);
-				mnGridView.setData(); // 실패 시에만 전체 리로드
+			const lockToRelease = currentLockInfo;
+			if (lockToRelease) unlockCell(lockToRelease, false);
+			isSaving = false;
+			if (!data || data.status || data.resultCode !== 200) {
+				const errMsg = (data && data.responseJSON && data.responseJSON.resultMessage) 
+					|| (data && data.resultMessage) 
+					|| '알 수 없는 서버 오류';
+				alert('수정 실패: ' + errMsg);
+				mnGridView.setData();
 			} else {
 				if (data.newSubSeq) {
 					item.mnSubSeq = parseInt(data.newSubSeq);
 				}
 			}
-		});
+		}, false);
 	}
 
 	// 참석자 update
-	function pm10_d02_update() {
+	function pm10_d02_update(onSuccess) {
 		if ($("#mnDiv_S").val() == 'MNDIV99') {
+			if (typeof onSuccess === 'function') onSuccess();
 			return false;
 		}
 		const list = attendList.map(item => {
@@ -1522,19 +1651,20 @@
 			attendList: list
 		}
 		postAjax('/user/pm/pm10/pm10_d02_update', paramObj, null, data => {
-			if (data.resultCode == 200) {
+			if (data && data.resultCode == 200) {
 				if ($("#mnDiv_S").val() == 'MNDIV02') {
 					attendFlag = false;			// 프래그 해제
 				}
+				if (typeof onSuccess === 'function') onSuccess();
 			} else {
-				alert('참석자 저장 실패: ' + data.resultMessage);
+				const errMsg = (data && data.resultMessage) || '알 수 없는 서버 오류';
+				alert('참석자 저장 실패: ' + errMsg);
 			}
 		});
 	}
 
 	// 참석자 삭제
 	function pm10_d02_delete() {
-		// 삭제할 대상으로 마킹된 ID 목록
 		const toRemoveIds = $('.attend-item.to-remove')
 			.map((_, el) => $(el).data('id'))
 			.get();
@@ -1543,9 +1673,25 @@
 			return;
 		}
 
-		// 고정멤버는 체크 해제만, 나머지는 삭제
 		const fixedToUncheck = toRemoveIds.filter(id => FIXED_ORDER.includes(id));
 		const nonFixedToDelete = toRemoveIds.filter(id => !FIXED_ORDER.includes(id));
+
+		function proceedNonFixedDelete() {
+			if (nonFixedToDelete.length) {
+				postAjax('/user/pm/pm10/pm10_d02_delete', {
+					mnDate: $('#mnDate_S').val(),
+					attendIds: nonFixedToDelete
+				}, null, data => {
+					if (data && data.resultCode === 200) {
+						attendList = attendList.filter(u => !nonFixedToDelete.includes(u.id));
+						renderAttendList();
+					} else {
+						const errMsg = (data && data.resultMessage) || '알 수 없는 서버 오류';
+						alert('참석자 삭제 실패: ' + errMsg);
+					}
+				});
+			}
+		}
 
 		if (fixedToUncheck.length) {
 			attendList = attendList.map(u =>
@@ -1554,53 +1700,47 @@
 					: u
 			);
 			renderAttendList();
-			pm10_d02_update(); // 전체 리스트를 보내서 변경된 reasonCd만 반영
-		}
-
-		if (nonFixedToDelete.length) {
-			postAjax('/user/pm/pm10/pm10_d02_delete', {
-				mnDate: $('#mnDate_S').val(),
-				attendIds: nonFixedToDelete
-			}, null, data => {
-				if (data.resultCode === 200) {
-					attendList = attendList.filter(u => !nonFixedToDelete.includes(u.id));
-					renderAttendList();
-				} else {
-					alert('참석자 삭제 실패: ' + data.resultMessage);
-				}
+			pm10_d02_update(function () {
+				proceedNonFixedDelete();
 			});
+		} else {
+			proceedNonFixedDelete();
 		}
 	}
 
 
 	// 첨부파일 Start
 	function mnUploadFile() {
-		// 파일 첨부인 경우 lastEditedCell 명시적 지정
-		if (currentFileRow && currentFileColumn) {
-			lastEditedCell = { isFileRow: true, colKey: currentFileColumn };
-		}
-
-		var formData = new FormData();
-
-		formData.append("userId", $("#userId").val());
-		formData.append("pgmId", $("#pgmId").val());
-
-		// 신규 업로드 파일들
-		$.each(mnFileArr, function (idx, obj) {
-			if (obj.fileKey === 0) {
-				formData.append("files", obj.file);
+		try {
+			if (currentFileRow && currentFileColumn) {
+				lastEditedCell = { isFileRow: true, colKey: currentFileColumn };
 			}
-		});
 
-		// 삭제할 파일 키들
-		formData.append("deleteFileArr", JSON.stringify(deleteFileArr));
-		formData.append("fileTrgtKey", $("#mnDate_S").val().replace(/-/g, "") + "-" + deptCodeMap[currentFileColumn]);
+			var formData = new FormData();
 
-		filePostAjax("/user/pm/pm10/mnUploadFile", formData, function (data) {
-			mnGridView.setData();
+			formData.append("userId", $("#userId").val());
+			formData.append("pgmId", $("#pgmId").val());
+
+			$.each(mnFileArr, function (idx, obj) {
+				if (obj.fileKey === 0) {
+					formData.append("files", obj.file);
+				}
+			});
+
+			formData.append("deleteFileArr", JSON.stringify(deleteFileArr));
+			formData.append("fileTrgtKey", $("#mnDate_S").val().replace(/-/g, "") + "-" + deptCodeMap[currentFileColumn]);
+
+			filePostAjax("/user/pm/pm10/mnUploadFile", formData, function (data) {
+				mnGridView.setData();
+				mnFileArr = [];
+				deleteFileArr = [];
+			});
+		} catch (e) {
+			console.error("파일 업로드 오류:", e);
 			mnFileArr = [];
 			deleteFileArr = [];
-		});
+			alert("파일 업로드 준비 중 오류가 발생했습니다.");
+		}
 	}
 
 	// 엑셀다운로드
@@ -1738,22 +1878,18 @@
 			alert("이동할 행을 선택하세요");
 			return;
 		}
-		// 공지사항/파일첨부 행은 이동 금지
 		if (sel.isNoticeRow || sel.isFileRow) return;
 
-		// 현재 선택된 행의 실제 인덱스
 		const idx = list.findIndex(r =>
 			r.mnDate === sel.mnDate &&
 			r.mnSubSeq === sel.mnSubSeq
 		);
-		// 가장 앞(0)이거나 유효하지 않은 인덱스면 리턴
 		if (idx <= 0) return;
 
-		// 한 칸 위로 스왑
 		[list[idx - 1], list[idx]] = [list[idx], list[idx - 1]];
 
 		grid.setData({ list, page: { totalElements: list.length } });
-		recalcSortOrder();
+		recalcSortOrder(true);
 	}
 
 	// 선택된 행 하나를 아래로 한 칸 이동
@@ -1770,30 +1906,25 @@
 			alert("이동할 행을 선택하세요");
 			return;
 		}
-		// 공지사항/파일첨부 행은 이동 금지
 		if (sel.isNoticeRow || sel.isFileRow) return;
 
-		// 현재 선택된 행의 실제 인덱스
 		const idx = list.findIndex(r =>
 			r.mnDate === sel.mnDate &&
 			r.mnSubSeq === sel.mnSubSeq
 		);
-		// 유효하지 않거나 마지막 인덱스이면 리턴
 		if (idx < 0 || idx >= list.length - 1) return;
 
-		// 공지사항 행 경계 체크 (공지사항 위치를 넘어갈 수 없음)
 		const noticeIdx = list.findIndex(r => r.isNoticeRow);
 		if (noticeIdx >= 0 && idx + 1 >= noticeIdx) return;
 
-		// 한 칸 아래로 스왑
 		[list[idx], list[idx + 1]] = [list[idx + 1], list[idx]];
 
 		grid.setData({ list, page: { totalElements: list.length } });
-		recalcSortOrder();
+		recalcSortOrder(true);
 	}
 
 	// 정렬순서 함수
-	function recalcSortOrder() {
+	function recalcSortOrder(saveToServer) {
 		const grid = mnGridView.target;
 		const allRows = grid.list;
 
@@ -1801,7 +1932,6 @@
 		const noticeRow = allRows.find(r => r.isNoticeRow);
 		const dataRows = allRows.filter(r => !r.isFileRow && !r.isNoticeRow);
 
-		// 로우가 없으면 정렬순서 계산 return
 		if (dataRows.length == 0 && noticeRow && noticeRow.mnSortNo == 0) {
 			return false;
 		}
@@ -1816,7 +1946,6 @@
 				: 0;
 		}
 
-		// setData 대신 list를 직접 교체하고 repaint (스크롤 유지)
 		const newList = [
 			...dataRows,
 			...(noticeRow ? [noticeRow] : []),
@@ -1825,22 +1954,23 @@
 		grid.list = newList;
 		grid.repaint();
 
-		// 정렬순서 서버 저장
-		const sortSave = allRows
-			.filter(r => !r.isFileRow && r.mnSubSeq > 0)
-			.map(r => ({
-				mnSubSeq: r.mnSubSeq,
-				mnSortNo: r.mnSortNo
-			}));
+		if (saveToServer === true) {
+			const sortSave = allRows
+				.filter(r => !r.isFileRow && r.mnSubSeq > 0)
+				.map(r => ({
+					mnSubSeq: r.mnSubSeq,
+					mnSortNo: r.mnSortNo
+				}));
 
-		var paramObj = {
-			mnDate: $('#mnDate_S').val(),
-			userId: $('#userId').val(),
-			pgmId: $('#pgmId').val(),
-			list: sortSave
-		};
+			var paramObj = {
+				mnDate: $('#mnDate_S').val(),
+				userId: $('#userId').val(),
+				pgmId: $('#pgmId').val(),
+				list: sortSave
+			};
 
-		postAjax('/user/pm/pm10/pm10_d01_sortNo_update', paramObj, null, function (data) {});
+			postAjax('/user/pm/pm10/pm10_d01_sortNo_update', paramObj, null, function (data) {}, false);
+		}
 	}
 
 	//Select 선택 코드값 체크하여 명을 출력
