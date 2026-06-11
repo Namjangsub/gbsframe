@@ -51,10 +51,10 @@
 			    SELECT X.*
 				     , ROWNUM AS RN
 				FROM   (
-					    SELECT CO_CD
-						     , APP_NO			/* 결재선 번호 */
-							 , APP_SEQ			/* 결재 순번 */
-							 , ID				/* 작성자 ID */
+					    SELECT A.CO_CD
+						     , A.APP_NO			/* 결재선 번호 */
+							 , A.APP_SEQ			/* 결재 순번 */
+							 , A.ID				/* 작성자 ID */
 							 , (
 								SELECT NAME
 								FROM   TB_CM06M01 AS B
@@ -62,46 +62,76 @@
 							   ) AS USER_NAME		/* 작성자 이름 */
 							 , A.APP_DIV			/* 결재선 구분 */
 							 , FN_CM05M01_CD_TO_NM(A.APP_DIV) AS APP_DIV_NM		/* 결재선구분 명  */
-							 , APP_LINE_NM			/* 결재자명 */
-							 , APP_ID				/* 결재자 id */
+							 , A.APP_LINE_NM			/* 결재자명 */
+							 , A.APP_ID				/* 결재자 id */
 							 , B.APP_USER_NM			/* 결재자명 */
-							 , USE_YN				/*사용여부 */
+							 , A.USE_YN				/*사용여부 */
 							 , B.DEPT_NM			/* 부서명  */
 							 , (SELECT D.LEVEL_NM FROM TB_CM07M01 D WHERE D.LEVEL_CD=B.LEVEL_CD) AS LEVEL_NM		/* 직급 */
 							 , B.EMAIL			/* E-mail  */
 							 , B.TEL_NO			/* 전화번호  */
 							 , B.OFF_TEL_NO			/* 회사번호 */
 							 , B.FAX_NO			/* fax번호 */
-							 , PG_PATH
-							 , ETC_FIELD1
-							 , ETC_FIELD2
-							 , ETC_FIELD3
-							 , CREAT_ID
-							 , CREAT_PGM
-							 , NVL(TO_CHAR(UDT_DTTM, 'YYYY-MM-DD'), TO_CHAR(CREAT_DTTM, 'YYYY-MM-DD')) AS CREAT_DTTM
-							 , UDT_ID
-							 , UDT_PGM
-							 , UDT_DTTM
+							 , A.PG_PATH
+							 , A.ETC_FIELD1
+							 , A.ETC_FIELD2
+							 , A.ETC_FIELD3
+							 , A.CREAT_ID
+							 , A.CREAT_PGM
+							 , NVL(TO_CHAR(A.UDT_DTTM, 'YYYY-MM-DD'), TO_CHAR(A.CREAT_DTTM, 'YYYY-MM-DD')) AS CREAT_DTTM
+							 , A.UDT_ID
+							 , A.UDT_PGM
+							 , A.UDT_DTTM
+							 , U.USE_YN  AS CM06_USE_YN
 						FROM   TB_BM13M01 AS A
-						       LEFT OUTER JOIN (
-								                SELECT BB.ID AS USER_ID
-												     , BB.NAME AS APP_USER_NM
-													 , BB.LEVEL_CD
-													 , BB.EMAIL
-													 , BB.TEL_NO
-													 , BB.OFF_TEL_NO
-													 , BB.FAX_NO
-													 , CC.DEPT_NM
-												FROM   TB_CM06M01 AS BB
-												       INNER JOIN TB_CM04M01 AS CC ON (BB.DEPT_ID = CC.DEPT_ID)
-												WHERE  1 = 1
-											   ) AS B ON (A.APP_ID = B.USER_ID)
+												LEFT OUTER JOIN (
+																	SELECT BB.ID AS USER_ID
+																		, BB.NAME AS APP_USER_NM
+																		, BB.LEVEL_CD
+																		, BB.EMAIL
+																		, BB.TEL_NO
+																		, BB.OFF_TEL_NO
+																		, BB.FAX_NO
+																		, CC.DEPT_NM
+																	FROM   TB_CM06M01 AS BB
+																		INNER JOIN TB_CM04M01 AS CC ON (BB.DEPT_ID = CC.DEPT_ID)
+																	WHERE  1 = 1
+																) AS B ON (A.APP_ID = B.USER_ID)
+												LEFT OUTER JOIN TB_CM06M01 U ON U.ID = A.APP_ID
 						WHERE  1 = 1
-						<include refid="selectApprovalListCondition"></include>
+						<!-- 작성자 id 필수 -->
+						<if test="userId != null and !userId.equals('')">
+						AND A.ID = #{userId}
+						</if>
+						<!-- 작성자명 id가 null일 경우만 -->
+						<if test="userId.equals('')">
+							<if test="userNm != null and !userNm.equals('')">
+							AND A.ID = ( SELECT DD.ID FROM TB_CM06M01 AS DD WHERE DD.NAME = #{userNm, jdbcType=VARCHAR} )
+							</if>
+						</if>
+						<!-- 회사코드 -->
+						<if test="coCd != null and !coCd.equals('')">
+						AND A.CO_CD = #{coCd}
+						</if>
+						<if test="appDiv != null and !appDiv.equals('')">
+						AND A.APP_DIV = #{appDiv}
+						</if>
+						<!-- 결재선번호 -->
+						<if test="appNo != null and !appNo.equals('')">
+						AND A.APP_No = #{appNo}
+						</if>
+						<!-- 결재자 -->
+						<if test="appId != null and !appId.equals('')">
+						AND A.APP_ID = #{appId}
+						</if>
+						<!-- 결재선명 -->
+						<if test="appLineNm != null and !appLineNm.equals('')">
+						AND A.APP_LINE_NM = #{appLineNm}
+						</if>
 						<!-- 결재자 id가 null일 경우만 결재자명 검색 (입력에서는 사용안되게)-->
 						<if test="appId.equals('') and actFlag == null">
 							<if test="appName != null and !appName.equals('')">
-							AND APP_ID = ( SELECT DD.ID FROM TB_CM06M01 AS DD WHERE DD.NAME = #{appName, jdbcType=VARCHAR} )
+							AND A.APP_ID = ( SELECT DD.ID FROM TB_CM06M01 AS DD WHERE DD.NAME = #{appName, jdbcType=VARCHAR} )
 							</if>
 						</if>
 						ORDER BY CO_CD DESC, APP_NO DESC, APP_DIV DESC, ID DESC, CREAT_DTTM DESC, UDT_DTTM DESC
