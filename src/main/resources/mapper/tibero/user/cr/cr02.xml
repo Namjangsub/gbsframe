@@ -663,9 +663,33 @@
                     ofType="CamelMap"/>
     </resultMap>
     <select id="selectOrdrsInfo" parameterType="map" resultMap="resultInfoMap">
+        WITH CLNT_UNSETTLED AS (
+            SELECT 
+                  CM.CO_CD
+                , CM.ORDRS_CLNT_CD
+                , 'Y' AS UNSETTLED_YN
+            FROM TB_CR02D02 CD
+            INNER JOIN TB_CR02M01 CM ON CM.CO_CD = CD.CO_CD AND CM.ORDRS_NO = CD.ORDRS_NO
+            WHERE CD.CO_CD = #{coCd}
+              AND CM.ORDRS_CLNT_CD = (SELECT ORDRS_CLNT_CD FROM TB_CR02M01 WHERE CO_CD = #{coCd} AND FILE_TRGT_KEY = #{fileTrgtKey})
+              AND CD.ORDRS_DTL_DIV10 = 'ORDRSDTLDIV1040'
+              AND CD.ORDRS_PRC != 0
+              AND (
+                  CD.ORDRS_PRC * (-1) - NVL((
+                      SELECT SUM(UT.ORDRS_PRC)
+                      FROM TB_CR02D02 UT
+                      WHERE UT.CO_CD = CD.CO_CD
+                        AND UT.UNSETTLED_ORDRS_NO = CD.ORDRS_NO
+                        AND UT.UNSETTLED_ORDRS_SEQ = CD.ORDRS_SEQ
+                        AND (UT.ORDRS_DTL_DIV10 = 'ORDRSDTLDIV1050' OR UT.UNSETTLED_ORDRS_NO IS NOT NULL)
+                  ), 0)
+              ) > 0
+            GROUP BY CM.CO_CD, CM.ORDRS_CLNT_CD
+        )
         SELECT TO_CHAR(T.ORDRS_DT, 'YYYY-MM-DD')         AS ORDRS_DT,
                TO_CHAR(T.FWD_EXCH_JOIN_DT, 'YYYY-MM-DD') AS FWD_EXCH_JOIN_DT,
                (SELECT COUNT(*) FROM TB_CR05D01 WHERE CO_CD = T.CO_CD AND ORDRS_NO = T.ORDRS_NO) AS CLMN_CNT,
+               NVL(CU.UNSETTLED_YN, 'N')                 AS UNSETTLED_YN,
                T.*,
                T.ORDRS_DIV 						AS NEW_ORDRS_DIV,
                B.CLNT_NM  						AS ORDRS_CLNT_NM,
@@ -696,6 +720,7 @@
                    LEFT OUTER JOIN TB_BM02M01 B ON T.ORDRS_CLNT_CD = B.CLNT_CD
                    LEFT OUTER JOIN TB_BM06M01 P ON T.PRJCT_SEQ = P.PRJCT_SEQ
                    LEFT OUTER JOIN TB_CR02D04 C ON T.CO_CD = C.CO_CD AND T.ORDRS_NO = C.ORDRS_NO
+                   LEFT OUTER JOIN CLNT_UNSETTLED CU ON T.CO_CD = CU.CO_CD AND T.ORDRS_CLNT_CD = CU.ORDRS_CLNT_CD
        WHERE T.CO_CD = #{coCd}
          AND T.FILE_TRGT_KEY = #{fileTrgtKey}
     </select>
