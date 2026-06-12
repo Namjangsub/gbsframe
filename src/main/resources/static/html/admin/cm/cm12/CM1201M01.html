@@ -32,6 +32,7 @@
 <script src="/static/js/ax5/ax5modal.min.js"></script>
 <script src="/static/js/ax5/ax5toast.min.js"></script>
 <script src="/static/js/jstree/jstree.min.js"></script>
+<script src="/static/js/fileTree.js"></script>
 <script src="/static/js/global.js"></script>
 <script src="/static/js/jquery.blockUI.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/heic2any/dist/heic2any.min.js"></script>
@@ -262,6 +263,11 @@
 							this.self.clearSelect();
 							this.self.select(this.dindex);
 							updateButtonsBySelection();
+							var colKey = this.column ? this.column.key : '';
+							if (colKey == "fileTrgtTypNm") {
+								var item = this.item;
+								_this.openFile(this.self, this.dindex, this.diondex, item, '', colKey, '');
+							}
 						},
 						onDBLClick : function() {
 							this.self.clearSelect();
@@ -291,6 +297,15 @@
 					},
 					columns : [
 							{key : "rnum",label : "No",				 width : 40, align: "center", hidden: false},
+							{key : "lpath",  label : "저장위치",		width : 300, align: "left"},
+							{key : "fileTrgtTypNm",  label : "등록화면",		width :110, align: "left",
+								formatter: function() {
+									if (this.item && this.item.fileTrgtTypNm) {
+										return '<span style="color:#337ab7;cursor:pointer;text-decoration:underline;">' + this.item.fileTrgtTypNm + '</span>';
+									}
+									return this.item ? (this.item.fileTrgtTypNm || '') : '';
+								}
+							},
 							{key : "fileKey",label : "파일키", hidden: true},
 // 							{key : "comonCd",  label : "comonCd",	width : 120, align: "center", hidden: false},
 // 							{key : "fileUp",  label : "up",	 		width : 60, align: "center", hidden: false},
@@ -312,8 +327,6 @@
 // 							{key : "itemNm",   label : "아이템명", 	width : 120, align: "left"},
 							{key : "creatNm",  label : "담당자",		width : 70, align: "center"},
 							{key : "creatDttm",label : "등록일자",		width : 130,	align: "center",},
-							{key : "fileTrgtTypNm",  label : "등록화면",		width :110, align: "left"},
-							{key : "lpath",  label : "저장위치",		width : 300, align: "left"},
 			// 				{key : "fileDelete",label : "삭제",		width : 80, align: "center",
 			// 					formatter : function() {
 			// 						return '<button style="height: 18px; padding:0px;" type="button" onclick="deleteFile('
@@ -350,12 +363,17 @@
 					let obj = item;
 					//작성자-작성일자-비용항목-filename
 					if (item.fileName) {
+						if (item.fileDown != 'Y') {
+							customAlert("파일 미리보기 권한이 없습니다.");
+							return false;
+						}
 						let tempFileName = item.lpath + '-' + item.fileName;
 
-						imageViewPopup(item.coCd, item.fileKey, tempFileName);
+						let imageList = getPreviewFileList(grid);
+						imageViewPopup(item.coCd, item.fileKey, tempFileName, imageList);
 					}
 				} else if (colKey == "fileTrgtTypNm") {
-					callEntryPgm(this.item);
+					callEntryPgm(item);
 				}
 		    },
 			setData : function(_pageNo) {
@@ -413,6 +431,33 @@
 				});
 			},
 		}
+
+	function getPreviewFileList(grid) {
+		let list = [];
+		if (grid && typeof grid.getList === "function") {
+			list = grid.getList() || [];
+		} else if (grid && Array.isArray(grid.list)) {
+			list = grid.list;
+		}
+
+		return list
+			.filter(function(row) {
+				return row && row.fileKey && row.fileName && row.fileDown == "Y";
+			})
+			.map(function(row) {
+				let fileName = row.fileName;
+				if (row.lpath) {
+					fileName = row.lpath + '-' + row.fileName;
+				}
+				return {
+					coCd: row.coCd,
+					fileKey: row.fileKey,
+					fileName: fileName,
+					fileType: row.fileType,
+					fileDown: row.fileDown
+				};
+			});
+	}
 
 	$(document.body).ready(function() {
 		//순서 맨 처음
@@ -594,7 +639,7 @@
 			"userId" : jwt.userId
 		};
 		postAjaxSync("/admin/cm/cm05/selectDocTreeListAuth", paramObj, null, function(data){
-			deptTree = data.docTreeList;
+			deptTree = (data && data.docTreeList) ? data.docTreeList : [];
 			for (let i = 0; i < deptTree.length; i++) {
 				if (deptTree[i].isLeaf == '1') {
 					deptTree[i].permCode = buildPermCode(deptTree[i]);
@@ -911,31 +956,136 @@
 
 
 	function callEntryPgm(row) {
-// 		let url = '';
-// 		if (row.fileTrgtTyp == 'BM0501P01') {
-// 			url = '/static/html/user/bm/bm05/BM0501P01.html';
-// 			var paramObj = {
-// 				actionType  : 'U',
-// 				fileTrgtKey : row.fileTrgtKey,
-// 				coCd 	    : row.coCd,
-// 			};
-// 			openModal("/static/html/user/bm/bm05/BM0501P01.html", 1600, 850, "", paramObj, function(data) {});
-// 		} else if (row.fileTrgtTyp == 'SM1101P01') {
-// 				var paramObj = {
-// 					actionType     : 'U',
-// 					fileTrgtKey    : row.fileTrgtKey,
-// 					refFileTrgtKey : row.fileTrgtKey,
-// 					coCd 	       : row.coCd,
-// 				};
-// 			openModal("/static/html/user/sm/sm11/SM1101P01.html", 1500, $('body').height()-50, "", paramObj, function(data) { });
-// 		} else if (row.fileTrgtTyp == 'PM0101M01' || row.fileTrgtTyp == 'PM0101M01_M' || row.fileTrgtTyp == 'PM0101P01') {
-// 				var paramObj = {
-// 					actionType : 'U',
-// 					fileTrgtKey: row.fileTrgtKey,
-// 					coCd 	   : row.coCd,
-// 				};
-// 			openModal("/static/html/user/pm/pm01/PM0101P01.html", 1100, 750, "", paramObj, function(data) { });
-// 		}
+		if (!row || !row.fileTrgtTyp) {
+			customAlert("이동할 등록화면 정보가 없습니다.");
+			return false;
+		}
+		if (!row.fileTrgtKey) {
+			customAlert("등록화면 키 정보가 없습니다.\n등록화면: " + (row.fileTrgtTypNm || row.fileTrgtTyp));
+			return false;
+		}
+
+		const bh = $('body').height();
+		const entryPgmMap = {
+			"BM0501P01": {
+				url: "/static/html/user/bm/bm05/BM0501P01.html",
+				width: 1600, height: 850,
+				param: function(row) { return { actionType: "U", fileTrgtKey: row.fileTrgtKey, coCd: row.coCd }; }
+			},
+			"CR1001P01": {
+				url: "/static/html/user/cr/cr10/CR1001P01.html",
+				width: 1400, height: 800,
+				param: function(row) { return { actionType: "U", fileTrgtKey: row.fileTrgtKey, coCd: row.coCd }; }
+			},
+			"CR5001P01": {
+				url: "/static/html/user/cr/cr50/CR5001P01.html",
+				width: 1400, height: 850,
+				param: function(row) { return { actionType: "U", fileTrgtKey: row.fileTrgtKey, coCd: row.coCd }; }
+			},
+			"IM0101P01": {
+				url: "/static/html/user/im/im01/IM0101P01.html",
+				width: 1200, height: 750,
+				param: function(row) { return { actionType: "U", imprvmNo: row.fileTrgtKey, fileTrgtKey: row.fileTrgtKey, coCd: row.coCd }; }
+			},
+			"PM0101M01": {
+				url: "/static/html/user/pm/pm01/PM0101P01.html",
+				width: 1100, height: 750,
+				param: function(row) { return { actionType: "I", fileTrgtKey: row.fileTrgtKey, coCd: row.coCd, showFileArea: "Y" }; }
+			},
+			"PM0101M01_M": {
+				url: "/static/html/user/pm/pm01/PM0101P01.html",
+				width: 1100, height: 750,
+				param: function(row) { return { actionType: "I", fileTrgtKey: row.fileTrgtKey, coCd: row.coCd, showFileArea: "Y" }; }
+			},
+			"PM0101P01": {
+				url: "/static/html/user/pm/pm01/PM0101P01.html",
+				width: 1100, height: 750,
+				param: function(row) { return { actionType: "I", fileTrgtKey: row.fileTrgtKey, coCd: row.coCd, showFileArea: "Y" }; }
+			},
+			"PM5001M01": {
+				url: "/static/html/user/pm/pm50/PM5001P01.html",
+				width: 1100, height: 750,
+				param: function(row) { return { actionType: "U", fileTrgtKey: row.fileTrgtKey, coCd: row.coCd }; }
+			},
+			"PM5001P01_M": {
+				url: "/static/html/user/pm/pm50/PM5001P01.html",
+				width: 1100, height: 750,
+				param: function(row) { return { actionType: "U", fileTrgtKey: row.fileTrgtKey, coCd: row.coCd }; }
+			},
+			"QM0101P01": {
+				url: "/static/html/user/qm/qm01/QM0101P01.html",
+				width: 1400, height: 850,
+				param: function(row) { return { actionType: "U", fileTrgtKey: row.fileTrgtKey, coCd: row.coCd }; }
+			},
+			"QM0101P03": {
+				url: "/static/html/user/qm/qm01/QM0101P03.html",
+				width: 1400, height: 850,
+				param: function(row) { return { actionType: "U", fileTrgtKey: row.fileTrgtKey, coCd: row.coCd }; }
+			},
+			"SM0201P01": {
+				url: "/static/html/user/sm/sm02/SM0201P01.html",
+				width: 1400, height: 800,
+				param: function(row) { return { actionType: "U", fileTrgtKey: row.fileTrgtKey, coCd: row.coCd }; }
+			},
+			"SM0301M01": {
+				url: "/static/html/user/sm/sm03/SM0301P01.html",
+				width: 1400, height: 800,
+				param: function(row) { return { actionType: "U", fileTrgtKey: row.fileTrgtKey, coCd: row.coCd }; }
+			},
+			"SM0301P01": {
+				url: "/static/html/user/sm/sm03/SM0301P01.html",
+				width: 1400, height: 800,
+				param: function(row) { return { actionType: "U", fileTrgtKey: row.fileTrgtKey, coCd: row.coCd }; }
+			},
+			"SM1001P01": {
+				url: "/static/html/user/sm/sm10/SM1001P01.html",
+				width: 1200, height: 750,
+				param: function(row) { return { actionType: "U", fileTrgtKey: row.fileTrgtKey, coCd: row.coCd }; }
+			},
+			"SM1101P01": {
+				url: "/static/html/user/sm/sm11/SM1101P01.html",
+				width: 1500, height: bh - 50,
+				param: function(row) { return { actionType: "U", fileTrgtKey: row.fileTrgtKey, refFileTrgtKey: row.fileTrgtKey, coCd: row.coCd }; }
+			},
+			"WB2101M02": {
+				url: "/static/html/user/wb/wb21/WB2101P01.html",
+				width: 1400, height: 800,
+				param: function(row) { return { actionType: "U", fileTrgtKey: row.fileTrgtKey, coCd: row.coCd }; }
+			},
+			"WB2101P01": {
+				url: "/static/html/user/wb/wb21/WB2101P01.html",
+				width: 1400, height: 800,
+				param: function(row) { return { actionType: "U", fileTrgtKey: row.fileTrgtKey, coCd: row.coCd }; }
+			},
+			"WB2101P02": {
+				url: "/static/html/user/wb/wb21/WB2101P01.html",
+				width: 1400, height: 800,
+				param: function(row) { return { actionType: "U", fileTrgtKey: row.fileTrgtKey, coCd: row.coCd }; }
+			},
+			"WB2201P02": {
+				url: "/static/html/user/wb/wb22/WB2201P02.html",
+				width: 1200, height: 700,
+				param: function(row) { return { actionType: "U", fileTrgtKey: row.fileTrgtKey, coCd: row.coCd }; }
+			},
+			"WB2401P01": {
+				url: "/static/html/user/wb/wb24/WB2401P01.html",
+				width: 1400, height: 800,
+				param: function(row) { return { actionType: "I", fileTrgtKey: row.fileTrgtKey, coCd: row.coCd }; }
+			},
+			"WB2401P11": {
+				url: "/static/html/user/wb/wb24/WB2401P11.html",
+				width: 1400, height: 800,
+				param: function(row) { return { actionType: "I", fileTrgtKey: row.fileTrgtKey, coCd: row.coCd }; }
+			}
+		};
+
+		const entryPgm = entryPgmMap[row.fileTrgtTyp];
+		if (!entryPgm) {
+			customAlert("등록화면 이동이 정의되지 않았습니다.\n등록화면: " + (row.fileTrgtTypNm || row.fileTrgtTyp));
+			return false;
+		}
+
+		openModal(entryPgm.url, entryPgm.width, entryPgm.height, "", entryPgm.param(row), function(data) {});
 	}
 
 </script>
