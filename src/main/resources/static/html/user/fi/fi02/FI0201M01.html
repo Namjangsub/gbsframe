@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="ko">
 <head>
 	<meta charset="utf-8">
@@ -11,6 +11,7 @@
 	<link rel="stylesheet" href="/static/bootstrap/css/bootstrap-datepicker.css">
 	<link rel="stylesheet" href="/static/fontawesome/css/all.css">
 	<link rel="stylesheet" href="/static/css/ax5/ax5grid.css" />
+	<link rel="stylesheet" href="/static/css/ax5/ax5menu.css" />
 	<link rel="stylesheet" href="/static/css/ax5/ax5mask.css" />
 	<link rel="stylesheet" href="/static/css/ax5/ax5modal.css" />
 	<link rel="stylesheet" href="/static/css/ax5/ax5toast.css" />
@@ -20,11 +21,12 @@
 	<link rel="stylesheet" href="/static/css/main.css" />
 	<link rel="stylesheet" href="/static/css/sub.css" />
 	<link rel="stylesheet" href="/static/css/common.css" />
-	
+
 	<script src="/static/js/jquery-latest.min.js"></script>
 	<script src="/static/js/jquery.serializeObject.js"></script>
 	<script src="/static/js/ax5/ax5core.min.js"></script>
 	<script src="/static/js/ax5/ax5grid.min.js"></script>
+	<script src="/static/js/ax5/ax5menu.min.js"></script>
 	<script src="/static/js/ax5/ax5mask.min.js"></script>
 	<script src="/static/js/ax5/ax5modal.min.js"></script>
 	<script src="/static/js/ax5/ax5toast.min.js"></script>
@@ -85,14 +87,14 @@
 	                <a onclick="deletePalBill();" style="height: 30px; line-height: 28px;" authchk>-</a>
 	                <a onclick="savePalBill()" style="height: 30px; line-height: 28px; width: 80px;" authchk><i class="fas fa-folder-plus"></i> 저장</a>
 	                <a onclick="copyPrevMonth();" style="height: 30px; line-height: 28px; width: 90px;" authchk><i class="fas fa-file-alt"></i> 전월복사</a>
-	            </div>
+		            </div>
 				<select class="prae_select" data-search="recordCnt">
-					<option value="10">10</option>
-					<option value="20" selected>20</option>
-					<option value="50">50</option>
+					<option value="50" selected>50</option>
 					<option value="100">100</option>
+					<option value="500">500</option>
+					<option value="1000">1000</option>
 					<option value="9999999">전체</option>
-				</select> 
+				</select>
 			</div>
 		</div>
 		<!-- 콘텐츠 -->
@@ -122,7 +124,8 @@
 					selector : false
 				},
 				body : {
-
+					onClick : function() {
+					}
 				},
 				page : {
 					navigationItemCount : 10,
@@ -136,20 +139,58 @@
 						gridView.setData(this.page.selectPage);
 					}
 				},
+				contextMenu: {
+					iconWidth: 20,
+					acceleratorWidth: 100,
+					itemClickAndClose: false,
+					icons: {'arrow': '<i class="fa fa-caret-right"></i>'},
+					items: [
+						{type: 1, label: "붙여넣기"},
+						{divide: true},
+						{type: 1, label: "줄추가"},
+						{type: 1, label: "내용 삭제"},
+						{type: 2, label: "줄삭제"},
+					],
+					popupFilter: function (item, param) {
+						if (param.element) {
+							return true;
+						} else {
+							return item.type == 1;
+						}
+					},
+					onClick: function (item, param) {
+						var thisGridRow = param.dindex;
+						var thisGridCol = param.colIndex;
+						if (item.label == "붙여넣기") {
+							gridPaste(gridView.target, thisGridRow, thisGridCol);
+						} else if (item.label == "줄추가") {
+							var newRow = $.extend({}, gridView.target.getList()[param.dindex]);
+							delete newRow.creatId;
+							gridView.target.addRow(newRow, param.dindex + 1);
+						} else if (item.label == "내용 삭제") {
+							['baseDept','sellAmt','sellPrftAmt','sellMngAmt','salesPrftAmt','bfrxPrftAmt','rmk'].forEach(function(key) {
+								gridView.target.setValue(param.dindex, key, '');
+							});
+						} else if (item.label == "줄삭제") {
+							gridView.target.removeRow(param.dindex);
+						}
+						gridView.target.contextMenu.close();
+					}
+				},
 				columns: [
 					{key: "coCd", hidden: true},
 					{key: "creatId", hidden: true}, // 생성, 수정 구분을 위한 컬럼. creatId 가 있으면 조직을 변경 불가
 		      {key: "coNm",    label: "회사",   align: "left",   width: 120, styleClass: "grid-cell-blue" },
 		      {key: "prftYm",  label: "년월",   align: "center", width: 100, styleClass: "grid-cell-blue"},
-		      {key: "baseDept",label: "조직",   align: "left",   width: 140, styleClass: "grid-cell-blue", 
-		        		editor: {type:"select", 
+		      {key: "baseDept",label: "조직",   align: "left",   width: 140, styleClass: "grid-cell-blue",
+		        		editor: {type:"select",
 		        			  config:{columnKeys:{optionValue: "cd", optionText: "nm"},
 										        options : baseDeptOption
 									         },
 							      disabled : function(){
 								       return this.item.creatId; // creatId 여부로 수정 가능여부 판단
 							      }
-						
+
 		        		}
 		        	},
 		        	{key: "sellAmt",       label: "매출액",     align: "right", width: 120,  formatter: "money", editor: {type:"text"}},
@@ -186,7 +227,7 @@
 				var tempElem = $('[data-search]')[i];
 				paramObj[$(tempElem).data("search")] = $(tempElem).val();
 			}
-			
+
 			postAjax("/user/fi/fi02/selectPalBillList", paramObj, null, function(data) {
 				try {
 					var list = data.resultList;
@@ -209,7 +250,7 @@
 			});
 		}
 	}
-	
+
 	$(document).ready(function() {
 		// 페이지 타이틀 set
 		mainDefaultLoad("회계업무", "이익등록");
@@ -217,19 +258,19 @@
 		setCommonSelect($("#main_area select[data-kind]"));
 		// 접속자 회사 set
 		$('[data-search="coCd"]').val(jwt.coCd);
-		
+
 		// 기준년월 set
 		$('#prftYm').val(new Date().toISOString().slice(0, 7));
-		
+
 		selectBaseDept(); // 조회 전 그리드 select에 들어갈 부서 조회
-		
+
 		authChk();
 	});
 
 	var baseDeptOption;
 	var upperDeptOption;
 	var lastDeptOption;
-	
+
 	function selectBaseDept(){
 		var formData = {
 			"coCd" : $("#coCd").val()
@@ -241,7 +282,7 @@
 			gridView.initView().setData(0);
 		});
 	}
-	
+
 	// 검색조건 초기화
 	function initSearch() {
 
@@ -250,20 +291,20 @@
 
 		// 사용여부 set
 		$('[data-search="useYn"]').val("Y");
-		
+
 		// 재검색
 		selectBaseDept();
 	}
-	
+
 	function addRow(){
 		gridView.target.addRow($.extend({}, "last", false));
 		var row = gridView.target.getList().length - 1;
 		gridView.target.setValue(row, "coCd", $("#coCd").val());
 		gridView.target.setValue(row, "coNm", $("#coCd option:selected").text());
 		gridView.target.setValue(row, "prftYm", $("#prftYm").val());
-		
+
 	}
-	
+
 	// 이익등록 삭제
 	function deletePalBill(){
 		var row = gridView.target.getList("selected");
@@ -297,7 +338,7 @@
 			});
 		}
 	}
-	
+
 	// 이익등록 저장
 	function savePalBill(){
 		var formData = {
@@ -306,7 +347,7 @@
 		}
 		var detailArr = gridView.target.getList();
 		formData["detailArr"] = JSON.stringify(detailArr);
-		
+
 		for(var i = 0; i < detailArr.length; i++){
 			for(var j = i + 1; j < detailArr.length; j++){
 				if (detailArr[i].baseDept == detailArr[j].baseDept){
@@ -330,7 +371,7 @@
 			});
 // 		}
 	}
-	
+
 	function copyPrevMonth(){
 		var row = gridView.target.getList().length;
 		if(row > 0){
@@ -343,7 +384,7 @@
 			}
 		}
 	}
-	
+
 	function callCopyPrevMonth(){
 		var formData = {
 				"userId" : jwt.userId,
@@ -359,4 +400,44 @@
 			});
 	}
 
+
+	function gridPaste(thisGrid, thisGridRow, thisGridCol) {
+		navigator.clipboard.readText()
+		.then(function(pasteData) {
+			if (!pasteData || thisGridRow === undefined) return;
+
+			var pasteRows = pasteData.replace(/[\r\n]+$/, '').split('\n').map(function(row) {
+				return row.split('\t');
+			});
+
+			// hidden 컬럼 제외한 visible 컬럼 목록 (원본 훼손 방지)
+			var tempColumns = (thisGrid.colGroup || []).filter(function(c) { return !c.hidden; });
+
+			var currGridData = thisGrid.list;
+			var startRowIndex = thisGridRow;
+			var startColIndex = thisGridCol;
+			var numRows = pasteRows.length;
+			var numCols = pasteRows[0].length;
+
+			var templateRow = JSON.parse(JSON.stringify(currGridData[thisGridRow] || {}));
+			delete templateRow.creatId;
+
+			for (var i = 0; i < numRows; i++) {
+				var calRow = startRowIndex + i;
+				if (calRow >= currGridData.length) {
+					currGridData.push(JSON.parse(JSON.stringify(templateRow)));
+				}
+				for (var j = 0; j < numCols; j++) {
+					var calCol = startColIndex + j;
+					if (calCol >= tempColumns.length) break;
+					var tkey = tempColumns[calCol].key;
+					var cellData = pasteRows[i][j].replace(/\r/g, '');
+					currGridData[calRow][tkey] = cellData;
+				}
+			}
+
+			thisGrid.setData({ list: currGridData, page: { totalElements: currGridData.length } });
+		})
+		.catch(function() {});
+	}
 </script>
