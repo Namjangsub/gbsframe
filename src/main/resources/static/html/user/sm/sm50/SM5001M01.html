@@ -106,9 +106,38 @@
 		border: 1px dashed;
 		float: left;
 	 }
-    .resizable-div {
-      border: 1px dashed #bbb9b9;
-    }
+    .col-splitter {
+		float: left;
+		width: 8px;
+		cursor: col-resize;
+		background-color: #f1f1f1;
+		border-left: 1px solid #ccc;
+		border-right: 1px solid #ccc;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		user-select: none;
+		-webkit-user-select: none;
+		position: relative;
+		transition: background-color 0.2s, border-color 0.2s;
+		z-index: 10;
+	}
+
+	.col-splitter:hover {
+		background-color: rgba(0, 123, 255, 0.1);
+		border-left: 1px solid #007bff;
+		border-right: 1px solid #007bff;
+	}
+
+	.col-splitter span {
+		font-size: 14px;
+		color: #888;
+		transition: color 0.2s;
+	}
+
+	.col-splitter:hover span {
+		color: #007bff;
+	}
     .blue-node > a { color: blue !important; } /* Define the blue color for the specific node */
 	</style>
 </head>
@@ -202,7 +231,7 @@
 
       <!-- 콘텐츠 -->
     <div class="row" style="margin-top: 0px;">
-      <div id="treeFrame" class="col-xs-2 resizable-div" style="padding-right: 1px; min-height: 247px; ">
+      <div id="treeFrame" class="col-xs-2" style="padding-right: 1px; min-height: 247px; ">
         <div class="contents" style="margin: 0px; padding: 0px; height: 100%;  min-height: 245px; min-width: 100px;">
 			<h3 class="location">
 			  <span class="page_tit"> PART List 내역</span>
@@ -213,7 +242,13 @@
             <div id="deptTree" style="height: 710px;  width: 100%;" ></div>
         </div>
       </div>
-      <div id="gridFrame" class="col-xs-10 resizable-div" style="padding-left: 0; padding-right: 0px;min-height:247px;">
+      
+      <!-- 세로형 가로폭 스플리터 바 추가 -->
+      <div id="colSplitter" class="col-splitter">
+          <span>⋮</span>
+      </div>
+
+      <div id="gridFrame" class="col-xs-10" style="padding-left: 0; padding-right: 0px;min-height:247px;">
         <div class="contents " style="margin:0px; padding:0px; height: 100%; width: 100%; min-height:200px; min-width: 245px">
 			<h3 class="location">
 				<span class="page_tit"> BOM 상세 매입 원가</span>
@@ -392,7 +427,19 @@
 					"bomLevel" 	: $("#bomLevel_S").val(),
 					"fileTrgtKey"	: fileTrgtKey
 				}
-	    		postAjax("/user/sm/sm50/selectBomAllCostList", formData, null, function(data) {
+				if (typeof $.blockUI === 'function') {
+					var message = "<div><img src='/static/img/progress.gif'/> <font size='5' color='blue'> 원가자료 취합중입니다. 잠시만 기다려주세요...</font></div>";
+					$.blockUI.defaults.overlayCSS.opacity = 0.1;
+					$.blockUI({
+						message: message,
+						css: {
+							backgroundColor: 'rgba(0,0,0,0.0)',
+							color: '#000000',
+							border: '0px solid #a00'
+						}
+					});
+				}
+				postAjax("/user/sm/sm50/selectBomAllCostList", formData, null, function(data) {
 					try {
 						let list = data.result;
 						let pcost = data.pcostInfo;
@@ -418,9 +465,11 @@
 						alert("오류 발생!! 전산실 연락 바랍니다", error.message);
 						return null; // 오류 발생 시 null 반환
 					} finally {
-						// console.log("함수 실행 완료.");
+						if (typeof $.blockUI === 'function') {
+							$.unblockUI();
+						}
 					}
-	    	 	});
+				}, false);
      	} //setData
 	}
 
@@ -465,51 +514,23 @@
 
 			initDeptTree(); //왼쪽 트리 그리기
 
-			$(".resizable-div").resizable();
-			// 사이즈 조정 시 태그 자동 크기 조절
-			$("#gridFrame").resize(function() {
-				var workWidth = $("#main_area").width() - 10;
+			// 가로폭 세로 스플리터 초기화
+			initColSplitter();
 
-			    var tagHeight = $("#gridFrame").height() - 45 ;
-			    var tagWidth  = $("#gridFrame").width();
-			    tagWidth = tagWidth < 100 ? 100 : tagWidth;
-			    tagWidth = tagWidth > 1400 ? 1400 : tagWidth;
+			// 해상도 대응 그리드 초기 리사이즈 실행 및 resize 이벤트 바인딩
+			adjustGridHeightToWindow();
+			$(window).on('resize', adjustGridHeightToWindow);
 
-			    $('[data-ax5grid="first-grid"]').height(tagHeight);
-			    $('[data-ax5grid-container="root"]').height(tagHeight);
-			    $('#treeFrame').height(tagHeight + 45);
-			    $('#deptTree').height(tagHeight);
-			    $('#treeFrame .contents').height(tagHeight+50);
+			// iframe 구조 대응: 부모 브라우저 윈도우 크기 변경 시 리사이즈 이벤트 강제 트리거
+			try {
+				if (window.self !== window.top) {
+					$(window.top).on('resize.sm5001', adjustGridHeightToWindow);
+				}
+			} catch (e) {}
 
-				var chgWidth = workWidth - tagWidth;
-			    chgWidth = (tagWidth + chgWidth) > workWidth ?  (workWidth - tagWidth) : chgWidth;
-				$("#gridFrame").width(tagWidth);
-			    $("#treeFrame").width(chgWidth);
-			    $('#deptTree').width(chgWidth);
-			    $('#treeFrame .contents').width(chgWidth);
-			});
-			// 사이즈 조정 시 태그 자동 크기 조절
-			$("#treeFrame").resize(function() {
-				var workWidth = $("#main_area").width() - 20;
+			// 브라우저 리소스 로딩 지연 등으로 인한 오측정 방지용 시간차 재보정
+			setTimeout(adjustGridHeightToWindow, 150);
 
-			    var tagHeight = $("#treeFrame").height() ;
-			    var tagWidth  = $("#treeFrame").width();
-			    tagWidth = tagWidth < 100 ? 100 : tagWidth;
-			    tagWidth = tagWidth > 1400 ? 1400 : tagWidth;
-
-			    $('#deptTree').height(tagHeight -45);
-			    $('#treeFrame .contents').height(tagHeight);
-			    $('#gridFrame').height(tagHeight);
-			    $('[data-ax5grid="first-grid"]').height(tagHeight - 45);
-			    $('[data-ax5grid-container="root"]').height(tagHeight- 45);
-
-			    $("#treeFrame").width(tagWidth);
-			    $('#deptTree').width(tagWidth);
-			    $('#treeFrame .contents').width(tagWidth);
-			    var chgWidth = workWidth - tagWidth;
-			    chgWidth = (tagWidth + chgWidth) > workWidth ?  (workWidth - tagWidth) : chgWidth;
-			    $("#gridFrame").width(chgWidth);
-			});
 			authChk("SM5001M01");
 
 			$("#bomRemark").prop("readonly", true);
@@ -528,14 +549,134 @@
 					}
 				});
 
-			$("#gridFrame").resize()
-
 			// 검색조건 이벤트 bind
 			$('[data-search]').on("change", function(){
 				initDeptTree();
 			});
 
       });
+
+	// 화면 해상도에 맞추어 그리드 및 트리 높이/너비를 동적으로 계산하여 가득 채워주는 함수
+	function adjustGridHeightToWindow() {
+		var winHeight = $(window).height();
+		var isIframe = (window.self !== window.top);
+
+		if (isIframe) {
+			try {
+				winHeight = window.top.innerHeight;
+			} catch (e) {
+				winHeight = $(window).height();
+			}
+		}
+
+		// 상단 검색 2줄 및 타이틀 마진 등 고정 오프셋 차감
+		var occupiedOffset = isIframe ? 240 : 170;
+		var availableHeight = winHeight - occupiedOffset;
+
+		// 최소 안전 가드 높이
+		if (availableHeight < 300) {
+			availableHeight = 300;
+		}
+
+		// 두 프레임 영역 및 세로 스플리터 바의 높이 연동
+		$('#treeFrame').height(availableHeight);
+		$('#gridFrame').height(availableHeight);
+		$('#colSplitter').height(availableHeight);
+
+		// 내부 jstree 및 ax5grid 높이 세팅
+		var tagHeight = availableHeight - 45;
+		if (tagHeight < 150) tagHeight = 150;
+
+		$('[data-ax5grid="first-grid"]').height(tagHeight);
+		$('[data-ax5grid-container="root"]').height(tagHeight);
+		$('#deptTree').height(tagHeight);
+		$('#treeFrame .contents').height(tagHeight + 50);
+
+		// 가로폭 해상도 대응 비례 배분 (여백 및 스플리터 두께 8px 고려)
+		var workWidth = $("#main_area").width() - 30;
+		var savedColRatio = localStorage.getItem('sm5001_col_ratio');
+		var colRatio = savedColRatio ? parseFloat(savedColRatio) : 0.166667; // 기본 col-xs-2 (2/12)
+
+		var treeWidth = Math.floor(workWidth * colRatio);
+		if (treeWidth < 100) treeWidth = 100;
+		if (treeWidth > 1400) treeWidth = 1400;
+
+		var gridWidth = workWidth - treeWidth;
+		if (gridWidth < 200) gridWidth = 200;
+
+		$("#treeFrame").width(treeWidth);
+		$('#treeFrame .contents').width(treeWidth);
+		$('#deptTree').width(treeWidth);
+
+		$("#gridFrame").width(gridWidth);
+		$('#gridFrame .contents').width(gridWidth);
+
+		// ax5grid 정렬 및 jstree 가로 갱신 유발
+		if (firstGrid.target) {
+			firstGrid.target.align();
+		}
+	}
+
+	// 가운데 세로 분할 바 드래그 제어
+	function initColSplitter() {
+		var isDragging = false;
+		var startX = 0;
+		var startWidthTree = 0;
+		var startWidthGrid = 0;
+
+		$('#colSplitter').on('mousedown', function(e) {
+			isDragging = true;
+			startX = e.pageX;
+			startWidthTree = $('#treeFrame').width();
+			startWidthGrid = $('#gridFrame').width();
+
+			$('body').css({
+				'user-select': 'none',
+				'-webkit-user-select': 'none',
+				'cursor': 'col-resize'
+			});
+
+			$(document).on('mousemove.colSplitter', function(e) {
+				if (!isDragging) return;
+
+				var deltaX = e.pageX - startX;
+				var newWidthTree = startWidthTree + deltaX;
+				var newWidthGrid = startWidthGrid - deltaX;
+
+				var workWidth = $("#main_area").width() - 30; // 여백 및 스플리터 두께 고려
+
+				// 경계 영역 제한 가드
+				if (newWidthTree > 100 && newWidthGrid > 200) {
+					$("#treeFrame").width(newWidthTree);
+					$('#treeFrame .contents').width(newWidthTree);
+					$('#deptTree').width(newWidthTree);
+
+					$("#gridFrame").width(newWidthGrid);
+					$('#gridFrame .contents').width(newWidthGrid);
+
+					if (firstGrid.target) {
+						firstGrid.target.align();
+					}
+				}
+			});
+
+			$(document).on('mouseup.colSplitter', function() {
+				isDragging = false;
+				$(document).off('mousemove.colSplitter mouseup.colSplitter');
+				$('body').css({
+					'user-select': '',
+					'-webkit-user-select': '',
+					'cursor': ''
+				});
+
+				var workWidth = $("#main_area").width();
+				var treeWidth = $("#treeFrame").width();
+				if (workWidth > 0) {
+					localStorage.setItem('sm5001_col_ratio', treeWidth / workWidth);
+				}
+			});
+		});
+	}
 
   	// 트리 초기화
   	function initDeptTree() {
