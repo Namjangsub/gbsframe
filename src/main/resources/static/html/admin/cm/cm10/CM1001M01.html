@@ -1,6 +1,74 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
+<style>
+#scndTable thead tr td {
+	position: relative;
+}
+.col-resizer {
+	position: absolute;
+	right: -3px;
+	top: 0;
+	width: 6px;
+	height: 100%;
+	cursor: col-resize;
+	z-index: 10;
+	background-color: transparent;
+	border-right: 2px dashed #bbb;
+	user-select: none;
+	-webkit-user-select: none;
+	transition: background-color 0.2s, border-color 0.2s;
+}
+.col-resizer:hover {
+	background-color: rgba(0, 123, 255, 0.2);
+	border-right: 2px solid #007bff;
+}
+.col-resizer::after {
+	content: "⋮";
+	position: absolute;
+	top: 50%;
+	left: 50%;
+	transform: translate(-50%, -50%);
+	font-size: 14px;
+	color: #888;
+	font-weight: bold;
+	pointer-events: none;
+	opacity: 0.7;
+	transition: color 0.2s, opacity 0.2s;
+}
+.col-resizer:hover::after {
+	color: #007bff;
+	opacity: 1;
+}
+.grid-splitter {
+	height: 8px;
+	cursor: row-resize;
+	background-color: #f1f1f1;
+	border-top: 1px solid #ccc;
+	border-bottom: 1px solid #ccc;
+	margin: 5px 0;
+	text-align: center;
+	line-height: 6px;
+	user-select: none;
+	-webkit-user-select: none;
+	position: relative;
+	transition: background-color 0.2s, border-color 0.2s;
+}
+.grid-splitter:hover {
+	background-color: rgba(0, 123, 255, 0.1);
+	border-top: 1px solid #007bff;
+	border-bottom: 1px solid #007bff;
+}
+.grid-splitter span {
+	font-size: 10px;
+	color: #888;
+	letter-spacing: 2px;
+	transition: color 0.2s;
+}
+.grid-splitter:hover span {
+	color: #007bff;
+}
+</style>
 <meta charset="utf-8">
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
 <meta name="viewport" content="width=device-width, initial-scale=0.6, user-scalable=no">
@@ -81,6 +149,7 @@
 							<div class="add_btn_small pdl10">
 								<a onclick="RemainedReport(1);" style="height: 30px; line-height: 28px; width: 110px;margin-top: 10px;margin-right: 15px;"><i class="fas fa-print"></i>미수금현황 출력</a>
 							</div>
+							<div class="col-resizer"></div>
 						</td>
 						<td style="text-align: left;">
 							<h3 class="location"><span class="page_tit">일정관리 문제현황</span>
@@ -90,6 +159,7 @@
 								</select>
 							</h3>
 							<span>※ 프로젝트+작업일보+일정관리 이슈, 프로젝트,작업일보는 최근 1개월임.</span>
+							<div class="col-resizer"></div>
 						</td>
 						<td style="text-align: left;">
 							<h3 class="location"><span class="page_tit">To-Do List</span>
@@ -106,6 +176,9 @@
 						<td>
 							<div class="contents" style="margin:0px;padding:0px;width:100%;min-width:300px">
 								<div data-ax5grid="clmn-grid" data-ax5grid-config="{}" style="height: 380px; width: 100%"></div>
+								<div class="grid-splitter" id="gridSplitter1">
+									<span style="font-size: 8px; color: #888; letter-spacing: 2px;">•••</span>
+								</div>
 								<div><h3 class="location"><span class="page_tit">미청구 현황</span></h3>
 									<span> ※ 해당자료 더블클릭은 청구작업 처리 가능</span>
 									<div class="add_btn_small pdl10">
@@ -122,6 +195,9 @@
 						<td>
 							<div class="contents" style="margin:0px;padding:0px;width:100%; min-width:300px">
 								<div data-ax5grid="todo-grid" data-ax5grid-config="{}" style="height: 380px; width: 100%"></div>
+								<div class="grid-splitter" id="gridSplitter2">
+									<span style="font-size: 8px; color: #888; letter-spacing: 2px;">•••</span>
+								</div>
 								<div><h3 class="location"><span class="page_tit">완료 예정 업무</span></h3>
 									<span> ※ 해당자료 더블클릭은 WBS결과 입력 처리 가능</span></div>
 								<div data-ax5grid="work-grid" data-ax5grid-config="{}" style="height: 385px; width: 100%"></div>
@@ -136,6 +212,8 @@
 </html>
 
 <script type="text/javascript">
+	var isUserResized1 = localStorage.getItem('cm1001_row_ratio1') ? true : false; // 첫번째 컬럼 상하 그리드 수동 크기 조정 여부
+	var isUserResized2 = localStorage.getItem('cm1001_row_ratio2') ? true : false; // 세번째 컬럼 상하 그리드 수동 크기 조정 여부
 
 	ax5.ui.grid.formatter["bilgYn"] = function () {
 		var color = this.value == "Y" ? "color-circle_02.png" : "color-circle_01.png";
@@ -211,7 +289,7 @@
 
 			postAjax("/user/cr/cr13/select_cr13_List", paramObj, null, function(data) {
 				try {
-					gridHeightResize(clmnGridView, $('body').height()/2 + 75);
+					adjustGridHeight();
 					var list = data.result;
 					if (list != undefined)
 					targetObj.setData({
@@ -364,7 +442,7 @@
 			};
 			postAjax("/user/wb/wb24/selectWbsIssueListDashboard", formData, null, function(data){
 				try {
-					gridHeightResize(issueGridView, 109); // 109 = 919 - 810 : 화면 Body 높이 - 그리드 기본크기 810
+					adjustGridHeight();
 					var list = data.result;
 					if (list != undefined)
 					targetObj.setData({
@@ -470,7 +548,7 @@
 					};
 			postAjax("/user/wb/wb20/selectToDoList", formData, null, function(data){
 				try {
-					gridHeightResize(gridView, $('body').height()/2 + 75);
+					adjustGridHeight();
 					var list = data.resultList;
 					if (list != undefined)
 					targetObj.setData({
@@ -553,7 +631,7 @@
 			};
 			postAjax("/user/cr/cr12/select_cr12_List", formData, null, function(data) {
 				try {
-					gridHeightResize(taxGridView, $('body').height()/2 + 80);
+					adjustGridHeight();
 					var list = data.result;
 					if (list != undefined)
 					targetObj.setData({
@@ -629,7 +707,7 @@
 			};
 			postAjax("/user/wb/wb22/selectIncompleteJob", formData, null, function(data){
 				try {
-					gridHeightResize(workGridView, $('body').height()/2 + 80);
+					adjustGridHeight();
 					var list = data.resultList;
 					if (list != undefined)
 					targetObj.setData({
@@ -682,6 +760,19 @@
 		issueGridView.initView().setData();
 		workGridView.initView().setData();
 		// grid init
+		
+		initColResizer();
+		initRowSplitter();
+
+		// 화면 해상도 대응 초기화 및 리사이즈 이벤트 바인딩
+		adjustGridHeight();
+		$(window).on('resize', adjustGridHeight);
+		try {
+			if (window.self !== window.top) {
+				$(window.top).on('resize.cm1001', adjustGridHeight);
+			}
+		} catch (e) {}
+		setTimeout(adjustGridHeight, 150);
 	});
 
 	//수정 or 등록 버튼 클릭 시
@@ -972,5 +1063,248 @@
 				});
 // 			}
 		}
+	}
+
+	function initColResizer() {
+		var isDragging = false;
+		var currentResizer = null;
+		var startX = 0;
+		var startWidth1 = 0;
+		var startWidth2 = 0;
+		var colIndex = -1;
+
+		$('#scndTable').css('table-layout', 'fixed');
+
+		// 로컬스토리지 저장값으로 가로폭 복원
+		var savedColWidths = localStorage.getItem('cm1001_col_widths');
+		if (savedColWidths) {
+			var widths = JSON.parse(savedColWidths);
+			var $cols = $('#scndTable colgroup col');
+			$cols.eq(0).attr('width', widths[0]);
+			$cols.eq(1).attr('width', widths[1]);
+			$cols.eq(2).attr('width', widths[2]);
+		}
+
+		$('.col-resizer').on('mousedown', function(e) {
+			isDragging = true;
+			currentResizer = $(this);
+			startX = e.pageX;
+
+			var $td = currentResizer.closest('td');
+			colIndex = $td.index();
+
+			var $cols = $('#scndTable colgroup col');
+			var width0 = $('#scndTable thead tr td').eq(0).outerWidth();
+			var width1 = $('#scndTable thead tr td').eq(1).outerWidth();
+			var width2 = $('#scndTable thead tr td').eq(2).outerWidth();
+
+			$cols.eq(0).attr('width', width0);
+			$cols.eq(1).attr('width', width1);
+			$cols.eq(2).attr('width', width2);
+
+			startWidth1 = parseInt($cols.eq(colIndex).attr('width'));
+			startWidth2 = parseInt($cols.eq(colIndex + 1).attr('width'));
+
+			$('body').css({
+				'user-select': 'none',
+				'-webkit-user-select': 'none',
+				'cursor': 'col-resize'
+			});
+
+			$(document).on('mousemove.colResize', function(e) {
+				if (!isDragging) return;
+
+				var deltaX = e.pageX - startX;
+				var newWidth1 = startWidth1 + deltaX;
+				var newWidth2 = startWidth2 - deltaX;
+
+				if (newWidth1 > 150 && newWidth2 > 150) {
+					var $cols = $('#scndTable colgroup col');
+					$cols.eq(colIndex).attr('width', newWidth1);
+					$cols.eq(colIndex + 1).attr('width', newWidth2);
+					
+					// 그리드 리사이징 강제 유발
+					if(clmnGridView.target) clmnGridView.target.align();
+					if(taxGridView.target) taxGridView.target.align();
+					if(issueGridView.target) issueGridView.target.align();
+					if(gridView.target) gridView.target.align();
+					if(workGridView.target) workGridView.target.align();
+				}
+			});
+
+			$(document).on('mouseup.colResize', function() {
+				isDragging = false;
+				$(document).off('mousemove.colResize mouseup.colResize');
+				$('body').css({
+					'user-select': '',
+					'-webkit-user-select': '',
+					'cursor': ''
+				});
+
+				// 가로 폭 세팅값 로컬스토리지 저장
+				var w0 = $('#scndTable thead tr td').eq(0).outerWidth();
+				var w1 = $('#scndTable thead tr td').eq(1).outerWidth();
+				var w2 = $('#scndTable thead tr td').eq(2).outerWidth();
+				localStorage.setItem('cm1001_col_widths', JSON.stringify([w0, w1, w2]));
+			});
+		});
+	}
+
+	// 화면 해상도에 맞추어 5개 그리드의 세로 높이를 비율로 분배하여 꽉 채워주는 함수
+	function adjustGridHeight() {
+		var winHeight = $(window).height();
+		var isIframe = (window.self !== window.top);
+
+		if (isIframe) {
+			try {
+				winHeight = window.top.innerHeight;
+			} catch (e) {
+				winHeight = $(window).height();
+			}
+		}
+
+		// 동적 오프셋 측정 (상단 헤더 마진, 탭 영역 높이 차감)
+		var occupiedOffset = isIframe ? 190 : 130;
+		var availableHeight = winHeight - occupiedOffset;
+
+		// 최소 해상도 가드
+		if (availableHeight < 400) {
+			availableHeight = 400;
+		}
+
+		// 그리드 사이의 한글 타이틀 텍스트 영역 등의 공간(약 55px)을 차감한 높이 계산
+		var titleOffset = 55;
+		var halfHeight = Math.floor((availableHeight - titleOffset) / 2);
+
+		if (halfHeight < 150) {
+			halfHeight = 150;
+		}
+
+		var heightTop = halfHeight;
+		var heightBottom = availableHeight - titleOffset - heightTop;
+
+		// 첫 번째 컬럼 그리드 높이 적용
+		if (!isUserResized1) {
+			if (clmnGridView.target) clmnGridView.target.setHeight(heightTop);
+			if (taxGridView.target) taxGridView.target.setHeight(heightBottom);
+		} else {
+			var ratio = localStorage.getItem('cm1001_row_ratio1') ? parseFloat(localStorage.getItem('cm1001_row_ratio1')) : 0.5;
+			var newH1 = Math.floor((availableHeight - titleOffset) * ratio);
+			var newH2 = availableHeight - titleOffset - newH1;
+			if (clmnGridView.target) clmnGridView.target.setHeight(newH1);
+			if (taxGridView.target) taxGridView.target.setHeight(newH2);
+		}
+
+		// 세 번째 컬럼 그리드 높이 적용
+		if (!isUserResized2) {
+			if (gridView.target) gridView.target.setHeight(heightTop);
+			if (workGridView.target) workGridView.target.setHeight(heightBottom);
+		} else {
+			var ratio = localStorage.getItem('cm1001_row_ratio2') ? parseFloat(localStorage.getItem('cm1001_row_ratio2')) : 0.5;
+			var newH1 = Math.floor((availableHeight - titleOffset) * ratio);
+			var newH2 = availableHeight - titleOffset - newH1;
+			if (gridView.target) gridView.target.setHeight(newH1);
+			if (workGridView.target) workGridView.target.setHeight(newH2);
+		}
+
+		// 일정관리 문제현황 그리드는 단독 열로 전체 사용
+		if (issueGridView.target) issueGridView.target.setHeight(availableHeight);
+	}
+
+	function initRowSplitter() {
+		// 첫 번째 컬럼 상하 그리드 분할 스플리터 드래그 이벤트
+		var isDragging1 = false;
+		var startY1 = 0;
+		var startH1_top = 0;
+		var startH1_bottom = 0;
+
+		$('#gridSplitter1').on('mousedown', function(e) {
+			isDragging1 = true;
+			startY1 = e.pageY;
+			startH1_top = $('[data-ax5grid="clmn-grid"]').height();
+			startH1_bottom = $('[data-ax5grid="tax-grid"]').height();
+
+			$('body').css({
+				'user-select': 'none',
+				'-webkit-user-select': 'none'
+			});
+
+			$(document).on('mousemove.rowSplitter1', function(e) {
+				if (!isDragging1) return;
+				var deltaY = e.pageY - startY1;
+				var newH_top = startH1_top + deltaY;
+				var newH_bottom = startH1_bottom - deltaY;
+
+				// 두 그리드의 최소 세로크기가 100px을 보장하도록 가드
+				if (newH_top > 100 && newH_bottom > 100) {
+					clmnGridView.target.setHeight(newH_top);
+					taxGridView.target.setHeight(newH_bottom);
+					isUserResized1 = true;
+				}
+			});
+
+			$(document).on('mouseup.rowSplitter1', function() {
+				isDragging1 = false;
+				$(document).off('mousemove.rowSplitter1 mouseup.rowSplitter1');
+				$('body').css({
+					'user-select': '',
+					'-webkit-user-select': ''
+				});
+
+				// 현재 조정된 비율 계산하여 로컬스토리지 저장
+				var h1 = $('[data-ax5grid="clmn-grid"]').height();
+				var h2 = $('[data-ax5grid="tax-grid"]').height();
+				if (h1 + h2 > 0) {
+					localStorage.setItem('cm1001_row_ratio1', h1 / (h1 + h2));
+				}
+			});
+		});
+
+		// 세 번째 컬럼 상하 그리드 분할 스플리터 드래그 이벤트
+		var isDragging2 = false;
+		var startY2 = 0;
+		var startH2_top = 0;
+		var startH2_bottom = 0;
+
+		$('#gridSplitter2').on('mousedown', function(e) {
+			isDragging2 = true;
+			startY2 = e.pageY;
+			startH2_top = $('[data-ax5grid="todo-grid"]').height();
+			startH2_bottom = $('[data-ax5grid="work-grid"]').height();
+
+			$('body').css({
+				'user-select': 'none',
+				'-webkit-user-select': 'none'
+			});
+
+			$(document).on('mousemove.rowSplitter2', function(e) {
+				if (!isDragging2) return;
+				var deltaY = e.pageY - startY2;
+				var newH_top = startH2_top + deltaY;
+				var newH_bottom = startH2_bottom - deltaY;
+
+				if (newH_top > 100 && newH_bottom > 100) {
+					gridView.target.setHeight(newH_top);
+					workGridView.target.setHeight(newH_bottom);
+					isUserResized2 = true;
+				}
+			});
+
+			$(document).on('mouseup.rowSplitter2', function() {
+				isDragging2 = false;
+				$(document).off('mousemove.rowSplitter2 mouseup.rowSplitter2');
+				$('body').css({
+					'user-select': '',
+					'-webkit-user-select': ''
+				});
+
+				// 현재 조정된 비율 계산하여 로컬스토리지 저장
+				var h1 = $('[data-ax5grid="todo-grid"]').height();
+				var h2 = $('[data-ax5grid="work-grid"]').height();
+				if (h1 + h2 > 0) {
+					localStorage.setItem('cm1001_row_ratio2', h1 / (h1 + h2));
+				}
+			});
+		});
 	}
 </script>
