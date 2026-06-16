@@ -17,6 +17,38 @@
 	background: #ffffff;
 	box-shadow: 1px 1px rgba(0, 0, 0, 0.15);
 }
+
+.grid-splitter {
+	height: 8px;
+	cursor: row-resize;
+	background-color: #f1f1f1;
+	border-top: 1px solid #ccc;
+	border-bottom: 1px solid #ccc;
+	margin: 5px 0;
+	text-align: center;
+	line-height: 6px;
+	user-select: none;
+	-webkit-user-select: none;
+	position: relative;
+	transition: background-color 0.2s, border-color 0.2s;
+}
+
+.grid-splitter:hover {
+	background-color: rgba(0, 123, 255, 0.1);
+	border-top: 1px solid #007bff;
+	border-bottom: 1px solid #007bff;
+}
+
+.grid-splitter span {
+	font-size: 10px;
+	color: #888;
+	letter-spacing: 2px;
+	transition: color 0.2s;
+}
+
+.grid-splitter:hover span {
+	color: #007bff;
+}
 </style>
 <head>
 <meta charset="utf-8">
@@ -165,6 +197,11 @@
 		      <div class="ax5_grid" data-ax5grid="clntCompGrid-grid" data-ax5grid-config="{}" style="height: 400px; width: 100%" ></div>
 		</div>
 
+		<!-- 가로 분할 바 -->
+		<div class="grid-splitter" id="gridSplitter">
+			<span style="font-size: 10px; color: #888; letter-spacing: 2px;">•••</span>
+		</div>
+
 		<!-- 콘텐츠 -->
 		<div class="contents no_bg">
 			<!-- 콘텐츠 타이틀 -->
@@ -196,6 +233,8 @@
 </html>
 
 <script type="text/javascript">
+	var isUserResized = localStorage.getItem('sm1601_row_ratio') ? true : false; // 사용자가 수동으로 그리드 크기를 조정했는지 여부
+
 	//formatter
 	$('[data-ax5formatter]').ax5formatter();
 	var today = moment(new Date()).format("YYYY-MM-DD");
@@ -594,6 +633,23 @@
 		//권한체크
 		authChk();
 
+		// 가로 분할 바 초기화
+		initSplitter();
+
+		// 해상도 대응 그리드 초기 리사이즈 실행 및 resize 이벤트 바인딩
+		adjustGridHeightToWindow();
+		$(window).on('resize', adjustGridHeightToWindow);
+
+		// iframe 구조 대응: 부모 브라우저 윈도우 크기 변경 시 리사이즈 이벤트 강제 트리거
+		try {
+			if (window.self !== window.top) {
+				$(window.top).on('resize.sm1601', adjustGridHeightToWindow);
+			}
+		} catch (e) {}
+
+		// 브라우저 리소스 로딩 지연 등으로 인한 오측정 방지용 시간차 재보정
+		setTimeout(adjustGridHeightToWindow, 150);
+
 	});//ready end
 
 	function initSearch() {
@@ -690,10 +746,104 @@
  	}
 
 	function gridResizeMain(size) {
-	    var tagHeight = (size) * 27 + 120 ;
-	    tagHeight = tagHeight > 750 ? 750 : tagHeight;
-	    tagHeight = tagHeight < 300 ? 300 : tagHeight;
+		// 화면 해상도 꽉 채우기 지원을 위해 데이터 수 기반 리사이즈 대신 전체 화면 대응 리사이즈를 호출합니다.
+		adjustGridHeightToWindow();
+	}
 
-	    gridView.target.setHeight(tagHeight);
+	function initSplitter() {
+		var isDragging = false;
+		var startY = 0;
+		var startHeight1 = 0;
+		var startHeight2 = 0;
+
+		$('#gridSplitter').on('mousedown', function(e) {
+			isDragging = true;
+			startY = e.pageY;
+			
+			// 현재 렌더링된 두 그리드 엘리먼트의 높이 획득
+			startHeight1 = $('[data-ax5grid="clntCompGrid-grid"]').height();
+			startHeight2 = $('[data-ax5grid="first-grid"]').height();
+			
+			$('body').css({
+				'user-select': 'none',
+				'-webkit-user-select': 'none'
+			});
+
+			$(document).on('mousemove.splitter', function(e) {
+				if (!isDragging) return;
+				
+				var deltaY = e.pageY - startY;
+				var newHeight1 = startHeight1 + deltaY;
+				var newHeight2 = startHeight2 - deltaY;
+				
+				// 두 그리드가 최소 100px 이상을 유지하도록 제한
+				if (newHeight1 > 100 && newHeight2 > 100) {
+					clntCompGridView.target.setHeight(newHeight1);
+					gridView.target.setHeight(newHeight2);
+					isUserResized = true; // 사용자가 크기를 직접 조정했음을 기록
+				}
+			});
+
+			$(document).on('mouseup.splitter', function() {
+				isDragging = false;
+				$(document).off('mousemove.splitter mouseup.splitter');
+				$('body').css({
+					'user-select': '',
+					'-webkit-user-select': ''
+				});
+
+				// 수동 조절 비율을 로컬스토리지에 보존
+				var h1 = $('[data-ax5grid="clntCompGrid-grid"]').height();
+				var h2 = $('[data-ax5grid="first-grid"]').height();
+				if (h1 + h2 > 0) {
+					localStorage.setItem('sm1601_row_ratio', h1 / (h1 + h2));
+				}
+			});
+		});
+	}
+
+	// 화면 해상도에 맞추어 그리드 높이를 동적으로 계산하여 가득 채워주는 함수
+	function adjustGridHeightToWindow() {
+		var winHeight = $(window).height();
+		var isIframe = (window.self !== window.top);
+
+		if (isIframe) {
+			try {
+				// iframe 내부인 경우, 부모 브라우저 윈도우의 innerHeight를 기준으로 측정하여 
+				// iframe의 크기 계산 한계 및 지연 문제를 근본적으로 극복합니다.
+				winHeight = window.top.innerHeight;
+			} catch (e) {
+				winHeight = $(window).height();
+			}
+		}
+
+		// 동적 측정 오동작을 소거하기 위해,
+		// 화면 상하단 고정 레이아웃 오프셋(검색 테이블, 타이틀바, 마진 등)을 정적으로 계산하여 뺍니다.
+		// iframe 환경인 경우 최상위 윈도우 기준 부모 창 오프셋(약 80px)을 추가 합산하여 340px를 차감하고,
+		// 팝업/모달 단독 창일 경우 250px를 차감합니다.
+		var occupiedOffset = isIframe ? 340 : 250;
+		var availableHeight = winHeight - occupiedOffset;
+
+		// 최소 높이 안전 가드 (극단적으로 작은 해상도 대응)
+		if (availableHeight < 300) {
+			availableHeight = 300; 
+		}
+
+		if (!isUserResized) {
+			// 초기 비율 분배 (상단 그리드 55%, 하단 그리드 45%)
+			var height1 = Math.floor(availableHeight * 0.55);
+			var height2 = availableHeight - height1;
+
+			clntCompGridView.target.setHeight(height1);
+			gridView.target.setHeight(height2);
+		} else {
+			// 사용자가 크기를 임의 조정한 경우, 로컬스토리지에 저장된 비율을 불러와서 해상도 비례 배분
+			var ratio = localStorage.getItem('sm1601_row_ratio') ? parseFloat(localStorage.getItem('sm1601_row_ratio')) : 0.55;
+			var height1 = Math.floor(availableHeight * ratio);
+			var height2 = availableHeight - height1;
+
+			clntCompGridView.target.setHeight(height1);
+			gridView.target.setHeight(height2);
+		}
 	}
 </script>
