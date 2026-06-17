@@ -97,6 +97,11 @@ public class QM01SvcImpl implements QM01Svc {
   public Map<String, String> selectQtyReqRespInfo(Map<String, String> paramMap) {
     return QM01Mapper.selectQtyReqRespInfo(paramMap);
   }
+
+  @Override
+  public Map<String, String> selectSalesLgistInfo(Map<String, String> paramMap) {
+    return QM01Mapper.selectSalesLgistInfo(paramMap);
+  }
   
   @Override
   public List<Map<String, String>> selectShareUserlst(Map<String, String> paramMap) {

@@ -35,6 +35,8 @@ public interface QM01Svc {
   
   Map<String, String> selectQtyReqRespInfo(Map<String, String> paramMap);
 
+  Map<String, String> selectSalesLgistInfo(Map<String, String> paramMap);
+
   int selectConfirmCount(Map<String, String> paramMap);
 
   //int insertQualityReq(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
