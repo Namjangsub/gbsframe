@@ -61,6 +61,14 @@ public class QM01Ctr {
         model.addAttribute("approval", approval);
         return "jsonView";
   }
+
+  // SalesCode 기준 물류 정보 조회
+  @PostMapping(value = "/selectSalesLgistInfo")
+  public String selectSalesLgistInfo(@RequestBody Map<String, String> paramMap, ModelMap model) {
+        Map<String, String> result = qm01Svc.selectSalesLgistInfo(paramMap);
+        model.addAttribute("result", result);
+        return "jsonView";
+  }
   
 //요청 정보2 
   @PostMapping(value = "/selectQtyReqRespInfo")
