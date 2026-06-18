@@ -285,7 +285,7 @@
 			<!-- 마인드맵 컨테이너 및 안내 가이드 래퍼 -->
 			<div style="position: relative;">
 				<!-- 마인드맵 조작 안내 가이드 (empty() 삭제 영향 차단) -->
-				<div id="jsmind_guide" style="position: absolute; top: 10px; left: 10px; z-index: 999; color: #888; font-size: 11px; font-weight: normal; pointer-events: none; background: rgba(244, 244, 244, 0.85); padding: 3px 6px; border-radius: 3px; border: 1px solid #ddd; line-height: 1.2;">
+				<div id="jsmind_guide" style="position: absolute; top: 10px; left: 10px; z-index: 1; color: #888; font-size: 11px; font-weight: normal; pointer-events: none; background: rgba(244, 244, 244, 0.85); padding: 3px 6px; border-radius: 3px; border: 1px solid #ddd; line-height: 1.2;">
 					<i class="fa fa-info-circle" style="color: #bbb; margin-right: 4px;"></i>사용법: ctrl+마우스스크롤(확대/축소), SpaceBar+마우스왼쪽클릭(마인드맵이동)
 				</div>
 				<!-- 마인드맵 컨테이너 -->
@@ -313,6 +313,38 @@
 	var isSpacePressed = false;
 	var dragStartPos = { x: 0, y: 0 };
 	var dragStartOffset = { x: 0, y: 0 };
+
+	// 마인드맵 노드들의 좌표 범위(bounding box)를 계산하는 함수
+	function getMapBounds() {
+		if (!jm || !jm.mind) return null;
+
+		var nodes = jm.mind.nodes;
+		var minX = Infinity, maxX = -Infinity;
+		var minY = Infinity, maxY = -Infinity;
+		var hasNodes = false;
+
+		for (var id in nodes) {
+			var node = nodes[id];
+			var view = node._data.view;
+			if (!view) continue;
+
+			var x = view.abs_x;
+			var y = view.abs_y;
+			var w = view.width;
+			var h = view.height;
+
+			if (typeof x === 'number' && typeof y === 'number' && w > 0 && h > 0) {
+				hasNodes = true;
+				if (x < minX) minX = x;
+				if (x + w > maxX) maxX = x + w;
+				if (y < minY) minY = y;
+				if (y + h > maxY) maxY = y + h;
+			}
+		}
+
+		if (!hasNodes) return null;
+		return { minX: minX, maxX: maxX, minY: minY, maxY: maxY };
+	}
 
 	// 줌 & 팬 CSS transform 적용 함수
 	function updateTransform() {
@@ -1067,6 +1099,33 @@
 				zoomOffset.y = mouseY - mapY * nextScale;
 				zoomScale = nextScale;
 
+				updateTransform();
+			} else {
+				// Ctrl 없이 휠만 사용하면 마인드맵을 위아래로 이동
+				e.preventDefault();
+
+				var nextOffsetY = zoomOffset.y - e.deltaY;
+
+				// 마인드맵 자료가 화면에서 완전히 사라지지 않도록 상하 이동 한계 적용
+				var bounds = getMapBounds();
+				if (bounds) {
+					var containerHeight = container.clientHeight;
+					var margin = 80; // 화면에 최소한으로 남겨둘 여백(px)
+					var scaledTop = bounds.minY * zoomScale;
+					var scaledBottom = bounds.maxY * zoomScale;
+
+					var minOffsetY = margin - scaledBottom;
+					var maxOffsetY = containerHeight - margin - scaledTop;
+
+					if (minOffsetY > maxOffsetY) {
+						// 컨테이너가 너무 작아 한계 범위가 역전되는 경우 중간값으로 고정
+						minOffsetY = maxOffsetY = (minOffsetY + maxOffsetY) / 2;
+					}
+
+					nextOffsetY = Math.max(minOffsetY, Math.min(maxOffsetY, nextOffsetY));
+				}
+
+				zoomOffset.y = nextOffsetY;
 				updateTransform();
 			}
 		}, { passive: false });

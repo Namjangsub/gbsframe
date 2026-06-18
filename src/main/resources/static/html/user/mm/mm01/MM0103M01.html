@@ -47,7 +47,8 @@
     <script src="./jsmind.js"></script>
     <script src="./jsmind.draggable-node.js"></script>
     <style type="text/css">
-        #jsmind_container { width: 1900px; height: 890px; border: solid 1px #ccc; background: #f4f4f4; }
+        #jsmind_container { width: 1900px; height: 890px; border: solid 1px #ccc; background: #f4f4f4; overflow: hidden !important; position: relative; }
+        #jsmind_container .jsmind-inner { overflow: visible !important; }
         
         /* Tooltip Style */
         #node-tooltip {
@@ -140,7 +141,14 @@
 			</tr>
 		</table>
     </div>
-    <div id="jsmind_container" style="height: calc(100% - 40px);"></div>
+    <!-- 마인드맵 컨테이너 및 안내 가이드 래퍼 -->
+    <div style="position: relative; height: 100%;">
+        <!-- 마인드맵 조작 안내 가이드 -->
+        <div id="jsmind_guide" style="position: absolute; top: 10px; left: 10px; z-index: 1; color: #888; font-size: 11px; font-weight: normal; pointer-events: none; background: rgba(244, 244, 244, 0.85); padding: 3px 6px; border-radius: 3px; border: 1px solid #ddd; line-height: 1.2;">
+            <i class="fa fa-info-circle" style="color: #bbb; margin-right: 4px;"></i>사용법: ctrl+마우스스크롤(확대/축소), SpaceBar+마우스왼쪽클릭(마인드맵이동)
+        </div>
+        <div id="jsmind_container" style="height: calc(100% - 40px);"></div>
+    </div>
     <!-- Tooltip Container -->
     <div id="node-tooltip"></div>
  </div>
@@ -150,6 +158,58 @@
     const sunsetBliss = ['#0d47a1', '#0d47a1', '#006494', '#006d77', '#166088', '#218380', '#73d2de', '#ffbc42', '#d81159', '#8f2d56', '#218380', '#73d2de'];
     
     var jm = null;
+
+    // 줌 & 팬 상태 제어 변수
+    var zoomScale = 1.0;
+    var zoomOffset = { x: 0, y: 0 };
+    var isDragging = false;
+    var isSpacePressed = false;
+    var dragStartPos = { x: 0, y: 0 };
+    var dragStartOffset = { x: 0, y: 0 };
+
+    // 마인드맵 노드들의 좌표 범위(bounding box)를 계산하는 함수
+    function getMapBounds() {
+        if (!jm || !jm.mind) return null;
+
+        var nodes = jm.mind.nodes;
+        var minX = Infinity, maxX = -Infinity;
+        var minY = Infinity, maxY = -Infinity;
+        var hasNodes = false;
+
+        for (var id in nodes) {
+            var node = nodes[id];
+            var view = node._data.view;
+            if (!view) continue;
+
+            var x = view.abs_x;
+            var y = view.abs_y;
+            var w = view.width;
+            var h = view.height;
+
+            if (typeof x === 'number' && typeof y === 'number' && w > 0 && h > 0) {
+                hasNodes = true;
+                if (x < minX) minX = x;
+                if (x + w > maxX) maxX = x + w;
+                if (y < minY) minY = y;
+                if (y + h > maxY) maxY = y + h;
+            }
+        }
+
+        if (!hasNodes) return null;
+        return { minX: minX, maxX: maxX, minY: minY, maxY: maxY };
+    }
+
+    // 줌 & 팬 CSS transform 적용 함수
+    function updateTransform() {
+        var $inner = $('#jsmind_container .jsmind-inner');
+        if ($inner.length > 0) {
+            $inner.css({
+                'transform': 'translate(' + zoomOffset.x + 'px, ' + zoomOffset.y + 'px) scale(' + zoomScale + ')',
+                'transform-origin': '0 0'
+            });
+        }
+    }
+
     function load_jsmind() {
         var param = {
             salesCd: $('#salesCd_S').val(),
@@ -326,8 +386,122 @@
                 } 
              }
          });
+
+         // ==========================================
+         // 마인드맵 확대/축소 (Ctrl + Mouse Wheel) 및 이동 (Space + Drag / Mouse Wheel) 기능 이벤트 바인딩
+         // ==========================================
+         var container = document.getElementById('jsmind_container');
+
+         // 1. 확대/축소 (Ctrl + Mouse Wheel) / 상하 이동 (Mouse Wheel)
+         container.addEventListener('wheel', function(e) {
+             if (e.ctrlKey) {
+                 e.preventDefault();
+
+                 var rect = container.getBoundingClientRect();
+                 var mouseX = e.clientX - rect.left;
+                 var mouseY = e.clientY - rect.top;
+
+                 var mapX = (mouseX - zoomOffset.x) / zoomScale;
+                 var mapY = (mouseY - zoomOffset.y) / zoomScale;
+
+                 var scaleStep = 0.1;
+                 var nextScale = zoomScale + (e.deltaY < 0 ? scaleStep : -scaleStep);
+                 nextScale = Math.max(0.3, Math.min(3.0, nextScale));
+
+                 zoomOffset.x = mouseX - mapX * nextScale;
+                 zoomOffset.y = mouseY - mapY * nextScale;
+                 zoomScale = nextScale;
+
+                 updateTransform();
+             } else {
+                 // Ctrl 없이 휠만 사용하면 마인드맵을 위아래로 이동
+                 e.preventDefault();
+
+                 var nextOffsetY = zoomOffset.y - e.deltaY;
+
+                 // 마인드맵 자료가 화면에서 완전히 사라지지 않도록 상하 이동 한계 적용
+                 var bounds = getMapBounds();
+                 if (bounds) {
+                     var containerHeight = container.clientHeight;
+                     var margin = 80;
+                     var scaledTop = bounds.minY * zoomScale;
+                     var scaledBottom = bounds.maxY * zoomScale;
+
+                     var minOffsetY = margin - scaledBottom;
+                     var maxOffsetY = containerHeight - margin - scaledTop;
+
+                     if (minOffsetY > maxOffsetY) {
+                         minOffsetY = maxOffsetY = (minOffsetY + maxOffsetY) / 2;
+                     }
+
+                     nextOffsetY = Math.max(minOffsetY, Math.min(maxOffsetY, nextOffsetY));
+                 }
+
+                 zoomOffset.y = nextOffsetY;
+                 updateTransform();
+             }
+         }, { passive: false });
+
+         // 2. Space 키 감지 (입력창 포커스 중이 아닐 때만 작동)
+         $(document).on('keydown', function(e) {
+             var activeTag = document.activeElement ? document.activeElement.tagName.toLowerCase() : '';
+             if (activeTag === 'input' || activeTag === 'textarea' || activeTag === 'select') {
+                 return;
+             }
+             if (e.code === 'Space' || e.key === ' ' || e.keyCode === 32) {
+                 e.preventDefault();
+                 if (!isSpacePressed) {
+                     isSpacePressed = true;
+                     $('#jsmind_container').css('cursor', 'grab');
+                 }
+             }
+         });
+
+         $(document).on('keyup', function(e) {
+             if (e.code === 'Space' || e.key === ' ' || e.keyCode === 32) {
+                 isSpacePressed = false;
+                 isDragging = false;
+                 $('#jsmind_container').css('cursor', 'default');
+             }
+         });
+
+         // 3. 마우스 드래그를 이용한 위치 이동
+         $('#jsmind_container').on('mousedown', function(e) {
+             if (isSpacePressed && e.button === 0) {
+                 isDragging = true;
+                 $(this).css('cursor', 'grabbing');
+                 dragStartPos.x = e.clientX;
+                 dragStartPos.y = e.clientY;
+                 dragStartOffset.x = zoomOffset.x;
+                 dragStartOffset.y = zoomOffset.y;
+                 e.preventDefault();
+             }
+         });
+
+         $(document).on('mousemove', function(e) {
+             if (isDragging) {
+                 var dx = e.clientX - dragStartPos.x;
+                 var dy = e.clientY - dragStartPos.y;
+
+                 zoomOffset.x = dragStartOffset.x + dx;
+                 zoomOffset.y = dragStartOffset.y + dy;
+
+                 updateTransform();
+             }
+         });
+
+         $(document).on('mouseup mouseleave', function() {
+             if (isDragging) {
+                 isDragging = false;
+                 if (isSpacePressed) {
+                     $('#jsmind_container').css('cursor', 'grab');
+                 } else {
+                     $('#jsmind_container').css('cursor', 'default');
+                 }
+             }
+         });
  	});
-    
+
     function showTooltip(e, node) {
         if (!node.data) return;
         var data = node.data.data;
@@ -548,6 +722,10 @@
          jm = new jsMind(options);
          jm.show(mind);
 
+         // 새로 그릴 때마다 줌/이동 상태 초기화
+         zoomScale = 1.0;
+         zoomOffset = { x: 0, y: 0 };
+         updateTransform();
      }
 
 
