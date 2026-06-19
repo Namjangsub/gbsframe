@@ -12,12 +12,11 @@ import java.util.Map;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.multipart.MultipartHttpServletRequest;
 
-import com.dksys.biz.user.wb.wb07.service.WB07Svc;
-import com.dksys.biz.user.wb.wb22.mapper.WB22Mapper;
 import com.dksys.biz.user.dw.dw02.mapper.DW02Mapper;
 import com.dksys.biz.user.wb.wb07.mapper.WB07Mapper;
+import com.dksys.biz.user.wb.wb07.service.WB07Svc;
+import com.dksys.biz.user.wb.wb22.mapper.WB22Mapper;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.reflect.TypeToken;
@@ -504,7 +503,7 @@ public class WB07SvcImpl implements WB07Svc {
 			List<Map<String, String>> planLevel2 = wb22Mapper.wbsPlanListChk(paramMap);
 			planFileTrgtKey = planLevel2.get(0).get("fileTrgtKey");
 			wbsPlanNo = planLevel2.get(0).get("wbsPlanNo");
-			codeId = planLevel2.get(0).get("wbsPlanCodeId") + "01";
+			codeId = planLevel2.get(0).get("wbsPlanCodeId");
 		} else {
 			// Level2(TASK) 실적 삭제, 계획 삭제
 //			deleteActual(paramMap);
