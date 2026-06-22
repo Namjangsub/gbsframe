@@ -1,0 +1,2337 @@
+<!DOCTYPE html>
+<html lang="ko">
+<style>
+	.attend-item {
+		display: inline-block;
+		margin: 5px;
+		padding: 4px 8px;
+		border: 1px solid #ddd;
+		border-radius: 4px;
+		cursor: pointer;
+		user-select: none;
+	}
+
+	.attend-item.to-remove {
+		background-color: #fdd;
+	}
+
+	.attend-item input {
+		margin-right: 4px;
+		cursor: auto;
+	}
+
+	/* 잠금 뱃지 스타일 */
+	.lock-badge {
+		display: inline-block;
+		background-color: #ff4d4f;
+		color: white;
+		padding: 2px 6px;
+		border-radius: 4px;
+		font-size: 11px;
+		font-weight: bold;
+		margin-bottom: 4px;
+	}
+
+	#grid .tui-grid-cell-content {
+		white-space: pre-wrap !important;
+		line-height: 1.25;
+	}
+
+	/* 회의결과 모드에서 실제로 회의결과가 입력된 부서 셀 구분 표시 (사전공지 대체표시와 구별).
+	   정확한 셀 패딩 폭을 알 수 없어 음수 마진으로 셀 경계까지 번지게 하지 않고, 콘텐츠 영역
+	   안에서만 배경/좌측 경계선으로 표시한다 (레이아웃 깨짐 위험 없음). */
+	.mn-result-filled {
+		display: block;
+		background-color: #eef9f0;
+		border-left: 3px solid #52c41a;
+		padding-left: 5px;
+		box-sizing: border-box;
+	}
+
+	/* 부서 셀(D03)을 마지막으로 수정(UDT_ID)한 사람이 현재 로그인 사용자 본인이면 글자색으로 구분 */
+	.mn-my-edit {
+		color: #1677ff;
+		/*font-weight: bold;*/
+	}
+
+	/* TOAST UI Grid 기본 CSS가 Arial/Dotum 13px을 강제하므로 페이지 공통 폰트(common.css)에 맞춰 재정의 */
+	#grid,
+	#grid * {
+		font-family: "Noto Sans KR", Arial, "dotum", sans-serif !important;
+		font-size: 12px !important;
+	}
+
+	.refresh-toggle-label {
+		display: inline-flex;
+		align-items: center;
+		gap: 6px;
+		cursor: pointer;
+		font-size: 13px;
+		white-space: nowrap;
+	}
+
+	/* 그리드 줄무늬(striped) 배경 - 짝수 행에만 옅은 배경색 적용 */
+	#grid .tui-grid-body-area tbody tr:nth-child(even) td.tui-grid-cell {
+		background-color: #f5f7fa;
+	}
+
+	/* 선택된 셀의 행/열 강조 (크로스헤어) */
+	#grid td.tui-grid-cell.pm11-xhair-row,
+	#grid td.tui-grid-cell.pm11-xhair-col {
+		background: rgba(135, 206, 235, 0.22) !important;
+	}
+	#grid td.tui-grid-cell.pm11-xhair-cell {
+		background: transparent !important;
+		box-shadow: inset 0 0 0 2px #1e6fff;
+	}
+</style>
+
+<head>
+	<meta charset="utf-8">
+	<meta http-equiv="X-UA-Compatible" content="IE=edge">
+	<meta name="viewport" content="width=device-width, initial-scale=0.6, user-scalable=no">
+	<link rel="icon" href="/static/favicon.ico" type="image/x-icon">
+	<link rel="stylesheet" href="/static/bootstrap/css/bootstrap.min.css">
+	<link rel="stylesheet" href="/static/bootstrap/css/bootstrap-theme.min.css">
+	<link rel="stylesheet" href="/static/bootstrap/css/dashboard.css">
+	<link rel="stylesheet" href="/static/bootstrap/css/bootstrap-datepicker.css">
+	<link rel="stylesheet" href="/static/bootstrap/css/bootstrap-multiselect.css">
+	<link rel="stylesheet" href="/static/fontawesome/css/all.css">
+	<link rel="stylesheet" href="/static/css/ax5/ax5mask.css">
+	<link rel="stylesheet" href="/static/css/ax5/ax5modal.css">
+	<link rel="stylesheet" href="/static/css/ax5/ax5toast.css">
+	<link rel="stylesheet" href="/static/css/ax5/ax5select.css">
+	<link rel="stylesheet" href="/static/css/tui-grid/4.21.22/tui-grid.css">
+	<link rel="stylesheet" href="/static/css/jstree/style.min.css">
+	<link rel="stylesheet" href="/static/css/gnb.css">
+	<link rel="stylesheet" href="/static/css/main.css">
+	<link rel="stylesheet" href="/static/css/sub.css">
+	<link rel="stylesheet" href="/static/css/common.css">
+
+	<script src="/static/js/jquery-latest.min.js"></script>
+	<script src="/static/js/jquery.serializeObject.js"></script>
+	<script src="/static/bootstrap/js/bootstrap.min.js"></script>
+	<script src="/static/bootstrap/js/bootstrap-datepicker.min.js"></script>
+	<script src="/static/bootstrap/js/bootstrap-datepicker.ko.min.js"></script>
+	<script src="/static/bootstrap/js/bootstrap-multiselect.min.js"></script>
+	<script src="/static/js/moment/moment-with-locales.js"></script>
+	<script src="/static/js/ax5/ax5core.min.js"></script>
+	<script src="/static/js/ax5/ax5mask.min.js"></script>
+	<script src="/static/js/ax5/ax5modal.min.js"></script>
+	<script src="/static/js/ax5/ax5toast.min.js"></script>
+	<script src="/static/js/ax5/ax5formatter.min.js"></script>
+	<script src="/static/js/ax5/ax5select.min.js"></script>
+	<script src="/static/js/tui-grid/4.21.22/tui-grid.min.js"></script>
+	<script src="/static/js/jstree/jstree.min.js"></script>
+	<script src="/static/js/global.js"></script>
+	<script src="/static/js/exceljs.min.js"></script>
+	<script src="/static/js/fileTree.js"></script>
+	<script src="/static/js/heic2any.min.js"></script>
+	<script src="/static/js/jquery.blockUI.js"></script>
+	<!-- 도움말 팝업 -->
+	<script src="/static/js/manualPopup.js"></script>
+</head>
+
+<body>
+	<div id="head_area"></div>
+	<div id="top_area"></div>
+	<div id="main_area" style="position: static;height: 1080px;">
+
+		<!-- 검색 콘텐츠 -->
+		<div class="contents search">
+			<div class="">
+				<!-- 테이블 인풋 5분할 -->
+				<table class="table_input type05">
+					<tr>
+						<th style="width: 200px; height: 30px; line-height: 30px;font-size: 15px;">임팀장 주간회의 자료</th>
+
+						<th class="hit">회의일자</th>
+						<td>
+							<input type="text" id="mnDate_S" class="input_calendar" name="mnDate_S" data-search="mnDate" autocomplete="off" onkeyup="dateMask(this);" required="required" msg="회의일자">
+						</td>
+						<td style="width: 120px">
+							<input id="mnWeeks_S" name="mnWeeks_S" data-search="mnWeeks" style="width:18px; font-size:15px; vertical-align: middle; margin-right:4px;" readonly>
+							<span style="font-size:15px; vertical-align: middle;">주차</span>
+						</td>
+						<th>구분</th>
+						<td>
+							<select id="mnDiv_S" name="mnDiv_S" data-search="mnDiv" onchange="mnGridView.setData(0);">
+								<option value="MNDIV01" selected>사전공지</option>
+								<option value="MNDIV02">회의결과</option>
+								<option value="MNDIV99">전체조회</option>
+							</select>
+						</td>
+						<td style="width: 180px; white-space: nowrap; padding-right: 20px;">
+							<label class="refresh-toggle-label" title="30초 자동 새로고침 on/off">
+								새로고침<input type="checkbox" id="refreshToggle" checked>
+								<span id="refreshStatusLabel">ON</span>
+							</label>
+						</td>
+						<td>
+							<div class="add_btn_small pdl10" style="width:500px; margin-left: 10px;">
+								<a onclick="moveSelectedUp();" id="moveUp" style="height: 30px; line-height: 28px; margin:0 5px;">▲</a>
+								<a onclick="moveSelectedDown();" id="moveDown" style="height: 30px; line-height: 28px;">▼</a>
+								<a onclick="insertMn();" id="addRow" style="width: 80px; height: 30px; line-height: 28px;">행 추가</a>
+								<a onclick="deleteMn();" id="deleteRow" style="width: 80px; height: 30px; line-height: 28px;">행 삭제</a>
+								<a onclick="setReport();" style="height: 30px; line-height: 28px; width: 100px;"><i class="fas fa-print"></i> 회의록출력</a>
+								<a onclick="jsonToExcel(mnGridView);" style="height: 30px; line-height: 28px; width: 90px;"><i class="fas fa-file-excel"></i> 엑셀다운로드</a>
+							</div>
+						</td>
+					</tr>
+				</table>
+				<!-- 검색조건 END -->
+				<form id="mainForm" onSubmit="return false;">
+					<input type="hidden" id="userId" name="userId">
+					<input type="hidden" id="deptId" name="deptId">
+					<input type="hidden" id="pgmId" name="pgmId" value="PM1002M11">
+					<input type="hidden" id="coCd_S" name="coCd_S" value="GUN">
+				</form>
+			</div>
+		</div>
+		<div class="contents attend-area" style="display: flex; align-items: center;">
+			<div id="attendCheckboxContainer" style="flex: 1;"></div>
+			<div class="add_btn_small pdl10" style="margin-left: auto; margin-right: 30px">
+				<a onclick="openUserSearch()" id="addAttendBtn" style="height:30px; line-height:28px;">+</a>
+				<a onclick="pm10_d02_delete()" id="removeAttendBtn" style="height:30px; line-height:28px;">-</a>
+			</div>
+		</div>
+
+		<!-- 콘텐츠 -->
+		<div class="contents no_bg">
+			<div id="grid" style="height: 900px; width: 100%;"></div>
+		</div>
+
+	</div>
+	<input type="file" id="fileInput" multiple style="display:none" />
+</body>
+
+</html>
+
+<script type="text/javascript">
+
+	let currentFileRow = null;
+	let currentFileColumn = null;
+	var mnFileArr = [];
+	var deleteFileArr = [];
+	let attendFlag = true;	// 구분이 회의결과일 때 참석자 리스트 update를 위한 flag
+	let lastEditedCell = null;
+	let currentLockInfo = null;
+	let lastClickedColKey = null;
+	// 그리드 밖(행추가 버튼 등) 클릭으로 getFocusedCell()이 null이 되는 경우의 대체용.
+	// resetData()는 호출될 때마다 모든 rowKey를 0부터 재배정하므로 rowKey 자체를 들고 있으면
+	// 이전 resetData 이후 엉뚱한 행을 가리키게 된다. 그래서 rowKey가 아니라 업무키(mnSubSeq 등)로 저장한다.
+	let lastFocusedRowInfo = null;
+
+	// 현재 포커스된 셀의 행을 반환하되, 그리드 밖 클릭(행삭제/이동 버튼 등)으로 포커스가 사라진
+	// 경우에는 lastFocusedRowInfo(업무키)로 대체 조회한다. list는 grid.getData() 결과를 넘긴다.
+	function resolveSelectedRow(grid, list) {
+		const fc = grid.getFocusedCell();
+		if (fc && fc.rowKey !== undefined && fc.rowKey !== null) {
+			const row = grid.getRow(fc.rowKey);
+			if (row) return row;
+		}
+		if (!lastFocusedRowInfo) return null;
+		return list.find(r =>
+			(lastFocusedRowInfo.isNoticeRow && r.isNoticeRow) ||
+			(lastFocusedRowInfo.isFileRow && r.isFileRow) ||
+			(!lastFocusedRowInfo.isNoticeRow && !lastFocusedRowInfo.isFileRow && !r.isNoticeRow && !r.isFileRow && String(r.mnSubSeq) === String(lastFocusedRowInfo.mnSubSeq))
+		) || null;
+	}
+
+	var isSyncing = false;
+	var isSaving = false;
+	var isCellEditing = false;	// 현재 셀 인라인 편집 중 여부 (편집 중인 셀 내부 클릭으로 락이 풀리는 것을 방지)
+	var activeEditorCtx = null;	// 현재 inline 편집 중인 textarea 에디터 참조 (autoSaveIfPending용)
+	// pm10_d01_update/d03_update의 저장 응답이 실제로 온 뒤에 이어서 처리해야 하는 콜백 대기열
+	// (예: setData가 재조회 전에 commitActiveEdit으로 트리거된 저장이 끝나길 기다려야 할 때 사용)
+	var pendingSaveCallbacks = [];
+	function flushPendingSaveCallbacks() {
+		const callbacks = pendingSaveCallbacks.splice(0);
+		callbacks.forEach(cb => { try { cb(); } catch (e) { } });
+	}
+
+	// === Soft Lock 3단계 방어 체계 ===
+	var isEditing = false;			// 1. 편집 중 플래그 (폴링 제어)
+	var pollInterval = null;		// 2. 폴링 인터벌 ID
+	var isPolling = false;			// 2. 폴링 중 여부 (unlockUserLocks 스킵용)
+	var idleTimer = null;			// 3. 유휴 타이머
+	var IDLE_TIMEOUT_MS = 10 * 60 * 1000;	// 3. 유휴 타임아웃 10분
+	var isPopupView = false;
+	let attendList = [];
+
+	// 셀 렌더러 인스턴스 등록부 (rowKey:columnName -> renderer instance)
+	// 폴링 시 잠금 뱃지만 바뀐 경우, grid.setValue가 동일 값이라 무시되는 문제를 피하기 위해
+	// 렌더러를 직접 다시 그려서 갱신한다.
+	var __pm11CellRenderers = {};
+	function refreshCellRender(rowKey, columnName) {
+		const inst = __pm11CellRenderers[rowKey + ':' + columnName];
+		if (inst && inst._lastProps) {
+			try { inst.render(inst._lastProps); } catch (e) { }
+		}
+	}
+
+	let fixedAttendList = [];
+	let FIXED_ORDER = [];
+
+	// 부서 코드 매핑
+	const deptCodeMap = {
+		gun00MnCnts: 'GUN00', gun60MnCnts: 'GUN60', gun30MnCnts: 'GUN30',
+		gun40MnCnts: 'GUN40', trn5010MnCnts: 'TRN5010', trn5020MnCnts: 'TRN5020',
+		gun10MnCnts: 'GUN10', gun80MnCnts: 'GUN80', gun70MnCnts: 'GUN70', gun75MnCnts: 'GUN75'
+	};
+
+	// 실제 화면에 표시되는(TUI Grid 컬럼으로 정의된) 부서 컬럼만 setValue 대상으로 사용
+	const visibleDeptCols = new Set([
+		'gun30MnCnts', 'gun70MnCnts', 'gun40MnCnts', 'trn5010MnCnts', 'trn5020MnCnts',
+		'gun80MnCnts', 'gun10MnCnts', 'gun00MnCnts'
+	]);
+
+	const mnStatusCode = [
+		{ 'CD': '', 'NM': '' },
+		{ 'CD': 'N', 'NM': '진행' },
+		{ 'CD': 'Y', 'NM': '완료' }
+	];
+
+	// 엑셀 출력용 컬럼 메타(Key/Label/Width) - TUI 컬럼 정의와 동일한 출력 순서 유지
+	const excelColumnsMeta = [
+		{ key: 'mnSubject', label: 'PROJECT\r\n주제', width: 100 },
+		{ key: 'gun30MnCnts', label: '영업\r\n국내/해외', width: 220 },
+		{ key: 'gun70MnCnts', label: '생산/생산관리', width: 220 },
+		{ key: 'gun40MnCnts', label: '기술연구소', width: 220 },
+		{ key: 'trn5010MnCnts', label: '구매외주\r\n기계/직접매출', width: 220 },
+		{ key: 'trn5020MnCnts', label: '구매외주\r\n전기', width: 220 },
+		{ key: 'gun80MnCnts', label: '전산', width: 220 },
+		{ key: 'gun10MnCnts', label: '경영지원,회계', width: 220 },
+		{ key: 'gun00MnCnts', label: '임원', width: 220 },
+		{ key: 'mnEtcAll', label: '비고', width: 220 }
+	];
+
+	// 셀별 잠금 정보 조회 함수
+	function getCellLockInfo(item, colKey) {
+		if (!item || item.isFileRow || item.isNoticeRow) return null;
+		// D01 컬럼 (mnSubject, mnEtcAll, mnStatus)
+		if (colKey === 'mnSubject' || colKey === 'mnEtcAll' || colKey === 'mnStatus') {
+			if (item.d01LockYn === 'Y' && item.d01LockUserNm) {
+				return { lockYn: item.d01LockYn, lockUserNm: item.d01LockUserNm };
+			}
+			return null;
+		}
+		// D03 컬럼 (부서별)
+		if (deptCodeMap[colKey]) {
+			const deptCd = deptCodeMap[colKey];
+			const prefix = deptCd.toLowerCase().replace(/([a-z])(\d)/g, '$1$2');
+			const lockYnKey = prefix + 'LockYn';
+			const lockNmKey = prefix + 'LockUserNm';
+			const lockDivKey = prefix + 'LockDiv';
+			if (item[lockYnKey] === 'Y' && item[lockNmKey]) {
+				return { lockYn: item[lockYnKey], lockUserNm: item[lockNmKey], lockDiv: item[lockDivKey] };
+			}
+		}
+		return null;
+	}
+
+	// 부서 셀(D03) 잠금은 사전공지(MN_CNTS)/회의결과(MN_RESULT)가 같은 잠금을 공유해 구분이 안 됐다.
+	// 잠근 시점의 구분(LOCK_DIV)을 같이 저장해 두면, 다른 사용자가 보는 뱃지에 "무엇을" 편집 중인지
+	// 표시할 수 있다. D01 잠금(주제/비고)이나 LOCK_DIV가 없는 옛 잠금은 일반 "편집 중"으로 표시.
+	function lockBadgeText(lockInfo) {
+		if (lockInfo.lockDiv === 'MNDIV01') return lockInfo.lockUserNm + ' 사전공지 편집 중';
+		if (lockInfo.lockDiv === 'MNDIV02') return lockInfo.lockUserNm + ' 회의결과 편집 중';
+		return lockInfo.lockUserNm + ' 편집 중';
+	}
+
+	function getLockTarget(item, colKey) {
+		if (!item || !colKey) return null;
+		if (item.isFileRow || item.isNoticeRow) return null;
+
+		if (colKey === 'mnSubject' || colKey === 'mnEtcAll' || colKey === 'mnStatus') {
+			return {
+				targetType: 'D01',
+				mnDate: item.mnDate || $('#mnDate_S').val(),
+				mnSubSeq: item.mnSubSeq
+			};
+		}
+		if (deptCodeMap[colKey]) {
+			return {
+				targetType: 'D03',
+				mnDate: item.mnDate || $('#mnDate_S').val(),
+				mnSubSeq: item.mnSubSeq,
+				mnDeptCd: deptCodeMap[colKey]
+			};
+		}
+		return null;
+	}
+
+	function isSameLock(a, b) {
+		if (!a || !b) return false;
+		return a.targetType === b.targetType
+			&& a.mnDate === b.mnDate
+			&& String(a.mnSubSeq) === String(b.mnSubSeq)
+			&& String(a.mnDeptCd || '') === String(b.mnDeptCd || '');
+	}
+
+	// 잠금 획득 응답으로 받은 최신 셀 데이터를 row 객체와 그리드에 동기화
+	function applyCellDataFromLock(item, colKey, cellData) {
+		if (!cellData || !item) return;
+		let targetKey = colKey;
+		if (cellData.mnDeptCd) {
+			for (const key in deptCodeMap) {
+				if (deptCodeMap[key] === cellData.mnDeptCd) {
+					targetKey = key;
+					break;
+				}
+			}
+		}
+		if (colKey === 'mnSubject' && cellData.mnSubject !== undefined) {
+			item.mnSubject = cellData.mnSubject;
+		}
+		if (colKey === 'mnEtcAll' && cellData.mnEtcAll !== undefined) {
+			item.mnEtcAll = cellData.mnEtcAll;
+		}
+		if (colKey === 'mnStatus' && cellData.mnStatus !== undefined) {
+			item.mnStatus = cellData.mnStatus;
+		}
+		if (deptCodeMap[targetKey]) {
+			const mnDiv = $('#mnDiv_S').val();
+			let value = (mnDiv === 'MNDIV02')
+				? ((cellData.mnResult && cellData.mnResult !== '') ? cellData.mnResult : cellData.mnCnts)
+				: cellData.mnCnts;
+			if (value !== undefined) item[targetKey] = value;
+		}
+
+		const grid = mnGridView.target;
+		if (grid && item.rowKey !== undefined && visibleDeptCols.has(targetKey)) {
+			isSyncing = true;
+			try { grid.setValue(item.rowKey, targetKey, item[targetKey]); } finally { isSyncing = false; }
+		}
+	}
+
+	function ensureNoticeRowSync(item) {
+		if (!item || !item.isNoticeRow) return true;
+		if (item.mnSubSeq && Number(item.mnSubSeq) > 0) return true;
+
+		const paramObj = {
+			mnDate: $('#mnDate_S').val(),
+			mnWeeks: $('#mnWeeks_S').val(),
+			userId: $('#userId').val(),
+			pgmId: $('#pgmId').val()
+		};
+
+		let ensured = false;
+		postAjaxSync('/user/pm/pm10/pm10_ensure_notice_row', paramObj, null, function (data) {
+			if (data && data.resultCode === 200) {
+				const subSeq = data.mnSubSeq || data.newSubSeq;
+				if (subSeq) {
+					item.mnSubSeq = parseInt(subSeq, 10);
+					item.mnDate = $('#mnDate_S').val();
+					item.mnWeeks = $('#mnWeeks_S').val();
+					if (data.mnSortNo !== undefined && data.mnSortNo !== null && data.mnSortNo !== '') {
+						item.mnSortNo = parseInt(data.mnSortNo, 10);
+					}
+					ensured = true;
+				}
+			}
+		});
+		return ensured;
+	}
+
+	function lockCellForEdit(item, colKey) {
+		if (deptCodeMap[colKey]) {
+			if (!item.mnSubject || item.mnSubject.trim() === '') {
+				alert("주제를 먼저 입력해야 부서 내용을 작성할 수 있습니다.");
+				return false;
+			}
+		}
+
+		if (item && item.isNoticeRow && (!item.mnSubSeq || Number(item.mnSubSeq) <= 0)) {
+			if (!ensureNoticeRowSync(item)) {
+				alert("공지사항 행을 생성할 수 없습니다.");
+				return false;
+			}
+		}
+
+		const lockTarget = getLockTarget(item, colKey);
+		if (!lockTarget) return true;
+		if (!lockTarget.mnSubSeq || lockTarget.mnSubSeq <= 0) return true;
+
+		if (currentLockInfo && isSameLock(currentLockInfo, lockTarget)) {
+			return true;
+		}
+
+		if (currentLockInfo && !isSameLock(currentLockInfo, lockTarget)) {
+			unlockCell(currentLockInfo);
+		}
+
+		// mnDiv: D03(부서별) 잠금에서만 의미있는 값으로, 잠그는 시점에 사전공지/회의결과 중 무엇을
+		// 편집하려는지 같이 저장해(LOCK_DIV) 다른 사용자에게 잠금 뱃지를 "사전공지 편집 중"/
+		// "회의결과 편집 중"으로 구분해 보여줄 수 있게 한다. D01 잠금에는 영향 없음(해당 SQL에 없음).
+		const paramObj = {
+			targetType: lockTarget.targetType,
+			mnDate: lockTarget.mnDate,
+			mnSubSeq: lockTarget.mnSubSeq,
+			mnDeptCd: lockTarget.mnDeptCd,
+			mnDiv: $('#mnDiv_S').val(),
+			userId: $('#userId').val(),
+			pgmId: $('#pgmId').val()
+		};
+
+		let lockOk = false;
+		postAjaxSync("/user/pm/pm10/pm10_lock_cell", paramObj, null, function (data) {
+			if (data && data.resultCode === 200) {
+				lockOk = true;
+				currentLockInfo = { ...lockTarget, colKey };
+				isEditing = true;
+				startIdleTimer();
+				applyCellDataFromLock(item, colKey, data.cellData);
+			} else if (data && data.resultCode === 409) {
+				alert((data.resultMessage || '다른 사용자') + "님이 수정 중인 셀입니다.");
+				if (!currentLockInfo) {
+					mnGridView.setData(0);
+				}
+				lockOk = false;
+			} else {
+				const errMsg = (data && data.resultMessage) || '';
+				alert("락 처리 실패: " + errMsg);
+				lockOk = false;
+			}
+		});
+		return lockOk;
+	}
+
+	function unlockCell(lockInfo, refreshAfterUnlock = true) {
+		if (!lockInfo) return;
+		const paramObj = {
+			targetType: lockInfo.targetType,
+			mnDate: lockInfo.mnDate,
+			mnSubSeq: lockInfo.mnSubSeq,
+			mnDeptCd: lockInfo.mnDeptCd,
+			userId: $('#userId').val()
+		};
+		postAjax("/user/pm/pm10/pm10_unlock_cell", paramObj, null, function () {
+			if (refreshAfterUnlock && !isSaving && !isEditing) {
+				mnGridView.updateData(true);	// unlock 완료 후 다른 사용자 변경사항 반영
+			}
+		});
+		currentLockInfo = null;
+		isEditing = false;			// 1. 편집 종료 → 폴링 재개
+		clearTimeout(idleTimer);		// 3. 유휴 타이머 해제
+	}
+
+	// onComplete: 서버 잠금 해제가 실제로 끝난 뒤에 이어서 처리해야 하는 작업(예: setData의
+	// 목록 재조회)이 있을 때 전달한다. 생략하면 기존처럼 fire-and-forget으로 동작한다.
+	function unlockUserLocks(onComplete) {
+		if (isPolling) {			// 2. 폴링 중에는 unlock 스킵
+			if (typeof onComplete === 'function') onComplete();
+			return;
+		}
+		const paramObj = {
+			mnDate: $('#mnDate_S').val(),
+			userId: $('#userId').val()
+		};
+		postAjax("/user/pm/pm10/pm10_unlock_user_cells", paramObj, null, function () {
+			if (typeof onComplete === 'function') onComplete();
+		}, false);
+		currentLockInfo = null;
+	}
+
+	// pm10_d03_update는 저장 시점의 #mnDiv_S 값으로 mnCnts(사전공지)/mnResult(회의결과) 중 어디에
+	// 쓸지 결정한다. 편집 커밋이 구분(mnDiv) 변경 도중 지연 실행되면 이미 바뀐 새 구분값을 읽어
+	// 엉뚱한 필드에 저장돼 버리므로, fn 실행 중에는 편집을 시작한 시점의 구분값으로 잠시 되돌린다.
+	function withMnDivAtEditStart(fn) {
+		const mnDivAtStart = activeEditorCtx && activeEditorCtx.mnDivAtEditStart;
+		const current = $('#mnDiv_S').val();
+		const needsRestore = mnDivAtStart !== undefined && mnDivAtStart !== current;
+		if (needsRestore) $('#mnDiv_S').val(mnDivAtStart);
+		try { fn(); } finally { if (needsRestore) $('#mnDiv_S').val(current); }
+	}
+
+	// 편집 중인 textarea 에디터에 미저장 내용이 있으면 강제 저장 후 true 반환
+	function autoSaveIfPending() {
+		if (!currentLockInfo || !activeEditorCtx) return false;
+		const grid = mnGridView.target;
+		const item = grid.getRow(activeEditorCtx.rowKey);
+		if (!item) return false;
+
+		const pendingVal = activeEditorCtx.getValue();
+		withMnDivAtEditStart(() => {
+			if (currentLockInfo.targetType === 'D01') {
+				pm10_d01_update(item, activeEditorCtx.columnName, pendingVal);
+			} else {
+				pm10_d03_update(item, activeEditorCtx.columnName, pendingVal);
+			}
+		});
+		return true;
+	}
+
+	// 셀 편집 중(엔터/다른 셀 클릭 없이) 행추가·삭제·이동·검색조건 변경 등 그리드 밖 액션을 실행하면
+	// 편집기(textarea)가 그냥 파괴되어 입력 중인 내용이 저장 없이 사라진다. 다른 셀를 클릭했을 때와
+	// 동일한 경로(grid.finishEditing → setValue → afterChange → pm10_d01/d03_update)로 명시적으로
+	// 커밋시켜, 어떤 액션을 하더라도 입력 중이던 내용이 저장되도록 한다.
+	// onDone: 실제로 저장(서버 응답)까지 끝난 뒤에 이어서 처리할 작업이 있으면 전달한다(예: setData의
+	// 재조회). 변경된 내용이 없어 저장이 발생하지 않는 경우에는 즉시 호출된다.
+	function commitActiveEdit(onDone) {
+		if (!activeEditorCtx) {
+			if (typeof onDone === 'function') onDone();
+			return;
+		}
+		const grid = mnGridView.target;
+		const { rowKey, columnName, getValue } = activeEditorCtx;
+		if (typeof onDone === 'function') {
+			pendingSaveCallbacks.push(onDone);
+		}
+		withMnDivAtEditStart(() => {
+			try { grid.finishEditing(rowKey, columnName, getValue()); } catch (e) { }
+		});
+		// finishEditing이 실제 값 변경이 없어 저장을 트리거하지 않았다면(또는 예외로 끝났다면)
+		// isSaving이 그대로 false이므로, 대기 중인 onDone을 지금 바로 흘려보낸다. 값이 바뀌어
+		// 저장이 실제로 시작된 경우(isSaving===true)에는 pm10_d01/d03_update의 응답 콜백이
+		// flushPendingSaveCallbacks를 호출할 때까지 기다린다.
+		if (!isSaving) flushPendingSaveCallbacks();
+	}
+
+	// 3. 유휴 타이머 시작 함수
+	function startIdleTimer() {
+		clearTimeout(idleTimer);
+		idleTimer = setTimeout(function () {
+			if (currentLockInfo) {
+				autoSaveIfPending();	// 미저장 내용 먼저 저장
+				unlockCell(currentLockInfo);
+				alert("10분간 활동이 없어 편집 잠금이 해제되었습니다.");
+				isEditing = false;
+				mnGridView.setData(0);
+			}
+		}, IDLE_TIMEOUT_MS);
+	}
+
+	// 3. 유휴 타이머 리셋 함수 (키보드/마우스 입력 시)
+	function resetIdleTimer() {
+		if (currentLockInfo) startIdleTimer();
+	}
+
+	// 마지막으로 편집한 셀의 rowKey를 찾는다 (공지/파일/신규행 특수 처리 포함)
+	function findRowKeyForEdit(grid, editInfo) {
+		const data = grid.getData();
+		if (editInfo.isNoticeRow) {
+			const r = data.find(r => r.isNoticeRow);
+			return r ? r.rowKey : null;
+		}
+		if (editInfo.isFileRow) {
+			const r = data.find(r => r.isFileRow);
+			return r ? r.rowKey : null;
+		}
+		if (String(editInfo.mnSubSeq) === '0') {
+			let maxSeq = 0, found = null;
+			data.forEach(r => {
+				if (!r.isFileRow && !r.isNoticeRow && Number(r.mnSubSeq) > maxSeq) {
+					maxSeq = Number(r.mnSubSeq); found = r;
+				}
+			});
+			return found ? found.rowKey : null;
+		}
+		const r2 = data.find(r => !r.isFileRow && !r.isNoticeRow && String(r.mnSubSeq) === String(editInfo.mnSubSeq));
+		return r2 ? r2.rowKey : null;
+	}
+
+	// 편집/갱신 이후에도 마지막으로 수정한 셀이 화면에 그대로 보이도록 포커스+스크롤 복원
+	function focusLastEditedCell() {
+		if (!lastEditedCell) return;
+		const grid = mnGridView.target;
+		const rowKey = findRowKeyForEdit(grid, lastEditedCell);
+		if (rowKey === null || rowKey === undefined) { lastEditedCell = null; return; }
+		if (lastEditedCell.colKey) {
+			try { grid.focus(rowKey, lastEditedCell.colKey, true); } catch (e) { }
+		}
+		lastEditedCell = null;
+	}
+
+	// ==========================================
+	// 선택 셀 행/열 강조 (크로스헤어)
+	// ==========================================
+	var __pm11Xhair = { initialized: false, prev: null };
+
+	function pm11InitXhair() {
+		if (__pm11Xhair.initialized) return;
+		__pm11Xhair.initialized = true;
+		document.addEventListener('mousedown', function (e) {
+			const gridEl = document.getElementById('grid');
+			if (!gridEl || (e.target && gridEl.contains(e.target))) return;
+			clearXhairClasses();
+		}, true);
+	}
+
+	function clearXhairClasses() {
+		const gridEl = document.getElementById('grid');
+		if (!gridEl) return;
+		// 스크롤 중 TUI Grid가 td DOM을 재활용(다른 행/열로 재사용)하면서 외부에서 붙인
+		// 클래스는 그대로 남아있을 수 있으므로, 이전 rowKey/columnName을 기억해 지우는 대신
+		// 현재 해당 클래스가 붙어 있는 모든 셀을 찾아 지운다.
+		gridEl.querySelectorAll('.pm11-xhair-row, .pm11-xhair-col, .pm11-xhair-cell').forEach(el => {
+			el.classList.remove('pm11-xhair-row', 'pm11-xhair-col', 'pm11-xhair-cell');
+		});
+		__pm11Xhair.prev = null;
+	}
+
+	function applyXhair() {
+		const grid = mnGridView.target;
+		if (!grid) return;
+		let focused = null;
+		try { focused = grid.getFocusedCell(); } catch (e) { }
+		if (!focused || focused.rowKey === null || focused.rowKey === undefined || !focused.columnName) {
+			clearXhairClasses();
+			return;
+		}
+		clearXhairClasses();
+		const gridEl = document.getElementById('grid');
+		if (!gridEl) return;
+		const rowKey = focused.rowKey;
+		const columnName = focused.columnName;
+		gridEl.querySelectorAll('td.tui-grid-cell[data-row-key="' + rowKey + '"]').forEach(el => el.classList.add('pm11-xhair-row'));
+		gridEl.querySelectorAll('td.tui-grid-cell[data-column-name="' + columnName + '"]').forEach(el => el.classList.add('pm11-xhair-col'));
+		const cell = gridEl.querySelector('td.tui-grid-cell[data-row-key="' + rowKey + '"][data-column-name="' + columnName + '"]');
+		if (cell) cell.classList.add('pm11-xhair-cell');
+		__pm11Xhair.prev = { rowKey, columnName };
+	}
+
+	// 행추가/이동 등으로 그리드를 갱신한 직후, 지정한 셀에 포커스+크로스헤어를 다시 적용한다.
+	// appendRow/moveRow 직후에는 rowHeight:'auto' 높이가 아직 재계산되지 않아 grid.focus()가
+	// 조용히 실패(return false, 예외 없음)할 수 있으므로 다음 tick으로 미뤄서 적용한다.
+	function refocusRow(rowKey, colKey) {
+		const grid = mnGridView.target;
+		const row = grid.getRow(rowKey);
+		if (!row) return;
+		lastFocusedRowInfo = { isNoticeRow: !!row.isNoticeRow, isFileRow: !!row.isFileRow, mnSubSeq: row.mnSubSeq };
+		setTimeout(function () {
+			try { grid.focus(rowKey, colKey, true); } catch (e) { }
+			applyXhair();
+		}, 0);
+	}
+
+	// ==========================================
+	// TOAST UI Grid 커스텀 에디터 (textarea)
+	// ==========================================
+	class TextareaEditor {
+		constructor(props) {
+			const $el = $('<textarea>')
+				.css({
+					width: '100%', boxSizing: 'border-box', border: '0',
+					outline: 'none', resize: 'none', padding: '6px 8px',
+					lineHeight: '1.25', overflow: 'hidden'
+				})
+				.val(String(props.value || ''));
+
+			const autoResize = () => {
+				$el.css('height', 'auto');
+				$el.css('height', $el[0].scrollHeight + 'px');
+			};
+			$el.on('input', autoResize);
+
+			// ax5-grid의 textarea 편집기처럼 Enter는 줄바꿈만 입력하고 편집을 끝내지 않는다.
+			// stopPropagation으로 TOAST UI Grid의 기본 keydown 핸들러(enter→저장 후 편집종료)에
+			// 도달하지 못하게만 막고, preventDefault는 호출하지 않아 textarea 기본 줄바꿈은 그대로 둔다.
+			// 저장은 다른 셀로 포커스가 이동할 때 그리드가 자동으로 처리한다(commitActiveEdit과 동일 경로).
+			$el.on('keydown', (e) => {
+				if (e.key === 'Enter' || e.keyCode === 13) {
+					e.stopPropagation();
+				}
+			});
+
+			this.el = $el[0];
+			this.autoResize = autoResize;
+			activeEditorCtx = {
+				rowKey: props.rowKey,
+				columnName: props.columnInfo.name,
+				getValue: () => $el.val(),
+				// pm10_d03_update는 저장 시점의 #mnDiv_S 값으로 mnCnts(사전공지)/mnResult(회의결과)를
+				// 가른다. 편집 커밋이 구분 변경(onchange → setData) 도중 지연 실행되면 이미 바뀐
+				// 새 구분값으로 저장되어 버리므로, 편집을 시작한 시점의 구분값을 따로 기억해 둔다.
+				mnDivAtEditStart: $('#mnDiv_S').val()
+			};
+		}
+		getElement() { return this.el; }
+		getValue() { return $(this.el).val(); }
+		mounted() {
+			$(this.el).focus().select();
+			this.autoResize();
+		}
+	}
+
+	// ==========================================
+	// TOAST UI Grid 커스텀 렌더러
+	// ==========================================
+
+	// 잠금 뱃지 + 일반 텍스트 표시용 (mnSubject, mnEtcAll)
+	class ValueRenderer {
+		constructor(props) {
+			this.el = document.createElement('div');
+			this.el.style.width = '100%';
+			__pm11CellRenderers[props.rowKey + ':' + props.columnInfo.name] = this;
+			this.render(props);
+		}
+		getElement() { return this.el; }
+		render(props) {
+			this._lastProps = props;
+			const $el = $(this.el).empty();
+			const row = props.grid.getRow(props.rowKey);
+			const colKey = props.columnInfo.name;
+			const lockInfo = getCellLockInfo(row, colKey);
+			if (lockInfo && lockInfo.lockYn === 'Y' && lockInfo.lockUserNm) {
+				$el.append($('<span class="lock-badge"></span>').text(lockBadgeText(lockInfo))).append('<br>');
+			}
+			const cellVal = props.value || '';
+			if (cellVal) {
+				$el.append($('<span></span>').css({ display: 'block', whiteSpace: 'pre-wrap' }).text(cellVal));
+			}
+		}
+	}
+
+	// 부서 컬럼용 (잠금 뱃지 + 생산/생산관리 병합표시 + 파일첨부 행 전용 UI)
+	class DeptCellRenderer {
+		constructor(props) {
+			this.el = document.createElement('div');
+			this.el.style.width = '100%';
+			__pm11CellRenderers[props.rowKey + ':' + props.columnInfo.name] = this;
+			this.render(props);
+		}
+		getElement() { return this.el; }
+		render(props) {
+			this._lastProps = props;
+			const $el = $(this.el).empty();
+			const row = props.grid.getRow(props.rowKey);
+			const colKey = props.columnInfo.name;
+
+			if (row && row.isFileRow) {
+				renderFileCellInto($el, row, colKey);
+				return;
+			}
+
+			const lockInfo = getCellLockInfo(row, colKey);
+			if (lockInfo && lockInfo.lockYn === 'Y' && lockInfo.lockUserNm) {
+				$el.append($('<span class="lock-badge"></span>').text(lockBadgeText(lockInfo))).append('<br>');
+			}
+
+			let cellVal = props.value || '';
+			if (colKey === 'gun70MnCnts') {
+				const g60 = row.gun60MnCnts || '';
+				const g70 = row.gun70MnCnts || '';
+				cellVal = g60 + (g60 && g70 ? '\n' : '') + g70;
+			}
+
+			// 회의결과 모드에서는 화면에 보이는 값이 "실제로 입력된 회의결과"인지 "아직 결과가 없어
+			// 사전공지 내용을 그대로 보여주는 중"인지 구별이 안 돼, 부서별로 어디까지 입력했는지
+			// 한눈에 알기 어렵다. resultKey(원본 회의결과)가 실제로 채워진 셀만 다르게 표시한다.
+			let hasResult = false;
+			if ($('#mnDiv_S').val() === 'MNDIV02' && row) {
+				const resultKey = colKey.replace('MnCnts', 'MnResult');
+				hasResult = !!(row[resultKey] && row[resultKey].toString().trim() !== '');
+				if (!hasResult && colKey === 'gun70MnCnts') {
+					hasResult = !!(row.gun60MnResult && row.gun60MnResult.toString().trim() !== '');
+				}
+			}
+			$el.toggleClass('mn-result-filled', hasResult);
+
+			// 부서 셀(D03)을 마지막으로 수정(UDT_ID)한 사람이 나(현재 로그인 사용자)인지 표시한다.
+			// MN_CNTS/MN_RESULT가 같은 행의 UDT_ID를 공유하므로, 사전공지/회의결과 중 어느 쪽을
+			// 마지막으로 고쳤는지까지는 구분하지 못하고 "이 부서 칸을 마지막으로 만진 사람"까지만 안다.
+			let isMyEdit = false;
+			if (row && deptCodeMap[colKey]) {
+				const myUserId = $('#userId').val();
+				const udtIdKey = deptCodeMap[colKey].toLowerCase().replace(/([a-z])(\d)/g, '$1$2') + 'UdtId';
+				isMyEdit = row[udtIdKey] === myUserId;
+				if (!isMyEdit && colKey === 'gun70MnCnts') {
+					isMyEdit = row.gun60UdtId === myUserId;
+				}
+			}
+			$el.toggleClass('mn-my-edit', isMyEdit);
+
+			if (cellVal) {
+				$el.append($('<span></span>').css({ display: 'block', whiteSpace: 'pre-wrap' }).text(cellVal));
+			}
+		}
+	}
+
+	function renderFileCellInto($el, row, colKey) {
+		const files = (row.filesByColumn && row.filesByColumn[colKey]) || [];
+		const isViewMode = $('#mnDiv_S').val() === 'MNDIV99';
+		if (!files.length) return;
+
+		// .tui-grid-cell-content가 위 12px/아래 11px 패딩을 강제하므로, 음수 margin으로 상쇄해 위아래 2px만 남김
+		$el.css({ marginTop: '-10px', marginBottom: '-9px' });
+
+		const $ul = $('<ul></ul>').css({ padding: 0, margin: 0, listStyle: 'none' });
+		files.forEach((f, i) => {
+			const $li = $('<li></li>').css({ margin: '2px 0', display: 'flex', alignItems: 'center' });
+			if (!isViewMode) {
+				$li.append(
+					$('<button class="file-remove">삭제</button>')
+						.attr({ 'data-idx': i, 'data-col': colKey })
+						.css({ fontSize: '6px', padding: '2px 1px', marginRight: '6px', backgroundColor: 'rgb(255,50,0)', color: '#fff', border: 'none', cursor: 'pointer', lineHeight: '1', height: 'auto' })
+				);
+			}
+			$li.append(
+				$('<span class="file-preview"></span>')
+					.attr({ 'data-col': colKey, 'data-filekey': f.fileKey, 'data-filename': f.name, 'data-filetype': f.fileType })
+					.css({ whiteSpace: 'nowrap', textDecoration: 'underline', cursor: 'pointer' })
+					.text(f.name)
+			);
+			$ul.append($li);
+		});
+		$el.append($ul);
+
+		if (!isViewMode) {
+			const $btnWrap = $('<div></div>').css({ width: '100%', textAlign: 'center', marginTop: '2px' });
+			$btnWrap.append($('<button class="file-add-btn">추가</button>').attr('data-col', colKey).css({ fontSize: '6px', padding: '2px 1px', cursor: 'pointer', lineHeight: '1', height: 'auto' }));
+			$el.append($btnWrap);
+		}
+	}
+
+	var mnGridView = {
+		initView: function () {
+			tui.Grid.applyTheme('default', {
+				cell: {
+					normal: { showVerticalBorder: true, showHorizontalBorder: true, border: '#dcdcdc' },
+					header: { showVerticalBorder: true, showHorizontalBorder: true, border: '#dcdcdc', background: '#f7f7f7' }
+				}
+			});
+
+			this.target = new tui.Grid({
+				el: document.getElementById('grid'),
+				scrollX: true,
+				scrollY: true,
+				bodyHeight: 'fitToParent',
+				rowHeight: 'auto',
+				minRowHeight: 50,
+				columns: [
+					{ header: 'PROJECT\n주제', name: 'mnSubject', width: 100, editor: { type: TextareaEditor }, renderer: { type: ValueRenderer } },
+					{ header: '영업\n국내/해외', name: 'gun30MnCnts', width: 220, editor: { type: TextareaEditor }, renderer: { type: DeptCellRenderer } },
+					{ header: '생산/생산관리', name: 'gun70MnCnts', width: 220, editor: { type: TextareaEditor }, renderer: { type: DeptCellRenderer } },
+					{ header: '기술연구소', name: 'gun40MnCnts', width: 220, editor: { type: TextareaEditor }, renderer: { type: DeptCellRenderer } },
+					{ header: '기계/직접매출', name: 'trn5010MnCnts', width: 220, editor: { type: TextareaEditor }, renderer: { type: DeptCellRenderer } },
+					{ header: '전기', name: 'trn5020MnCnts', width: 220, editor: { type: TextareaEditor }, renderer: { type: DeptCellRenderer } },
+					{ header: '전산', name: 'gun80MnCnts', width: 220, editor: { type: TextareaEditor }, renderer: { type: DeptCellRenderer } },
+					{ header: '경영지원,회계', name: 'gun10MnCnts', width: 220, editor: { type: TextareaEditor }, renderer: { type: DeptCellRenderer } },
+					{ header: '임원', name: 'gun00MnCnts', width: 220, editor: { type: TextareaEditor }, renderer: { type: DeptCellRenderer } },
+					{ header: '비고', name: 'mnEtcAll', width: 220, editor: { type: TextareaEditor }, renderer: { type: ValueRenderer } }
+				],
+				header: {
+					height: 60,
+					complexColumns: [
+						{ header: '구매외주', name: 'mergeTrn50', childNames: ['trn5010MnCnts', 'trn5020MnCnts'] }
+					]
+				},
+				columnOptions: {
+					resizable: true,
+					frozenCount: 1
+				}
+			});
+
+			const grid = this.target;
+
+			// 셀 편집 진입 시점에 동기식으로 락 획득을 시도하고, 실패하면 편집모드 진입을 막는다
+			grid.on('editingStart', function (ev) {
+				const row = grid.getRow(ev.rowKey);
+				const colKey = ev.columnName;
+				if (!row) { ev.stop(); return; }
+				if ($('#mnDiv_S').val() === 'MNDIV99') { ev.stop(); return; }
+				if (row.isFileRow) { ev.stop(); return; }
+				if (row.isNoticeRow && colKey === 'mnSubject') { ev.stop(); return; }
+				if (!lockCellForEdit(row, colKey)) { ev.stop(); return; }
+				isCellEditing = true;
+			});
+
+			grid.on('afterChange', function (ev) {
+				if (isSyncing) return;
+				$.each(ev.changes, function (i, change) {
+					const row = grid.getRow(change.rowKey);
+					if (!row) return;
+					if (change.columnName === 'mnSubject' || change.columnName === 'mnStatus' || change.columnName === 'mnEtcAll') {
+						pm10_d01_update(row, change.columnName, change.value);
+					} else {
+						pm10_d03_update(row, change.columnName, change.value);
+					}
+					if (!row.isNoticeRow) {
+						recalcSortOrder(false);
+					}
+				});
+			});
+
+			// 편집 종료 시 변경사항이 없었다면(=저장 콜백에서 해제되지 않음) 즉시 락 해제
+			grid.on('editingFinish', function () {
+				activeEditorCtx = null;
+				isCellEditing = false;
+				if (isSaving) return;
+				if (currentLockInfo) unlockCell(currentLockInfo);
+			});
+
+			// 셀 클릭: 이전 락 해제 + 파일첨부 행의 빈 셀 클릭 시 파일 선택창 호출
+			// 단, 현재 편집 중인 셀 내부를 클릭(커서 이동 등)한 경우는 락을 풀지 않는다
+			grid.on('click', function (ev) {
+				if (ev.rowKey === undefined || ev.rowKey === null || !ev.columnName) return;
+				if (currentLockInfo && !isCellEditing) {
+					unlockCell(currentLockInfo);
+				}
+				lastClickedColKey = ev.columnName;
+				const row = grid.getRow(ev.rowKey);
+				if (!row) return;
+				if ($('#mnDiv_S').val() === 'MNDIV99') return;
+				if (ev.columnName === 'mnSubject' && row.mnSubject === '파일첨부') return;
+				if (row.isFileRow && deptCodeMap[ev.columnName]) {
+					const files = (row.filesByColumn && row.filesByColumn[ev.columnName]) || [];
+					if (files.length === 0) {
+						currentFileRow = row;
+						currentFileColumn = ev.columnName;
+						$('#fileInput').trigger('click');
+					}
+				}
+			});
+
+			// 포커스 셀이 바뀔 때마다 행/열 강조(크로스헤어) 갱신
+			grid.on('focusChange', function () {
+				const fc = grid.getFocusedCell();
+				if (fc && fc.rowKey !== undefined && fc.rowKey !== null) {
+					const row = grid.getRow(fc.rowKey);
+					if (row) {
+						lastFocusedRowInfo = { isNoticeRow: !!row.isNoticeRow, isFileRow: !!row.isFileRow, mnSubSeq: row.mnSubSeq };
+					}
+				}
+				setTimeout(applyXhair, 0);
+			});
+			// resetData 등으로 그리드 DOM이 다시 그려진 뒤에도 강조 유지
+			grid.on('onGridUpdated', function () {
+				setTimeout(applyXhair, 0);
+			});
+
+			pm11InitXhair();
+
+			// 가로 스크롤 후 고정열(PROJECT 주제)과 일반열(부서별 등록) 간 셀 높이가
+			// 어긋나 보이는 현상 방지: 스크롤이 멈춘 뒤 레이아웃을 재계산해 동기화
+			setTimeout(function () {
+				const rsideBody = document.querySelector('#grid .tui-grid-rside-area .tui-grid-body-area');
+				const lsideBody = document.querySelector('#grid .tui-grid-lside-area .tui-grid-body-area');
+				let scrollSyncTimer = null;
+				function onBodyScroll() {
+					// 스크롤로 셀 DOM이 재활용되면 행/열 강조 표시가 다른 셀에 남을 수 있으므로 즉시 다시 계산
+					applyXhair();
+					clearTimeout(scrollSyncTimer);
+					scrollSyncTimer = setTimeout(function () {
+						try { grid.refreshLayout(); } catch (e) { }
+					}, 200);
+				}
+				if (rsideBody) rsideBody.addEventListener('scroll', onBodyScroll, { passive: true });
+				if (lsideBody) lsideBody.addEventListener('scroll', onBodyScroll, { passive: true });
+			}, 0);
+
+			return this;
+		},
+
+		setData: function (_pageNo) {
+			if (isPopupView) return false;
+			// commitActiveEdit으로 트리거된 저장이 아직 서버에 반영되기 전에 unlockUserLocks/
+			// selectMnList를 먼저 보내면, 방금 입력한 내용이 반영되지 않은(수정 전) 데이터를 그대로
+			// 다시 받아와 화면에 옛 값이 보이게 된다. 저장이 실제로 끝난 뒤에야 잠금 해제 → 재조회
+			// 순서로 이어지도록 콜백으로 순서를 보장한다.
+			commitActiveEdit(function () {
+				// unlockUserLocks()의 서버 잠금 해제 응답이 오기 전에 selectMnList를 먼저 보내면,
+				// 서버가 아직 LOCK_YN='N'으로 갱신하기 전 데이터를 그대로 다시 받아와 "편집 중" 뱃지가
+				// 화면에 남아 있게 된다(다음 폴링까지 갱신되지 않음). 잠금 해제가 실제로 끝난 뒤에
+				// 조회를 보내도록 콜백으로 순서를 보장한다.
+				unlockUserLocks(function () {
+					const paramObj = {};
+					$.each($('#main_area [data-search]'), function (idx, elem) {
+						if ($(elem).hasClass("input_calendar")) {
+							paramObj[$(elem).data("search")] = deleteHyphenStr($(elem).val());
+						} else {
+							paramObj[$(elem).data("search")] = $(elem).val();
+						}
+					});
+					paramObj.userId = jwt.userId;
+					paramObj.deptCodes = JSON.stringify(Object.values(deptCodeMap));
+
+					postAjax("/user/pm/pm10/selectMnList", paramObj, null, function (data) {
+						try {
+							const merged = mnGridView.processGridData(data);
+							mnGridView.target.resetData(merged);
+							mnGridView.target.refreshLayout();
+
+							defalutAttendList(data.defaultAttendList || []);
+							select_p10_d02_List(data.d02List || []);
+							recalcSortOrder();
+						} catch (error) {
+							alert("오류 발생!! 전산실 연락 바랍니다: " + error.message);
+						} finally {
+							focusLastEditedCell();
+						}
+					});
+				});
+			});
+		},
+
+		processGridData: function (data) {
+			if (!data) return [];
+			const list = Array.isArray(data.result) ? data.result : [];
+
+			// rnum이 있는 회의록만 추출
+			const rows = list.filter(r => r.rnum !== undefined);
+
+			// 공지사항 기본 구조
+			let noticeRow = rows.find(r => r.mnSubject === '공지사항');
+			if (!noticeRow) {
+				noticeRow = {
+					mnDate: $('#mnDate_S').val(),
+					mnWeeks: $('#mnWeeks_S').val(),
+					mnSubSeq: 0,
+					mnSubject: '공지사항',
+					mnSortNo: 0,
+					isNoticeRow: true,
+					gun00MnCnts: '', gun30MnCnts: '', gun40MnCnts: '', gun60MnCnts: '',
+					trn5010MnCnts: '', trn5020MnCnts: '', gun10MnCnts: '', gun80MnCnts: '',
+					mnStatus: '', mnEtcAll: ''
+				};
+			} else {
+				noticeRow.isNoticeRow = true;
+			}
+
+			// 파일첨부 처리: data.result 중 files 키를 가진 객체에서 JSON 파싱
+			const fileEntry = list.find(r => typeof r.files === 'string');
+			const parsedFiles = fileEntry ? JSON.parse(fileEntry.files) : [];
+
+			const fileRow = {
+				mnDate: $('#mnDate_S').val(),
+				mnWeeks: $('#mnWeeks_S').val(),
+				mnSubSeq: 0,
+				mnSubject: '파일첨부',
+				gun00MnCnts: '', gun30MnCnts: '', gun40MnCnts: '', gun60MnCnts: '',
+				trn5010MnCnts: '', trn5020MnCnts: '', gun10MnCnts: '', gun80MnCnts: '',
+				mnStatus: '',
+				mnEtcAll: '',
+				mnSortNo: 0,
+				isFileRow: true,
+				filesByColumn: {}
+			};
+
+			parsedFiles.forEach(f => {
+				const deptCode = String(f.fileTrgtKey).split('-').length >= 2 ? String(f.fileTrgtKey).split('-')[1] : '';
+				const colKey = Object.keys(deptCodeMap).find(key => deptCodeMap[key] === deptCode);
+				if (!colKey) return;
+
+				if (!fileRow.filesByColumn[colKey]) {
+					fileRow.filesByColumn[colKey] = [];
+				}
+				fileRow.filesByColumn[colKey].push({
+					name: f.fileName,
+					fileKey: f.fileKey,
+					fileType: f.fileType
+				});
+			});
+
+			// '파일첨부'는 실제 DB행이 아니라 항상 합성되는 가상 행이므로, 누군가 주제를 실수로
+			// '파일첨부'/'공지사항' 으로 입력해 진짜 D01 행이 생기더라도 일반 데이터 행으로 섞여
+			// 들어가지 않도록 공지사항과 동일하게 제외한다(안 그러면 파일첨부 합성 행 뒤/주변에
+			// 같은 이름의 진짜 행이 끼어 보이는 현상이 생긴다).
+			const nonNoticeRows = rows.filter(r => r.mnSubject !== '공지사항' && r.mnSubject !== '파일첨부');
+			const merged = [...nonNoticeRows, noticeRow, fileRow].sort((a, b) => {
+				if (a.isFileRow) return 1;
+				if (b.isFileRow) return -1;
+				if (a.isNoticeRow) return 1;
+				if (b.isNoticeRow) return -1;
+				return ((a.mnSortNo || 0) - (b.mnSortNo || 0));
+			});
+
+			const deptCols = Object.keys(deptCodeMap);
+			const mnDivVal = $('#mnDiv_S').val();
+
+			merged.forEach(item => {
+				// LOCK_YN/LOCK_USER_NM이 NULL이면 MyBatis CamelMap이 해당 키를 만들지 않고(callSettersOnNulls
+				// 기본값 false), 그러면 TUI Grid observable이 이 행에 대해 __storage__ 슬롯을 생성하지 않아
+				// 이후 grid.setValue()로 값을 넣어도 getRow()/렌더러가 절대 읽지 못한다. 그래서 처음부터
+				// 모든 행에 락 관련 키를 항상 채워 넣어 observable 슬롯이 만들어지도록 보장한다.
+				if (item.d01LockYn === undefined) item.d01LockYn = '';
+				if (item.d01LockUserNm === undefined) item.d01LockUserNm = '';
+
+				deptCols.forEach(colKey => {
+					const cntsVal = item[colKey] || '';
+					const resultKey = colKey.replace('MnCnts', 'MnResult');
+					const resultVal = item[resultKey] || '';
+					// resultKey도 DB값이 NULL이면 MyBatis CamelMap이 키 자체를 안 만들어(위 LOCK_YN과
+					// 동일한 이유) observable 슬롯이 없는 채로 남는다. 그러면 결과를 처음 입력해 저장한
+					// 뒤 grid.setValue(rowKey, resultKey, ...)로 갱신해도 getRow()가 못 읽어, 행삭제의
+					// "회의결과 있는지" 판별이 방금 입력한 결과를 누락하게 된다. 항상 슬롯을 만들어 둔다.
+					if (item[resultKey] === undefined) item[resultKey] = '';
+
+					if (mnDivVal === 'MNDIV01') {
+						item[colKey] = cntsVal;
+					}
+					else if (mnDivVal === 'MNDIV02') {
+						item[colKey] = (resultVal) ? resultVal : cntsVal;
+					}
+					else if (mnDivVal === 'MNDIV99') {
+						let parts = [];
+						if (cntsVal) parts.push(`[사전공지]\n${cntsVal}`);
+						if (resultVal) parts.push(`[회의결과]\n${resultVal}`);
+						item[colKey] = parts.length ? parts.join('\n\n') : '';
+					}
+
+					const deptCd = deptCodeMap[colKey];
+					if (deptCd) {
+						const prefix = deptCd.toLowerCase().replace(/([a-z])(\d)/g, '$1$2');
+						const ynKey = prefix + 'LockYn';
+						const nmKey = prefix + 'LockUserNm';
+						const divKey = prefix + 'LockDiv';
+						if (item[ynKey] === undefined) item[ynKey] = '';
+						if (item[nmKey] === undefined) item[nmKey] = '';
+						if (item[divKey] === undefined) item[divKey] = '';
+						// UDT_ID(최종수정자)도 LOCK_YN/resultKey와 같은 이유(NULL이면 MyBatis가
+						// 키를 안 만듦)로 observable 슬롯을 미리 만들어 둬야 저장 후 setValue로
+						// "내 입력" 색 구분을 갱신할 수 있다.
+						const udtIdKey = prefix + 'UdtId';
+						if (item[udtIdKey] === undefined) item[udtIdKey] = '';
+					}
+				});
+			});
+
+			return merged;
+		},
+
+		updateData: function (isPolling) {
+			if (isPopupView) return false;
+			const paramObj = {};
+			$.each($('#main_area [data-search]'), function (idx, elem) {
+				if ($(elem).hasClass("input_calendar")) {
+					paramObj[$(elem).data("search")] = deleteHyphenStr($(elem).val());
+				} else {
+					paramObj[$(elem).data("search")] = $(elem).val();
+				}
+			});
+			paramObj.userId = jwt.userId;
+			paramObj.deptCodes = JSON.stringify(Object.values(deptCodeMap));
+
+			postAjax("/user/pm/pm10/selectMnList", paramObj, null, function (data) {
+				try {
+					const grid = mnGridView.target;
+					let newList = mnGridView.processGridData(data);
+					const oldList = grid.getData();
+
+					// 로컬 전용(아직 DB에 안 들어간) 빈 행 추출
+					const localUnsaved = oldList.filter(oldItem =>
+						!oldItem.isFileRow && !oldItem.isNoticeRow &&
+						String(oldItem.mnSubSeq) !== '0' &&
+						(!oldItem.mnSubject || oldItem.mnSubject.trim() === '') &&
+						!newList.some(newItem => String(newItem.mnSubSeq) === String(oldItem.mnSubSeq))
+					);
+					if (localUnsaved.length > 0) {
+						localUnsaved.forEach(u => newList.push(u));
+						const dRows = newList.filter(r => !r.isFileRow && !r.isNoticeRow);
+						dRows.sort((a, b) => (a.mnSortNo || 0) - (b.mnSortNo || 0));
+						const fRow = newList.find(r => r.isFileRow);
+						const nRow = newList.find(r => r.isNoticeRow);
+						newList = [...dRows, nRow, fRow].filter(x => x);
+					}
+
+					// 행 구성(PK 풀)이 완전히 바뀌었는지 정밀 비교
+					let isStructureChanged = false;
+					if (newList.length !== oldList.length) {
+						isStructureChanged = true;
+					} else {
+						for (let i = 0; i < newList.length; i++) {
+							const nr = newList[i];
+							const found = oldList.some(or =>
+								(nr.isNoticeRow && or.isNoticeRow) ||
+								(nr.isFileRow && or.isFileRow) ||
+								(!nr.isNoticeRow && !nr.isFileRow && String(nr.mnSubSeq) === String(or.mnSubSeq))
+							);
+							if (!found) { isStructureChanged = true; break; }
+						}
+					}
+
+					// PK 풀은 같아도 다른 사용자가 행이동(moveSelectedUp/Down)으로 순서만 바꿨을 수 있다.
+					// 아래의 증분 병합(incremental merge)은 필드값만 patch하고 실제 행 순서는 절대
+					// 다시 그리지 않으므로, 순서가 달라졌는데도 못 잡으면 다른 사용자의 화면에는 영원히
+					// (다음 구조변경/재조회 전까지) 옛 순서가 남는다. mnSortNo 비교만으로는 부족하므로
+					// (증분 병합이 store에 반영도 안 함) 실제 데이터행 순서(mnSubSeq 나열)를 직접 비교한다.
+					if (!isStructureChanged) {
+						const newOrder = newList.filter(r => !r.isNoticeRow && !r.isFileRow).map(r => String(r.mnSubSeq));
+						const oldOrder = oldList.filter(r => !r.isNoticeRow && !r.isFileRow).map(r => String(r.mnSubSeq));
+						if (newOrder.some((subSeq, i) => subSeq !== oldOrder[i])) {
+							isStructureChanged = true;
+						}
+					}
+
+					// 누군가 새 행을 썼거나 지웠거나(또는 순서를 바꿨다면) 풀 리로드
+					if (isStructureChanged) {
+						grid.resetData(normalizeRowOrder(newList));
+						grid.refreshLayout();
+						defalutAttendList(data.defaultAttendList || []);
+						if (data.d02List) select_p10_d02_List(data.d02List);
+						if (!isPolling) focusLastEditedCell();
+						return;
+					}
+
+					const deptCols = Object.keys(deptCodeMap);
+					const otherCols = ['mnStatus', 'mnEtcAll'];
+					const deptLockKeys = {};
+					deptCols.forEach(colKey => {
+						const deptCd = deptCodeMap[colKey];
+						const prefix = deptCd.toLowerCase().replace(/([a-z])(\d)/g, '$1$2');
+						deptLockKeys[colKey] = { yn: prefix + 'LockYn', nm: prefix + 'LockUserNm', div: prefix + 'LockDiv' };
+					});
+
+					newList.forEach(newItem => {
+						let oldItem = null;
+						if (newItem.isNoticeRow) oldItem = oldList.find(r => r.isNoticeRow);
+						else if (newItem.isFileRow) oldItem = oldList.find(r => r.isFileRow);
+						else oldItem = oldList.find(r =>
+							!r.isNoticeRow && !r.isFileRow &&
+							String(r.mnDate) === String(newItem.mnDate) &&
+							String(r.mnSubSeq) === String(newItem.mnSubSeq)
+						);
+						if (!oldItem) return;
+						const rowKey = oldItem.rowKey;
+						let isItemLockChanged = false;
+
+						// 0. 첨부파일 변경 감지
+						if (newItem.isFileRow) {
+							let fileChanged = false;
+							for (const colKey of deptCols) {
+								const newFiles = (newItem.filesByColumn && newItem.filesByColumn[colKey]) || [];
+								const oldFiles = (oldItem.filesByColumn && oldItem.filesByColumn[colKey]) || [];
+								if (newFiles.length !== oldFiles.length) { fileChanged = true; break; }
+								for (let f = 0; f < newFiles.length; f++) {
+									if (String(newFiles[f].fileKey) !== String(oldFiles[f].fileKey)) { fileChanged = true; break; }
+								}
+								if (fileChanged) break;
+							}
+							if (fileChanged) {
+								// oldItem은 grid.getData()가 만든 스냅샷(클론)이라 직접 고쳐도 내부 store에는 반영되지
+								// 않으므로, setValue로 실제 store에 반영한 뒤 렌더러를 직접 호출해 다시 그린다.
+								isSyncing = true;
+								try {
+									grid.setValue(rowKey, 'filesByColumn', newItem.filesByColumn);
+								} finally {
+									isSyncing = false;
+								}
+								oldItem.filesByColumn = newItem.filesByColumn;
+								deptCols.forEach(colKey => {
+									if (visibleDeptCols.has(colKey)) refreshCellRender(rowKey, colKey);
+								});
+							}
+						}
+
+						// 1. D01 락 체크
+						if ((oldItem.d01LockYn !== newItem.d01LockYn) || (oldItem.d01LockUserNm !== newItem.d01LockUserNm)) {
+							isItemLockChanged = true;
+						}
+						// 2. 부서 락 체크
+						if (!isItemLockChanged) {
+							for (const colKey of deptCols) {
+								const keys = deptLockKeys[colKey];
+								if ((oldItem[keys.yn] !== newItem[keys.yn]) || (oldItem[keys.nm] !== newItem[keys.nm]) || (oldItem[keys.div] !== newItem[keys.div])) {
+									isItemLockChanged = true;
+									break;
+								}
+							}
+						}
+
+						// 값 변경 체크 및 setValue (isSyncing으로 afterChange 트리거 방지)
+						isSyncing = true;
+						try {
+							deptCols.forEach(colKey => {
+								// resultKey(원본 회의결과)는 화면표시용 colKey와 별개의 값이라 colKey 동기화로는
+								// 갱신되지 않는다. 다른 사용자가 폴링 중 회의결과를 입력/삭제하면 이 값도 같이
+								// 갱신해 둬야, 이후 행삭제의 "회의결과 있는지" 판별과 회의결과 셀 강조표시(아래
+								// DeptCellRenderer)가 최신 상태를 본다. colKey의 setValue가 그 셀의 자동
+								// 재렌더링을 트리거하므로, 렌더러가 최신 resultKey를 보도록 반드시 먼저 갱신한다.
+								const resultKey = colKey.replace('MnCnts', 'MnResult');
+								if (String(oldItem[resultKey] || '') !== String(newItem[resultKey] || '')) {
+									oldItem[resultKey] = newItem[resultKey];
+									grid.setValue(rowKey, resultKey, newItem[resultKey]);
+								}
+								// udtIdKey(예: gun30UdtId, 부서 셀 최종수정자)도 같은 이유로 colKey의
+								// setValue가 재렌더링을 트리거하기 전에 먼저 갱신해야 "내 입력" 색
+								// 구분이 다른 사용자의 수정을 즉시 반영한다.
+								if (deptCodeMap[colKey]) {
+									const udtIdKey = deptCodeMap[colKey].toLowerCase().replace(/([a-z])(\d)/g, '$1$2') + 'UdtId';
+									if (oldItem[udtIdKey] !== newItem[udtIdKey]) {
+										oldItem[udtIdKey] = newItem[udtIdKey];
+										grid.setValue(rowKey, udtIdKey, newItem[udtIdKey]);
+									}
+								}
+								if (String(oldItem[colKey] || '') !== String(newItem[colKey] || '')) {
+									oldItem[colKey] = newItem[colKey];
+									if (visibleDeptCols.has(colKey)) grid.setValue(rowKey, colKey, newItem[colKey]);
+								}
+							});
+							otherCols.forEach(colKey => {
+								if (String(oldItem[colKey] || '') !== String(newItem[colKey] || '')) {
+									oldItem[colKey] = newItem[colKey];
+									if (colKey === 'mnEtcAll') grid.setValue(rowKey, colKey, newItem[colKey]);
+								}
+							});
+							if (String(oldItem.mnSubject || '') !== String(newItem.mnSubject || '')) {
+								oldItem.mnSubject = newItem.mnSubject;
+								grid.setValue(rowKey, 'mnSubject', newItem.mnSubject);
+							}
+							if (String(oldItem.mnSortNo || 0) !== String(newItem.mnSortNo || 0)) {
+								oldItem.mnSortNo = newItem.mnSortNo;
+							}
+
+							// grid.getData()/getRow()는 매번 새 스냅샷(클론)을 반환하므로 oldItem을 직접 고쳐도
+							// 내부 store에는 반영되지 않는다. 락 필드는 그리드 컬럼이 아니라서 위 setValue 대상에
+							// 빠져 있었으므로, 실제로 store에 반영되도록 락 필드 이름 그대로 setValue 한다.
+							if (isItemLockChanged) {
+								if (oldItem.d01LockYn !== newItem.d01LockYn) grid.setValue(rowKey, 'd01LockYn', newItem.d01LockYn);
+								if (oldItem.d01LockUserNm !== newItem.d01LockUserNm) grid.setValue(rowKey, 'd01LockUserNm', newItem.d01LockUserNm);
+								deptCols.forEach(colKey => {
+									const keys = deptLockKeys[colKey];
+									if (oldItem[keys.yn] !== newItem[keys.yn]) grid.setValue(rowKey, keys.yn, newItem[keys.yn]);
+									if (oldItem[keys.nm] !== newItem[keys.nm]) grid.setValue(rowKey, keys.nm, newItem[keys.nm]);
+									if (oldItem[keys.div] !== newItem[keys.div]) grid.setValue(rowKey, keys.div, newItem[keys.div]);
+								});
+								Object.assign(oldItem, newItem);
+							}
+						} finally {
+							isSyncing = false;
+						}
+
+						if (isItemLockChanged) {
+							// store에는 위에서 이미 반영됐지만, 표시 텍스트(mnSubject 등)는 안 바뀐 경우
+							// setValue로는 해당 셀이 다시 그려지지 않으므로 렌더러를 직접 호출해 뱃지를 갱신한다.
+							refreshCellRender(rowKey, 'mnSubject');
+							refreshCellRender(rowKey, 'mnEtcAll');
+							deptCols.forEach(colKey => {
+								if (visibleDeptCols.has(colKey)) refreshCellRender(rowKey, colKey);
+							});
+						}
+					});
+
+					defalutAttendList(data.defaultAttendList || []);
+					if (data.d02List) select_p10_d02_List(data.d02List);
+
+					if (!isPolling) {
+						focusLastEditedCell();
+					}
+				} catch (error) {
+					console.error(error);
+				}
+			}, false);
+		}
+	};
+
+	$(document).ready(function () {
+		mainDefaultLoad("사업계획", "임팀장주간회의록");
+		setCommonSelect($("#main_area select[data-kind]"));
+
+		$("#top_area").hide();
+		$('#head_area').toggleClass('off');
+		$('#main_area').toggleClass('on');
+
+		$("#userId").val(jwt.userId);
+		$("#deptId").val(jwt.deptId);
+
+		$('.attend-area').hide();
+
+		$('#mnDate_S').datepicker({
+			format: "yyyy-mm-dd",
+			language: "ko",
+			autoclose: true,
+			beforeShowDay: function (date) {
+				return date.getDay() === 5;	// 금요일만 선택가능
+			}
+		}).datepicker("setDate", moment().day(5).toDate());
+		$('#mnWeeks_S').val(moment($('#mnDate_S').val(), 'YYYY-MM-DD').isoWeek());
+
+		$('#removeAttendBtn').on('click', () => {
+			const toRemoveIds = $('.attend-item.to-remove').map((_, el) => $(el).data('id')).get();
+			if (!toRemoveIds.length) return;
+			attendList = attendList.filter(u => !toRemoveIds.includes(u.id));
+			renderAttendList();
+		});
+
+		showSize();
+		mnGridView.initView().setData();
+
+		$('#mnDate_S').on('change', function () {
+			$('#mnWeeks_S').val(moment($('#mnDate_S').val(), 'YYYY-MM-DD').isoWeek());
+			mnGridView.setData(0);
+		});
+
+		$('#mnDiv_S').on('change', function () {
+			if ($('#mnDiv_S').val() === 'MNDIV01') {
+				$('.attend-area').hide();
+				$('#moveUp, #moveDown, #addRow, #deleteRow').show();
+			}
+			else if ($('#mnDiv_S').val() === 'MNDIV02') {
+				if (attendFlag) {
+					pm10_d02_update();
+				}
+				$('#moveUp, #moveDown, #addRow, #deleteRow').show();
+				$('.attend-area').show().css('pointer-events', 'auto');
+				$('#addAttendBtn, #removeAttendBtn').show();
+				$('#attendCheckboxContainer input.attend-checkbox').prop('disabled', false).css('pointer-events', 'auto').css('cursor', 'pointer');
+			}
+			else if ($('#mnDiv_S').val() === 'MNDIV99') {
+				$('.attend-area').show().css('pointer-events', 'none');
+				$('#addAttendBtn, #removeAttendBtn').hide();
+				$('#attendCheckboxContainer input.attend-checkbox').prop('disabled', true).css('pointer-events', 'none').css('cursor', 'default');
+				$('#moveUp, #moveDown, #addRow, #deleteRow').hide();
+			}
+		});
+
+		$('#refreshToggle').on('change', function () {
+			$('#refreshStatusLabel').text(this.checked ? 'ON' : 'OFF');
+		});
+
+		$('.off_btn').on('click', function (e) {
+			mnGridView.setData(0);
+		});
+
+		$('#fileInput').on('change', function () {
+			if (!currentFileRow || !currentFileColumn) return;
+			Array.from(this.files).forEach(file => {
+				mnFileArr.push({ fileKey: 0, file, row: currentFileRow, column: currentFileColumn });
+				currentFileRow.filesByColumn = currentFileRow.filesByColumn || {};
+				currentFileRow.filesByColumn[currentFileColumn] = currentFileRow.filesByColumn[currentFileColumn] || [];
+				currentFileRow.filesByColumn[currentFileColumn].push({ name: file.name, fileKey: 0 });
+			});
+			// currentFileRow는 getRow()가 만든 스냅샷(클론)이라 직접 고쳐도 내부 store에는 반영되지
+			// 않으므로, setValue로 실제 store에 반영한 뒤 렌더러를 직접 호출해 다시 그린다.
+			isSyncing = true;
+			try {
+				mnGridView.target.setValue(currentFileRow.rowKey, 'filesByColumn', currentFileRow.filesByColumn);
+			} finally {
+				isSyncing = false;
+			}
+			refreshCellRender(currentFileRow.rowKey, currentFileColumn);	// 업로드 완료 전이라도 선택한 파일명을 즉시 표시
+			mnUploadFile();
+			$(this).val('');
+			currentFileRow = null;
+			currentFileColumn = null;
+		});
+
+		// 파일 추가
+		$('#grid').on('click', '.file-add-btn', function (e) {
+			e.stopPropagation();
+			const colKey = $(this).data('col');
+			const fileRow = mnGridView.target.getData().find(r => r.isFileRow === true);
+			if (!fileRow) return;
+			currentFileRow = fileRow;
+			currentFileColumn = colKey;
+			$('#fileInput').trigger('click');
+		});
+
+		// 파일 삭제
+		$('#grid').on('click', '.file-remove', function (e) {
+			e.stopPropagation();
+			const idx = $(this).data('idx');
+			const colKey = $(this).data('col');
+			const fileRow = mnGridView.target.getData().find(r => r.isFileRow === true);
+			if (!fileRow || !fileRow.filesByColumn || !fileRow.filesByColumn[colKey]) return;
+
+			const removed = fileRow.filesByColumn[colKey].splice(idx, 1)[0];
+			deleteFileArr.push({ fileKey: removed.fileKey });
+			lastEditedCell = { isFileRow: true, colKey: colKey };
+
+			currentFileRow = fileRow;
+			currentFileColumn = colKey;
+			// fileRow는 getData()가 만든 스냅샷(클론)이라 직접 고쳐도 내부 store에는 반영되지
+			// 않으므로, setValue로 실제 store에 반영한 뒤 렌더러를 직접 호출해 다시 그린다.
+			isSyncing = true;
+			try {
+				mnGridView.target.setValue(fileRow.rowKey, 'filesByColumn', fileRow.filesByColumn);
+			} finally {
+				isSyncing = false;
+			}
+			refreshCellRender(fileRow.rowKey, colKey);	// 서버 삭제 완료 전이라도 즉시 화면에서 제거 표시
+			mnUploadFile();
+		});
+
+		// 이미지 미리보기
+		$('#grid').on('click', '.file-preview', function (e) {
+			e.stopPropagation();
+			const fileKey = $(this).data('filekey');
+			const fileName = $(this).data('filename');
+			const colKey = $(this).data('col');
+			const fileRow = mnGridView.target.getData().find(r => r.isFileRow === true);
+			if (!fileRow) return;
+
+			const allFiles = fileRow.filesByColumn[colKey] || [];
+			const imageList = allFiles.map(f => ({
+				fileKey: Number(f.fileKey),
+				fileName: f.name,
+				coCd: $('#coCd_S').val()
+			}));
+			isPopupView = true;
+			const paramObj = { fileKey: fileKey, fileName: fileName, fileList: imageList, coCd: 'GUN' };
+			openThirdModal("/static/html/cmn/modal/attachImageView.html", $('body').width() - 40, $('body').height() - 50, fileName, paramObj, function () {
+				isEditing = false;
+				isPopupView = false;
+			});
+		});
+
+		$(window).on('resize', showSize);
+
+		// 2. Polling: 30초마다 그리드 데이터 갱신 (편집 중이 아니고, 자동새로고침이 켜져 있을 때만)
+		pollInterval = setInterval(function () {
+			if (isEditing || isPopupView) return;
+			if (!$('#refreshToggle').is(':checked')) return;
+			isPolling = true;
+			mnGridView.updateData(true);
+			isPolling = false;
+		}, 30000);
+
+		// 5. beforeunload: 브라우저 이탈 시 즉시 락 해제
+		window.addEventListener('beforeunload', function () {
+			if (currentLockInfo) {
+				const params = new URLSearchParams();
+				params.append("mnDate", $('#mnDate_S').val());
+				params.append("userId", $('#userId').val());
+				navigator.sendBeacon('/user/pm/pm10/pm10_unlock_user_cells', params);
+			}
+		});
+
+		// 3. 유휴 감지: 키보드/마우스 입력 시 타이머 리셋
+		$(document).on('keydown mousemove', function () {
+			resetIdleTimer();
+		});
+	});
+
+	function showSize() {
+		$('#grid').height(window.innerHeight - 95);
+		$('#main_area').height(window.innerHeight);
+		if (mnGridView.target) mnGridView.target.refreshLayout();
+	}
+
+	function initSearch() {
+		$(".contents.search select").val("");
+		$(".contents.search input").val("");
+
+		$('#mnDate_S').val(moment().day(5).format('YYYY-MM-DD'));
+		$('#mnWeeks_S').val(moment($('#mnDate_S').val(), 'YYYY-MM-DD').isoWeek());
+
+		mnGridView.setData(0);
+	}
+
+	// 참석자 리스트 불러오기 & 렌더링
+	function select_p10_d02_List(list) {
+		if (list.length > 0) {
+			attendList = list.map(user => ({
+				id: user.id,
+				name: user.name,
+				title: user.title,
+				reasonCd: user.reasonCd,
+				reasonRmk: user.reasonRmk
+			}));
+		} else {
+			attendList = fixedAttendList.map(user => ({ ...user, reasonCd: 'Y' }));
+		}
+
+		reorderAttendList();
+		renderAttendList();
+
+		attendList.forEach(item => {
+			if (item.reasonCd === 'Y') {
+				$(`#attendCheckboxContainer .attend-item[data-id="${item.id}"] .attend-checkbox`).prop('checked', true);
+			}
+		});
+	}
+
+	// 행 추가
+	let isInsertingRow = false;	// getNextSubSeq 응답 대기 중 중복 클릭 시 행이 두 번 추가되는 것을 방지
+	function insertMn() {
+		if ($('#mnDiv_S').val() === 'MNDIV99') {
+			alert('전체조회 화면에서는 행을 추가할 수 없습니다.');
+			return false;
+		}
+		commitActiveEdit();
+		if (isInsertingRow) return false;
+		isInsertingRow = true;
+
+		const grid = mnGridView.target;
+		// 버튼(그리드 바깥 영역) 클릭으로 getFocusedCell()이 null이 되는 경우 마지막으로 포커스됐던 셀을 대신 사용.
+		// rowKey는 resetData() 때마다 재배정되므로 즉시 업무키(mnSubSeq 등)로 변환해 들고 있는다.
+		const fc = grid.getFocusedCell();
+		let focusedRowInfo = lastFocusedRowInfo;
+		if (fc && fc.rowKey !== undefined && fc.rowKey !== null) {
+			const fcRow = grid.getRow(fc.rowKey);
+			if (fcRow) {
+				focusedRowInfo = { isNoticeRow: !!fcRow.isNoticeRow, isFileRow: !!fcRow.isFileRow, mnSubSeq: fcRow.mnSubSeq };
+			}
+		}
+
+		postAjax('/user/pm/pm10/getNextSubSeq', {}, null, function (data) {
+			isInsertingRow = false;
+			if (data && data.resultCode === 200) {
+				// 서버 응답을 기다리는 동안 다른 사용자/폴링으로 그리드 상태가 바뀔 수 있으므로,
+				// 삽입 위치는 요청 전이 아니라 응답을 받은 이 시점에 다시 계산한다.
+				const list = grid.getData();
+
+				// 공지사항/파일첨부는 항상 맨 뒤에 있어야 하므로, 둘 중 더 앞쪽 인덱스를 절대 넘어가지 못하게 한다.
+				const noticeIndex = list.findIndex(r => r.isNoticeRow);
+				const fileIndex = list.findIndex(r => r.isFileRow);
+				const tailIndexes = [noticeIndex, fileIndex].filter(i => i >= 0);
+				const defaultInsertIndex = tailIndexes.length ? Math.min(...tailIndexes) : list.length;
+
+				// 선택 행은 rowKey(resetData마다 재배정되어 신뢰 불가) 대신 업무키(mnSubSeq/isNoticeRow/isFileRow)로 찾는다.
+				const selIndex = focusedRowInfo ? list.findIndex(r =>
+					(focusedRowInfo.isNoticeRow && r.isNoticeRow) ||
+					(focusedRowInfo.isFileRow && r.isFileRow) ||
+					(!focusedRowInfo.isNoticeRow && !focusedRowInfo.isFileRow && !r.isNoticeRow && !r.isFileRow && String(r.mnSubSeq) === String(focusedRowInfo.mnSubSeq))
+				) : -1;
+				const sel = selIndex >= 0 ? list[selIndex] : null;
+				// 선택한 셀의 행 "바로 위"에 삽입 (splice가 해당 인덱스 앞에 끼워넣으므로 selIndex 그대로 사용)
+				const insertIndex = (sel && !sel.isNoticeRow && !sel.isFileRow)
+					? Math.min(selIndex, defaultInsertIndex)
+					: defaultInsertIndex;
+
+				const newRow = {
+					mnDate: $('#mnDate_S').val(),
+					mnWeeks: $('#mnWeeks_S').val(),
+					mnSubSeq: data.newSubSeq,
+					mnSubject: '',
+					mnSortNo: 0,
+					isNoticeRow: false,
+					isFileRow: false,
+					// getNextSubSeq가 미리 채번해주므로 mnSubSeq는 항상 0이 아니다. 즉 "저장 여부"를
+					// mnSubSeq 유무로는 판별할 수 없어, 실제 D01/D03 저장이 한 번도 일어나지 않은
+					// 행임을 별도로 표시해 둔다 (행삭제가 서버에 없는 행을 지우려 시도하는 것을 방지).
+					isUnsaved: true,
+					d01LockYn: '',
+					d01LockUserNm: ''
+				};
+				// resultKey(예: gun30MnResult)는 그리드 컬럼이 아니라 appendRow가 기본값을 채워주지
+				// 않는다(컬럼은 채워줌). 슬롯 자체가 없으면 이후 회의결과를 입력해 저장해도 store에는
+				// 반영되지만 getRow()로 못 읽혀, 신규 행에서는 "회의결과 입력됨" 강조표시와 행삭제의
+				// 회의결과 판별(deleteMn)이 동작하지 않는다. 처음부터 슬롯을 만들어 둔다.
+				Object.keys(deptCodeMap).forEach(colKey => {
+					newRow[colKey.replace('MnCnts', 'MnResult')] = '';
+					const prefix = deptCodeMap[colKey].toLowerCase().replace(/([a-z])(\d)/g, '$1$2');
+					newRow[prefix + 'LockYn'] = '';
+					newRow[prefix + 'LockUserNm'] = '';
+					newRow[prefix + 'LockDiv'] = '';
+					newRow[prefix + 'UdtId'] = '';
+				});
+				// resetData()로 그리드 전체를 매번 다시 그리면(rowHeight:'auto' + frozenCount 조합에서)
+				// TOAST UI Grid가 이전 행의 DOM(<tr>)을 완전히 정리하지 못하고 같은 rowKey를 공유한
+				// 채 남기는 경우가 있어, 반복 호출 시 행 중복/크로스헤어 다중표시/엉뚱한 행 편집으로
+				// 이어진다. 신규 행 1개만 끼워 넣을 때는 전체를 다시 그리지 않는 appendRow를 사용해
+				// 해당 부분만 갱신한다.
+				grid.appendRow(newRow, { at: insertIndex });
+				recalcSortOrder(true);
+
+				const freshRow = grid.getData().find(r => !r.isNoticeRow && !r.isFileRow && String(r.mnSubSeq) === String(newRow.mnSubSeq));
+				if (freshRow) refocusRow(freshRow.rowKey, 'mnSubject');
+			} else {
+				alert('행 번호 채번 실패: ' + ((data && data.resultMessage) || '알 수 없는 서버 오류'));
+			}
+		}, false);
+	}
+
+	// 행 삭제
+	function deleteMn() {
+		if ($('#mnDiv_S').val() === 'MNDIV99') {
+			alert('전체조회 화면에서는 행을 삭제할 수 없습니다.');
+			return false;
+		}
+		const grid = mnGridView.target;
+		const list = grid.getData();
+		const fileRow = list.find(r => r.isFileRow);
+		const sel = resolveSelectedRow(grid, list);
+		if (!sel) {
+			alert("삭제할 주제를 선택하세요!");
+			return false;
+		}
+
+		if (sel.mnSubject == "파일첨부" || ((sel.mnSubSeq == 0) && (sel.mnSubject == '공지사항'))) {
+			return false;
+		}
+
+		if (sel.d01LockYn === 'Y') {
+			alert((sel.d01LockUserNm || '다른 사용자') + "님이 편집 중인 행은 삭제할 수 없습니다.");
+			return false;
+		}
+		const deptCols = Object.keys(deptCodeMap);
+		for (const colKey of deptCols) {
+			const deptCd = deptCodeMap[colKey];
+			const prefix = deptCd.toLowerCase().replace(/([a-z])(\d)/g, '$1$2');
+			if (sel[prefix + 'LockYn'] === 'Y') {
+				alert((sel[prefix + 'LockUserNm'] || '다른 사용자') + "님이 편집 중인 행은 삭제할 수 없습니다.");
+				return false;
+			}
+		}
+
+		// getNextSubSeq가 미리 채번해주기 때문에 mnSubSeq만으로는 "저장 여부"를 판별할 수 없다.
+		// D01/D03 저장이 한 번도 성공하지 않은 행(isUnsaved)은 서버에 삭제할 대상이 없으므로,
+		// 서버 호출 없이 그리드에서만 제거한다 (서버에 보내면 0건 삭제로 실패 처리되어 오작동한다).
+		if (sel.isUnsaved) {
+			// 삭제할 행 자신을 저장할 필요는 없으므로(곧 지울 행이라 의미가 없음), 편집기가 열려
+			// 있다면 값 없이 finishEditing을 호출해 저장 없이 닫고(락만 정리) 그리드에서 제거한다.
+			if (activeEditorCtx) {
+				try { grid.finishEditing(); } catch (e) { }
+			}
+			grid.removeRow(sel.rowKey);
+			recalcSortOrder(true);
+			grid.blur();
+			clearXhairClasses();
+			lastFocusedRowInfo = null;
+			return;
+		}
+
+		// 이미 저장된 행을 삭제하는 경우에는 서버 삭제 요청이 항상 전송되므로, 편집 중이던 내용을
+		// 먼저 커밋해도(또는 커밋과 삭제가 경합해도) 고아 레코드가 남지 않는다 - 삭제 자체가 처리된다.
+		commitActiveEdit();
+
+		const targetCols = deptCols.filter(colKey => {
+			const resultKey = colKey.replace('MnCnts', 'MnResult');
+			return sel[resultKey] && sel[resultKey].toString().trim() !== '';
+		});
+		const hasResult = targetCols.length > 0;
+
+		// 회의결과 화면에서는 행 자체(주제 등)를 지우는 게 아니라 부서별 회의결과만 비우는 것이
+		// 본래 목적이므로, 사전공지 화면에서만 적용되는 "결과 있는 행은 삭제 금지" 차단을 여기서는
+		// 적용하지 않고 부서별 mnResult를 모두 비워 저장한다.
+		if ($('#mnDiv_S').val() === 'MNDIV02') {
+			if (!hasResult) {
+				alert("삭제할 회의결과가 없습니다.");
+				return false;
+			}
+			if (!confirm("선택한 행의 회의결과를 모두 삭제하시겠습니까?")) {
+				return false;
+			}
+			// 회의결과 모드에서는 화면에 보이는 부서 컬럼(colKey)이 "결과가 있으면 결과, 없으면
+			// 사전공지 내용"을 보여주도록 로드 시점에 덮어써져, 원래의 사전공지 내용(mnCnts)은
+			// 클라이언트 쪽에 더 이상 남아 있지 않다. 그래서 결과를 비운 직후 colKey를 그냥 빈
+			// 문자열로 setValue하면 실제로는 존재하는 사전공지 내용이 화면에서 사라져 보인다.
+			// 부서별 삭제 저장이 모두 끝난 뒤 서버에서 다시 조회해야 사전공지 내용이 정확히
+			// 복원된다(행 전체 삭제와 동일하게 성공 후 setData()로 새로고침).
+			let remaining = targetCols.length;
+			targetCols.forEach(colKey => {
+				pm10_d03_update(sel, colKey, '', () => {
+					remaining -= 1;
+					if (remaining <= 0) mnGridView.setData();
+				});
+			});
+			return;
+		}
+
+		if (hasResult) {
+			alert("회의결과가 있는 행은 삭제할 수 없습니다.");
+			return false;
+		}
+		if (!confirm("선택한 행을 정말 삭제하시겠습니까?")) {
+			return false;
+		}
+		const paramObj = {
+			mnDate: sel.mnDate,
+			mnSubSeq: sel.mnSubSeq,
+			fileInfoJson: JSON.stringify(fileRow ? fileRow.filesByColumn : {})
+		};
+		postAjax("/user/pm/pm10/deleteMn", paramObj, null, function (data) {
+			if (data && data.resultCode == 200) {
+				// 삭제된 행의 rowKey는 setData()의 resetData로 재배정되므로, 미리 포커스/크로스헤어를
+				// 비워 reassign된 rowKey가 엉뚱한 행에 강조 표시를 남기는 것을 방지한다.
+				grid.blur();
+				clearXhairClasses();
+				lastFocusedRowInfo = null;
+				mnGridView.setData();
+			} else {
+				alert("삭제 실패: " + ((data && data.resultMessage) || '알 수 없는 오류'));
+				mnGridView.updateData(true);
+			}
+		});
+	}
+
+	// 회의 주제 Insert, Update
+	function pm10_d01_update(item, colKey, value) {
+		item[colKey] = value;
+
+		const normalRows = mnGridView.target.getData().filter(r => !r.isFileRow && !r.isNoticeRow);
+		let newSubSeq, newSortNo;
+
+		if (item.isNoticeRow) {
+			newSubSeq = item.mnSubSeq;
+			newSortNo = normalRows.length + 1;
+			item.mnSortNo = newSortNo;
+		} else {
+			newSubSeq = item.mnSubSeq;
+			// getData()는 매번 새로 복제된 배열을 반환하므로 r === item(참조비교)은 항상 실패한다.
+			// rowKey로 비교해야 자기 행을 정확히 찾을 수 있다.
+			newSortNo = normalRows.findIndex(r => r.rowKey === item.rowKey) + 1;
+			item.mnSortNo = newSortNo;
+		}
+
+		lastEditedCell = {
+			mnDate: $('#mnDate_S').val(),
+			mnSubSeq: newSubSeq,
+			colKey: colKey,
+			isNoticeRow: !!item.isNoticeRow
+		};
+
+		const paramObj = {
+			mnDate: $('#mnDate_S').val(),
+			mnWeeks: $('#mnWeeks_S').val(),
+			mnSubSeq: newSubSeq,
+			mnSubject: item.mnSubject,
+			mnSortNo: newSortNo,
+			mnEtcAll: item.mnEtcAll,
+			mnStatus: item.mnStatus,
+			userId: $('#userId').val(),
+			pgmId: $('#pgmId').val()
+		};
+
+		isSaving = true;
+		postAjax('/user/pm/pm10/pm10_d01_update', paramObj, null, function (data) {
+			const lockToRelease = currentLockInfo;
+			if (lockToRelease) unlockCell(lockToRelease, false);
+			isSaving = false;
+			if (!data || data.status || data.resultCode !== 200) {
+				const errMsg = (data && data.responseJSON && data.responseJSON.resultMessage)
+					|| (data && data.resultMessage)
+					|| '알 수 없는 서버 오류';
+				alert('수정 실패: ' + errMsg);
+				mnGridView.setData();
+			} else {
+				if (data.newSubSeq) {
+					item.mnSubSeq = parseInt(data.newSubSeq);
+				}
+				markRowSaved(item.rowKey);
+			}
+			flushPendingSaveCallbacks();
+		}, false);
+	}
+
+	// 팀별 회의 내용 Insert, Update
+	// onComplete: 이 호출 자체의 저장 응답이 온 뒤 바로 실행할 작업(예: 행삭제의 부서별 회의결과
+	// 일괄 비우기에서 N개 호출이 모두 끝난 시점 판단). 셀 편집의 일반 저장 흐름에는 영향 없다.
+	function pm10_d03_update(item, colKey, value, onComplete) {
+		const dataRows = mnGridView.target.getData().filter(r => !r.isFileRow && !r.isNoticeRow && r.mnSubSeq > 0);
+		const newSubSeq = item.mnSubSeq;
+		// 저장 응답은 비동기로 나중에 오므로, 응답 콜백 안에서 #mnDiv_S를 다시 읽으면 그 사이
+		// 구분이 바뀌었을 때 어느 필드에 실제로 저장됐는지와 다른 값을 보고 판단하게 된다. 호출
+		// 시점의 구분값을 고정해 paramObj 구성과 응답 처리 모두 같은 값을 기준으로 삼는다.
+		const mnDivAtSave = $("#mnDiv_S").val();
+
+		lastEditedCell = {
+			mnDate: $('#mnDate_S').val(),
+			mnSubSeq: newSubSeq,
+			colKey: colKey,
+			isNoticeRow: !!item.isNoticeRow
+		};
+
+		const paramObj = {
+			mnDate: $('#mnDate_S').val(),
+			mnWeeks: $('#mnWeeks_S').val(),
+			mnDiv: mnDivAtSave,
+			mnSubject: item.mnSubject,
+			mnSubSeq: newSubSeq,
+			mnSortNo: item.isNoticeRow ? (dataRows.length + 1) : gPasIntChk(item.mnSortNo),
+			mnDeptCd: deptCodeMap[colKey],
+			mnCnts: mnDivAtSave === 'MNDIV01' ? value : '',
+			mnEtc: '',
+			mnEtcAll: item.mnEtcAll,
+			mnResult: mnDivAtSave === 'MNDIV02' ? value : '',
+			mnStatus: item.mnStatus,
+			clntPjt: '',
+			clntCd: '',
+			userId: $('#userId').val(),
+			pgmId: $('#pgmId').val()
+		};
+		isSaving = true;
+		postAjax('/user/pm/pm10/pm10_d03_update', paramObj, null, function (data) {
+			const lockToRelease = currentLockInfo;
+			if (lockToRelease) unlockCell(lockToRelease, false);
+			isSaving = false;
+			if (!data || data.status || data.resultCode !== 200) {
+				const errMsg = (data && data.responseJSON && data.responseJSON.resultMessage)
+					|| (data && data.resultMessage)
+					|| '알 수 없는 서버 오류';
+				alert('수정 실패: ' + errMsg);
+				mnGridView.setData();
+			} else {
+				if (data.newSubSeq) {
+					item.mnSubSeq = parseInt(data.newSubSeq);
+				}
+				markRowSaved(item.rowKey);
+				// resultKey(예: gun30MnResult)는 로드 시점에 한 번 채워지는 원본 데이터라, 새로
+				// 저장된 회의결과를 반영해두지 않으면 새로고침 전까지 "결과 없음"으로 잘못 판별된다
+				// (행삭제의 회의결과 일괄삭제가 이 값으로 대상을 고르기 때문에 직접 영향을 받는다).
+				let needsRerender = false;
+				if (mnDivAtSave === 'MNDIV02') {
+					const resultKey = colKey.replace('MnCnts', 'MnResult');
+					isSyncing = true;
+					try { mnGridView.target.setValue(item.rowKey, resultKey, value); } finally { isSyncing = false; }
+					needsRerender = true;
+				}
+				// UDT_ID(최종수정자)는 사전공지/회의결과 구분 없이 매 저장마다 갱신되므로 division과
+				// 무관하게 항상 반영해 "내 입력" 색 구분을 갱신한다.
+				if (deptCodeMap[colKey]) {
+					const udtIdKey = deptCodeMap[colKey].toLowerCase().replace(/([a-z])(\d)/g, '$1$2') + 'UdtId';
+					isSyncing = true;
+					try { mnGridView.target.setValue(item.rowKey, udtIdKey, $('#userId').val()); } finally { isSyncing = false; }
+					needsRerender = true;
+				}
+				// 편집 커밋 시점(finishEditing → setValue(colKey))에 이미 한 번 재렌더링됐지만, 그때는
+				// 아직 위 resultKey/udtIdKey가 갱신되기 전이라 셀 강조표시(DeptCellRenderer의
+				// mn-result-filled/mn-my-edit)가 옛 상태로 그려졌을 수 있다. 값이 최신화된 지금
+				// 다시 그려 강조표시를 맞춘다.
+				if (needsRerender) {
+					refreshCellRender(item.rowKey, colKey);
+				}
+			}
+			flushPendingSaveCallbacks();
+			if (typeof onComplete === 'function') onComplete(data);
+		}, false);
+	}
+
+	// 참석자 update
+	function pm10_d02_update(onSuccess) {
+		if ($("#mnDiv_S").val() == 'MNDIV99') {
+			if (typeof onSuccess === 'function') onSuccess();
+			return false;
+		}
+		const list = attendList.map(item => {
+			const isChecked = $(`#attendCheckboxContainer .attend-item[data-id="${item.id}"] .attend-checkbox`).is(':checked');
+			return { attendId: item.id, reasonCd: isChecked ? 'Y' : 'N', reasonRmk: '' };
+		});
+		const paramObj = {
+			mnDate: $('#mnDate_S').val(),
+			userId: $('#userId').val(),
+			pgmId: $('#pgmId').val(),
+			attendList: list
+		};
+		postAjax('/user/pm/pm10/pm10_d02_update', paramObj, null, data => {
+			if (data && data.resultCode == 200) {
+				if ($("#mnDiv_S").val() == 'MNDIV02') {
+					attendFlag = false;
+				}
+				if (typeof onSuccess === 'function') onSuccess();
+			} else {
+				alert('참석자 저장 실패: ' + ((data && data.resultMessage) || '알 수 없는 서버 오류'));
+			}
+		});
+	}
+
+	// 참석자 삭제
+	function pm10_d02_delete() {
+		const toRemoveIds = $('.attend-item.to-remove').map((_, el) => $(el).data('id')).get();
+		if (!toRemoveIds.length) {
+			alert('삭제할 대상을 클릭해 선택하세요.');
+			return;
+		}
+
+		const fixedToUncheck = toRemoveIds.filter(id => FIXED_ORDER.includes(id));
+		const nonFixedToDelete = toRemoveIds.filter(id => !FIXED_ORDER.includes(id));
+
+		function proceedNonFixedDelete() {
+			if (nonFixedToDelete.length) {
+				postAjax('/user/pm/pm10/pm10_d02_delete', {
+					mnDate: $('#mnDate_S').val(),
+					attendIds: nonFixedToDelete
+				}, null, data => {
+					if (data && data.resultCode === 200) {
+						attendList = attendList.filter(u => !nonFixedToDelete.includes(u.id));
+						renderAttendList();
+					} else {
+						alert('참석자 삭제 실패: ' + ((data && data.resultMessage) || '알 수 없는 서버 오류'));
+					}
+				});
+			}
+		}
+
+		if (fixedToUncheck.length) {
+			attendList = attendList.map(u => fixedToUncheck.includes(u.id) ? { ...u, reasonCd: 'N' } : u);
+			renderAttendList();
+			pm10_d02_update(function () {
+				proceedNonFixedDelete();
+			});
+		} else {
+			proceedNonFixedDelete();
+		}
+	}
+
+	// 첨부파일 Start
+	function mnUploadFile() {
+		try {
+			if (currentFileRow && currentFileColumn) {
+				lastEditedCell = { isFileRow: true, colKey: currentFileColumn };
+			}
+
+			const formData = new FormData();
+			formData.append("userId", $("#userId").val());
+			formData.append("pgmId", $("#pgmId").val());
+
+			$.each(mnFileArr, function (idx, obj) {
+				if (obj.fileKey === 0) {
+					formData.append("files", obj.file);
+				}
+			});
+
+			formData.append("deleteFileArr", JSON.stringify(deleteFileArr));
+			formData.append("fileTrgtKey", $("#mnDate_S").val().replace(/-/g, "") + "-" + deptCodeMap[currentFileColumn]);
+
+			filePostAjax("/user/pm/pm10/mnUploadFile", formData, function (data) {
+				mnGridView.setData();
+				mnFileArr = [];
+				deleteFileArr = [];
+			});
+		} catch (e) {
+			console.error("파일 업로드 오류:", e);
+			mnFileArr = [];
+			deleteFileArr = [];
+			alert("파일 업로드 준비 중 오류가 발생했습니다.");
+		}
+	}
+
+	// 엑셀다운로드
+	function jsonToExcel(gridView) {
+		const list = gridView.target.getData().map(row => {
+			const newRow = { ...row };
+			if (newRow.isFileRow && newRow.filesByColumn) {
+				Object.keys(newRow.filesByColumn).forEach(colKey => {
+					const files = newRow.filesByColumn[colKey];
+					if (files && files.length > 0) {
+						newRow[colKey] = files.map(f => f.name).join('\r\n');
+					}
+				});
+			}
+			return newRow;
+		});
+
+		exportJSONToExcel(list, excelColumnsMeta, "임팀장주간회의록");
+	}
+
+	// 체크박스 렌더링 함수
+	function renderAttendList() {
+		const container = $('#attendCheckboxContainer').empty();
+		attendList.forEach(item => {
+			const isChecked = item.reasonCd === 'Y';
+			const $item = $(`
+				<div class="attend-item" data-id="${item.id}">
+					<input type="checkbox" class="attend-checkbox" ${isChecked ? 'checked' : ''}/>
+					${item.name} ${item.title}
+				</div>`
+			);
+
+			$item.on('click', function (e) {
+				if (!$(e.target).hasClass('attend-checkbox')) {
+					$(this).toggleClass('to-remove');
+				}
+			});
+
+			$item.find('.attend-checkbox').on('change', function () {
+				pm10_d02_update();
+			});
+			container.append($item);
+		});
+	}
+
+	// 참석자 검색
+	function openUserSearch() {
+		const paramObj = { coCd: $('#coCd_S').val(), userId: '', userNm: '' };
+		openSecondModal("/static/html/cmn/modal/userSearch.html", 450, 650, "사용자 검색", paramObj, function (tree) {
+			const sel = tree.get_checked()[0];
+			const node = tree.get_node(sel);
+			if (!attendList.some(u => u.id === node.id)) {
+				attendList.push({
+					id: node.id,
+					name: node.text,
+					title: node.original.levelNm,
+					reasonCd: 'Y'
+				});
+				reorderAttendList();
+				renderAttendList();
+				pm10_d02_update();
+			}
+		});
+	}
+
+	// 선택된 행 하나를 위로 한 칸 이동
+	function moveSelectedUp() {
+		if ($('#mnDiv_S').val() === 'MNDIV99') {
+			alert('전체조회 화면에서는 행을 이동할 수 없습니다.');
+			return false;
+		}
+		commitActiveEdit();
+		const grid = mnGridView.target;
+		const list = grid.getData().slice();
+		const sel = resolveSelectedRow(grid, list);
+
+		if (!sel) { alert("이동할 행을 선택하세요"); return; }
+		if (sel.isNoticeRow || sel.isFileRow) return;
+
+		const idx = list.findIndex(r => r.mnDate === sel.mnDate && r.mnSubSeq === sel.mnSubSeq);
+		if (idx <= 0) return;
+
+		const fc = grid.getFocusedCell();
+		const colKey = (fc && fc.columnName) ? fc.columnName : 'mnSubject';
+
+		// resetData는 전체 rowKey를 재배정해 포커스/크로스헤어가 끊기거나 엉뚱한 행으로 옮겨가므로,
+		// rowKey를 그대로 유지하는 moveRow로 해당 행만 옮긴다 (행추가의 appendRow와 동일한 이유).
+		grid.moveRow(sel.rowKey, idx - 1);
+		recalcSortOrder(true);
+
+		refocusRow(sel.rowKey, colKey);
+	}
+
+	// 선택된 행 하나를 아래로 한 칸 이동
+	function moveSelectedDown() {
+		if ($('#mnDiv_S').val() === 'MNDIV99') {
+			alert('전체조회 화면에서는 행을 이동할 수 없습니다.');
+			return false;
+		}
+		commitActiveEdit();
+		const grid = mnGridView.target;
+		const list = grid.getData().slice();
+		const sel = resolveSelectedRow(grid, list);
+
+		if (!sel) { alert("이동할 행을 선택하세요"); return; }
+		if (sel.isNoticeRow || sel.isFileRow) return;
+
+		const idx = list.findIndex(r => r.mnDate === sel.mnDate && r.mnSubSeq === sel.mnSubSeq);
+		if (idx < 0 || idx >= list.length - 1) return;
+
+		const noticeIdx = list.findIndex(r => r.isNoticeRow);
+		if (noticeIdx >= 0 && idx + 1 >= noticeIdx) return;
+
+		const fc = grid.getFocusedCell();
+		const colKey = (fc && fc.columnName) ? fc.columnName : 'mnSubject';
+
+		// resetData는 전체 rowKey를 재배정해 포커스/크로스헤어가 끊기거나 엉뚱한 행으로 옮겨가므로,
+		// rowKey를 그대로 유지하는 moveRow로 해당 행만 옮긴다 (행추가의 appendRow와 동일한 이유).
+		grid.moveRow(sel.rowKey, idx + 1);
+		recalcSortOrder(true);
+
+		refocusRow(sel.rowKey, colKey);
+	}
+
+	// 공지사항/파일첨부는 항상 마지막 두 행이어야 하는 불변식. 폴링 병합 등 어떤 경로로
+	// 만들어진 목록이든 resetData에 넘기기 전에 항상 이 함수로 강제하고, 동일 mnSubSeq
+	// 데이터 행이 중복으로 섞여 있으면 제거한다 (병합 로직 버그로 같은 행이 두 번 들어가도 방어).
+	function normalizeRowOrder(list) {
+		const seen = new Set();
+		const dataRows = [];
+		let noticeRow = null;
+		let fileRow = null;
+		list.forEach(row => {
+			if (row.isFileRow) { if (!fileRow) fileRow = row; return; }
+			if (row.isNoticeRow) { if (!noticeRow) noticeRow = row; return; }
+			const key = String(row.mnSubSeq);
+			if (seen.has(key)) return;
+			seen.add(key);
+			dataRows.push(row);
+		});
+		return [...dataRows, noticeRow, fileRow].filter(Boolean);
+	}
+
+	// D01/D03 저장이 처음으로 성공하면 해당 행의 isUnsaved를 해제한다. getData()/getRow()는 클론을
+	// 반환하므로 grid.setValue로 실제 store에 반영해야 다음 행삭제 시 정확히 판별할 수 있다.
+	function markRowSaved(rowKey) {
+		if (rowKey === undefined || rowKey === null) return;
+		const grid = mnGridView.target;
+		const row = grid.getRow(rowKey);
+		if (!row || !row.isUnsaved) return;
+		isSyncing = true;
+		try { grid.setValue(rowKey, 'isUnsaved', false); } finally { isSyncing = false; }
+	}
+
+	// 정렬순서 함수 (saveToServer=false 인 일반 편집 경로에서는 그리드를 다시 그리지 않아 포커스/스크롤을 보존한다)
+	function recalcSortOrder(saveToServer) {
+		const grid = mnGridView.target;
+		const allRows = grid.getData();
+
+		const noticeRow = allRows.find(r => r.isNoticeRow);
+		const dataRows = allRows.filter(r => !r.isFileRow && !r.isNoticeRow);
+
+		if (dataRows.length == 0 && noticeRow && noticeRow.mnSortNo == 0) {
+			return false;
+		}
+
+		// getData()가 반환하는 행은 클론이라 row.mnSortNo 직접 대입만으로는 그리드 내부 store에 반영되지
+		// 않는다. setValue로 실제 store에 반영하지 않으면, 다음 폴링에서 grid.getData()로 다시 읽은
+		// mnSortNo가 옛 값(신규 행은 0)으로 남아있어 정렬이 깨지고 행이 엉뚱한 위치(파일첨부 뒤 등)에
+		// 나타나는 원인이 된다. mnSortNo는 그리드 컬럼이 아니지만 setValue는 afterChange를 그대로
+		// 발생시키므로, pm10_d01_update/d03_update로 잘못 저장되지 않도록 isSyncing으로 감싼다.
+		isSyncing = true;
+		try {
+			dataRows.forEach((row, idx) => {
+				const newSortNo = idx + 1;
+				row.mnSortNo = newSortNo;
+				grid.setValue(row.rowKey, 'mnSortNo', newSortNo);
+			});
+			if (noticeRow) {
+				const noticeSortNo = noticeRow.mnSubSeq > 0 ? dataRows.length + 1 : 0;
+				noticeRow.mnSortNo = noticeSortNo;
+				grid.setValue(noticeRow.rowKey, 'mnSortNo', noticeSortNo);
+			}
+		} finally {
+			isSyncing = false;
+		}
+
+		if (saveToServer === true) {
+			const sortSave = allRows
+				.filter(r => !r.isFileRow && r.mnSubSeq > 0)
+				.map(r => ({ mnSubSeq: r.mnSubSeq, mnSortNo: r.mnSortNo }));
+
+			const paramObj = {
+				mnDate: $('#mnDate_S').val(),
+				userId: $('#userId').val(),
+				pgmId: $('#pgmId').val(),
+				list: sortSave
+			};
+			postAjax('/user/pm/pm10/pm10_d01_sortNo_update', paramObj, null, function () { }, false);
+		}
+	}
+
+	// Select 선택 코드값 체크하여 명을 출력
+	function getComboName(comboArray, key) {
+		let rtnNm = "";
+		for (const element of comboArray) {
+			if (key.value == element.CD) {
+				rtnNm = element.NM;
+				break;
+			}
+		}
+		return rtnNm;
+	}
+
+	// 참석자 정렬 함수
+	function reorderAttendList() {
+		attendList.sort((a, b) => {
+			const ia = FIXED_ORDER.indexOf(a.id);
+			const ib = FIXED_ORDER.indexOf(b.id);
+			if (ia !== -1 && ib !== -1) return ia - ib;
+			if (ia !== -1) return -1;
+			if (ib !== -1) return 1;
+			return 0;
+		});
+	}
+
+	// 임팀장주간회의록 출력
+	function setReport(_type = "") {
+		const arg =
+			"coCd#" + $('#coCd_S').val()
+			+ "#mnDate#" + $("#mnDate_S").val()
+			+ "#mnDiv#" + $("#mnDiv_S").val()
+			+ "#";
+		const fileName = "PM1002R01.jrf";
+		if (_type == '' || _type == 'S' || _type == undefined) {
+			const todayDate = new Date().format('yyyyMMddHHmmss');
+			callReport(fileName, arg, 1150, 720, $('#mnDate_S').val() + '임팀장주간회의록' + todayDate);
+		} else {
+			ubiExportAjax(fileName, arg, function (response) {
+				if (response.resultCode === 200) {
+					downloadPDFFromBase64(response.base64FileData, response.exportFileName);
+				} else {
+					alert('PDF 내보내기 실패: ' + response.resultText);
+				}
+			});
+		}
+	}
+
+	// 기본참석자
+	function defalutAttendList(list) {
+		const defaultList = Array.isArray(list) ? list : [];
+		fixedAttendList = defaultList.map(user => ({
+			id: user.id,
+			name: user.name,
+			title: user.title || ''
+		}));
+		FIXED_ORDER = fixedAttendList.map(user => user.id);
+	}
+</script>
