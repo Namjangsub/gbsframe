@@ -119,7 +119,7 @@ public class CR11SvcImpl implements CR11Svc {
 			//"dataChk" 값을 확인하여 "I"인 경우 세부정보를 삽입
 	    	if ("U".equals(dataChk)) {
 				//데이터 처리
-	    		result = cr11Mapper.update_cr11_Modal(dtl);
+	    		result += cr11Mapper.update_cr11_Modal(dtl);
 	    	} 
 	    }
 			    
@@ -129,11 +129,11 @@ public class CR11SvcImpl implements CR11Svc {
 		if (uploadFileList.size() > 0) {
 			paramMap.put("fileTrgtTyp", paramMap.get("pgmId"));
 			paramMap.put("fileTrgtKey", paramMap.get("fileTrgtKey"));
-			cm08Svc.uploadFile(paramMap, mRequest);
+			result += cm08Svc.uploadFile(paramMap, mRequest);
 		}
 		
 		for(String fileKey : deleteFileList) {
-			cm08Svc.deleteFile(fileKey);
+			result += cm08Svc.deleteFile(fileKey);
 		}
 		//---------------------------------------------------------------
 		//첨부 화일 처리  끝
