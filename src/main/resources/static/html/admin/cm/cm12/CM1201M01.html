@@ -34,6 +34,7 @@
 <script src="/static/js/jstree/jstree.min.js"></script>
 <script src="/static/js/fileTree.js"></script>
 <script src="/static/js/global.js"></script>
+<script src="/static/js/ax5/ax5formatter.min.js"></script>
 <script src="/static/js/jquery.blockUI.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/heic2any/dist/heic2any.min.js"></script>
 
@@ -231,7 +232,7 @@
 					<span class="page_tit" style="text-align: right;"> 문서현황</span>
 				</h3>
 				<div class="contents" style="margin:0px;padding:0 5px;height:100%; width:100%; min-width:300px">
-					<div id="my-grid" data-ax5grid="file-grid" data-ax5grid-config="{}" style="height: 100%; width: 100%"></div>
+					<div id="my-grid" data-ax5grid="cm1201-file-grid" data-ax5grid-config="{}" style="height: 100%; width: 100%"></div>
 				</div>
 			</div>
 		</div>
@@ -248,7 +249,7 @@
 				this.target = new ax5.ui.grid();
 				var _this = this;
 				this.target.setConfig({
-			    	target: $('[data-ax5grid="file-grid"]'),
+			    	target: $('[data-ax5grid="cm1201-file-grid"]'),
 // 			        showLineNumber: true,
 // 	                lineNumberColumnWidth: 40,
 	                showRowSelector : true,
@@ -367,6 +368,10 @@
 							customAlert("파일 미리보기 권한이 없습니다.");
 							return false;
 						}
+						// 등록화면 부모 메뉴 접근권한 체크
+						if (!checkFileTargetAuth(item)) {
+							return false;
+						}
 						let tempFileName = item.lpath + '-' + item.fileName;
 
 						let imageList = getPreviewFileList(grid);
@@ -398,7 +403,7 @@
 				paramObj["searchValue"]  = $("#searchValue_S").val();
 				paramObj["searchName"]   = $("#searchName_S").val();
 				paramObj["pageNo"] = _pageNo + 1;
-				paramObj["comonCd"] = comonCd;
+				paramObj["comonCd"] = comonCd == 'PARENT_FILETREE' ? 'FILETREE' : comonCd;
 				paramObj["userId"] = jwt.userId;
 
 				postAjax("/admin/cm/cm08/selectTreeFileList", paramObj, null, function(data){
@@ -580,7 +585,7 @@
 			$('#deptTree').jstree(true).select_node(selectedId);
 
 			var tree = $("#deptTree").jstree(true);
-			const topNode = 'FILETREE';
+			const topNode = 'PARENT_FILETREE';
 			const rootNode = tree.get_node(topNode);
 
 			//자식노드중에 isLeaf가 1인 자식인 하나도 없으면 트리목록 삭제 처리
@@ -641,6 +646,12 @@
 		postAjaxSync("/admin/cm/cm05/selectDocTreeListAuth", paramObj, null, function(data){
 			deptTree = (data && data.docTreeList) ? data.docTreeList : [];
 			for (let i = 0; i < deptTree.length; i++) {
+				if (deptTree[i].id == 'FILETREE') {
+					deptTree[i].id = 'PARENT_FILETREE';
+				}
+				if (deptTree[i].parent == 'FILETREE') {
+					deptTree[i].parent = 'PARENT_FILETREE';
+				}
 				if (deptTree[i].isLeaf == '1') {
 					deptTree[i].permCode = buildPermCode(deptTree[i]);
 					deptTree[i].text = deptTree[i].text + ' (' + deptTree[i].permCode +')';
@@ -955,6 +966,87 @@
 	}
 
 
+	const entryPgmConfig = {
+		"TB_BM99P01": { url: "/static/html/admin/bm/bm99/BM9901P01.html", width: 1000, height: 700, parentMenuId: "NONE" },					// 매뉴얼
+		"TB_CM09M01": { url: "/static/html/admin/cm/cm09/CM0902P02.html", width: 1400, height: 870, actionType: "U", parentMenuId:"CM0901M02"},	// 공지사항
+		"TB_CM14M01": { url: "/static/html/admin/cm/cm14/CM1401P01.html", width: 1400, height: 870, actionType: "U",  parentMenuId:"CM1401M01"},	// 자료실
+		"TB_BM02M01": { url: "/static/html/admin/bm/bm02/BM0202P01.html", width: 1500, height: 870, actionType: "U", parentMenuId:"BM0201M01"},	// 거래처관리
+		"BM0501P01": { url: "/static/html/user/bm/bm05/BM0501P01.html", width: 1600, height: 850, actionType: "U", parentMenuId : "BM0501M01"},	// 자재마스터
+		"BM1001P01": { url: "/static/html/user/bm/bm10/BM1001P01.html", width: 1600, height: 850, actionType: "U", parentMenuId: "BM1001M01"},	// 제품마스터
+		"CM1601M01": { url: "/static/html/admin/cm/cm16/CM1601P01.html", width: 1100, height: 850, actionType: "U", parentMenuId: "CM1601M01"},	// 업무요청
+		"BM1601P01": { url: "/static/html/admin/bm/bm16/BM1601P01.html", width: 1600, height: 850, actionType: "U", parentMenuId: "BM1601M01"},	// 프로젝트관리
+		// 임팀장주간회의자료는 새탭으로 열기
+		"CR0101M01": { url: "/static/html/user/cr/cr01/CR0101P01.html", width: 1600, height: 850, actionType: "U", parentMenuId: "CR0101M01"},	// 영업견적서
+		"CR0202P01": { url: "/static/html/user/cr/cr02/CR0202P01.html", width: 1800, height: 870, actionType: "U", parentMenuId: "CR0201M02"},	// 영업수주
+		"CR5001P01": { url: "/static/html/user/cr/cr50/CR5001P01.html", width: 1800, height: 850, actionType: "U", parentMenuId: "CR5001M01"},	// PFU
+		"CR0701P01": { url: "/static/html/user/cr/cr07/CR0701P01.html", width: 1600, height: 850, actionType: "U", parentMenuId: "CR0701M01"},	// 매출확정
+		"CR0801P01": { url: "/static/html/user/cr/cr08/CR0801P01.html", width: 1600, height: 850, actionType: "U", parentMenuId: "CR0801M01"},	// 매출계산서
+		"CR0501P01": { url: "/static/html/user/cr/cr05/CR0501P01.html", width: 1600, height: 850, actionType: "U", parentMenuId: "CR0501M01"},	// 영업수금
+		"BM1101P01": { url: "/static/html/user/bm/bm11/BM1101P01.html", width: 1600, height: 850, actionType: "U", parentMenuId: "BM1101M01"},	// 구매단가
+		"SM0201P01": { url: "/static/html/user/sm/sm02/SM0201P01.html", width: 1800, height: 850, actionType: "U", parentMenuId: "SM0201M01"},	// 매입발주
+		"SM071P01": { url: "/static/html/user/sm/sm07/SM0701P01.html", width: 1600, height: 870, actionType: "U", parentMenuId: "SM0701M01"}, 		// 공급업체확인
+		"SM0301P01": { url: "/static/html/user/sm/sm03/SM0301P01.html", width: 1600, height: 870, actionType: "U", parentMenuId: "SM0301M01"},	// 매입입고
+		"SM1001P01": { url: "/static/html/user/sm/sm10/SM1001P01.html", width: 1500, height: 850, actionType: "U", parentMenuId: "SM1001M01"},	// 구매비용
+		"SM2001P01": { url: "/static/html/user/sm/sm20/SM2001P01.html", width: 1600, height: 850, actionType: "U", parentMenuId: "SM2001M01"},	// 계산서발행
+		"SM0401P01": { url: "/static/html/user/sm/sm04/SM0401P01.html", width: 1600, height: 850, actionType: "U", parentMenuId: "SM0401M01"},	// 자재출고관리
+		"PM0301P01": { url: "/static/html/user/pm/pm03/PM0301P01.html", width: 1600, height: 850, actionType: "U", parentMenuId: "PM0301M01"},	// 제품출고관리
+		"SM1101P01": { url: "/static/html/user/sm/sm11/SM1101P01.html", width: 1500, height: "bh_50", actionType: "U", parentMenuId: "SM1101M01" },// 외주관리
+		"PM5001P01_M": { url: "/static/html/user/pm/pm50/PM5001P01.html", width: 1100, height: 750, actionType: "U", parentMenuId: "PM5001M01"},	// 출장자 사진
+		"PM5001M01": { url: "/static/html/user/pm/pm50/PM5001P01.html", width: 1100, height: 750, actionType: "U", parentMenuId: "PM5001M01"},	// 출장자 사진PC
+		"CR1001P01": { url: "/static/html/user/cr/cr10/CR1001P01.html", width: 1400, height: 800, actionType: "U", parentMenuId: "CR1001M01"},	// 물류진행요청
+		"WB2101P02": { url: "/static/html/user/wb/wb21/WB2101P01.html", width: 1300, height: 850, actionType: "U", parentMenuId: "WB2101M02"},	// 과제관리
+		"WB2101P01": { url: "/static/html/user/wb/wb21/WB2101P01.html", width: 1300, height: 850, actionType: "U", parentMenuId: "WB2101M02"},	// 과제 메뉴얼
+		"WB2201P02": { url: "/static/html/user/wb/wb22/WB2201P02.html", width: 1200, height: 700, actionType: "U", parentMenuId: "WB2201M02"},	// TASK 실적
+		"WB2401P01": { url: "/static/html/user/wb/wb24/WB2401P01.html", width: 1200, height: 870, actionType: "I", parentMenuId: "WB2401M01"},	// 일정계획문제
+		"WB2401P11": { url: "/static/html/user/wb/wb24/WB2401P11.html", width: 1200, height: 870, actionType: "I", parentMenuId: "WB2401M01"},	// 일정실적문제
+		"WB2501P01": { url: "/static/html/user/wb/wb25/WB2501P01.html", width: 1500, height: 700, actionType: "U", parentMenuId: "WB2501M01"},	// 과제평가
+		"IM0101P01": { url: "/static/html/user/im/im01/IM0101P01.html", width: 1600, height: 860, actionType: "U", parentMenuId: "IM0101M01"},	// 개선제안서
+		"CR1101P01": { url: "/static/html/user/cr/cr11/CR1101P01.html", width: 1600, height: 850, actionType: "U", parentMenuId: "CR1101M01"},	// 실행원가관리
+		"QM0101P01": { url: "/static/html/user/qm/qm01/QM0101P01.html", width: 1600, height: 870, actionType: "U", parentMenuId: "QM0101M01" },	// 발주및출장요청
+		"QM0101P03": { url: "/static/html/user/qm/qm01/QM0101P03.html", width: 1600, height: 870, actionType: "U", parentMenuId: "QM0101M01" },	// 발주및출장결과
+		"QM0201P01": { url: "/static/html/user/qm/qm02/QM0201P01.html", width: 1600, height: 850, actionType: "U", parentMenuId: "QM0201M01" },	// 발주및출장요청서고찰
+		"PM0101M01": { url: "/static/html/user/pm/pm01/PM0101P01.html", width: 1100, height: 750, actionType: "I", parentMenuId: "PM0101M01" },	// 작업일보
+		"PM0101M01_M": { url: "/static/html/user/pm/pm01/PM0101P01.html", width: 1100, height: 750, actionType: "I", parentMenuId: "PM0101M01" },	// 작업일보
+	};
+
+	function checkFileTargetAuth(row) {
+		if (!row || !row.fileTrgtTyp) {
+			customAlert("등록화면 정보가 없습니다.");
+			return false;
+		}
+
+		// 1. 권한 검증용 부모 메뉴 ID 도출
+		let parentMenuId = "";
+		if (row.fileTrgtTyp === 'PM1002M01') {
+			parentMenuId = 'PM1002M01';
+		} else {
+			const config = entryPgmConfig[row.fileTrgtTyp];
+			if (config && config.parentMenuId) {
+				parentMenuId = config.parentMenuId;
+			}
+		}
+
+		// 2. 부모 메뉴 ID가 있으면 서버에 권한 검증 요청 (NONE인 경우는 공통 도움말 등으로 스킵)
+		if (parentMenuId && parentMenuId !== "NONE") {
+			let hasAuth = "N";
+			postAjaxSync("/admin/cm/cm08/checkMenuAuthority", { userId: jwt.userId, menuId: parentMenuId }, null, function(data) {
+				if (data.resultCode === 200 && data.hasAuth === "Y") {
+					hasAuth = "Y";
+				}
+			});
+
+			if (hasAuth !== "Y") {
+				customAlert("해당 등록화면에 대한 접근 권한이 없습니다.");
+				return false;
+			}
+		} else if (!parentMenuId) {
+			customAlert("등록화면의 부모메뉴 권한 정보가 설정되지 않았습니다.");
+			return false;
+		}
+
+		return true;
+	}
+
 	function callEntryPgm(row) {
 		if (!row || !row.fileTrgtTyp) {
 			customAlert("이동할 등록화면 정보가 없습니다.");
@@ -965,127 +1057,91 @@
 			return false;
 		}
 
-		const bh = $('body').height();
-		const entryPgmMap = {
-			"BM0501P01": {
-				url: "/static/html/user/bm/bm05/BM0501P01.html",
-				width: 1600, height: 850,
-				param: function(row) { return { actionType: "U", fileTrgtKey: row.fileTrgtKey, coCd: row.coCd }; }
-			},
-			"CR1001P01": {
-				url: "/static/html/user/cr/cr10/CR1001P01.html",
-				width: 1400, height: 800,
-				param: function(row) { return { actionType: "U", fileTrgtKey: row.fileTrgtKey, coCd: row.coCd }; }
-			},
-			"CR5001P01": {
-				url: "/static/html/user/cr/cr50/CR5001P01.html",
-				width: 1400, height: 850,
-				param: function(row) { return { actionType: "U", fileTrgtKey: row.fileTrgtKey, coCd: row.coCd }; }
-			},
-			"IM0101P01": {
-				url: "/static/html/user/im/im01/IM0101P01.html",
-				width: 1200, height: 750,
-				param: function(row) { return { actionType: "U", imprvmNo: row.fileTrgtKey, fileTrgtKey: row.fileTrgtKey, coCd: row.coCd }; }
-			},
-			"PM0101M01": {
-				url: "/static/html/user/pm/pm01/PM0101P01.html",
-				width: 1100, height: 750,
-				param: function(row) { return { actionType: "I", fileTrgtKey: row.fileTrgtKey, coCd: row.coCd, showFileArea: "Y" }; }
-			},
-			"PM0101M01_M": {
-				url: "/static/html/user/pm/pm01/PM0101P01.html",
-				width: 1100, height: 750,
-				param: function(row) { return { actionType: "I", fileTrgtKey: row.fileTrgtKey, coCd: row.coCd, showFileArea: "Y" }; }
-			},
-			"PM0101P01": {
-				url: "/static/html/user/pm/pm01/PM0101P01.html",
-				width: 1100, height: 750,
-				param: function(row) { return { actionType: "I", fileTrgtKey: row.fileTrgtKey, coCd: row.coCd, showFileArea: "Y" }; }
-			},
-			"PM5001M01": {
-				url: "/static/html/user/pm/pm50/PM5001P01.html",
-				width: 1100, height: 750,
-				param: function(row) { return { actionType: "U", fileTrgtKey: row.fileTrgtKey, coCd: row.coCd }; }
-			},
-			"PM5001P01_M": {
-				url: "/static/html/user/pm/pm50/PM5001P01.html",
-				width: 1100, height: 750,
-				param: function(row) { return { actionType: "U", fileTrgtKey: row.fileTrgtKey, coCd: row.coCd }; }
-			},
-			"QM0101P01": {
-				url: "/static/html/user/qm/qm01/QM0101P01.html",
-				width: 1400, height: 850,
-				param: function(row) { return { actionType: "U", fileTrgtKey: row.fileTrgtKey, coCd: row.coCd }; }
-			},
-			"QM0101P03": {
-				url: "/static/html/user/qm/qm01/QM0101P03.html",
-				width: 1400, height: 850,
-				param: function(row) { return { actionType: "U", fileTrgtKey: row.fileTrgtKey, coCd: row.coCd }; }
-			},
-			"SM0201P01": {
-				url: "/static/html/user/sm/sm02/SM0201P01.html",
-				width: 1400, height: 800,
-				param: function(row) { return { actionType: "U", fileTrgtKey: row.fileTrgtKey, coCd: row.coCd }; }
-			},
-			"SM0301M01": {
-				url: "/static/html/user/sm/sm03/SM0301P01.html",
-				width: 1400, height: 800,
-				param: function(row) { return { actionType: "U", fileTrgtKey: row.fileTrgtKey, coCd: row.coCd }; }
-			},
-			"SM0301P01": {
-				url: "/static/html/user/sm/sm03/SM0301P01.html",
-				width: 1400, height: 800,
-				param: function(row) { return { actionType: "U", fileTrgtKey: row.fileTrgtKey, coCd: row.coCd }; }
-			},
-			"SM1001P01": {
-				url: "/static/html/user/sm/sm10/SM1001P01.html",
-				width: 1200, height: 750,
-				param: function(row) { return { actionType: "U", fileTrgtKey: row.fileTrgtKey, coCd: row.coCd }; }
-			},
-			"SM1101P01": {
-				url: "/static/html/user/sm/sm11/SM1101P01.html",
-				width: 1500, height: bh - 50,
-				param: function(row) { return { actionType: "U", fileTrgtKey: row.fileTrgtKey, refFileTrgtKey: row.fileTrgtKey, coCd: row.coCd }; }
-			},
-			"WB2101M02": {
-				url: "/static/html/user/wb/wb21/WB2101P01.html",
-				width: 1400, height: 800,
-				param: function(row) { return { actionType: "U", fileTrgtKey: row.fileTrgtKey, coCd: row.coCd }; }
-			},
-			"WB2101P01": {
-				url: "/static/html/user/wb/wb21/WB2101P01.html",
-				width: 1400, height: 800,
-				param: function(row) { return { actionType: "U", fileTrgtKey: row.fileTrgtKey, coCd: row.coCd }; }
-			},
-			"WB2101P02": {
-				url: "/static/html/user/wb/wb21/WB2101P01.html",
-				width: 1400, height: 800,
-				param: function(row) { return { actionType: "U", fileTrgtKey: row.fileTrgtKey, coCd: row.coCd }; }
-			},
-			"WB2201P02": {
-				url: "/static/html/user/wb/wb22/WB2201P02.html",
-				width: 1200, height: 700,
-				param: function(row) { return { actionType: "U", fileTrgtKey: row.fileTrgtKey, coCd: row.coCd }; }
-			},
-			"WB2401P01": {
-				url: "/static/html/user/wb/wb24/WB2401P01.html",
-				width: 1400, height: 800,
-				param: function(row) { return { actionType: "I", fileTrgtKey: row.fileTrgtKey, coCd: row.coCd }; }
-			},
-			"WB2401P11": {
-				url: "/static/html/user/wb/wb24/WB2401P11.html",
-				width: 1400, height: 800,
-				param: function(row) { return { actionType: "I", fileTrgtKey: row.fileTrgtKey, coCd: row.coCd }; }
-			}
-		};
+		// 권한 검증
+		if (!checkFileTargetAuth(row)) {
+			return false;
+		}
 
-		const entryPgm = entryPgmMap[row.fileTrgtTyp];
-		if (!entryPgm) {
+		// 임팀장 주간회의 자료 (새 탭으로 열기)
+		if (row.fileTrgtTyp === 'PM1002M01') {
+			let mnDateStr = "";
+			let datePart = row.fileTrgtKey.split("-")[0];
+			if (datePart.length === 8) {
+				mnDateStr = datePart.substring(0, 4) + "-" + datePart.substring(4, 6) + "-" + datePart.substring(6, 8);
+			} else if (datePart.length === 10 && datePart.indexOf("-") === 4) {
+				mnDateStr = datePart;
+			}
+			
+			if (!mnDateStr) {
+				if (row.fileTrgtKey.match(/^\d{4}-\d{2}-\d{2}/)) {
+					mnDateStr = row.fileTrgtKey.substring(0, 10);
+				}
+			}
+			
+			if (!mnDateStr) {
+				customAlert("올바른 회의일자 형식이 아닙니다.");
+				return false;
+			}
+			
+			const tabName = "PM1002M01_TAB";
+			const url = "/static/html/user/pm/pm10/PM1002M01.html";
+			const paramObj = { "mnDate": mnDateStr };
+			const query = $.param(paramObj);
+			const finalUrl = query ? `${url}?${query}` : url;
+			const w = window.open(finalUrl, tabName);
+			if (!w) { 
+				customAlert('팝업 차단을 해제하세요.'); 
+				return false; 
+			}
+			w.focus();
+			return true;
+		}
+
+		const config = entryPgmConfig[row.fileTrgtTyp];
+		if (!config) {
 			customAlert("등록화면 이동이 정의되지 않았습니다.\n등록화면: " + (row.fileTrgtTypNm || row.fileTrgtTyp));
 			return false;
 		}
 
-		openModal(entryPgm.url, entryPgm.width, entryPgm.height, "", entryPgm.param(row), function(data) {});
+		// 팝업 파라미터 획득을 위한 백엔드 공통 API 호출 (동기식)
+		let targetInfo = {};
+		postAjaxSync("/admin/cm/cm08/selectMByTargetForPopup", { fileTrgtTyp: row.fileTrgtTyp, fileTrgtKey: row.fileTrgtKey }, null, function(data) {
+			if (data.result) {
+				targetInfo = data.result;
+			} else {
+				customAlert("등록화면으로 이동할 수 없습니다.");
+				return false;
+			} 
+		});
+
+		const bh = $('body').height(); 
+		let height = config.height;
+		if (height === "bh_50") {
+			height = bh - 50;
+		}
+
+		// 팝업 공통 파라미터 세팅
+		let popupParam = {
+			actionType: config.actionType,
+			coCd: targetInfo.coCd || row.coCd || jwt.coCd,
+			fileTrgtKey: targetInfo.fileTrgtKey || row.fileTrgtKey,
+			pgmId: config.parentMenuId
+		};
+
+		// 백엔드에서 조회해온 모든 정보를 기본 파라미터로 세팅
+		Object.assign(popupParam, targetInfo);
+
+		// 각 화면별 특수 파라미터 처리 (가공 데이터나 세션 정보 등 특수 케이스만 분기)
+		if (row.fileTrgtTyp == 'QM0101P03') {
+			popupParam.deptId = jwt.deptId;
+		} else if (row.fileTrgtTyp == 'SM0201P01') {
+			popupParam.userId = jwt.userId;
+		} else if (row.fileTrgtTyp == 'TB_BM99P01') {
+			popupParam.userId = jwt.userId;
+		} else if (row.fileTrgtTyp == 'SM071P01') {
+			popupParam.deptId = jwt.userId;
+		}
+		openModal(config.url, config.width, height, "", popupParam, function(data) {});
 	}
 
 </script>

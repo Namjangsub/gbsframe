@@ -41,10 +41,14 @@ public interface CM08Mapper {
 	Map<String, String> dwgFileDownInfo(Map<String, String> paramMap);
 	
 	Map<String, String> selectMByTarget(Map<String, String> paramMap);
+	Map<String, String> selectMByTargetForPopup(Map<String, String> paramMap);
 	Map<String, String> selectMByRetriveValue(Map<String, String> m);
 
 
     long nextDlHistId();
     int insertDnldStart(Map<String, Object> hist);
     int updateDnldEnd(Map<String, Object> end);
+
+	String selectUserAuthInfo(String userId);
+	int checkMenuAuthority(Map<String, Object> paramMap);
 }

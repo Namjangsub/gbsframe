@@ -101,11 +101,11 @@
 		            LEFT OUTER JOIN TB_BM01M01 E ON T.PRDT_CD = E.PRDT_CD
 		            LEFT OUTER JOIN TB_CM05M01 F ON T.ITEM_CD = F.CODE_ID
 		            LEFT OUTER JOIN TB_CM15M01 G ON T.COMON_CD = G.COMON_CD
-		        								AND G.CO_CD   = T.CO_CD
+		        								AND G.CO_CD   = NVL(T.CO_CD, #{coCd})
         								        AND G.USER_ID = #{userId}
 		        WHERE 1=1
 		        <if test="coCd != null and !coCd.equals('')">
-		            AND T.CO_CD = #{coCd}
+		            AND (T.CO_CD = #{coCd} OR T.FILE_TRGT_TYP = 'TB_BM02M01' OR T.CO_CD IS NULL)
 		        </if>
 		        <if test="comonCd.equals('FITR90')">	        
 		        	AND (T.COMON_CD IS NULL OR T.COMON_CD = '' OR B1.ID IS NULL) --저장위치 없는 파일
@@ -224,11 +224,11 @@
 		            LEFT OUTER JOIN TB_CM05M01 F ON T.ITEM_CD = F.CODE_ID
 		            LEFT OUTER JOIN TB_CM05M01 F2 ON F2.CODE_KIND = 'DRPDIV' AND  F2.CODE_RPRC = T.FILE_TRGT_TYP
 		            LEFT OUTER JOIN TB_CM15M01 G ON T.COMON_CD = G.COMON_CD
-		        								AND G.CO_CD   = T.CO_CD
+		        								AND G.CO_CD   = NVL(T.CO_CD, #{coCd})
         								        AND G.USER_ID = #{userId}
 		        WHERE 1=1
 		        <if test="coCd != null and !coCd.equals('')">
-		            AND T.CO_CD = #{coCd}
+		            AND (T.CO_CD = #{coCd} OR T.FILE_TRGT_TYP = 'TB_BM02M01' OR T.CO_CD IS NULL)
 		        </if>
 		        <if test="comonCd.equals('FITR90')">	        
 		        	AND (T.COMON_CD IS NULL OR T.COMON_CD = '' OR B1.ID IS NULL) --저장위치 없는 파일
@@ -539,6 +539,220 @@
 	</select>    
   
   
+    <select id="selectMByTargetForPopup" resultType="CamelMap">
+	/* fileTrgtTyp = SALES_CD | ORDRS_NO | CLNT_PJT | CLNT_CD | CO_CD */
+		<choose>
+		<!--1. 매뉴얼(도움말) -->
+		<when test="fileTrgtTyp == 'TB_BM99P01'">
+			SELECT MENU_ID AS PGM_ID FROM TB_PG_EXPL WHERE FILE_TRGT_KEY = #{fileTrgtKey}
+			FETCH FIRST 1 ROWS ONLY
+		</when>
+
+		<!--2. 공지사항 -->
+		<when test="fileTrgtTyp == 'TB_CM09M01'">
+			SELECT NOTI_KEY, CO_CD FROM TB_CM09M01 WHERE NOTI_KEY = #{fileTrgtKey}
+			FETCH FIRST 1 ROWS ONLY
+		</when>
+
+		<!--3. 거래처관리 -->
+		<when test="fileTrgtTyp == 'TB_BM02M01'">
+			SELECT CLNT_CD, CRN_TYP FROM TB_BM02M01 WHERE CLNT_CD = #{fileTrgtKey}
+			FETCH FIRST 1 ROWS ONLY
+		</when>
+
+		<!--4. 프로젝트관리 -->
+		<when test="fileTrgtTyp == 'BM1601P01'">
+			SELECT PRJCT_SEQ, CO_CD FROM TB_BM06M01 WHERE PRJCT_SEQ = #{fileTrgtKey}
+			FETCH FIRST 1 ROWS ONLY
+		</when>
+		
+		<!--5. 견적서 관리 -->
+		<when test="fileTrgtTyp == 'CR0101M01'">
+			SELECT EST_NO, CO_CD, EST_DEG FROM TB_CR01M01 WHERE FILE_TRGT_KEY = #{fileTrgtKey}
+			FETCH FIRST 1 ROWS ONLY
+		</when>
+
+		<!--6. 영업수주 -->
+		<when test="fileTrgtTyp == 'CR0202P01'">
+			SELECT ORDRS_NO, CO_CD FROM TB_CR02M01 WHERE FILE_TRGT_KEY = #{fileTrgtKey}
+			FETCH FIRST 1 ROWS ONLY
+		</when>
+
+		<!--7. PFU관리 -->
+		<when test="fileTrgtTyp == 'CR5001P01'">
+			SELECT FILE_TRGT_KEY, CO_CD, CLNT_CD, ORDRS_NO, SALES_CD, CLNT_PJT, VER_NO FROM TB_CR50M01 WHERE FILE_TRGT_KEY = #{fileTrgtKey}
+			FETCH FIRST 1 ROWS ONLY
+		</when>
+	
+		<!--8. 매입 발주 등록 -->
+		<when test="fileTrgtTyp == 'SM0201P01'">
+			SELECT CO_CD, SALES_CD, ORDRG_NO, PCHS_CLNT_CD AS CLNT_CD, REQ_NO, FILE_TRGT_KEY FROM TB_SM02M01 WHERE FILE_TRGT_KEY = #{fileTrgtKey}
+			FETCH FIRST 1 ROWS ONLY
+		</when>
+		
+		<!--9. 공급업체 확인요청  -->
+		<when test="fileTrgtTyp == 'SM071P01'">
+			SELECT ORDRG_NO, CO_CD, SALES_CD FROM TB_SM02M01 WHERE FILE_TRGT_KEY = #{fileTrgtKey}
+			FETCH FIRST 1 ROWS ONLY
+		</when>
+	
+		<!--10. 매입 입고 -->
+		<when test="fileTrgtTyp == 'SM0301P01'">
+			SELECT S.*, M.PCHS_CLNT_CD AS CLNT_CD
+			FROM (
+					SELECT  S.CO_CD, S.SALES_CD, S.IN_NO, S.REQ_NO, S.FILE_TRGT_KEY,
+					    (
+					        SELECT MIN(D.ORDRG_NO)
+					        FROM TB_SM03D01 D
+					        WHERE D.IN_NO = S.IN_NO
+					    ) AS ORDRG_NO
+					FROM TB_SM03M01 S
+					WHERE S.FILE_TRGT_KEY = #{fileTrgtKey}
+				) S  LEFT OUTER JOIN TB_SM02M01 M ON M.ORDRG_NO = S.ORDRG_NO
+			FETCH FIRST 1 ROWS ONLY
+		</when>
+	
+		<!--11. 구매비용 -->
+		<when test="fileTrgtTyp == 'SM1001P01'">
+			SELECT CO_CD, PCHS_CLNT_CD AS CLNT_CD, COST_NO, SALES_CD, ORDRS_NO, REQ_NO, FILE_TRGT_KEY FROM TB_SM10M01 WHERE FILE_TRGT_KEY = #{fileTrgtKey}
+			FETCH FIRST 1 ROWS ONLY
+		</when>
+	
+	
+		<!--12. 외주관리 -->
+		<when test="fileTrgtTyp == 'SM1101P01'">
+			SELECT M.CO_CD, M.CTRT_NO, M.CLNT_CD, M.ORDRS_NO, D.SALES_CD, M.FILE_TRGT_KEY, M.FILE_TRGT_KEY AS REF_FILE_TRGT_KEY
+			FROM TB_SM11M01 M
+					LEFT OUTER JOIN TB_SM11D02 D ON D.CTRT_NO = M.CTRT_NO AND NVL(D.ORDRS_AMT, 0) != 0
+			WHERE M.FILE_TRGT_KEY = #{fileTrgtKey}
+			FETCH FIRST 1 ROWS ONLY
+		</when>
+
+		<!--13 출장자 사진 Upload작업 -->
+		<when test="fileTrgtTyp == 'PM5001M01'">
+			SELECT FILE_TRGT_KEY, CO_CD, SALES_CD FROM TB_PM50M01 WHERE FILE_TRGT_KEY = SUBSTR(#{fileTrgtKey}, 1, 9)
+			FETCH FIRST 1 ROWS ONLY
+		</when>
+	
+		<!--14 출장자 사진 Upload작업 -->
+		<when test="fileTrgtTyp == 'PM5001P01_M'">
+			SELECT FILE_TRGT_KEY, CO_CD, SALES_CD FROM TB_PM50M01 WHERE FILE_TRGT_KEY = SUBSTR(#{fileTrgtKey}, 1, 9)
+			FETCH FIRST 1 ROWS ONLY
+		</when>
+
+		<!--15. 물류진행요청 등록 -->
+		<when test="fileTrgtTyp == 'CR1001P01'">
+			SELECT M.CO_CD, M.ORDRS_NO, M.CLNT_PJT, D.SALES_CD, M.FILE_TRGT_KEY, M.LGIST_NO
+			FROM TB_CR11M01 M 
+					LEFT OUTER JOIN TB_CR11D01 D ON D.LGIST_NO = M.LGIST_NO
+			WHERE M.FILE_TRGT_KEY = #{fileTrgtKey}
+			ORDER BY SALES_CD
+			FETCH FIRST 1 ROWS ONLY
+		</when>
+
+		<!--16. 과제관리 첨부파일-->
+		<when test="fileTrgtTyp == 'WB2101P02'">
+			SELECT  CO_CD, SJ_NO, SALES_CD, FILE_TRGT_KEY FROM TB_WB21M01 WHERE FILE_TRGT_KEY = #{fileTrgtKey}
+			FETCH FIRST 1 ROWS ONLY
+		</when>
+	
+		<!--17. 과제관리 메뉴얼-->
+		<when test="fileTrgtTyp == 'WB2101P01'">
+			SELECT  CO_CD, SJ_NO, SALES_CD, FILE_TRGT_KEY FROM TB_WB21M01 WHERE FILE_TRGT_KEY = SUBSTR(#{fileTrgtKey}, 1, INSTR(#{fileTrgtKey}, '-', 1, 1) - 1)
+			FETCH FIRST 1 ROWS ONLY
+		</when>
+	
+		<!--18. TASK 실적등록 -->
+		<when test="fileTrgtTyp == 'WB2201P02'">
+			SELECT CO_CD, SALES_CD, WBS_PLAN_CODE_KIND, FILE_TRGT_KEY, WBS_RSLTS_NO AS WBS_PLAN_NO FROM TB_WB23M01 WHERE FILE_TRGT_KEY = #{fileTrgtKey}
+			FETCH FIRST 1 ROWS ONLY
+		</when>
+	
+	
+		<!--19. WBS 계획 문제 -->
+		<when test="fileTrgtTyp == 'WB2401P01'">
+			SELECT FILE_TRGT_KEY AS ISS_FILE_TRGT_KEY,  CO_CD, WBS_PLAN_CODE_KIND, WBS_PLAN_CODE_ID, SALES_CD, WBS_PLAN_NO FROM TB_WB24M02 WHERE FILE_TRGT_KEY = #{fileTrgtKey}
+			FETCH FIRST 1 ROWS ONLY
+		</when>
+	
+	
+		<!--20. WBS 실적 문제 -->
+		<when test="fileTrgtTyp == 'WB2401P11'">
+			SELECT FILE_TRGT_KEY AS ISS_FILE_TRGT_KEY, ISS_NO AS REQ_NO, CO_CD, WBS_PLAN_CODE_KIND, WBS_PLAN_CODE_ID, SALES_CD, WBS_PLAN_NO FROM TB_WB24M02 WHERE FILE_TRGT_KEY = #{fileTrgtKey}
+			FETCH FIRST 1 ROWS ONLY
+		</when>
+
+		<!--21. 과제평가 -->
+		<when test="fileTrgtTyp == 'WB2501P01'">
+			SELECT T.FILE_TRGT_KEY
+				, T.CO_CD
+				, T.SALES_CD
+				, (
+					SELECT MAX(A.VER_NO)
+					FROM TB_WB21M01 A
+					WHERE A.SALES_CD = T.SALES_CD
+				) AS VER_NO
+			FROM TB_WB25M01 T
+			WHERE T.FILE_TRGT_KEY = #{fileTrgtKey}
+			FETCH FIRST 1 ROWS ONLY
+		</when>
+	
+	
+		<!--22. 개선제안 -->
+		<when test="fileTrgtTyp == 'IM0101P01'">
+			SELECT  CO_CD, IMPRVM_NO AS FILE_TRGT_KEY, IMPRVM_NO, SALES_CD, 1 AS JOB_LEVEL FROM TB_IM01M01 WHERE IMPRVM_NO = #{fileTrgtKey}
+			FETCH FIRST 1 ROWS ONLY
+		</when>
+
+		<!--23. 요인별 발주 및 출장요청 -->
+		<when test="fileTrgtTyp == 'QM0101P01'">
+			SELECT FILE_TRGT_KEY, CO_CD, SALES_CD, REQ_NO FROM TB_QM01M01 WHERE FILE_TRGT_KEY = #{fileTrgtKey}
+			FETCH FIRST 1 ROWS ONLY
+		</when>
+	
+		<!--24. 요인별 발주 및 출장결과 -->
+		<when test="fileTrgtTyp == 'QM0101P03'">
+			SELECT T.FILE_TRGT_KEY, T.CO_CD, T.SALES_CD, T.REQ_NO, A.RSLT_NO
+			FROM TB_QM01M01 T
+						LEFT OUTER JOIN TB_QM01P01 A ON T.REQ_NO = A.REQ_NO
+			WHERE FILE_TRGT_KEY = #{fileTrgtKey}
+			FETCH FIRST 1 ROWS ONLY
+		</when>
+
+		<!--25. 발주출장요청서 고찰 -->
+		<when test="fileTrgtTyp == 'QM0201P01'">
+			SELECT STAT_YM, ORDRG_ID, FILE_TRGT_KEY, CO_CD, RES_DT FROM TB_QM02M01 WHERE FILE_TRGT_KEY = #{fileTrgtKey}
+			FETCH FIRST 1 ROWS ONLY
+		</when>
+
+		<!-- 26. 작업일보관리 및 등록 -->
+		<when test="fileTrgtTyp == 'PM0101M01' or fileTrgtTyp == 'PM0101P01'">
+			SELECT ORD_CO_CD AS CO_CD, FILE_TRGT_KEY, 'Y' AS SHOW_FILE_AREA FROM TB_PM01M01 WHERE FILE_TRGT_KEY = #{fileTrgtKey}
+			FETCH FIRST 1 ROWS ONLY
+		</when>
+		
+		<!-- 27. 작업일보관리 첨부파일 -->
+		<when test="fileTrgtTyp == 'PM0101M01_M'">
+			SELECT M.ORD_CO_CD AS CO_CD, M.CLNT_CD, M.ORDRS_NO, M.SALES_CD, M.CLNT_PJT, M.PRDT_CD, M.ITEM_DIV, M.FILE_TRGT_KEY, 'Y' AS SHOW_FILE_AREA
+			  FROM TB_PM01D01 D
+					LEFT OUTER JOIN TB_PM01M01 M ON M.WORK_RPT_NO = D.WORK_RPT_NO
+			 WHERE D.WORK_RPT_NO =  SUBSTR(#{fileTrgtKey}, 1, INSTR(#{fileTrgtKey}, '-', -1) - 1) -- 'DM20240509-6575' 
+			   AND D.WORK_RPT_NO_SEQ = SUBSTR(#{fileTrgtKey}, INSTR(#{fileTrgtKey}, '-', -1) + 1)  --'1'
+			 FETCH FIRST 1 ROWS ONLY
+		</when>
+	
+		<!-- 예외 -->
+		<otherwise>
+			SELECT #{salesCd, jdbcType=VARCHAR} SALES_CD
+			     , #{ordrsNo, jdbcType=VARCHAR} ORDRS_NO
+			     , #{coCd,    jdbcType=VARCHAR} CO_CD 
+			     , #{fileTrgtKey, jdbcType=VARCHAR} FILE_TRGT_KEY
+			 FROM DUAL
+		</otherwise>
+		</choose>
+	</select>    
+  
+  
   
 	<select id="selectMByRetriveValue" resultType="CamelMap">
 	/* fileTrgtTyp = SALES_CD | ORDRS_NO | CLNT_PJT | CLNT_CD | CO_CD */
@@ -641,4 +855,38 @@
 		 WHERE DL_HIST_ID  = #{dlHistId}
 		   AND RESULT_CD   = 'P'  <!-- 중복 업데이트 방지(선택) -->
 	</update>
+
+	<!-- 사용자 권한 정보(AUTH_INFO) 단일 조회 -->
+	<select id="selectUserAuthInfo" parameterType="String" resultType="String">
+		SELECT AUTH_INFO 
+		  FROM TB_CM06M01 
+		 WHERE ID = #{userId}
+	</select>
+
+	<!-- 사용자 메뉴 권한 검증 -->
+	<select id="checkMenuAuthority" parameterType="Map" resultType="int">
+		WITH auth_role AS (
+			SELECT DISTINCT TRIM(REGEXP_SUBSTR(AUTH_ROLE, '[^,]+', 1, LEVEL)) AS AUTH_ROLE_NAME
+			  FROM TB_CM01M01
+			 WHERE AUTH_ID IN 
+				 <foreach collection="authList" item="item" index="index" separator="," open="(" close=")">
+					 #{item}
+				 </foreach>
+			CONNECT BY LEVEL <![CDATA[ <= ]]> REGEXP_COUNT(AUTH_ROLE, ',') + 1
+			   AND PRIOR AUTH_ID = AUTH_ID
+			   AND PRIOR DBMS_RANDOM.VALUE IS NOT NULL
+		),
+		role_menu AS (
+			SELECT DISTINCT REGEXP_SUBSTR(ROLE_MENU, '[^\,]+', 1, LV) AS ROLE_MENU_NAME
+			  FROM TB_CM02M01 S
+				 , (SELECT LEVEL AS LV FROM DUAL CONNECT BY LEVEL <![CDATA[ <= ]]> 1000)
+			 WHERE ROLE_ID IN (SELECT AUTH_ROLE_NAME FROM auth_role)
+			   AND REGEXP_SUBSTR(ROLE_MENU, '[^\,]+', 1, LV) IS NOT NULL
+		)
+		SELECT COUNT(*) 
+		  FROM role_menu R
+		  INNER JOIN TB_CM03M01 M ON R.ROLE_MENU_NAME = M.MENU_ID
+		 WHERE M.MENU_URL LIKE '%' || #{menuId} || '%'
+		   AND M.USE_YN = 'Y'
+	</select>
 </mapper>

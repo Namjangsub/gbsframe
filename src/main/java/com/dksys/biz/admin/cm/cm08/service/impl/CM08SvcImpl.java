@@ -622,6 +622,11 @@ public class CM08SvcImpl implements CM08Svc {
         return cm08Mapper.selectFileInfoUser(paramMap);
     }
 
+    @Override
+    public Map<String, String> selectMByTargetForPopup(Map<String, String> paramMap) {
+        return cm08Mapper.selectMByTargetForPopup(paramMap);
+    }
+
 	@Override
 	public List<Map<String, String>> selectFileListAll(Map<String, String> paramMap) {
 		return cm08Mapper.selectFileListAll(paramMap);
@@ -1071,6 +1076,23 @@ public class CM08SvcImpl implements CM08Svc {
 			logger.error("Failed to save UbiReport PDF", e);
 			throw new FileStorageException("UbiReport PDF generation or saving failed: " + e.getMessage(), e);
 		}
+	}
+
+	@Override
+	public boolean checkMenuAuthority(String userId, String menuId) {
+		String authInfo = cm08Mapper.selectUserAuthInfo(userId);
+		if (authInfo == null || authInfo.trim().isEmpty()) {
+			return false;
+		}
+		
+		List<String> authList = java.util.Arrays.asList(authInfo.split(","));
+		
+		Map<String, Object> paramMap = new HashMap<>();
+		paramMap.put("authList", authList);
+		paramMap.put("menuId", menuId);
+		
+		int count = cm08Mapper.checkMenuAuthority(paramMap);
+		return count > 0;
 	}
     
 }

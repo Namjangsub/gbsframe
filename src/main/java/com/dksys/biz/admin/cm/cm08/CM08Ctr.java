@@ -321,6 +321,13 @@ public class CM08Ctr {
     	model.addAttribute("fileList", fileList);
         return "jsonView";
     }
+    
+    @PostMapping("/selectMByTargetForPopup")
+    public String selectMByTargetForPopup(@RequestBody Map<String, String> param, ModelMap model) {
+    	Map<String, String> result = cm08Svc.selectMByTargetForPopup(param);
+    	model.addAttribute("result", result);
+        return "jsonView";
+    }
 	@PostMapping("/selectTreeFileModule")
 	public String selectTreeFileModule(@RequestBody Map<String, String> param, ModelMap model) {
 		int totalCnt = cm08Svc.selectTreeFileCount(param);
@@ -440,5 +447,17 @@ public class CM08Ctr {
   		}
   		return "jsonView";
     }
+
+	@PostMapping(value = "/checkMenuAuthority")
+	public String checkMenuAuthority(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		String userId = paramMap.get("userId");
+		String menuId = paramMap.get("menuId");
+		
+		boolean hasAuth = cm08Svc.checkMenuAuthority(userId, menuId);
+		
+		model.addAttribute("hasAuth", hasAuth ? "Y" : "N");
+		model.addAttribute("resultCode", 200);
+		return "jsonView";
+	}
     
 }

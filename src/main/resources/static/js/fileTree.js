@@ -61,7 +61,22 @@ var approvalWorkingGrid; //팝업화면에서 결재정보 저장용
 
 			initDeptTree(popSelector + ' #' + selector, popSelector, fileTempCocd);
 
-			currPgmAuthChk = authChk(); // true:저장권한, false:저장권한 없음
+			let authMenuId = undefined;
+			if (modalStack.last() != undefined && modalStack.last().paramObj) {
+				authMenuId = modalStack.last().paramObj.pgmId || modalStack.last().paramObj.parentMenuId;
+			}
+			let hasMenuInAuth = false;
+			if (authMenuId) {
+				const arr = JSON.parse(localStorage.getItem("authArr"));
+				if (arr && arr[0] && arr[0][authMenuId] !== undefined) {
+					hasMenuInAuth = true;
+				}
+			}
+			if (hasMenuInAuth) {
+				currPgmAuthChk = authChk(authMenuId);
+			} else {
+				currPgmAuthChk = authChk();
+			}
 
 			fileTreeGridView.init(gridSelector, _fileList_area);
 			

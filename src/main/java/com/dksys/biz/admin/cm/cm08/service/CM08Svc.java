@@ -44,6 +44,8 @@ public interface CM08Svc {
 	int deleteFileCall(Map<String, String> paramMap);
 
 	public Map<String, String> selectFileInfoUser(Map<String, String> paramMap);
+	
+	public Map<String, String> selectMByTargetForPopup(Map<String, String> paramMap);
 
 	int uploadFile(Map<String, String> paramMap, MultipartHttpServletRequest mRequest);
 
@@ -57,5 +59,5 @@ public interface CM08Svc {
 
 	int saveUbiReport(Map<String, String> param);
 
-
+	public boolean checkMenuAuthority(String userId, String menuId);
 }
