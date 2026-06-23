@@ -37,6 +37,11 @@
 		line-height: 1.25;
 	}
 
+	/* 헤더 라벨의 \n 줄바꿈이 기본 white-space:normal에 의해 한 줄로 뭉쳐 보이는 것을 방지 */
+	#grid .tui-grid-cell-header {
+		white-space: pre-line;
+	}
+
 	/* 회의결과 모드에서 실제로 회의결과가 입력된 부서 셀 구분 표시 (사전공지 대체표시와 구별).
 	   정확한 셀 패딩 폭을 알 수 없어 음수 마진으로 셀 경계까지 번지게 하지 않고, 콘텐츠 영역
 	   안에서만 배경/좌측 경계선으로 표시한다 (레이아웃 깨짐 위험 없음). */
@@ -59,6 +64,16 @@
 	#grid * {
 		font-family: "Noto Sans KR", Arial, "dotum", sans-serif !important;
 		font-size: 12px !important;
+	}
+
+	/* 검색줄이 화면보다 넓어져도 가로 스크롤은 가능하지만 스크롤바 자체는 안 보이게 숨김 */
+	#searchScrollWrap {
+		scrollbar-width: none;
+		-ms-overflow-style: none;
+	}
+
+	#searchScrollWrap::-webkit-scrollbar {
+		display: none;
 	}
 
 	.refresh-toggle-label {
@@ -139,42 +154,43 @@
 
 		<!-- 검색 콘텐츠 -->
 		<div class="contents search">
-			<div class="">
+			<div class="" id="searchScrollWrap" style="overflow-x: auto;">
 				<!-- 테이블 인풋 5분할 -->
 				<table class="table_input type05">
 					<tr>
 						<th style="width: 200px; height: 30px; line-height: 30px;font-size: 15px;">임팀장 주간회의 자료</th>
 
 						<th class="hit">회의일자</th>
-						<td>
+						<td style="width: 300px;">
 							<input type="text" id="mnDate_S" class="input_calendar" name="mnDate_S" data-search="mnDate" autocomplete="off" onkeyup="dateMask(this);" required="required" msg="회의일자">
 						</td>
-						<td style="width: 120px">
+						<td style="width: 220px">
 							<input id="mnWeeks_S" name="mnWeeks_S" data-search="mnWeeks" style="width:18px; font-size:15px; vertical-align: middle; margin-right:4px;" readonly>
 							<span style="font-size:15px; vertical-align: middle;">주차</span>
 						</td>
 						<th>구분</th>
-						<td>
-							<select id="mnDiv_S" name="mnDiv_S" data-search="mnDiv" onchange="mnGridView.setData(0);">
+						<td style="width: 300px;">
+							<select id="mnDiv_S" name="mnDiv_S" data-search="mnDiv" onchange="mnGridView.setData(0);" style="width: 85px; max-width: 85px;">
 								<option value="MNDIV01" selected>사전공지</option>
 								<option value="MNDIV02">회의결과</option>
 								<option value="MNDIV99">전체조회</option>
 							</select>
 						</td>
-						<td style="width: 180px; white-space: nowrap; padding-right: 20px;">
+						<td style="width: 120px; white-space: nowrap; padding-right: 0;">
 							<label class="refresh-toggle-label" title="30초 자동 새로고침 on/off">
 								새로고침<input type="checkbox" id="refreshToggle" checked>
 								<span id="refreshStatusLabel">ON</span>
 							</label>
 						</td>
-						<td>
-							<div class="add_btn_small pdl10" style="width:500px; margin-left: 10px;">
-								<a onclick="moveSelectedUp();" id="moveUp" style="height: 30px; line-height: 28px; margin:0 5px;">▲</a>
-								<a onclick="moveSelectedDown();" id="moveDown" style="height: 30px; line-height: 28px;">▼</a>
+						<td style="text-align: right; white-space: nowrap;">
+							<div class="add_btn_small pdl10" style="float: none; display: inline-block; white-space: nowrap;">
+								<a onclick="moveSelectedUp();" id="moveUp" title="위로 이동" style="height: 30px; line-height: 28px; margin:0 5px;">▲</a>
+								<a onclick="moveSelectedDown();" id="moveDown" title="아래로 이동" style="height: 30px; line-height: 28px;">▼</a>
 								<a onclick="insertMn();" id="addRow" style="width: 80px; height: 30px; line-height: 28px;"><i class="fas fa-plus"></i> 행 추가</a>
 								<a onclick="deleteMn();" id="deleteRow" style="width: 80px; height: 30px; line-height: 28px;"><i class="fas fa-trash"></i> 행 삭제</a>
 								<a onclick="setReport();" style="height: 30px; line-height: 28px; width: 100px;"><i class="fas fa-print"></i> 회의록출력</a>
 								<a onclick="jsonToExcel(mnGridView);" style="height: 30px; line-height: 28px; width: 90px;"><i class="fas fa-file-excel"></i> 엑셀다운로드</a>
+								<a onclick="logoutClick();" title="로그아웃" style="height: 30px; line-height: 28px; width: 30px; text-align: center; margin-left: 5px;"><i class="fas fa-sign-out-alt"></i></a>
 							</div>
 						</td>
 					</tr>
@@ -2268,6 +2284,15 @@
 	function jsonToExcel(gridView) {
 		const list = gridView.target.getData().map(row => {
 			const newRow = { ...row };
+
+			// 화면의 "생산/생산관리" 컬럼은 GUN60(생산)+GUN70(생산관리) 두 부서 데이터를 한 셀에
+			// 합쳐서 보여준다(DeptCellRenderer 참고). 이 합치기는 화면 렌더링 시점에만 일어나고
+			// row 데이터(gun70MnCnts)에는 반영되지 않으므로, 엑셀도 같은 방식으로 합쳐야 화면에
+			// 보이는 내용과 일치한다.
+			const g60 = newRow.gun60MnCnts || '';
+			const g70 = newRow.gun70MnCnts || '';
+			newRow.gun70MnCnts = g60 + (g60 && g70 ? '\n' : '') + g70;
+
 			if (newRow.isFileRow && newRow.filesByColumn) {
 				Object.keys(newRow.filesByColumn).forEach(colKey => {
 					const files = newRow.filesByColumn[colKey];

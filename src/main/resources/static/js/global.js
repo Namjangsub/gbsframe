@@ -2802,7 +2802,9 @@ function exportJSONToExcel (_excelJsonData, _excelHeader, _excelFileName = 'exce
 		right: { style: "thin" }
 	};
 	const headerAlignment = {
-		horizontal: "center" // 가운데 정렬
+		horizontal: "center", // 가운데 정렬
+		vertical: "middle",
+		wrapText: true // 헤더 라벨의 \r\n/\n 줄바꿈이 한 줄로 뭉쳐 보이지 않도록 줄바꿈 표시
 	};
 	const dataFont = {
 		name: '나눔고딕',
@@ -2827,6 +2829,8 @@ function exportJSONToExcel (_excelJsonData, _excelHeader, _excelFileName = 'exce
 		    worksheet.getColumn(outCellNo).width =  Math.min(cellWidth, 10);
 		}
 	});
+	// 헤더 라벨에 줄바꿈(\r\n/\n)이 들어간 경우 기본 행높이로는 둘째 줄이 가려지므로 여유 있게 키운다.
+	worksheet.getRow(1).height = 30;
 
 	// 데이터 삽입
 	for (let row = 0; row < _excelJsonData.length; row++) {
@@ -3720,17 +3724,17 @@ function fileUpload ($form) {
 	var fileUploadArr = [];
 	var tempArr = [];
 	var totalFileSize = 0; // 첨부파일 사이즈 처리용 변수
-		
+
 	tempArr = treeModule.getFileArr();
 	$.each(tempArr, function(idx, obj) {
 		if (obj.fileKey == 0) {
 			formData.append("files", obj.file);
-			
+
 			// 파일 사이즈 단위 누적 (바이트 단위)
 			if (obj.file && obj.file.size) {
 				totalFileSize += obj.file.size;
 			}
-			
+
 			var cloneObj = $.extend({}, obj);
 			cloneObj.file = '';
 			fileUploadArr.push(cloneObj);
@@ -3752,7 +3756,7 @@ function fileUpload ($form) {
 				}
 			}
 		});
-		
+
 		if (totalFileSize >= MAX_SIZE) {
 			var limitMb = Math.round(MAX_SIZE / (1024 * 1024));
 			var attachMb = Math.round(totalFileSize / (1024 * 1024));
@@ -3760,7 +3764,7 @@ function fileUpload ($form) {
 			return false;
 		}
 	}
-	
+
 	if (fileUploadArr.length === 0 && treeModule.getDeleteFileArr().length === 0) {
 		customAlert("첨부/삭제할 파일이 없습니다.");
 		return false;
