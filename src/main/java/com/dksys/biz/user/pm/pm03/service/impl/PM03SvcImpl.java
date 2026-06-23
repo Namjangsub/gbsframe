@@ -75,7 +75,9 @@ public class PM03SvcImpl implements PM03Svc {
 		//---------------------------------------------------------------
 		//첨부 화일 권한체크  끝
 		//---------------------------------------------------------------
-		String outNo = String.valueOf(pm03Mapper.selectOutNoNext(paramMap));
+		String fileTrgtKey = pm03Mapper.selectFileTrgtKeyNext(paramMap);
+		paramMap.put("fileTrgtKey", fileTrgtKey);
+		String outNo = pm03Mapper.selectOutNoNext(paramMap);
 		paramMap.put("outNo", outNo);
 		int result = pm03Mapper.insertDeliveryMast(paramMap);
 		//pm03Mapper.deleteLgistSalesCdAll(paramMap);
@@ -104,7 +106,6 @@ public class PM03SvcImpl implements PM03Svc {
 		//---------------------------------------------------------------
 		if (uploadFileList.size() > 0) {
 		    paramMap.put("fileTrgtTyp", paramMap.get("pgmId"));
-		    paramMap.put("fileTrgtKey", paramMap.get("prjctSeq"));
 		    cm08Svc.uploadFile(paramMap, mRequest);
 		}
 		//---------------------------------------------------------------

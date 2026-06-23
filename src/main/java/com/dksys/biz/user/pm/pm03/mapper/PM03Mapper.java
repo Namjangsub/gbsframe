@@ -18,6 +18,8 @@ public interface PM03Mapper {
 
   Map<String, String> selectDeliveryMastInfo(Map<String, String> paramMap);
 
+  String selectFileTrgtKeyNext(Map<String, String> paramMap);
+
   String selectOutNoNext(Map<String, String> paramMap);
 
   int insertDeliveryMast(Map<String, String> paramMap);
