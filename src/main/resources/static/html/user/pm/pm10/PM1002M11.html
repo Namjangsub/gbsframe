@@ -171,8 +171,8 @@
 							<div class="add_btn_small pdl10" style="width:500px; margin-left: 10px;">
 								<a onclick="moveSelectedUp();" id="moveUp" style="height: 30px; line-height: 28px; margin:0 5px;">▲</a>
 								<a onclick="moveSelectedDown();" id="moveDown" style="height: 30px; line-height: 28px;">▼</a>
-								<a onclick="insertMn();" id="addRow" style="width: 80px; height: 30px; line-height: 28px;">행 추가</a>
-								<a onclick="deleteMn();" id="deleteRow" style="width: 80px; height: 30px; line-height: 28px;">행 삭제</a>
+								<a onclick="insertMn();" id="addRow" style="width: 80px; height: 30px; line-height: 28px;"><i class="fas fa-plus"></i> 행 추가</a>
+								<a onclick="deleteMn();" id="deleteRow" style="width: 80px; height: 30px; line-height: 28px;"><i class="fas fa-trash"></i> 행 삭제</a>
 								<a onclick="setReport();" style="height: 30px; line-height: 28px; width: 100px;"><i class="fas fa-print"></i> 회의록출력</a>
 								<a onclick="jsonToExcel(mnGridView);" style="height: 30px; line-height: 28px; width: 90px;"><i class="fas fa-file-excel"></i> 엑셀다운로드</a>
 							</div>
@@ -221,21 +221,34 @@
 	// resetData()는 호출될 때마다 모든 rowKey를 0부터 재배정하므로 rowKey 자체를 들고 있으면
 	// 이전 resetData 이후 엉뚱한 행을 가리키게 된다. 그래서 rowKey가 아니라 업무키(mnSubSeq 등)로 저장한다.
 	let lastFocusedRowInfo = null;
+	// 행삭제(서버에 저장된 행)처럼 setData()의 비동기 재조회가 끝난 뒤에야 크로스헤어를 복원할 수
+	// 있는 경우, 복원에 필요한 정보를 setData 호출 전에 여기 담아 전달한다. setData()는 재조회가
+	// 끝나면 이 값이 있으면 복원하고, 없으면 기존처럼 focusLastEditedCell()을 사용한다.
+	let pendingXhairRestore = null;
+	// restoreGridScroll()이 스크롤 위치를 되돌리는 동안에는, 그 동작 자체가 발생시키는 네이티브
+	// scroll 이벤트로 가로 스크롤 동기화용 onBodyScroll()의 refreshLayout() 재예약이 걸리지 않도록
+	// 막는 플래그.
+	let isRestoringGridScroll = false;
 
 	// 현재 포커스된 셀의 행을 반환하되, 그리드 밖 클릭(행삭제/이동 버튼 등)으로 포커스가 사라진
 	// 경우에는 lastFocusedRowInfo(업무키)로 대체 조회한다. list는 grid.getData() 결과를 넘긴다.
+	// lastFocusedRowInfo(업무키 기준)를 항상 최우선으로 신뢰한다. resetData() 직후처럼
+	// grid.getFocusedCell()의 rowKey가 재배정 전 숫자를 그대로 들고 있는 stale 상태일 수 있는데,
+	// 그 숫자가 새 목록에서 "마침 범위 안의 다른 행"을 가리키면(존재는 하니 단순 null 체크로는 못
+	// 잡는다) 행삭제/행이동이 사용자가 선택한 행이 아니라 그 stale 숫자가 가리키는 엉뚱한 행에
+	// 적용돼버린다. 실제 사용자가 새 셀을 클릭한 경우에는 focusChange 핸들러가 lastFocusedRowInfo를
+	// 그 즉시 동기적으로 갱신해 두므로, 이 우선순위로도 정상적인 클릭 흐름은 영향받지 않는다.
 	function resolveSelectedRow(grid, list) {
+		if (lastFocusedRowInfo) {
+			const row = list.find(r => isSameBusinessRow(lastFocusedRowInfo, r));
+			if (row) return row;
+		}
 		const fc = grid.getFocusedCell();
 		if (fc && fc.rowKey !== undefined && fc.rowKey !== null) {
 			const row = grid.getRow(fc.rowKey);
 			if (row) return row;
 		}
-		if (!lastFocusedRowInfo) return null;
-		return list.find(r =>
-			(lastFocusedRowInfo.isNoticeRow && r.isNoticeRow) ||
-			(lastFocusedRowInfo.isFileRow && r.isFileRow) ||
-			(!lastFocusedRowInfo.isNoticeRow && !lastFocusedRowInfo.isFileRow && !r.isNoticeRow && !r.isFileRow && String(r.mnSubSeq) === String(lastFocusedRowInfo.mnSubSeq))
-		) || null;
+		return null;
 	}
 
 	var isSyncing = false;
@@ -645,18 +658,10 @@
 
 	// ==========================================
 	// 선택 셀 행/열 강조 (크로스헤어)
+	// 엑셀의 선택 셀 표시와 동일하게, 그리드 밖(검색조건/버튼 등)으로 포커스가 이동해도
+	// 강조 표시는 그대로 유지한다. 그리드 안의 다른 셀을 클릭/포커스했을 때만 강조가 옮겨간다.
 	// ==========================================
-	var __pm11Xhair = { initialized: false, prev: null };
-
-	function pm11InitXhair() {
-		if (__pm11Xhair.initialized) return;
-		__pm11Xhair.initialized = true;
-		document.addEventListener('mousedown', function (e) {
-			const gridEl = document.getElementById('grid');
-			if (!gridEl || (e.target && gridEl.contains(e.target))) return;
-			clearXhairClasses();
-		}, true);
-	}
+	var __pm11Xhair = { prev: null };
 
 	function clearXhairClasses() {
 		const gridEl = document.getElementById('grid');
@@ -670,25 +675,58 @@
 		__pm11Xhair.prev = null;
 	}
 
+	// 실제 grid.focus() 호출 없이, 지정한 rowKey/colKey 위치에만 크로스헤어 DOM 클래스를 적용한다.
+	// (폴링처럼 사용자가 그리드 밖 다른 입력에 집중하고 있을 수 있는 상황에서 키보드 포커스를
+	// 빼앗지 않으면서도 시각적 강조만 다시 그려야 할 때 사용)
+	function applyXhairAt(rowKey, colKey) {
+		clearXhairClasses();
+		if (rowKey === undefined || rowKey === null || !colKey) return;
+		const gridEl = document.getElementById('grid');
+		if (!gridEl) return;
+		gridEl.querySelectorAll('td.tui-grid-cell[data-row-key="' + rowKey + '"]').forEach(el => el.classList.add('pm11-xhair-row'));
+		gridEl.querySelectorAll('td.tui-grid-cell[data-column-name="' + colKey + '"]').forEach(el => el.classList.add('pm11-xhair-col'));
+		const cell = gridEl.querySelector('td.tui-grid-cell[data-row-key="' + rowKey + '"][data-column-name="' + colKey + '"]');
+		if (cell) cell.classList.add('pm11-xhair-cell');
+		__pm11Xhair.prev = { rowKey, columnName: colKey };
+	}
+
+	// 업무키(isNoticeRow/isFileRow/mnSubSeq) 기준으로 같은 행인지 비교한다. resetData()가 rowKey를
+	// 재배정해버려도 이 비교는 영향받지 않는다.
+	function isSameBusinessRow(info, r) {
+		return (info.isNoticeRow && r.isNoticeRow) ||
+			(info.isFileRow && r.isFileRow) ||
+			(!info.isNoticeRow && !info.isFileRow && !r.isNoticeRow && !r.isFileRow && String(r.mnSubSeq) === String(info.mnSubSeq));
+	}
+
 	function applyXhair() {
 		const grid = mnGridView.target;
 		if (!grid) return;
+		// lastFocusedRowInfo(업무키 기준)를 항상 최우선으로 신뢰한다. resetData()가 rowKey를 전부
+		// 재배정해도 grid.getFocusedCell()의 rowKey는 갱신되지 않고 재배정 전 숫자를 그대로 들고
+		// 있는 stale 상태로 남을 수 있는데, 그 숫자가 새 목록에서 "마침 범위 안의 다른 행"을 가리키면
+		// (존재 자체는 하니 단순 null/존재여부 검사로는 못 잡는다) 엉뚱한 행에 강조가 옮겨가 버린다.
+		// 실제 사용자가 새 셀을 클릭한 경우에는 focusChange 핸들러가 다음 tick에 lastFocusedRowInfo를
+		// 갱신해 두므로, 이 우선순위를 바꿔도 정상적인 클릭 흐름은 전혀 영향받지 않는다.
+		if (lastFocusedRowInfo) {
+			const row = grid.getData().find(r => isSameBusinessRow(lastFocusedRowInfo, r));
+			if (row) {
+				applyXhairAt(row.rowKey, lastFocusedRowInfo.colKey || 'mnSubject');
+				return;
+			}
+		}
+		// lastFocusedRowInfo가 아예 없을 때만(예: 최초 진입) grid.getFocusedCell()을 마지막 수단으로
+		// 사용한다. 이때도 rowKey가 실제 존재하는 행을 가리키는지 확인한다.
 		let focused = null;
 		try { focused = grid.getFocusedCell(); } catch (e) { }
-		if (!focused || focused.rowKey === null || focused.rowKey === undefined || !focused.columnName) {
-			clearXhairClasses();
-			return;
+		if (focused && focused.rowKey !== null && focused.rowKey !== undefined && focused.columnName) {
+			let focusedRow = null;
+			try { focusedRow = grid.getRow(focused.rowKey); } catch (e) { }
+			if (focusedRow) {
+				applyXhairAt(focused.rowKey, focused.columnName);
+				return;
+			}
 		}
 		clearXhairClasses();
-		const gridEl = document.getElementById('grid');
-		if (!gridEl) return;
-		const rowKey = focused.rowKey;
-		const columnName = focused.columnName;
-		gridEl.querySelectorAll('td.tui-grid-cell[data-row-key="' + rowKey + '"]').forEach(el => el.classList.add('pm11-xhair-row'));
-		gridEl.querySelectorAll('td.tui-grid-cell[data-column-name="' + columnName + '"]').forEach(el => el.classList.add('pm11-xhair-col'));
-		const cell = gridEl.querySelector('td.tui-grid-cell[data-row-key="' + rowKey + '"][data-column-name="' + columnName + '"]');
-		if (cell) cell.classList.add('pm11-xhair-cell');
-		__pm11Xhair.prev = { rowKey, columnName };
 	}
 
 	// 행추가/이동 등으로 그리드를 갱신한 직후, 지정한 셀에 포커스+크로스헤어를 다시 적용한다.
@@ -698,11 +736,89 @@
 		const grid = mnGridView.target;
 		const row = grid.getRow(rowKey);
 		if (!row) return;
-		lastFocusedRowInfo = { isNoticeRow: !!row.isNoticeRow, isFileRow: !!row.isFileRow, mnSubSeq: row.mnSubSeq };
+		lastFocusedRowInfo = { isNoticeRow: !!row.isNoticeRow, isFileRow: !!row.isFileRow, mnSubSeq: row.mnSubSeq, colKey: colKey };
 		setTimeout(function () {
 			try { grid.focus(rowKey, colKey, true); } catch (e) { }
 			applyXhair();
 		}, 0);
+	}
+
+	// 구조변경(행 추가/삭제) 전후로 "직전에 선택했던 셀"이 어느 행으로 옮겨가야 하는지 계산한다.
+	// 1) 그 행이 여전히 존재하면(행 추가는 기존 행을 지우지 않으므로 항상 여기 해당) 그 행.
+	// 2) 행이 삭제되어 없어졌다면, 삭제되기 전 그 행의 "바로 위" 행부터 위로 거슬러 올라가며
+	//    (그 위 행도 같이 삭제됐다면 계속 위로) 아직 남아있는 첫 번째 행.
+	// 3) 위로도 남은 행이 없으면(맨 첫 행까지 모두 삭제된 경우) 변경된 목록의 새 첫 행.
+	// prevList: 구조변경 전 grid.getData() 스냅샷, newList: 구조변경 후 grid.getData(), prevInfo: 직전 선택 셀의 업무키.
+	function findRestoreTargetRow(prevList, newList, prevInfo) {
+		if (!prevInfo || !newList || !newList.length) return null;
+
+		const stillThere = newList.find(r => isSameBusinessRow(prevInfo, r));
+		if (stillThere) return stillThere;
+
+		if (prevList) {
+			const prevIdx = prevList.findIndex(r => isSameBusinessRow(prevInfo, r));
+			for (let i = prevIdx - 1; i >= 0; i--) {
+				const found = newList.find(r => isSameBusinessRow(prevList[i], r));
+				if (found) return found;
+			}
+		}
+
+		// 바로 위 행조차 찾을 수 없으면(맨 첫 행이 삭제된 경우 등) 변경된 목록의 첫 행으로
+		return newList[0];
+	}
+
+	// 구조변경(행추가/삭제/이동, setData/폴링 재조회 등) 후 — 직전 선택 셀로 그대로 키보드
+	// 포커스+크로스헤어를 되돌린다(grid.focus() 호출 포함). TOAST UI Grid는 포커스된 셀이 있는
+	// 상태에서 다시 그려질 때마다 내부적으로 자신의 숨겨진 클립보드 엘리먼트로 실제 키보드 포커스를
+	// 다시 가져가므로(렌더링마다 반복되는 내부 동작이라 우리가 grid.focus()를 부르지 않아도 이미
+	// 일어난다), 모델의 focusedCell을 우리가 명시적으로 올바른 새 rowKey로 맞춰주지 않으면 그
+	// 내부 동작과 우리의 DOM 강조 표시가 서로 어긋나 크로스헤어가 사라지거나 엉뚱한 행에 남는다.
+	function restoreXhairAfterStructureChange(prevList, prevInfo) {
+		const grid = mnGridView.target;
+		const target = findRestoreTargetRow(prevList, grid.getData(), prevInfo);
+		if (!target) return;
+		refocusRow(target.rowKey, prevInfo.colKey || 'mnSubject');
+	}
+
+	// resetData()/refreshLayout()는 스크롤 위치를 맨 위로 되돌려버리므로, 재조회 전 스크롤 위치를
+	// 찍어 두고(captureGridScroll) 재조회가 끝난 뒤 다시 복원한다(restoreGridScroll). 크로스헤어
+	// 복원(grid.focus 포함)보다 반드시 나중에 실행되도록 호출 순서를 지킨다(둘 다 setTimeout(0)이라
+	// 같은 동기 블록 안에서 크로스헤어 복원 호출 → 스크롤 복원 호출 순서로 적으면 큐 순서도 그대로 보장된다).
+	function captureGridScroll() {
+		const rsideBody = document.querySelector('#grid .tui-grid-rside-area .tui-grid-body-area');
+		const lsideBody = document.querySelector('#grid .tui-grid-lside-area .tui-grid-body-area');
+		return {
+			top: rsideBody ? rsideBody.scrollTop : 0,
+			left: rsideBody ? rsideBody.scrollLeft : 0,
+			lsideTop: lsideBody ? lsideBody.scrollTop : 0
+		};
+	}
+
+	function restoreGridScroll(pos) {
+		if (!pos) return;
+		isRestoringGridScroll = true;
+		let attempts = 0;
+		const apply = function () {
+			const rsideBody = document.querySelector('#grid .tui-grid-rside-area .tui-grid-body-area');
+			const lsideBody = document.querySelector('#grid .tui-grid-lside-area .tui-grid-body-area');
+			if (rsideBody) { rsideBody.scrollTop = pos.top; rsideBody.scrollLeft = pos.left; }
+			if (lsideBody) { lsideBody.scrollTop = pos.lsideTop; }
+			attempts++;
+			const settled = (!rsideBody || rsideBody.scrollTop === pos.top) && (!lsideBody || lsideBody.scrollTop === pos.lsideTop);
+			// rowHeight:'auto'인 행의 실제 높이는 DOM 삽입 후 비동기로 늦게 확정될 수 있어, 너무 일찍
+			// scrollTop을 복원하면 아직 다 자라지 않은(작은) scrollHeight에 맞춰 0으로 clamp 되어버린다.
+			// 고정된 지연시간을 추측하는 대신, 실제로 적용됐는지 확인해 안 됐으면(그리고 시도 여력이
+			// 남았으면) 다음 애니메이션 프레임에 다시 시도해 레이아웃이 자리잡을 때까지 자가 종료
+			// 방식으로 맞춘다.
+			if (!settled && attempts < 30) {
+				requestAnimationFrame(apply);
+			} else {
+				// 우리가 만든 scroll 이벤트로 onBodyScroll()의 200ms 디바운스가 걸려 있을 수 있으므로,
+				// 그 디바운스가 끝날 때까지는 억제 플래그를 유지했다가 해제한다.
+				setTimeout(function () { isRestoringGridScroll = false; }, 250);
+			}
+		};
+		requestAnimationFrame(apply);
 	}
 
 	// ==========================================
@@ -995,22 +1111,29 @@
 			});
 
 			// 포커스 셀이 바뀔 때마다 행/열 강조(크로스헤어) 갱신
+			// focusChange 이벤트 콜백이 동기적으로 실행되는 그 순간에는 grid.getRow(fc.rowKey)가
+			// 아직 행을 못 찾는(undefined) 경우가 있다(TUI Grid가 preact 기반으로 상태를 비동기
+			// 배치 처리하는 것으로 보임). 그 결과 lastFocusedRowInfo가 계속 null로 남아, 화면에는
+			// (grid.getFocusedCell() 직접 사용 폴백 덕에) 크로스헤어가 정상으로 보이지만, 이후
+			// resetData가 일어나면 lastFocusedRowInfo가 비어 있어 복원할 게 없는 문제가 있었다.
+			// applyXhair와 같은 다음 tick(setTimeout 0)에서는 grid.getRow()가 안정적으로 행을
+			// 찾으므로, 조회 자체를 그 시점으로 옮겨 lastFocusedRowInfo가 항상 실제로 채워지게 한다.
 			grid.on('focusChange', function () {
-				const fc = grid.getFocusedCell();
-				if (fc && fc.rowKey !== undefined && fc.rowKey !== null) {
-					const row = grid.getRow(fc.rowKey);
-					if (row) {
-						lastFocusedRowInfo = { isNoticeRow: !!row.isNoticeRow, isFileRow: !!row.isFileRow, mnSubSeq: row.mnSubSeq };
+				setTimeout(function () {
+					const fc = grid.getFocusedCell();
+					if (fc && fc.rowKey !== undefined && fc.rowKey !== null) {
+						const row = grid.getRow(fc.rowKey);
+						if (row) {
+							lastFocusedRowInfo = { isNoticeRow: !!row.isNoticeRow, isFileRow: !!row.isFileRow, mnSubSeq: row.mnSubSeq, colKey: fc.columnName };
+						}
 					}
-				}
-				setTimeout(applyXhair, 0);
+					applyXhair();
+				}, 0);
 			});
 			// resetData 등으로 그리드 DOM이 다시 그려진 뒤에도 강조 유지
 			grid.on('onGridUpdated', function () {
 				setTimeout(applyXhair, 0);
 			});
-
-			pm11InitXhair();
 
 			// 가로 스크롤 후 고정열(PROJECT 주제)과 일반열(부서별 등록) 간 셀 높이가
 			// 어긋나 보이는 현상 방지: 스크롤이 멈춘 뒤 레이아웃을 재계산해 동기화
@@ -1021,6 +1144,10 @@
 				function onBodyScroll() {
 					// 스크롤로 셀 DOM이 재활용되면 행/열 강조 표시가 다른 셀에 남을 수 있으므로 즉시 다시 계산
 					applyXhair();
+					// restoreGridScroll()이 직전 스크롤 위치를 되돌리는 중에 발생한 스크롤 이벤트라면,
+					// 이 디바운스가 끝난 뒤 refreshLayout()을 다시 실행해 방금 복원한 위치를 또 흔드는
+					// 일이 없도록 건너뛴다.
+					if (isRestoringGridScroll) return;
 					clearTimeout(scrollSyncTimer);
 					scrollSyncTimer = setTimeout(function () {
 						try { grid.refreshLayout(); } catch (e) { }
@@ -1057,7 +1184,13 @@
 					paramObj.deptCodes = JSON.stringify(Object.values(deptCodeMap));
 
 					postAjax("/user/pm/pm10/selectMnList", paramObj, null, function (data) {
+						// resetData가 모든 rowKey를 재배정하고 스크롤도 맨 위로 되돌려버리기 전에, 복원에 쓸
+						// "구조변경 전" 목록과 스크롤 위치를 미리 찍어 둔다(날짜/구분 변경, 새로고침 등
+						// setData()를 부르는 모든 경로에 공통 적용).
+						let prevList = null;
+						const prevScroll = captureGridScroll();
 						try {
+							prevList = mnGridView.target.getData();
 							const merged = mnGridView.processGridData(data);
 							mnGridView.target.resetData(merged);
 							mnGridView.target.refreshLayout();
@@ -1068,7 +1201,21 @@
 						} catch (error) {
 							alert("오류 발생!! 전산실 연락 바랍니다: " + error.message);
 						} finally {
-							focusLastEditedCell();
+							// 행삭제 등에서 미리 요청해 둔 크로스헤어 복원이 있으면 그것을 가장 우선 적용한다.
+							// 그게 없더라도 직전에 선택해 둔 셀(lastFocusedRowInfo)이 있으면 화면이 새로
+							// 그려진 뒤에도 같은 셀(없으면 바로 위/첫 행)에 크로스헤어를 그대로 유지하고,
+							// 선택된 셀이 전혀 없었을 때만 마지막으로 편집한 셀로 포커스를 복원한다.
+							if (pendingXhairRestore) {
+								const restore = pendingXhairRestore;
+								pendingXhairRestore = null;
+								restoreXhairAfterStructureChange(restore.prevList, restore.prevInfo);
+							} else if (lastFocusedRowInfo) {
+								restoreXhairAfterStructureChange(prevList, lastFocusedRowInfo);
+							} else {
+								focusLastEditedCell();
+							}
+							// 크로스헤어 복원(grid.focus의 자동 스크롤 포함)이 끝난 뒤 원래 스크롤 위치로 되돌린다.
+							restoreGridScroll(prevScroll);
 						}
 					});
 				});
@@ -1267,11 +1414,23 @@
 
 					// 누군가 새 행을 썼거나 지웠거나(또는 순서를 바꿨다면) 풀 리로드
 					if (isStructureChanged) {
+						// resetData가 스크롤을 맨 위로 되돌려버리므로 미리 찍어 둔다. 포커스된 셀이 있는
+						// 채로 그리드가 다시 그려지면 TOAST UI Grid가 내부적으로 자신의 클립보드
+						// 엘리먼트에 키보드 포커스를 다시 가져가는 동작을 어차피 자체적으로 수행하므로
+						// (폴링이라고 이 동작이 면제되지 않는다), grid.focus()를 굳이 피해도 다른 입력에
+						// 가 있는 포커스를 지키지 못한다 — 오히려 모델의 focusedCell을 새 rowKey로 맞춰
+						// 주지 않으면 그 내부 동작과 우리 강조 표시가 어긋나 크로스헤어가 사라진다.
+						const prevScroll = captureGridScroll();
 						grid.resetData(normalizeRowOrder(newList));
 						grid.refreshLayout();
 						defalutAttendList(data.defaultAttendList || []);
 						if (data.d02List) select_p10_d02_List(data.d02List);
-						if (!isPolling) focusLastEditedCell();
+						if (lastFocusedRowInfo) {
+							restoreXhairAfterStructureChange(oldList, lastFocusedRowInfo);
+						} else if (!isPolling) {
+							focusLastEditedCell();
+						}
+						restoreGridScroll(prevScroll);
 						return;
 					}
 
@@ -1655,14 +1814,17 @@
 		isInsertingRow = true;
 
 		const grid = mnGridView.target;
-		// 버튼(그리드 바깥 영역) 클릭으로 getFocusedCell()이 null이 되는 경우 마지막으로 포커스됐던 셀을 대신 사용.
-		// rowKey는 resetData() 때마다 재배정되므로 즉시 업무키(mnSubSeq 등)로 변환해 들고 있는다.
+		// lastFocusedRowInfo(업무키 기준)를 최우선으로 신뢰한다. resetData() 직후처럼
+		// grid.getFocusedCell()의 rowKey가 재배정 전 숫자를 그대로 들고 있는 stale 상태일 수 있는데,
+		// 그 숫자가 새 목록에서 마침 다른 행을 가리키면(존재는 하니 null 체크로는 못 잡는다) 새 행이
+		// 엉뚱한 위치에 삽입돼버린다. lastFocusedRowInfo가 없을 때만(버튼 클릭으로 포커스가 비어
+		// 있고 이전 선택 기록도 없는 경우) grid.getFocusedCell()을 대신 사용한다.
 		const fc = grid.getFocusedCell();
 		let focusedRowInfo = lastFocusedRowInfo;
-		if (fc && fc.rowKey !== undefined && fc.rowKey !== null) {
+		if (!focusedRowInfo && fc && fc.rowKey !== undefined && fc.rowKey !== null) {
 			const fcRow = grid.getRow(fc.rowKey);
 			if (fcRow) {
-				focusedRowInfo = { isNoticeRow: !!fcRow.isNoticeRow, isFileRow: !!fcRow.isFileRow, mnSubSeq: fcRow.mnSubSeq };
+				focusedRowInfo = { isNoticeRow: !!fcRow.isNoticeRow, isFileRow: !!fcRow.isFileRow, mnSubSeq: fcRow.mnSubSeq, colKey: fc.columnName };
 			}
 		}
 
@@ -1726,8 +1888,14 @@
 				grid.appendRow(newRow, { at: insertIndex });
 				recalcSortOrder(true);
 
-				const freshRow = grid.getData().find(r => !r.isNoticeRow && !r.isFileRow && String(r.mnSubSeq) === String(newRow.mnSubSeq));
-				if (freshRow) refocusRow(freshRow.rowKey, 'mnSubject');
+				if (focusedRowInfo) {
+					// 행 추가는 기존 행을 지우지 않으므로 직전에 선택돼 있던 셀이 그대로 남아 있다.
+					// 새로 추가한 행으로 포커스를 옮기지 않고 그 셀의 크로스헤어를 그대로 유지한다.
+					restoreXhairAfterStructureChange(list, focusedRowInfo);
+				} else {
+					const freshRow = grid.getData().find(r => !r.isNoticeRow && !r.isFileRow && String(r.mnSubSeq) === String(newRow.mnSubSeq));
+					if (freshRow) refocusRow(freshRow.rowKey, 'mnSubject');
+				}
 			} else {
 				alert('행 번호 채번 실패: ' + ((data && data.resultMessage) || '알 수 없는 서버 오류'));
 			}
@@ -1748,6 +1916,11 @@
 			alert("삭제할 주제를 선택하세요!");
 			return false;
 		}
+
+		// 삭제 후 크로스헤어 복원 시 같은 열을 유지하기 위해, 삭제 시점에 포커스돼 있던 열을 기억해
+		// 둔다. lastFocusedRowInfo가 stale일 일 없는 출처이므로 우선 사용한다.
+		const fcAtDelete = grid.getFocusedCell();
+		const colKeyAtDelete = (lastFocusedRowInfo && lastFocusedRowInfo.colKey) || (fcAtDelete && fcAtDelete.columnName) || 'mnSubject';
 
 		if (sel.mnSubject == "파일첨부" || ((sel.mnSubSeq == 0) && (sel.mnSubject == '공지사항'))) {
 			return false;
@@ -1778,9 +1951,9 @@
 			}
 			grid.removeRow(sel.rowKey);
 			recalcSortOrder(true);
-			grid.blur();
-			clearXhairClasses();
-			lastFocusedRowInfo = null;
+			// 방금 지운 행이 직전에 선택돼 있던 셀이므로, 그 바로 위 행(없으면 새 목록의 첫 행)에
+			// 크로스헤어를 다시 표시한다.
+			restoreXhairAfterStructureChange(list, { isNoticeRow: false, isFileRow: false, mnSubSeq: sel.mnSubSeq, colKey: colKeyAtDelete });
 			return;
 		}
 
@@ -1836,7 +2009,9 @@
 		postAjax("/user/pm/pm10/deleteMn", paramObj, null, function (data) {
 			if (data && data.resultCode == 200) {
 				// 삭제된 행의 rowKey는 setData()의 resetData로 재배정되므로, 미리 포커스/크로스헤어를
-				// 비워 reassign된 rowKey가 엉뚱한 행에 강조 표시를 남기는 것을 방지한다.
+				// 비워 reassign된 rowKey가 엉뚱한 행에 강조 표시를 남기는 것을 방지한다. 대신 setData()의
+				// 재조회가 끝난 뒤(삭제 전 목록 list 기준으로) 크로스헤어를 다시 계산하도록 요청해 둔다.
+				pendingXhairRestore = { prevList: list, prevInfo: { isNoticeRow: false, isFileRow: false, mnSubSeq: sel.mnSubSeq, colKey: colKeyAtDelete } };
 				grid.blur();
 				clearXhairClasses();
 				lastFocusedRowInfo = null;
@@ -2169,8 +2344,10 @@
 		const idx = list.findIndex(r => r.mnDate === sel.mnDate && r.mnSubSeq === sel.mnSubSeq);
 		if (idx <= 0) return;
 
+		// lastFocusedRowInfo가 stale일 일 없는 colKey 출처이므로 우선 사용한다(아래 grid.getFocusedCell()의
+		// columnName은 stale일 가능성이 있는 fc.rowKey와 같은 이유로 신뢰도가 낮다).
 		const fc = grid.getFocusedCell();
-		const colKey = (fc && fc.columnName) ? fc.columnName : 'mnSubject';
+		const colKey = (lastFocusedRowInfo && lastFocusedRowInfo.colKey) || (fc && fc.columnName) || 'mnSubject';
 
 		// resetData는 전체 rowKey를 재배정해 포커스/크로스헤어가 끊기거나 엉뚱한 행으로 옮겨가므로,
 		// rowKey를 그대로 유지하는 moveRow로 해당 행만 옮긴다 (행추가의 appendRow와 동일한 이유).
@@ -2200,8 +2377,10 @@
 		const noticeIdx = list.findIndex(r => r.isNoticeRow);
 		if (noticeIdx >= 0 && idx + 1 >= noticeIdx) return;
 
+		// lastFocusedRowInfo가 stale일 일 없는 colKey 출처이므로 우선 사용한다(아래 grid.getFocusedCell()의
+		// columnName은 stale일 가능성이 있는 fc.rowKey와 같은 이유로 신뢰도가 낮다).
 		const fc = grid.getFocusedCell();
-		const colKey = (fc && fc.columnName) ? fc.columnName : 'mnSubject';
+		const colKey = (lastFocusedRowInfo && lastFocusedRowInfo.colKey) || (fc && fc.columnName) || 'mnSubject';
 
 		// resetData는 전체 rowKey를 재배정해 포커스/크로스헤어가 끊기거나 엉뚱한 행으로 옮겨가므로,
 		// rowKey를 그대로 유지하는 moveRow로 해당 행만 옮긴다 (행추가의 appendRow와 동일한 이유).
