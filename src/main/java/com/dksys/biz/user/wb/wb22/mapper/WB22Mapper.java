@@ -56,6 +56,8 @@ public interface WB22Mapper {
 
 	List<Map<String, String>> selectRsltsApprovalList(Map<String, String> paramMap);
 
+	Map<String, String> selectWbsRsltsInfo(Map<String, String> paramMap);
+
 	int selectWbsRstlsSeqNext(Map<String, String> paramMap);
 
 	int wbsRsltsInsert(Map<String, String> paramMap);

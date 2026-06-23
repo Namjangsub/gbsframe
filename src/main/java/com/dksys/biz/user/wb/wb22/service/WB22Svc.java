@@ -35,6 +35,8 @@ public interface WB22Svc {
 
 	List<Map<String, String>> selectRsltsApprovalList(Map<String, String> paramMap);
 	   
+	Map<String, String> selectWbsRsltsInfo(Map<String, String> paramMap);
+
 	int wbsRsltsInsert(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
 	
 	int wbsRsltsUpdate(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;

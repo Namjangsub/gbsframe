@@ -352,76 +352,60 @@ var gridViewPop = {
 	  $("#wbsPopupRslt #fileUpBtn").hide();	// 파일첨부버튼 기본 숨김
 	  $.each(paramObj, function (index, item) {
 		  $("#popFormRslts #" + index).val(item);
-	      if (index == "closeYn_P") {
-	          /* var color = item == "Y" ? "color-circle_02.png" : "color-circle_01.png";
-	          var html = '<img src="/static/img/'+color+'" align="center" style="width: 10px;height: 10px;"></img>';
-	          $("#popFormRslts #close").html(html) */
-	      }
-	  })
+	  });
 
+	  var coCd = paramObj.coCd || paramObj.coCd_P || jwt.coCd;
+	  var salesCd = paramObj.salesCd || paramObj.salesCd2_P || paramObj.salesCd_P;
+	  var wbsPlanNo = paramObj.wbsPlanNo || paramObj.wbsPlanNo2_P;
+	  var fileTrgtKey = paramObj.fileTrgtKey;
 
-	  var row1 = gridView1.target.getList("selected")[0];
-	  if (row1 != undefined) {
-		  $.each(row1, function (key, val) {
-			  $("#popFormRslts #" + key + "1_P").val(val);
-			  /* if (key == "closeYn") {
-		          var color = val == "Y" ? "color-circle_02.png" : "color-circle_01.png";
-		          var html = '<img src="/static/img/'+color+'" align="center" style="width: 10px;height: 10px;"></img>';
-		          $("#popFormRslts #close1").html(html)
-		      }  */
-		  });
-
+	  // Fallback to parent grid if keys are missing (backwards compatibility)
+	  if (!wbsPlanNo && typeof gridView2 !== 'undefined' && gridView2.target) {
+		  var selectedRow = gridView2.target.getList("selected")[0];
+		  if (selectedRow) {
+			  wbsPlanNo = selectedRow.wbsPlanNo;
+			  if (!salesCd) salesCd = selectedRow.salesCd;
+			  if (!coCd) coCd = selectedRow.coCd;
+		  }
 	  }
 
-	  var row2 = gridView2.target.getList("selected")[0];
-	  if (row2 != undefined) {
-		  $.each(row2, function (key, val) {
-	          if (actionType == "C") {
-	              if (key == "wbsPlanNo") {
-	                  $("#popFormRslts #wbsRsltsNo").val(val);
-	              }
-	              else if (key == "wbsPlanMngId") {
-	                  $("#popFormRslts #wbsRsltsId").val(val);
-	              }
-	              else if (key == "wbsPlanMngNm") {
-	                  $("#popFormRslts #wbsRsltsNm").val(val);
-	              }
-	              else if (key == "wbsPlansDt") {
-	                  $("#popFormRslts #wbsRsltssDt").val(val);
-	              }
-	              else if (key == "wbsPlaneDt") {
-	//                  $("#popFormRslts #wbsRsltseDt").val(val);
-	              }
-	              else if (key == "daycnt") {
-	                  $("#popFormRslts #rsltsDaycnt").val(val);
-	              }
-	          }
-	          if (key.includes('Rslts') || key.includes('rslts')) {
+	  var searchParam = {
+		  "coCd": coCd,
+		  "salesCd": salesCd,
+		  "wbsPlanNo": wbsPlanNo,
+		  "fileTrgtKey": fileTrgtKey
+	  };
 
-	              $("#popFormRslts #" + key).val(val);
-	          }
-	          else {
-	              $("#popFormRslts #" + key + "2_P").val(val);
-	          }
-	          if (key == "closeYn") {
-	             /*  var color = val == "Y" ? "color-circle_02.png" : "color-circle_01.png";
-	              var html = '<img src="/static/img/'+color+'" align="center" style="width: 10px;height: 10px;"></img>';
-	              $("#popFormRslts #close2").html(html) */
-	          }
-	          else if (key == "rsltsCloseYn") {
-	        	  if (val == "Y") {
-	        		  $("#wbsPopupRslt #actionBtn").hide();
-					  $("#wbsPopupRslt #fileUpBtn").show();
-					  $("#popFormRslts #coCd").val($("#popFormRslts #coCd2_P").val());
-					  $("#popFormRslts #fileTrgtKey").val($("#popFormRslts #rsltsFileTrgtKey").val());
+	  postAjaxSync("/user/wb/wb22/selectWbsRsltsInfo", searchParam, null, function(data) {
+		  var info = data.resultInfo;
+		  if (info) {
+			  $.each(info, function(key, val) {
+				  var targetKey = key;
+				  if (key.match(/P$/)) {
+					  targetKey = key.replace(/P$/, "_P");
+				  }
+				  var $el = $("#popFormRslts #" + targetKey);
+				  if ($el.length > 0) {
+					  $el.val(val);
+				  }
+			  });
 
-	        	  }
-	        	 /*  var color = val == "Y" ? "color-circle_02.png" : "color-circle_01.png";
-	              var html = '<img src="/static/img/'+color+'" align="center" style="width: 10px;height: 10px;"></img>';
-	              $("#popFormRslts #close3").html(html) */
-	          }
-	      });
-	  }
+			  if (actionType == "C") {
+				  $("#wbsRsltsNo").val(info.wbsPlanNo2P);
+				  $("#wbsRsltsId").val(info.wbsPlanMngId2P || jwt.userId);
+				  $("#wbsRsltsNm").val(info.wbsPlanMngNm2P || jwt.userNm);
+				  $("#wbsRsltssDt").val(info.wbsPlansDt2P);
+				  $("#rsltsDaycnt").val(info.daycnt2P);
+			  }
+
+			  if (info.rsltsCloseYn == "Y") {
+				  $("#wbsPopupRslt #actionBtn").hide();
+				  $("#wbsPopupRslt #fileUpBtn").show();
+				  $("#popFormRslts #coCd").val(info.coCd2P);
+				  $("#popFormRslts #fileTrgtKey").val(info.rsltsFileTrgtKey);
+			  }
+		  }
+	  });
 
 	  $("#popFormRslts #userId").val(jwt.userId);
 	  $("#popFormRslts #userNm").val(jwt.userNm);
@@ -699,9 +683,13 @@ function updateWbsRslts() {
         filePostAjax("/user/wb/wb22/wbsRsltsUpdate", formData, function(data) {
 			if (data.resultCode == 200) {
 				salesCd = $("#popFormRslts #salesCd2_P").val()
-				gridView1.setData(0);
-				gridView2.setData(0);
+				if (typeof gridView1 !== 'undefined' && gridView1 && typeof gridView1.setData === 'function') {
+					gridView1.setData(0);
+				}
 
+				if (typeof gridView2 !== 'undefined' && gridView2 && typeof gridView2.setData === 'function') {
+					gridView2.setData(0);
+				}
 				kakaoTodo();
 
 				modalStack.close();

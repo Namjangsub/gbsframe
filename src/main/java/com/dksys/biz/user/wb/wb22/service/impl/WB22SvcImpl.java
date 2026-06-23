@@ -1565,6 +1565,11 @@ public class WB22SvcImpl implements WB22Svc {
 	}
 
 	@Override
+	public Map<String, String> selectWbsRsltsInfo(Map<String, String> paramMap) {
+		return wb22Mapper.selectWbsRsltsInfo(paramMap);
+	}
+
+	@Override
 	public int wbsPlanChangeListCount(Map<String, String> paramMap) {
 		return wb22Mapper.wbsPlanChangeListCount(paramMap);
 	}

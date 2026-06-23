@@ -617,6 +617,13 @@ public class WB22Ctr {
 		return "jsonView";
 	}
 
+	@PostMapping(value = "/selectWbsRsltsInfo")
+	public String selectWbsRsltsInfo(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		Map<String, String> resultInfo = wb22Svc.selectWbsRsltsInfo(paramMap);
+		model.addAttribute("resultInfo", resultInfo);
+		return "jsonView";
+	}
+
 	@PostMapping(value = "/wbsPlanChangeList")
 	public String wbsPlanChangeList(@RequestBody Map<String, String> paramMap, ModelMap model) {
 		int totalCnt = wb22Svc.wbsPlanChangeListCount(paramMap);
