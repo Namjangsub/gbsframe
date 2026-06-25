@@ -16,8 +16,8 @@
 	--			  , A.ORDRG_SEQ
 			      , MAX(A.ORDRG_DIV10)	 				AS ORDRG_DIV10				/* 입고구분 */
 			      , MAX(A.ORDRG_DIV20)	 				AS ORDRG_DIV20				/* 용도구분 */
-			      , SUM(NVL(A.ORDRG_QTY,0))  			AS ORDRG_QTY
-			      , SUM(NVL(A.ORDRG_AMT,0))  			AS ORDRG_AMT
+			      , (SELECT SUM(NVL(X.ORDRG_QTY,0)) FROM TB_SM02D01 X WHERE X.CO_CD = A.CO_CD AND X.SALES_CD = A.SALES_CD AND X.ORDRG_NO = A.ORDRG_NO) AS ORDRG_QTY
+			      , (SELECT SUM(NVL(X.ORDRG_AMT,0)) FROM TB_SM02D01 X WHERE X.CO_CD = A.CO_CD AND X.SALES_CD = A.SALES_CD AND X.ORDRG_NO = A.ORDRG_NO) AS ORDRG_AMT
 			      , TO_CHAR(min(A.DUDT_DEQ_DT), 'YYYY-MM-DD') 		AS DUDT_DEQ_DT		/* 납기요청일 */
 			      , TO_CHAR(min(A.DUDT_INTEND_DT), 'YYYY-MM-DD') 	AS DUDT_INTEND_DT		/* 납기예정일 */
 				  , MAX(A.CREAT_ID)    					AS CREAT_ID
@@ -100,16 +100,18 @@
 	          			LEFT OUTER JOIN TB_CR02D02 A ON SALE.SALES_CD = A.SALES_CD
 			          	LEFT OUTER JOIN TB_CR02M01 M ON(A.CO_CD = M.CO_CD AND A.ORDRS_NO = M.ORDRS_NO)
 		)
-		,CTOT AS ( -- 발주번호+SEQ 별 총입고수량 산정
+		,CTOT AS ( -- 발주번호+SALES_CD 별 총입고수량 산정
 			SELECT    C.ORDRG_NO
+					, C.SALES_CD
 					, NVL(SUM(C.IN_QTY), 0) AS TOT_IN_QTY
 			  FROM TB_SM03D01 C
 			WHERE  1=1
-			 AND EXISTS (SELECT 1 FROM BJM WHERE BJM.ORDRG_NO = C.ORDRG_NO)
-			GROUP BY C.ORDRG_NO
+			 AND EXISTS (SELECT 1 FROM BJM WHERE BJM.ORDRG_NO = C.ORDRG_NO AND BJM.SALES_CD = C.SALES_CD)
+			GROUP BY C.ORDRG_NO, C.SALES_CD
 		)
-		,INO AS ( --발주번호별 입고내역
-			  SELECT  DISTINCT I.ORDRG_NO
+		,INO AS ( --발주번호+SALES_CD별 입고내역
+			  SELECT  I.ORDRG_NO
+			  				  , I.SALES_CD
 			  				  , I.IN_NO
 			  				  , MAX(I.PCHS_NO)					AS PCHS_NO
 			  				  , SUM(nvl(I.IN_QTY,0)) 			AS  IN_QTY
@@ -123,8 +125,8 @@
 	            FROM TB_SM03D01 I
 			          	LEFT OUTER JOIN TB_SM03M01 M ON (M.CO_CD =I.CO_CD AND M.IN_NO =I.IN_NO AND M.SALES_CD =I.SALES_CD AND M.REQ_NO =I.REQ_NO )
 	           WHERE 1=1
-			     AND EXISTS (SELECT 1 FROM BJM WHERE BJM.ORDRG_NO = I.ORDRG_NO)
-	           GROUP BY I.ORDRG_NO, I.IN_NO
+			     AND EXISTS (SELECT 1 FROM BJM WHERE BJM.ORDRG_NO = I.ORDRG_NO AND BJM.SALES_CD = I.SALES_CD)
+	           GROUP BY I.ORDRG_NO, I.SALES_CD, I.IN_NO
 		)
 	</sql>
 
@@ -150,8 +152,8 @@
 				  , A.ORDRG_NO
 			      , MAX(A.ORDRG_DIV10)	 				AS ORDRG_DIV10				/* 입고구분 */
 			      , MAX(A.ORDRG_DIV20)	 				AS ORDRG_DIV20				/* 용도구분 */
-			      , SUM(NVL(A.ORDRG_QTY,0))  			AS ORDRG_QTY
-			      , SUM(NVL(A.ORDRG_AMT,0))  			AS ORDRG_AMT
+			      , (SELECT SUM(NVL(X.ORDRG_QTY,0)) FROM TB_SM02D01 X WHERE X.CO_CD = A.CO_CD AND X.SALES_CD = A.SALES_CD AND X.ORDRG_NO = A.ORDRG_NO) AS ORDRG_QTY
+			      , (SELECT SUM(NVL(X.ORDRG_AMT,0)) FROM TB_SM02D01 X WHERE X.CO_CD = A.CO_CD AND X.SALES_CD = A.SALES_CD AND X.ORDRG_NO = A.ORDRG_NO) AS ORDRG_AMT
 			      , TO_CHAR(min(A.DUDT_DEQ_DT), 'YYYY-MM-DD') 		AS DUDT_DEQ_DT		/* 납기요청일 */
 			      , TO_CHAR(min(A.DUDT_INTEND_DT), 'YYYY-MM-DD') 	AS DUDT_INTEND_DT		/* 납기예정일 */
 				  , MAX(A.CREAT_ID)    					AS CREAT_ID
@@ -217,16 +219,18 @@
 		        
 		       
 		)
-		,CTOT AS ( -- 발주번호+SEQ 별 총입고수량 산정
+		,CTOT AS ( -- 발주번호+SALES_CD 별 총입고수량 산정
 			SELECT    C.ORDRG_NO
+					, C.SALES_CD
 					, NVL(SUM(C.IN_QTY), 0) AS TOT_IN_QTY
 			  FROM TB_SM03D01 C
 			WHERE  1=1
-			 AND EXISTS (SELECT 1 FROM BJM WHERE BJM.ORDRG_NO = C.ORDRG_NO)
-			GROUP BY C.ORDRG_NO
+			 AND EXISTS (SELECT 1 FROM BJM WHERE BJM.ORDRG_NO = C.ORDRG_NO AND BJM.SALES_CD = C.SALES_CD)
+			GROUP BY C.ORDRG_NO, C.SALES_CD
 		)
-		,INO AS ( --발주번호별 입고내역
-			  SELECT  DISTINCT I.ORDRG_NO
+		,INO AS ( --발주번호+SALES_CD별 입고내역
+			  SELECT  I.ORDRG_NO
+			  				  , I.SALES_CD
 			  				  , I.IN_NO
 			  				  , MAX(I.PCHS_NO)					AS PCHS_NO
 			  				  , SUM(nvl(I.IN_QTY,0)) 			AS  IN_QTY
@@ -240,18 +244,18 @@
 	            FROM TB_SM03D01 I
 			          	LEFT OUTER JOIN TB_SM03M01 M ON (M.CO_CD =I.CO_CD AND M.IN_NO =I.IN_NO AND M.SALES_CD =I.SALES_CD AND M.REQ_NO =I.REQ_NO )
 	           WHERE 1=1
-			     AND EXISTS (SELECT 1 FROM BJM WHERE BJM.ORDRG_NO = I.ORDRG_NO)
-	           GROUP BY I.ORDRG_NO, I.IN_NO
+			     AND EXISTS (SELECT 1 FROM BJM WHERE BJM.ORDRG_NO = I.ORDRG_NO AND BJM.SALES_CD = I.SALES_CD)
+	           GROUP BY I.ORDRG_NO, I.SALES_CD, I.IN_NO
 		)
 			SELECT COUNT(*)
 			  FROM BJM														        --발주내역
 							           JOIN SUJU		 ON SUJU.SALES_CD = BJM.SALES_CD
-			   				LEFT OUTER JOIN INO          ON  BJM.ORDRG_NO = INO.ORDRG_NO		--입고내역
+			   				LEFT OUTER JOIN INO          ON  BJM.ORDRG_NO = INO.ORDRG_NO AND BJM.SALES_CD = INO.SALES_CD		--입고내역
 							LEFT OUTER JOIN TB_CM06M01 M ON M.ID = BJM.CREAT_ID
 							LEFT OUTER JOIN TB_BM02M01 D ON BJM.PCHS_CLNT_CD = D.CLNT_CD
 		              		LEFT OUTER JOIN TB_BM02M01 C ON SUJU.ORDRS_CLNT_CD = C.CLNT_CD --거래처정보
 		              		LEFT OUTER JOIN TB_BM02M01 P ON BJM.PCHS_CLNT_CD = P.CLNT_CD --공급사정보
-		              		LEFT OUTER JOIN CTOT      CT ON CT.ORDRG_NO =  BJM.ORDRG_NO
+		              		LEFT OUTER JOIN CTOT      CT ON CT.ORDRG_NO =  BJM.ORDRG_NO AND CT.SALES_CD = BJM.SALES_CD
 		              		LEFT OUTER JOIN TB_QM01M01 Q ON Q.REQ_NO =  BJM.REQ_NO
 			 WHERE 1=1
 				<if test='cmpletYn == "Y"'>
@@ -283,8 +287,8 @@
 				  , A.ORDRG_NO
 			      , MAX(A.ORDRG_DIV10)	 				AS ORDRG_DIV10				/* 입고구분 */
 			      , MAX(A.ORDRG_DIV20)	 				AS ORDRG_DIV20				/* 용도구분 */
-			      , SUM(NVL(A.ORDRG_QTY,0))  			AS ORDRG_QTY
-			      , SUM(NVL(A.ORDRG_AMT,0))  			AS ORDRG_AMT
+			      , (SELECT SUM(NVL(X.ORDRG_QTY,0)) FROM TB_SM02D01 X WHERE X.CO_CD = A.CO_CD AND X.SALES_CD = A.SALES_CD AND X.ORDRG_NO = A.ORDRG_NO) AS ORDRG_QTY
+			      , (SELECT SUM(NVL(X.ORDRG_AMT,0)) FROM TB_SM02D01 X WHERE X.CO_CD = A.CO_CD AND X.SALES_CD = A.SALES_CD AND X.ORDRG_NO = A.ORDRG_NO) AS ORDRG_AMT
 			      , TO_CHAR(min(A.DUDT_DEQ_DT), 'YYYY-MM-DD') 		AS DUDT_DEQ_DT		/* 납기요청일 */
 			      , TO_CHAR(min(A.DUDT_INTEND_DT), 'YYYY-MM-DD') 	AS DUDT_INTEND_DT		/* 납기예정일 */
 				  , MAX(A.CREAT_ID)    					AS CREAT_ID
@@ -350,16 +354,18 @@
 		        
 		       
 		)
-		,CTOT AS ( -- 발주번호+SEQ 별 총입고수량 산정
+		,CTOT AS ( -- 발주번호+SALES_CD 별 총입고수량 산정
 			SELECT    C.ORDRG_NO
+					, C.SALES_CD
 					, NVL(SUM(C.IN_QTY), 0) AS TOT_IN_QTY
 			  FROM TB_SM03D01 C
 			WHERE  1=1
-			 AND EXISTS (SELECT 1 FROM BJM WHERE BJM.ORDRG_NO = C.ORDRG_NO)
-			GROUP BY C.ORDRG_NO
+			 AND EXISTS (SELECT 1 FROM BJM WHERE BJM.ORDRG_NO = C.ORDRG_NO AND BJM.SALES_CD = C.SALES_CD)
+			GROUP BY C.ORDRG_NO, C.SALES_CD
 		)
-		,INO AS ( --발주번호별 입고내역
-			  SELECT  DISTINCT I.ORDRG_NO
+		,INO AS ( --발주번호+SALES_CD별 입고내역
+			  SELECT  I.ORDRG_NO
+			  				  , I.SALES_CD
 			  				  , I.IN_NO
 			  				  , MAX(I.PCHS_NO)					AS PCHS_NO
 			  				  , SUM(nvl(I.IN_QTY,0)) 			AS  IN_QTY
@@ -373,8 +379,8 @@
 	            FROM TB_SM03D01 I
 			          	LEFT OUTER JOIN TB_SM03M01 M ON (M.CO_CD =I.CO_CD AND M.IN_NO =I.IN_NO AND M.SALES_CD =I.SALES_CD AND M.REQ_NO =I.REQ_NO )
 	           WHERE 1=1
-			     AND EXISTS (SELECT 1 FROM BJM WHERE BJM.ORDRG_NO = I.ORDRG_NO)
-	           GROUP BY I.ORDRG_NO, I.IN_NO
+			     AND EXISTS (SELECT 1 FROM BJM WHERE BJM.ORDRG_NO = I.ORDRG_NO AND BJM.SALES_CD = I.SALES_CD)
+	           GROUP BY I.ORDRG_NO, I.SALES_CD, I.IN_NO
 		)
 
 		SELECT T.*
@@ -414,11 +420,11 @@
 	              			, INO.PCHS_NO	--매입확정번호
 					  FROM BJM														        --발주내역
 									           JOIN SUJU		 ON SUJU.SALES_CD = BJM.SALES_CD
-					   				LEFT OUTER JOIN INO          ON  BJM.ORDRG_NO = INO.ORDRG_NO		--입고내역
+					   				LEFT OUTER JOIN INO          ON  BJM.ORDRG_NO = INO.ORDRG_NO AND BJM.SALES_CD = INO.SALES_CD		--입고내역
 									LEFT OUTER JOIN TB_CM06M01 M ON M.ID = BJM.CREAT_ID
 				              		LEFT OUTER JOIN TB_BM02M01 C ON SUJU.ORDRS_CLNT_CD = C.CLNT_CD --거래처정보
 				              			       JOIN CLNT       P ON BJM.PCHS_CLNT_CD = P.CLNT_CD --공급사정보
-				              		LEFT OUTER JOIN CTOT      CT ON CT.ORDRG_NO =  BJM.ORDRG_NO
+				              		LEFT OUTER JOIN CTOT      CT ON CT.ORDRG_NO =  BJM.ORDRG_NO AND CT.SALES_CD = BJM.SALES_CD
 				              		LEFT OUTER JOIN TB_QM01M01 Q ON Q.REQ_NO =  BJM.REQ_NO
 					 WHERE 1=1
 						<if test='cmpletYn == "Y"'>
@@ -925,12 +931,12 @@
 					SELECT    SUJU.CLNT_PJT             AS CLNT_PJT      --고객사PJT
 							, FN_CM05M01_CD_TO_NM(SUJU.CLNT_PJT)    AS CLNT_PJT_NM
 					  FROM BJM														        --발주내역
-					   				LEFT OUTER JOIN INO          ON  BJM.ORDRG_NO = INO.ORDRG_NO		--입고내역
+					   				LEFT OUTER JOIN INO          ON  BJM.ORDRG_NO = INO.ORDRG_NO AND BJM.SALES_CD = INO.SALES_CD		--입고내역
 									LEFT OUTER JOIN TB_CM06M01 M ON M.ID = BJM.CREAT_ID
 									LEFT OUTER JOIN TB_BM02M01 D ON BJM.PCHS_CLNT_CD = D.CLNT_CD
 									LEFT OUTER JOIN SUJU		 ON SUJU.SALES_CD = BJM.SALES_CD
 				              		LEFT OUTER JOIN TB_BM02M01 C ON SUJU.ORDRS_CLNT_CD = C.CLNT_CD --거래처정보
-				              		LEFT OUTER JOIN CTOT       CT ON CT.ORDRG_NO =  BJM.ORDRG_NO
+				              		LEFT OUTER JOIN CTOT       CT ON CT.ORDRG_NO =  BJM.ORDRG_NO AND CT.SALES_CD = BJM.SALES_CD
 					 WHERE 1=1
 						<!-- 입고잔량이 있는것만(데쉬보드용) -->
 						<if test="remainQty != null and !remainQty.equals('')">
@@ -965,9 +971,9 @@
 					SELECT   BJM.CREAT_ID    			AS ORDRG_MNG_ID
 							, M.NAME 		  			AS ORDRG_MNG_NM
 					  FROM BJM														        --발주내역
-					   				LEFT OUTER JOIN INO          ON  BJM.ORDRG_NO = INO.ORDRG_NO		--입고내역
+					   				LEFT OUTER JOIN INO          ON  BJM.ORDRG_NO = INO.ORDRG_NO AND BJM.SALES_CD = INO.SALES_CD		--입고내역
 									LEFT OUTER JOIN TB_CM06M01 M ON M.ID = BJM.CREAT_ID
-				              		LEFT OUTER JOIN CTOT       CT ON CT.ORDRG_NO =  BJM.ORDRG_NO
+				              		LEFT OUTER JOIN CTOT       CT ON CT.ORDRG_NO =  BJM.ORDRG_NO AND CT.SALES_CD = BJM.SALES_CD
 					 WHERE 1=1
 						<!-- 입고잔량이 있는것만(데쉬보드용) -->
 						<if test="remainQty != null and !remainQty.equals('')">
