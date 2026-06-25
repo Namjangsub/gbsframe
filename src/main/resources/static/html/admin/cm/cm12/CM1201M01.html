@@ -194,7 +194,7 @@
 		<div class="contents no_bg">
 			<!-- 콘텐츠 타이틀 -->
 			<div class="contents_tit" style="margin: 0px;">
-				<span style="height: 30px; line-height: 30px;font-size: 15px;margin-left: 15px; color:green">(LUDMX) : L=목록, U=등록, D=다운, M=이동, X=삭제
+				<span style="height: 30px; line-height: 30px;font-size: 15px;margin-left: 15px; color:green">(LUDMX) : L=목록, U=등록, D=다운, M=이동, X=삭제 ※등록화면에 대한 권한이 없으면 파일 다운, 등록, 이동, 삭제 불가
 				</span>
 				<div id="selectBtnAuth" class="add_btn_small pdl10" style="margin: 0px; padding: 0px;">
 					<a id="btnMove" onclick="moveFile();" style="height: 30px; line-height: 28px; width: 50px;" authchk><i class="fas fa-retweet"></i> 이동</a>
@@ -757,6 +757,11 @@
         	return false;
         };
 
+		// 등록화면 권한 체크
+		if (!checkFileTargetAuth(row)) {
+			return false;
+		}
+
 		var fileKey = row.fileKey;
 		var paramObj = {
 			"fileKey" : fileKey,
@@ -803,6 +808,11 @@
         	customAlert('파일 삭제는 자룔를 등록한 담당자만 삭제 가능합니다.')
         	return false;
         };
+
+		// 등록화면 권한 체크
+		if (!checkFileTargetAuth(row)) {
+			return false;
+		}
 
 		var paramObj = {
 			"fileKey" : row.fileKey,
@@ -905,7 +915,14 @@
 	}
 
 	function uploadFile() {
-		customcustomAlert("거래처, 제품, 아이템, SalesCode등 필수 정보가 필요하여\n통합파일관리 화면에서의 파일 업로드는 보류!\n\n각 팀별 해당 업무 화면에서 업로드하세요!.");
+		const rows = gridView.target.getList("selected");
+		if (rows.length > 0) {
+			const row = rows[0];
+			if (!checkFileTargetAuth(row)) {
+				return false;
+			}
+		}
+		customAlert("거래처, 제품, 아이템, SalesCode등 필수 정보가 필요하여\n통합파일관리 화면에서의 파일 업로드는 보류!\n\n각 팀별 해당 업무 화면에서 업로드하세요!.");
 	}
 
 	function downloadSelectRow() {
@@ -916,14 +933,44 @@
 			return false;
 		}
 
-		const denied = rows.filter(r => r.fileDown !== 'Y');
-		if (denied.length > 0) {
-			const names = denied.map(r => `[${r.rnum ?? ''}] ${r.fileName ?? '(이름없음)'}`).join('\n');
-			customAlert("파일 다운로드 권한이 없는 항목이 있습니다.\n\n" + names);
+		let authorizedRows = [];
+		let unauthorizedRows = [];
+
+		// 1차 권한(fileDown) 및 2차 권한(checkFileTargetAuth)을 함께 판별하여 분류
+		for (let i = 0; i < rows.length; i++) {
+			const row = rows[i];
+			
+			// 파일다운로드 권한 자체가 없는 경우
+			if (row.fileDown !== 'Y') {
+				row.failReason = "다운로드 권한 없음";
+				unauthorizedRows.push(row);
+			} 
+			// 부모 등록화면 접근 권한이 없는 경우
+			else if (!checkFileTargetAuth(row, true)) {
+				const targetName = row.fileTrgtTypNm || row.fileTrgtTyp || "알수없음";
+				row.failReason = `등록화면 권한 없음 (${targetName})`;
+				unauthorizedRows.push(row);
+			} 
+			// 권한이 모두 패스된 경우
+			else {
+				authorizedRows.push(row);
+			}
+		}
+
+		// 권한이 없는 항목이 있는 경우 안내 얼럿 팝업 띄움 (다운로드는 중단하지 않고 진행)
+		if (unauthorizedRows.length > 0) {
+			const names = unauthorizedRows.map(r => {
+				return `[No ${r.rnum ?? ''}] ${r.fileName ?? '(이름없음)'} - 사유: ${r.failReason}`;
+			}).join('\n');
+			customAlert("다음 항목들은 권한이 없어 다운로드에서 제외되었습니다.\n\n" + names);
+		}
+
+		// 권한이 있는 항목만 다운로드 진행
+		if (authorizedRows.length === 0) {
 			return false;
 		}
 
-		$.each(rows, function(idx, obj) {
+		$.each(authorizedRows, function(idx, obj) {
 			if (obj.fileName) {
 				let tempFileName = obj.lpath + '-' + obj.fileName;
 				downloadPromises.push(downloadFile(obj.fileKey, tempFileName));
@@ -1009,11 +1056,13 @@
 		"PM0101M01_M": { url: "/static/html/user/pm/pm01/PM0101P01.html", width: 1100, height: 750, actionType: "I", parentMenuId: "PM0101M01" },	// 작업일보
 	};
 
-	function checkFileTargetAuth(row) {
+	function checkFileTargetAuth(row, silent) {
 		if (!row || !row.fileTrgtTyp) {
-			customAlert("등록화면 정보가 없습니다.");
+			if (!silent) customAlert("등록화면 정보가 없습니다.");
 			return false;
 		}
+
+		const targetName = row.fileTrgtTypNm || row.fileTrgtTyp || "해당";
 
 		// 1. 권한 검증용 부모 메뉴 ID 도출
 		let parentMenuId = "";
@@ -1036,11 +1085,11 @@
 			});
 
 			if (hasAuth !== "Y") {
-				customAlert("해당 등록화면에 대한 접근 권한이 없습니다.");
+				if (!silent) customAlert(`[${targetName}] 화면에 대한 접근 권한이 없습니다.`);
 				return false;
 			}
 		} else if (!parentMenuId) {
-			customAlert("등록화면의 부모메뉴 권한 정보가 설정되지 않았습니다.");
+			if (!silent) customAlert(`[${targetName}] 등록화면의 부모메뉴 권한 정보가 설정되지 않았습니다.`);
 			return false;
 		}
 
@@ -1125,7 +1174,7 @@
 			actionType: config.actionType,
 			coCd: targetInfo.coCd || row.coCd || jwt.coCd,
 			fileTrgtKey: targetInfo.fileTrgtKey || row.fileTrgtKey,
-			pgmId: config.parentMenuId
+			pgmId: row.fileTrgtTyp
 		};
 
 		// 백엔드에서 조회해온 모든 정보를 기본 파라미터로 세팅
