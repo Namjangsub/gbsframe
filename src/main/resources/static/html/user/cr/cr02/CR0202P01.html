@@ -645,6 +645,16 @@
 				const tempOrdrsDiv = $(this).val();
 				const gridData = gridOrdrsDetail.getList();
 
+				// 정상수주로 변경 시, 기존 백업해 둔 금액이 있으면 복원
+				if (tempOrdrsDiv === "ORDRSDIV1" || tempOrdrsDiv === "ORDRSDIV2") {
+					var prevAmt = $('#ordrsDiv').data('prevOrdrsAmt');
+					var prevExAmt = $('#ordrsDiv').data('prevExchangeAmt');
+					if (prevAmt !== undefined && prevAmt !== "") {
+						$('#ordrsAmt').val(prevAmt);
+						$('#exchangeAmt').val(prevExAmt);
+					}
+				}
+
 				// 발주요청서, 구매발주서, 외주관리에 등록되어 있으면 변경 불가, 메세지
 				if (tempOrdrsDiv == "ORDRSDIV8") {
 					paramObj={"ordrsNo" : $("#ordrsNo").val()};
@@ -753,6 +763,10 @@
 						$('#arvlChrgCont').removeAttr('required');
 						$('#arvlAddrTh').removeClass('hit');
 						$('#arvlAddr').removeAttr('required');
+						if ($("#ordrsAmt").val() != 0) {
+							customAlert("수주취소, 가수주로 변경시 수주금액은 0원으로 변경됩니다.");
+							$("#ordrsAmt").val(0);
+						}
 					} else { //정상수주
 						$("#ordrsAmtTh").addClass('hit');
 						$("#currCdTh").addClass('hit');
@@ -786,6 +800,12 @@
 		// 수주구분 요소가 포커스를 받을 때 이전 값을 저장
 		$('#ordrsDiv').on('focus', function () {
 			$(this).data('prevVal', $(this).val());
+			var prevVal = $(this).val();
+			// 이전 수주구분이 정상수주(ORDRSDIV1, ORDRSDIV2)인 경우 수주금액 백업
+			if (prevVal === "ORDRSDIV1" || prevVal === "ORDRSDIV2") {
+				$(this).data('prevOrdrsAmt', $('#ordrsAmt').val());
+				$(this).data('prevExchangeAmt', $('#exchangeAmt').val());
+			}
 		});
 
 
@@ -1042,15 +1062,10 @@
 			return false;
 		}
 
-		// 금액 콤마 제거
-		var saveOrdrsDiv = $("#ordrsDiv").val();
-		var isCancelOrTempOrdrs = (saveOrdrsDiv == "ORDRSDIV8" || saveOrdrsDiv == "ORDRSDIV9");
-		if (isCancelOrTempOrdrs) {
-			if (!confirm("수주가의 기계PART, 전기PART, 합계가 모두 0원으로 변경됩니다.\n계속 진행하시겠습니까?")) {
-				return false;
-			}
-		}
+		// 수주취소 시 수주가의 기계PART, 전기PART, 합계가 모두 0원으로 변경
+		var isCancelOrTempOrdrs = ($("#ordrsDiv").val() == "ORDRSDIV8");
 
+		// 금액 콤마 제거
 		$.each($('.popup_area input[comma],#exrate,#ordrsAmt,#exchangeAmt'), function (idx, elem) {
 			deleteComma(elem);
 		});
@@ -1478,6 +1493,13 @@
 			if ((tempOrdrsDiv == "ORDRSDIV1" || tempOrdrsDiv == "ORDRSDIV8" || tempOrdrsDiv == "ORDRSDIV9") && ($("#prjctSeq").val() == '' || $("#prjctSeq").val() == undefined)) {
 				alert("정상수주, 수주취소, 가수주 등록시 프로젝트명은 필수입니다. 전산실에 문의해주세요.");
 				return false;
+			}
+
+			// 필수 검증 완료 후 수주취소인 경우 confirm 확인
+			if (tempOrdrsDiv == "ORDRSDIV8") {
+				if (!confirm("설비의 기계PART, 전기PART 모두 0원으로 변경됩니다.\n계속 진행하시겠습니까?")) {
+					return false;
+				}
 			}
 
 			// input box 값과 비교
@@ -3031,6 +3053,11 @@
 	// 프로젝트 검색 함수
 	function openSecondProjectSearch(searchValue) {
 
+		if ($('#ordrsClntCd').val() == "") {
+			customAlert("고객사를 먼저 선택해주세요.");
+			return false;
+		}
+
 		if (event && event.keyCode === 13) {
 			event.preventDefault();  // prevent form from submitting
 		}
@@ -3041,7 +3068,8 @@
 			"reqDtFrom"	 : $('#ordrsDt').val(),
 			// "prjctNm"	 : $('#clntPjt').val(),
 			"prjctNm"	 : $('#clntPjt option:selected').text(),
-			"searchValue": $('#prjctSeqNm').val()
+			"searchValue": $('#prjctSeqNm').val(),
+			"ordrsClntCd": $('#ordrsClntCd').val()
 		};
 
 		openSecondModal("/static/html/cmn/modal/prjctSearch.html", 1300, 670, "프로젝트 검색", paramObj, function (grid) {
