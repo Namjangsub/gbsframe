@@ -14,6 +14,8 @@ public interface WB22Mapper {
 
 	Map<String, String> selectSjInfo(Map<String, String> paramMap);
 
+	List<Map<String, String>> selectShipmentPhotoList(Map<String, String> paramMap);
+
 	List<Map<String, String>> selectWBS1Level(Map<String, String> paramMap);
 
 	String selectMaxWbsPlanNo(Map<String, String> paramMap);

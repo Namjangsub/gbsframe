@@ -50,6 +50,35 @@ public class WB22Ctr {
 		return "jsonView";
 	}
 
+	// 출고전후사진 목록 조회 (WB2201P07)
+	@PostMapping(value = "/selectShipmentPhotoList")
+	public String selectShipmentPhotoList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		List<Map<String, String>> beforeList = wb22Svc.selectShipmentPhotoList(paramMap, "WB2201P07_BF");
+		List<Map<String, String>> afterList = wb22Svc.selectShipmentPhotoList(paramMap, "WB2201P07_AF");
+		model.addAttribute("beforeList", beforeList);
+		model.addAttribute("afterList", afterList);
+		return "jsonView";
+	}
+
+	// 출고전후사진 등록 (WB2201P07) - CM08의 공용 fileUpload는 salesCd/clntCd/prdtCd 등을 저장하지 않아
+	// CM08 파일 수정 없이 CM08Svc.uploadFile을 직접 재사용해서 해당 값들이 저장되도록 처리함
+	@PostMapping(value = "/uploadShipmentPhoto")
+	public String uploadShipmentPhoto(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
+		try {
+			if (wb22Svc.uploadShipmentPhoto(paramMap, mRequest) != 0) {
+				model.addAttribute("resultCode", 200);
+				model.addAttribute("resultMessage", messageUtils.getMessage("insert"));
+			} else {
+				model.addAttribute("resultCode", 500);
+				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+			}
+		} catch (Exception e) {
+			model.addAttribute("resultCode", 900);
+			model.addAttribute("resultMessage", e.getMessage());
+		}
+		return "jsonView";
+	}
+
 	// 이력조회
 	@PostMapping(value = "/selectHistWBS1Level")
 	public String selectHistWBS1Level(@RequestBody Map<String, String> paramMap, ModelMap model) {

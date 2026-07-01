@@ -12,7 +12,11 @@ public interface WB22Svc {
 	List<Map<String, String>> selectWbsSjList(Map<String, String> paramMap);	
 
 	Map<String, String> selectSjInfo(Map<String, String> paramMap);
-	
+
+	List<Map<String, String>> selectShipmentPhotoList(Map<String, String> paramMap, String fileTrgtTyp);
+
+	int uploadShipmentPhoto(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
+
 	List<Map<String, String>> selectWBS1Level(Map<String, String> paramMap);
 	
 	int wbsLevel1Insert(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;

@@ -82,6 +82,41 @@ public class WB22SvcImpl implements WB22Svc {
 	}
 
 	@Override
+	public List<Map<String, String>> selectShipmentPhotoList(Map<String, String> paramMap, String fileTrgtTyp) {
+		Map<String, String> param = new HashMap<String, String>(paramMap);
+		param.put("fileTrgtTyp", fileTrgtTyp);
+		return wb22Mapper.selectShipmentPhotoList(param);
+	}
+
+	@Override
+	public int uploadShipmentPhoto(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
+		// CM08과 동일한 파일첨부 권한체크(CM15) 재사용 -->파일 업로드 권한 없으면 Exception 발생
+		Map<String, String> authParam = new HashMap<String, String>();
+		authParam.put("userId", paramMap.get("userId"));
+		authParam.put("comonCd", paramMap.get("comonCd"));
+		authParam.put("coCd", paramMap.get("coCd"));
+		authParam.put("jobType", "fileUp");
+		cm15Svc.selectFileAuthCheck(authParam);
+
+		// CM08Svc.uploadFile은 salesCd/clntCd/prdtCd/prjctCd/ordrsNo를 그대로 저장해주므로
+		// CM08 파일은 수정하지 않고 이 서비스 메서드만 그대로 재사용함
+		Map<String, String> param = new HashMap<String, String>();
+		param.put("userId", paramMap.get("userId"));
+		param.put("comonCd", paramMap.get("comonCd"));
+		param.put("coCd", paramMap.get("coCd"));
+		param.put("fileTrgtTyp", paramMap.get("pgmId"));
+		param.put("fileTrgtKey", paramMap.get("fileTrgtKey"));
+		param.put("salesCd", paramMap.get("salesCd"));
+		param.put("clntCd", paramMap.get("clntCd"));
+		param.put("prdtCd", paramMap.get("prdtCd"));
+		param.put("prjctCd", paramMap.get("prjctCd"));
+		param.put("ordrsNo", paramMap.get("ordrsNo"));
+		param.put("itemCd", paramMap.get("itemCd"));
+
+		return cm08Svc.uploadFile(param, mRequest);
+	}
+
+	@Override
 	public List<Map<String, String>> selectWBS1Level(Map<String, String> paramMap) {
 		return wb22Mapper.selectWBS1Level(paramMap);
 	}
