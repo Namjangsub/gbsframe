@@ -406,6 +406,7 @@
 							 , 0   AS INPUT_CLMN_DTL_TOT
 							 , 'I' AS DATA_CHK
 							 , A.VAT_CD  	AS VAT_CD
+							 , NVL(BS.SELL_BILL_DTL_AMT, 0) AS SELL_BILL_AMT_SUM
 						FROM   TB_CR02M01 AS A --수주
 						       --수금계획
 							   JOIN TB_CR02D01 AS P  ON P.CO_CD    = A.CO_CD
@@ -433,6 +434,20 @@
 											   ) AS C   ON C.CO_CD         = P.CO_CD
 												       AND C.ORDRS_NO      = P.ORDRS_NO
 												       AND C.CLMN_PLAN_SEQ = P.CLMN_PLAN_SEQ
+							   --매출계산서 집계
+							   LEFT OUTER JOIN (
+								                SELECT DISTINCT BM.CO_CD
+								                     , BD.ORDRS_NO
+								                     , BD.CLMN_PLAN_SEQ
+								                     , SUM(NVL(BD.SELL_BILL_DTL_AMT, 0)) AS SELL_BILL_DTL_AMT
+												FROM   TB_CR04M01 AS BM --매출계산서
+												       --매출계산서 상세
+													   LEFT OUTER JOIN TB_CR04D01 AS BD  ON BD.CO_CD        = BM.CO_CD
+													                                    AND BD.SELL_BILL_NO = BM.SELL_BILL_NO
+												GROUP BY BM.CO_CD, BD.ORDRS_NO, BD.CLMN_PLAN_SEQ
+											   ) AS BS  ON BS.CO_CD         = P.CO_CD
+											           AND BS.ORDRS_NO      = P.ORDRS_NO
+													   AND BS.CLMN_PLAN_SEQ = P.CLMN_PLAN_SEQ
 							   --회사
 							   LEFT OUTER JOIN TB_CM05M01 AS R ON R.CODE_ID = A.CO_CD
 							   --수주구분
@@ -455,6 +470,7 @@
 		AND    A.CO_CD         = #{coCd}
 		AND    A.ORDRS_CLNT_CD = #{ordrsClntCd}
 		AND    A.CURR_CD       = #{currCd}
+		AND    A.SELL_BILL_AMT_SUM > 0
     </select>
 	
     <!-- 수정팝업 조회 -->
