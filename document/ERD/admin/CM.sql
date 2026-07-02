@@ -220,3 +220,20 @@ CREATE TABLE TB_CM09M01
 
 
 
+CREATE TABLE TB_CM30M01
+(
+	USER_ID varchar(20) NOT NULL,
+	-- 화면(프로그램) ID (예: BM0101M01)
+	PGM_ID varchar(50) NOT NULL,
+	-- 화면 내 그리드 식별자 (예: first-grid)
+	GRID_ID varchar(50) NOT NULL,
+	-- 컬럼설정 JSON 트리 [{key,label,width,hidden},{label,columns:[...]}]
+	COLUMN_CONFIG varchar(16000),
+	CREAT_ID varchar(20) NOT NULL,
+	CREAT_PGM varchar(30) NOT NULL,
+	CREAT_DTTM timestamp NOT NULL,
+	UDT_ID varchar(20),
+	UDT_PGM varchar(30),
+	UDT_DTTM timestamp,
+	PRIMARY KEY (USER_ID, PGM_ID, GRID_ID)
+);

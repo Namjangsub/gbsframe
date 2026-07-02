@@ -1,0 +1,191 @@
+<style>
+	#gridColumnEdit .gce-list { overflow: auto; height: 450px; border: 1px solid #ddd; margin: 10px 0; }
+	#gridColumnEdit table { width: 100%; border-collapse: collapse; }
+	#gridColumnEdit th { background: #f5f5f5; padding: 5px; border-bottom: 1px solid #ddd; text-align: center; font-size: 12px; position: sticky; top: 0; }
+	#gridColumnEdit td { padding: 3px 5px; border-bottom: 1px solid #eee; font-size: 12px; }
+	#gridColumnEdit .gce-group-row td { background: #eef3f8; font-weight: bold; }
+	#gridColumnEdit .gce-label { text-align: left; }
+	#gridColumnEdit .gce-width input { width: 60px; text-align: right; }
+	#gridColumnEdit .gce-move { text-align: center; white-space: nowrap; }
+	#gridColumnEdit .gce-move a { cursor: pointer; padding: 0 4px; color: #337ab7; }
+	#gridColumnEdit .gce-chk { text-align: center; }
+	#gridColumnEdit .gce-hidden-label { color: #aaa; }
+</style>
+
+<div id="gridColumnEdit">
+	<div class="popup_table" style="padding: 10px 10px 0 10px;">
+		<span style="font-size: 12px; color: #666;">
+			체크 해제 시 컬럼이 숨겨집니다. 순서 이동(▲▼)은 같은 그룹 안에서만 가능합니다.
+		</span>
+		<div class="gce-list">
+			<table>
+				<thead>
+					<tr>
+						<th style="width: 50px;">표시</th>
+						<th>컬럼명</th>
+						<th style="width: 80px;">너비</th>
+						<th style="width: 70px;">이동</th>
+					</tr>
+				</thead>
+				<tbody id="gceTbody"></tbody>
+			</table>
+		</div>
+	</div>
+	<div style="padding: 5px 10px; text-align: right;">
+		<button type="button" class="btn btn-primary btn-sm" onclick="gceSave();">저장</button>
+		<button type="button" class="btn btn-default btn-sm" onclick="gceReset();">기본값 복원</button>
+		<button type="button" class="btn btn-default btn-sm" onclick="modalStack.close();">닫기</button>
+	</div>
+</div>
+
+<script type="text/javascript">
+	// 팝업 파라미터: pgmId, gridId, metaColumns(현재 적용중인 컬럼 메타 트리)
+	var gceParam = modalStack.last().paramObj;
+	var gceColumns = JSON.parse(JSON.stringify(gceParam.metaColumns));
+
+	$(document).ready(function() {
+		gceRender();
+	});
+
+	// label의 HTML 태그(<br> 등) 제거하여 표시
+	function gceLabelText(label) {
+		return $('<div>').html(label == null ? '' : String(label)).text();
+	}
+
+	// path: 트리 내 위치 배열 (예: [2,0] = 3번째 그룹의 첫번째 자식)
+	function gceNodeAt(path) {
+		var node = null, arr = gceColumns;
+		for (var i = 0; i < path.length; i++) {
+			node = arr[path[i]];
+			arr = node.columns;
+		}
+		return node;
+	}
+
+	function gceParentArr(path) {
+		var arr = gceColumns;
+		for (var i = 0; i < path.length - 1; i++) {
+			arr = arr[path[i]].columns;
+		}
+		return arr;
+	}
+
+	function gceRender() {
+		var html = '';
+		function renderRows(cols, parentPath, depth) {
+			$.each(cols, function(idx, col) {
+				var path = parentPath.concat(idx).join(',');
+				var indent = 'padding-left:' + (5 + depth * 20) + 'px;';
+				var moveBtns =
+					'<a onclick="gceMove(\'' + path + '\', -1);">▲</a>' +
+					'<a onclick="gceMove(\'' + path + '\', 1);">▼</a>';
+				if (col.columns) {
+					// 그룹 헤더 행: 체크박스는 하위 전체 표시/숨김 일괄 토글
+					var allHidden = gceAllLeavesHidden(col);
+					html += '<tr class="gce-group-row">'
+						+ '<td class="gce-chk"><input type="checkbox" ' + (allHidden ? '' : 'checked') + ' onclick="gceToggleGroup(\'' + path + '\', this.checked);"></td>'
+						+ '<td class="gce-label" style="' + indent + '">' + gceLabelText(col.label) + '</td>'
+						+ '<td></td>'
+						+ '<td class="gce-move">' + moveBtns + '</td>'
+						+ '</tr>';
+					renderRows(col.columns, parentPath.concat(idx), depth + 1);
+				} else {
+					html += '<tr>'
+						+ '<td class="gce-chk"><input type="checkbox" ' + (col.hidden ? '' : 'checked') + ' onclick="gceToggleLeaf(\'' + path + '\', this.checked);"></td>'
+						+ '<td class="gce-label' + (col.hidden ? ' gce-hidden-label' : '') + '" style="' + indent + '">' + gceLabelText(col.label) + '</td>'
+						+ '<td class="gce-width"><input type="number" min="20" max="1000" value="' + (col.width || '') + '" onchange="gceChangeWidth(\'' + path + '\', this.value);"></td>'
+						+ '<td class="gce-move">' + moveBtns + '</td>'
+						+ '</tr>';
+				}
+			});
+		}
+		renderRows(gceColumns, [], 0);
+		$('#gceTbody').html(html);
+	}
+
+	function gceAllLeavesHidden(group) {
+		var allHidden = true;
+		$.each(group.columns || [], function(i, c) {
+			if (c.columns) {
+				if (!gceAllLeavesHidden(c)) { allHidden = false; return false; }
+			} else if (!c.hidden) {
+				allHidden = false; return false;
+			}
+		});
+		return allHidden;
+	}
+
+	function gceParsePath(pathStr) {
+		return $.map(String(pathStr).split(','), function(v) { return parseInt(v, 10); });
+	}
+
+	function gceToggleLeaf(pathStr, checked) {
+		gceNodeAt(gceParsePath(pathStr)).hidden = !checked;
+		gceRender();
+	}
+
+	function gceToggleGroup(pathStr, checked) {
+		function setAll(cols) {
+			$.each(cols || [], function(i, c) {
+				if (c.columns) setAll(c.columns);
+				else c.hidden = !checked;
+			});
+		}
+		setAll(gceNodeAt(gceParsePath(pathStr)).columns);
+		gceRender();
+	}
+
+	function gceChangeWidth(pathStr, value) {
+		var w = parseInt(value, 10);
+		if (!isNaN(w) && w > 0) {
+			gceNodeAt(gceParsePath(pathStr)).width = w;
+		}
+	}
+
+	// 같은 부모(그룹) 내에서만 위/아래 이동
+	function gceMove(pathStr, dir) {
+		var path = gceParsePath(pathStr);
+		var arr = gceParentArr(path);
+		var idx = path[path.length - 1];
+		var newIdx = idx + dir;
+		if (newIdx < 0 || newIdx >= arr.length) return;
+		var tmp = arr[idx];
+		arr[idx] = arr[newIdx];
+		arr[newIdx] = tmp;
+		gceRender();
+	}
+
+	function gceSave() {
+		var paramObj = {
+			"userId": jwt.userId,
+			"pgmId": gceParam.pgmId,
+			"gridId": gceParam.gridId,
+			"columnConfig": JSON.stringify(gceColumns)
+		};
+		postAjax("/admin/cm/cm30/saveGridConfig", paramObj, null, function(data) {
+			if (data.resultCode == 200) {
+				alert(data.resultMessage);
+				var callback = modalStack.last().callback;
+				modalStack.close();
+				if (typeof callback === 'function') callback();
+			}
+		});
+	}
+
+	function gceReset() {
+		if (!confirm("저장된 컬럼 설정을 삭제하고 기본값으로 복원하시겠습니까?")) return false;
+		var paramObj = {
+			"userId": jwt.userId,
+			"pgmId": gceParam.pgmId,
+			"gridId": gceParam.gridId
+		};
+		deleteAjax("/admin/cm/cm30/deleteGridConfig", paramObj, null, function(data) {
+			if (data.resultCode == 200) {
+				alert(data.resultMessage);
+				var callback = modalStack.last().callback;
+				modalStack.close();
+				if (typeof callback === 'function') callback();
+			}
+		});
+	}
+</script>
