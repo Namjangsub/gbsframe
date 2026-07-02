@@ -118,6 +118,7 @@
 <script src="/static/js/commApproval.js"></script>
 <!-- 도움말 팝업 -->
 <script src="/static/js/manualPopup.js"></script>
+<script src="/static/js/common/GridColumnConfig.js"></script>
 </head>
 
 <body>
@@ -244,7 +245,7 @@
 					<a onclick="openIssueList();" style="height: 30px; line-height: 28px; width: 90px;"><i class="fas fa-clipboard-list"></i> 이슈현황조회</a>
 					<a onclick="openPFUList();" style="height: 30px; line-height: 28px; width: 90px;"><i class="fas fa-clipboard-list"></i> PFU등록화면</a>
 					<a onclick="excelDown();" style="height: 30px; line-height: 28px; width: 90px;"><i class="fas fa-file-excel"></i> 엑셀다운로드</a>
-					
+					<a onclick="openGridColumnEdit();" style="height: 30px; line-height: 28px; width: 90px;"><i class="fas fa-cog"></i>그리드설정</a>
                 </div>
                 
                 <!-- 검색되는 ROW수 -->
@@ -272,6 +273,34 @@
     var isFirst = true;
     let select_index = null;
 
+	// 합계대상 컬럼 정의 (footSum 총계행, buildSumRow가 최종 컬럼 순서에 맞춰 위치 자동 생성)
+	var cr0201SumCells = {
+		"ordrsAmt"                  : { collector: "sum", formatter: "money", align: "right" },
+		"exchangeAmt"               : { collector: "sum", formatter: "money", align: "right" },
+		"unsettledAmt"              : { collector: "sum", formatter: "money", align: "right" },
+		"settlementAmt"             : { collector: "sum", formatter: "money", align: "right" },
+		"ordrsPrcMach"              : { collector: "sum", formatter: "money", align: "right" },
+		"ordrsPrcElcty"             : { collector: "sum", formatter: "money", align: "right" },
+		"estEpctMatPrc"             : { collector: "sum", formatter: "money", align: "right" },
+		"trgtPchsPcostMach"         : { collector: "sum", formatter: "money", align: "right" },
+		"trgtPchsPcostElcty"        : { collector: "sum", formatter: "money", align: "right" },
+		"trgtPchsPcostInHousePrcsn" : { collector: "sum", formatter: "money", align: "right" }
+	};
+
+	// 합계 컬럼명이 sum용 가상key이므로 setData 시 그대로 유지 (footSum collector가 해당 key로 집계)
+	var cr0201SumKeyMap = {
+		"sumOrdrsAmt"                   : "ordrsAmt",
+		"sumExchangeAmt"                 : "exchangeAmt",
+		"sumUnsettledAmt"                : "unsettledAmt",
+		"sumSettlementAmt"               : "settlementAmt",
+		"sumOrdrsPrcMacht"               : "ordrsPrcMach",
+		"sumOrdrsPrcElcty"               : "ordrsPrcElcty",
+		"sumEstEpctMatPrc"               : "estEpctMatPrc",
+		"sumTrgtPchsPcostMach"           : "trgtPchsPcostMach",
+		"sumTrgtPchsPcostElcty"          : "trgtPchsPcostElcty",
+		"sumTrgtPchsPcostInHousePrcsn"   : "trgtPchsPcostInHousePrcsn"
+	};
+
 	ax5.ui.grid.formatter["appStatus"] = function () {
 		if(this.value == undefined) {
 	        return ' ';
@@ -296,67 +325,9 @@
 		return styleClass;
 	}
 
-    var gridView = {
-        initView: function () {
-            this.target = new ax5.ui.grid();
-			var _this = this; 
-            this.target.setConfig({
-                target: $('[data-ax5grid="first-grid"]'),
-                frozenColumnIndex : 7,
-				showLineNumber    : false,
-				showRowSelector   : true,
-				// multipleSelect    : true,
-				sortable          : false,
-                header: {
-                    align: "center",
-                    selector: false
-                },
-                body: {
-					mergeCells : ["clntNm", "mngNm", "ordrsDivNm", "appStatus", "clntPjtNm", "ctrtNm", "ioDt", "ordrsAmt", "currNm", "exrate", "exchangeAmt"],
-                    onClick: function () {
-						var list = gridView.target.getList();
 
-                          $.each(list, function(idx, obj){
-                              gridView.target.select(obj.__index, {selected: false});
-                          });
-                         if(this.item.lvl == '2' || this.item.lvl == '1'){
-                             this.self.select(this.dindex);
-                         }
-                         select_index = this.doindex;
-                    },
-                    onDBLClick: function () {
-						// this.self  : gridInstance
-						// this.dindex: 행 index
-						// this.item  : 행 데이터
-						// this.column: 컬럼 정보
-						var grid   = this.self;
-						var dindex = this.dindex;
-						var doindex = this.doindex;
-						var item   = this.item;
-						var colKey = this.column.key;
-						var evt    = '' //this.event;
-						var $cell  = '' //$(evt.target).closest("[data-ax5grid-column]"); // 여기서 셀 DOM 추출
-						_this.openFile(grid, dindex, doindex, item, $cell, colKey, evt);
-                    },
-                },
-                page: {
-                    navigationItemCount: 10,
-                    height: 30,
-                    display: true,
-                    firstIcon: '<i class="fa fa-step-backward" aria-hidden="true"></i>',
-                    prevIcon: '<i class="fa fa-caret-left" aria-hidden="true"></i>',
-                    nextIcon: '<i class="fa fa-caret-right" aria-hidden="true"></i>',
-                    lastIcon: '<i class="fa fa-step-forward" aria-hidden="true"></i>',
 
-                    onChange: function () {
-                        gridView.setData(this.page.selectPage);
-                    }
-                },
-
-                
-                // TB_CR02M01, this.item.ordrsDiv =='ORDRSDIV9'-->가수주 ||this.item.ctrtDoc=='CONTRACT01' --> 구두 진행
-
-                columns: [
+	var defaultColumns = [
 					{key: "salesCd"			, label: "수주번호/salesCd", align: "left", width: 165 , hidden: false, treeControl: true, styleClass: function () {return gridColorSet(this.item.collapse);}},
 					{key: "clntNm"			, label: "고객사명"	, align: "left", width: 180, styleClass: function () {return gridColorSet(this.item.collapse);}},
 					{key: "mngNm"			, label: "영업담당자"	, align: "center", width: 70, styleClass: function () {return gridColorSet(this.item.collapse);}},
@@ -432,15 +403,6 @@
 							},
 				              ]
                     },
-//                     {key: undefined, label: "실집행원가",
-// 						columns: [
-// 									{key: undefined, label: "노무비 및 제조경비 <br> (판관비 제외)",
-// 										columns: [
-// 		                    						{key: "laborCostMfgCost", label: "금액",  formatter: "money", align: "right", width: 100, width: 80, styleClass: function () {return gridColorSet(this.item.collapse);}},
-// 		                    					 ]
-// 									},
-//                     			]
-//                     },
                     {key: "estNo"      , label: "견적번호"   , align: "center", width: 100, enableFilter: true, width: 80, styleClass: function () {return gridColorSet(this.item.collapse);}},
                     {key: "estDeg"     , label: "차수"       , align: "center", width: 40, enableFilter: true, width: 80, styleClass: function () {return gridColorSet(this.item.collapse);}},
                     {key: "creatId"  , label: "생성자"  , align: "center", width: 80, hidden: true},
@@ -453,58 +415,70 @@
                     {key: "coCd"       , label: "회사코드"   , align: "center", width: 100, enableFilter: true, hidden: true},
                     {key: "coNm"       , label: "회사명"     , align: "center", width: 100, enableFilter: true, hidden: true},
                     {key: "clntCd"     , label: "고객사코드" , align: "center", width: 100, hidden: true},
-                    //{key: "ordrsClntNm", label: "고객사명", align: "center", width: 100},
                     {key: "lvl", label: "레벨", align: "center", width: 30, hidden: true},
                     {key: "ioSeq", label: "SEQ", align: "center", width: 40, hidden: true},
                     {key: "clntPjt"    , label: "고객사PJT"  , align: "left"  , width: 80, hidden: true},
                     {key: "ordrsNo"    , label: "수주번호"   , align: "center", width: 70, hidden: true},
                     {key: "histNo"    , label: "차수"   , align: "center", width: 40, hidden: true},
-                    {key: "rrn"     , label: "No."   , align: "center"  , width: 40, width: 80, hidden: true},
-                    //{key: "currNm", label: "통화단위", align: "center", width: 100},
-                    //{key: "fwdExchJoinDt", label: "선물환가입일", align: "center", width: 100},
-                    //{key: "fwdExchChkList", label: "선물환 Check List", align: "center", width: 100},
-                    //{key: "ordrger", label: "발주자", align: "center", width: 100},
-                    // {key: "mngId", label: "담당자", align: "center", width: 100},
-                    // {key: "ctrtDoc", label: "계약문서", align: "center", width: 100},
-                    // {key: "pmntMtdNm", label: "결재방법", align: "center", width: 100},
+                    {key: "rrn"     , label: "No."   , align: "center"  , width: 40, hidden: true},
                     {key: "pid"        , label: "PID"      , align: "center", width: 150, hidden: true},
 					{key: "id"         , label: "ID"       , align: "center", width: 150, hidden: true},
 					{key: "lvl"        , label: "lvl"      , align: "center", width: 80 , hidden: true},
-                    //TB_CR02D02테이블 컬럼
-					// {key: "ioSeq"          , label: "수주seq"       , align: "right" , width: 60, hidden: true},
                     {key: "prdtCd"         , label: "제품구분코드"  , align: "center", width: 80, hidden: true},
                     {key: "itemDiv"        , label: "아이템구분코드", align: "center", width: 80, hidden: true},
-                ],
-				footSum: [
-  			    	[
-  			    		{label: "총계", colspan:8, align:"center"},
-                        {key: "sumOrdrsAmt"		, collector: "sum", formatter: "money", align: "right"},
-                        {},
-                        {},
-                        {key: "sumExchangeAmt"		, collector: "sum", formatter: "money", align: "right"},
-                        {key: "sumUnsettledAmt"		, collector: "sum", formatter: "money", align: "right"},
-                        {key: "sumSettlementAmt"	, collector: "sum", formatter: "money", align: "right"},
-                        {},
-                        {},
-                        {},
-                        {},
-                        {},
-                        {},
-                        {},
-                        {},
-                        {key: "sumOrdrsPrcMacht"	, collector: "sum", formatter: "money", align: "right"},
-                        {key: "sumOrdrsPrcElcty"	, collector: "sum", formatter: "money", align: "right"},
-                        {key: "sumOrdrsPrc"	, collector: "sum", formatter: "money", align: "right"},
-                        {},
-                        {key: "sumEstEpctMatPrc"	, collector: "sum", formatter: "money", align: "right"},
-                        {key: "sumTrgtPchsPcostMach"	, collector: "sum", formatter: "money", align: "right"},
-                        {key: "sumTrgtPchsPcostElcty"	, collector: "sum", formatter: "money", align: "right"},
-                        {key: "sumSum"	, collector: "sum", formatter: "money", align: "right"},
-                        {key: "sumTrgtPchsPcostInHousePrcsn"	, collector: "sum", formatter: "money", align: "right"},
-                        {key: "sumMachineValueAfterDeduction"	, collector: "sum", formatter: "money", align: "right"},
+                ];
 
-  	                 ]
-  			    ],
+	// 그리드 콜럼 설정 팝업 (저장/복원 후 그리드 재구성)
+	function openGridColumnEdit() {
+		GridColumnConfig.openEditor("CR0201M02", "first-grid", defaultColumns, function() {
+			if (gridView.target) {
+				try { gridView.target.destroy(); } catch(e) {}
+			}
+			$('[data-ax5grid="first-grid"]').empty();
+			gridView.initView().setData(0);
+		});
+	}
+
+	var gridView = {
+        initView: function () {
+            this.target = new ax5.ui.grid();
+			var _this = this;
+			// 사용자별 컬럼설정 적용 (순서/숨김/너비) - 합계행도 이 순서 기준으로 재생성
+			var cols = GridColumnConfig.apply("CR0201M02", "first-grid", defaultColumns);
+            this.target.setConfig({
+                target: $('[data-ax5grid="first-grid"]'),
+                frozenColumnIndex : 7,
+				showLineNumber    : false,
+				showRowSelector   : true,
+				sortable          : false,
+                header: { align: "center", selector: false },
+                body: {
+					mergeCells : ["clntNm", "mngNm", "ordrsDivNm", "appStatus", "clntPjtNm", "ctrtNm", "ioDt", "ordrsAmt", "currNm", "exrate", "exchangeAmt"],
+                    onClick: function () {
+						var list = gridView.target.getList();
+                          $.each(list, function(idx, obj){ gridView.target.select(obj.__index, {selected: false}); });
+                         if(this.item.lvl == '2' || this.item.lvl == '1'){ this.self.select(this.dindex); }
+                         select_index = this.doindex;
+                    },
+                    onDBLClick: function () {
+						var grid = this.self; var dindex = this.dindex; var doindex = this.doindex;
+						var item = this.item; var colKey = this.column.key;
+						_this.openFile(grid, dindex, doindex, item, '', colKey, '');
+                    },
+                },
+                page: {
+                    navigationItemCount: 10, height: 30, display: true,
+                    firstIcon: '<i class="fa fa-step-backward" aria-hidden="true"></i>',
+                    prevIcon: '<i class="fa fa-caret-left" aria-hidden="true"></i>',
+                    nextIcon: '<i class="fa fa-caret-right" aria-hidden="true"></i>',
+                    lastIcon: '<i class="fa fa-step-forward" aria-hidden="true"></i>',
+                    onChange: function () { gridView.setData(this.page.selectPage); }
+                },
+				// 사용자 컬럼설정 반영된 최종 순서에 맞춰 총계 행 자동 생성
+				footSum: [
+					GridColumnConfig.buildSumRow(cols, {label: "총계", labelColspan: 8, sums: cr0201SumCells})
+				],
+                columns: cols,
                 tree : {
 					use         : true,
 					indentWidth : 15,
