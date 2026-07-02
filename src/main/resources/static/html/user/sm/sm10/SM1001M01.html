@@ -34,6 +34,7 @@
 <script src="/static/js/ax5/ax5toast.min.js"></script>
 <script src="/static/js/jstree/jstree.min.js"></script>
 <script src="/static/js/global.js"></script>
+<script src="/static/js/common/GridColumnConfig.js"></script>
 <script src="/static/js/fileTree.js"></script>
 <script src="/static/js/jquery.blockUI.js"></script>
 <!-- 도움말 팝업 -->
@@ -193,6 +194,7 @@
 					<a onclick="setReportMulti();" style="height: 30px; line-height: 28px; width: 100px;"><i class="fas fa-print"></i> 기타구매발주서</a> 
 <!-- 					<a onclick="setReportMain();" style="height: 30px; line-height: 28px; width: 80px;" title="내역서를 출력합니다."><i class="fas fa-print"></i>출력</a> -->
 					<a onclick="excelDown();" style="height: 30px; line-height: 28px; width: 90px;" authChk><i class="fas fa-file-excel"></i>엑셀다운로드</a>
+					<a onclick="openGridColumnEdit();" style="height: 30px; line-height: 28px; width: 90px;"><i class="fas fa-cog"></i>그리드설정</a>
 				</div>
 				
 				<select id="recordCnt" class="prae_select" data-search="recordCnt" onchange="gridView.setData(0);">
@@ -226,54 +228,13 @@
 		}
 	};
 	
-	var gridView = {
-		initView : function() {
-  			this.target = new ax5.ui.grid();
-  			this.target.setConfig({
-  		    	showRowSelector: true,
-  		    	multipleSelect: true,
-  				showLineNumber: true,
-  				lineNumberColumnWidth: 35,
-  		    	sortable: true,
-  		        target: $('[data-ax5grid="first-grid"]'),
-  		        header: {
-  		        	align: "center",
-  		        	selector: true
-  		        },
-  		        body: {
-  		        	mergeCells : ["coNm","ordrsNo","salesCd","costNo","pchsClntNm"],
-  		        	 onClick: function () {
-   		                this.self.clearSelect();
-  		                this.self.select(this.dindex);
-  		            },
-  		            onDBLClick: function () {
-   		                this.self.clearSelect();
-  		                this.self.select(this.dindex);
-  		            	insertPchsCostModal("U");
-  		            },
-  		        },
+	// 합계대상 컬럼 정의 (footSum 총계행 공용, key 기반)
+	// buildSumRow()가 사용자 컬럼설정 적용 후의 최종 순서에 맞춰 위치 배열을 자동 생성한다.
+	var sm1001SumCells = {
+		"costAmt": {collector: "sum", formatter: "money", align: "right"}
+	};
 
-				page : {
-					navigationItemCount : 10,
-					height : 30,
-					display : true,
-					firstIcon : '<i class="fa fa-step-backward" aria-hidden="true"></i>',
-					prevIcon : '<i class="fa fa-caret-left" aria-hidden="true"></i>',
-					nextIcon : '<i class="fa fa-caret-right" aria-hidden="true"></i>',
-					lastIcon : '<i class="fa fa-step-forward" aria-hidden="true"></i>',
-					onChange : function() {
-						gridView.setData(this.page.selectPage);
-					}
-				},
-
-				footSum: [
-  			    	[
-  			    		{label: "총계", colspan:7, align:"center"},
-						{key: "costAmt", 		collector: "sum", formatter:"money", align: "right"}
-  	                 ]
-  			    ],
-
-		    	columns : [
+	var defaultColumns = [
 						 {key: "fileTrgtKey",	label: "파일대상KEY",		width: 50,		align: "center", 	hidden:true}
 						,{key: "coCd",	    	label: "회사코드",			width: 70,		align: "center", 	hidden:true}
 // 						,{key: "coNm",	    	label: "회사",			width: 70,		align: "center", 	hidden:false}
@@ -320,7 +281,56 @@
 						,{key: "udtId", 		label: "수정", 			width: 80,		align: "center", 	hidden:true}
 						,{key: "udtNm", 		label: "수정", 			width: 60,		align: "center"  }
 						,{key: "udtDttm",		label: "수정일", 			width: 80,		align: "center"}
-    	            ]
+	];
+
+	var gridView = {
+		initView : function() {
+  			this.target = new ax5.ui.grid();
+  			// 사용자별 컬럼설정 적용 (순서/숨김/너비) - 합계행도 이 순서 기준으로 재생성
+  			var cols = GridColumnConfig.apply("SM1001M01", "first-grid", defaultColumns);
+  			this.target.setConfig({
+  		    	showRowSelector: true,
+  		    	multipleSelect: true,
+  				showLineNumber: true,
+  				lineNumberColumnWidth: 35,
+  		    	sortable: true,
+  		        target: $('[data-ax5grid="first-grid"]'),
+  		        header: {
+  		        	align: "center",
+  		        	selector: true
+  		        },
+  		        body: {
+  		        	mergeCells : ["coNm","ordrsNo","salesCd","costNo","pchsClntNm"],
+  		        	 onClick: function () {
+   		                this.self.clearSelect();
+  		                this.self.select(this.dindex);
+  		            },
+  		            onDBLClick: function () {
+   		                this.self.clearSelect();
+  		                this.self.select(this.dindex);
+  		            	insertPchsCostModal("U");
+  		            },
+  		        },
+
+				page : {
+					navigationItemCount : 10,
+					height : 30,
+					display : true,
+					firstIcon : '<i class="fa fa-step-backward" aria-hidden="true"></i>',
+					prevIcon : '<i class="fa fa-caret-left" aria-hidden="true"></i>',
+					nextIcon : '<i class="fa fa-caret-right" aria-hidden="true"></i>',
+					lastIcon : '<i class="fa fa-step-forward" aria-hidden="true"></i>',
+					onChange : function() {
+						gridView.setData(this.page.selectPage);
+					}
+				},
+
+				footSum: [
+					// 사용자 컬럼설정 반영된 최종 순서에 맞춰 총계 행 자동 생성
+					GridColumnConfig.buildSumRow(cols, {label: "총계", labelColspan: 7, sums: sm1001SumCells})
+  			    ],
+
+		    	columns : cols
 
 							});
         			return this;
@@ -529,6 +539,14 @@
 					});
 		}
 
+	}
+
+	// 그리드 컬럼 설정 팝업 (저장/복원 후 그리드 재구성)
+	function openGridColumnEdit() {
+		GridColumnConfig.openEditor("SM1001M01", "first-grid", defaultColumns, function() {
+			$('[data-ax5grid="first-grid"]').empty();
+			gridView.initView().setData(0);
+		});
 	}
 
 	// 초기화 버튼용
