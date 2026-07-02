@@ -84,6 +84,7 @@
 <script src="/static/js/ax5/ax5toast.min.js"></script>
 <script src="/static/js/jstree/jstree.min.js"></script>
 <script src="/static/js/global.js"></script>
+<script src="/static/js/common/GridColumnConfig.js"></script>
 <script src="/static/js/fileTree.js"></script>
 <script src="/static/js/ax5/ax5formatter.min.js"></script>
 <script src="/static/js/ax5/ax5grid-inline-editor.js"></script>
@@ -220,6 +221,8 @@
 					<a onclick="setReportOrderDetail('F');" style="height: 30px; line-height: 28px; width: 120px;" title="발주내역중 매입확정건만 출력됩니다.건양ITT로 출력됩니다."><i class="fas fa-print"></i> FAT발주명세서</a>
 					<a onclick="setReportOrderDetail('N');" style="height: 30px; line-height: 28px; width: 90px;" title="발주내역중 매입확정건만 출력됩니다."><i class="fas fa-print"></i> 발주명세서</a>
 					<a onclick="excelDown();" style="height: 30px; line-height: 28px; width: 90px;"><i class="fas fa-file-excel"></i> 엑셀다운로드</a>
+					<a onclick="openGridColumnEditTop();" style="height: 30px; line-height: 28px; width: 110px;"><i class="fas fa-cog"></i> 상단그리드설정</a>
+					<a onclick="openGridColumnEdit();" style="height: 30px; line-height: 28px; width: 110px;"><i class="fas fa-cog"></i> 하단그리드설정</a>
 				</div>
 				<!-- <select id="recordCnt" class="prae_select" data-search="recordCnt" -->
 					<!-- onchange="gridView.setData(0);"> -->
@@ -264,9 +267,59 @@
 	// 제한일자
 	var limitDate = null;
 
+	// 합계대상 컬럼 정의 (상단 요약그리드 footSum 공용, key 기반)
+	var sm1401TopSumCells = {
+		"ordrgQty":   {collector: "sum", formatter: "money", align: "center"},
+		"ordrgAmt":   {collector: "sum", formatter: "money", align: "right"},
+		"inQty":      {collector: "sum", formatter: "money", align: "right"},
+		"badQty":     {collector: "sum", formatter: "money", align: "right"},
+		"inDtlAmt":   {collector: "sum", formatter: "money", align: "right"},
+		"pchsAmtRem": {collector: "sum", formatter: "money", align: "right"},
+		"pchsAmt":    {collector: "sum", formatter: "money", align: "right"},
+		"pchsVat":    {collector: "sum", formatter: "money", align: "right"},
+		"pchsTot":    {collector: "sum", formatter: "money", align: "right"}
+	};
+
+	var defaultColumnsTop = [
+	            {key: "coCd",      					label: "회사",          	hidden: true},
+	            {key: "coCdNm",      				label: "회사명",          hidden: true},
+	            {key: "pchsClntNm",      			label: "구매처명",      	align: "left",   	width: 130},
+	            {key: undefined, label: "주문내역", groupId: "ordrsInfo", columns: [
+		            {key: "ordrgQty",     			label: "요청수량",      	align: "center",	width: 70, formatter: "money",          	hidden: false},
+		            {key: "ordrgAmt",     			label: "발주금액",      	align: "right",		width: 100, formatter: "money",          	hidden: false},
+		            {key: "dudtDeqDt",     			label: "납기요청",     	align: "center",		width: 80,},
+	            ]},
+				{key: "", label: "", width: 3,},
+	            {key: undefined, label: "처리(입고,기타,반품)내역", groupId: "processInfo", columns: [
+		            {key: "inQty",     				label: "입고수량",      	align: "right",		width: 70, formatter: "money",          	hidden: false},
+		            {key: "badQty",     			label: "불량수량",      	align: "right",		width: 70, formatter: "money",          	hidden: false},
+		            {key: "inDtlAmt",     			label: "입고금액",      	align: "right",		width: 100, formatter: "money",          	hidden: false},
+		            {key: "inDt",     				label: "최종입고",     	align: "center",		width: 80,},
+				]},
+				{key: "", label: "", width: 3,},
+	            {key: undefined, label: "미확정내역", groupId: "unconfirmedInfo", columns: [
+		            {key: "pchsAmtRem",     		label: "미확정 금액",      	align: "right",		width: 150, formatter: "money",
+						styleClass : function() { return (parseInt(this.item.pchsAmtRem) != 0) ? "grid-font-blue-bold" : ""; } },
+				]},
+				{key: "", label: "", width: 3,},
+	            {key: undefined, label: "매입확정내역", groupId: "confirmedInfo", columns: [
+		            {key: "pchsAmt",     			label: "확정 금액",      	align: "right",		width: 100, formatter: "money",          	hidden: false},
+		            {key: "pchsVat",     			label: "부가세",      	align: "right",		width: 100, formatter: "money",          	hidden: false},
+		            {key: "pchsTot",     			label: "합계",      		align: "right",		width: 100, formatter: "money",          	hidden: false},
+		            {key: "pchsCnt",     			label: "확정횟수",      	align: "center",		width: 70, formatter: "money",          	hidden: false},
+		            {key: "cmpletSum",     			label: "완료",      		align: "center",		width: 70, formatter: "money",          	hidden: false},
+		            {key: "pchsDt",     			label: "최종확정일",      	align: "center",		width: 80,},
+				]},
+	            {key: "sts",      			label: "비 고",      	align: "left",   	width: 100},
+	            {key: "pchsClmnDay",    			label: "결재일",      	align: "center",	width: 80, hidden: false},
+	            {key: "pchsClntCd",    				label: "구매처",      	align: "center",	width: 80, hidden: false},
+	];
+
 	var clntCompGridView = {
 		initView: function(){
 		this.target = new ax5.ui.grid();
+		// 사용자별 컬럼설정 적용 (순서/숨김/너비) - 합계행도 이 순서 기준으로 재생성
+		var colsTop = GridColumnConfig.apply("SM1401M14", "clntCompGrid-grid", defaultColumnsTop);
 		this.target.setConfig({
 			/* showRowSelector: false, */
 			multipleSelect: false,
@@ -321,62 +374,10 @@
 				}
 	        },
 				footSum: [
-				    	[
-				    		{label: "합계", colspan:1, align:"center"},
-				    		{key: "ordrgQty",		collector: "sum", formatter:"money", align: "center"},
-				    		{key: "ordrgAmt",		collector: "sum", formatter:"money", align: "right"},
-				    		{},
-				    		{},
-				    		{key: "inQty",			collector: "sum", formatter:"money", align: "right"},
-				    		{key: "badQty",			collector: "sum", formatter:"money", align: "right"},
-				    		{key: "inDtlAmt",		collector: "sum", formatter:"money", align: "right"},
-				    		{},
-				    		{},
-// 				    		{key: "pchsQtyRem",		collector: "sum", formatter:"money", align: "right"},
-				    		{key: "pchsAmtRem",		collector: "sum", formatter:"money", align: "right"},
-				    		{},
-// 				    		{key: "pchsQty",		collector: "sum", formatter:"money", align: "right"},
-				    		{key: "pchsAmt",		collector: "sum", formatter:"money", align: "right"},
-				    		{key: "pchsVat",		collector: "sum", formatter:"money", align: "right"},
-				    		{key: "pchsTot",		collector: "sum", formatter:"money", align: "right"},
-		                 ]
+					// 사용자 컬럼설정 반영된 최종 순서에 맞춰 합계 행 자동 생성
+					GridColumnConfig.buildSumRow(colsTop, {label: "합계", labelColspan: 1, sums: sm1401TopSumCells})
 				    ],
-	        columns: [
-	            {key: "coCd",      					label: "회사",          	hidden: true},
-	            {key: "coCdNm",      				label: "회사명",          hidden: true},
-	            {key: "pchsClntNm",      			label: "구매처명",      	align: "left",   	width: 130},
-	            {key: undefined, label: "주문내역", columns: [
-		            {key: "ordrgQty",     			label: "요청수량",      	align: "center",	width: 70, formatter: "money",          	hidden: false},
-		            {key: "ordrgAmt",     			label: "발주금액",      	align: "right",		width: 100, formatter: "money",          	hidden: false},
-		            {key: "dudtDeqDt",     			label: "납기요청",     	align: "center",		width: 80,},
-	            ]},
-				{key: "", label: "", width: 3,},
-	            {key: undefined, label: "처리(입고,기타,반품)내역", columns: [
-		            {key: "inQty",     				label: "입고수량",      	align: "right",		width: 70, formatter: "money",          	hidden: false},
-		            {key: "badQty",     			label: "불량수량",      	align: "right",		width: 70, formatter: "money",          	hidden: false},
-		            {key: "inDtlAmt",     			label: "입고금액",      	align: "right",		width: 100, formatter: "money",          	hidden: false},
-		            {key: "inDt",     				label: "최종입고",     	align: "center",		width: 80,},
-				]},
-				{key: "", label: "", width: 3,},
-	            {key: undefined, label: "미확정내역", columns: [
-// 		            {key: "pchsQtyRem",     		label: "수량",      		align: "right",		width: 70, formatter: "money",          	hidden: false},
-		            {key: "pchsAmtRem",     		label: "미확정 금액",      	align: "right",		width: 150, formatter: "money",
-						styleClass : function() { return (parseInt(this.item.pchsAmtRem) != 0) ? "grid-font-blue-bold" : ""; } },
-				]},
-				{key: "", label: "", width: 3,},
-	            {key: undefined, label: "매입확정내역", columns: [
-// 		            {key: "pchsQty",     			label: "수량",      		align: "right",		width: 70, formatter: "money",          	hidden: false},
-		            {key: "pchsAmt",     			label: "확정 금액",      	align: "right",		width: 100, formatter: "money",          	hidden: false},
-		            {key: "pchsVat",     			label: "부가세",      	align: "right",		width: 100, formatter: "money",          	hidden: false},
-		            {key: "pchsTot",     			label: "합계",      		align: "right",		width: 100, formatter: "money",          	hidden: false},
-		            {key: "pchsCnt",     			label: "확정횟수",      	align: "center",		width: 70, formatter: "money",          	hidden: false},
-		            {key: "cmpletSum",     			label: "완료",      		align: "center",		width: 70, formatter: "money",          	hidden: false},
-		            {key: "pchsDt",     			label: "최종확정일",      	align: "center",		width: 80,},
-				]},
-	            {key: "sts",      			label: "비 고",      	align: "left",   	width: 100},
-	            {key: "pchsClmnDay",    			label: "결재일",      	align: "center",	width: 80, hidden: false},
-	            {key: "pchsClntCd",    				label: "구매처",      	align: "center",	width: 80, hidden: false},
-	           ]
+	        columns: colsTop
 	     });
 	     return this;
 
@@ -454,9 +455,65 @@
 		}
 
 
+	// 합계대상 컬럼 정의 (하단 상세그리드 footSum 공용, key 기반)
+	var sm1401BottomSumCells = {
+		"ordrgAmt":   {collector: "sum", formatter: "money", align: "right"},
+		"inTotAmt":   {collector: "sum", formatter: "money", align: "right"},
+		"remainAmt":  {collector: "sum", formatter: "money", align: "right"},
+		"pchsAmt":    {collector: "sum", formatter: "money", align: "right"},
+		"pchsVat":    {collector: "sum", formatter: "money", align: "right"},
+		"pchsAmtVat": {collector: "sum", formatter: "money", align: "right"}
+	};
+
+	var defaultColumnsBottom = [
+						{key : "rn", 				label : "No", 					align : "center", width : 40},
+						{key : "deptId", 			label : "관리부서", 			align : "center", width : 40, hidden : true},
+						{key : "pchsClntNm", 		label : "구매처명", 			align : "left", width : 140},
+						{key : "ordrgNo", 			label : "발주번호", 			align : "center", width : 90}, 	//발주번호
+						{key : "inNo", 				label : "입고번호", 			align : "center", width : 90}, 	//매입번호
+						{key : "pchsNo", 			label : "확정번호", 			align : "center", width : 80, hidden : false}, /* 매입확정번호 */
+// 						{key : "pchsSeq", 			label : "매입순번", 			align : "center", width : 70, hidden : true},
+						{key : "ordrgAmt", 			label : "발주총금액", 			align : "right", width : 110, formatter : "money", hidden : false},
+						{key : "inTotAmt", 			label : "입고총금액", 			align : "right", width : 110, formatter : "money", hidden : false},
+						{key : "inDt", 				label : "최종입고일", 			width : 80, align : "center"},
+						{key : "remainAmt", 		label : "미확정금액", 			align : "right", width : 110, formatter : "money", hidden : false,
+							styleClass : function() { return (parseInt(this.item.remainAmt) != 0) ? "grid-font-blue-bold" : ""; } },
+// 						{key : "isCnt", 			label : "확정건수", 			align : "center", width : 60,
+// 							styleClass : function() { return (parseInt(this.item.isCnt) > 0) ? "grid-font-red-bold" : ""; } },
+						{key : "pchsAmt", 			label : "매입확정금액", 		align : "right", width : 110, formatter : "money"},
+						{key : "pchsVat", 			label : "확정부가세", 			align : "right", width : 110, formatter : "money"},
+						{key : "pchsAmtVat", 		label : "매입확정합계", 		align : "right", width : 120, formatter : "money"},
+						{key : "totPchsDt", 		label : "최종확정일", 			width : 80, align : "center"},
+						{key : "payDiv", 	    	label : "영수", 				width:  60,		align: "center", 	hidden:true},
+						{key : "payDivNm", 	    	label : "영수", 				width:  60,		align: "center"},
+						{key : "pchsClmnDay", 	    label : "지급일", 				width:  60,		align: "center"},
+						{key : "totPchsNoAmtTot", 	label : "전체확정금액", 		align : "right", width : 120, formatter : "money"},
+// 						{key : "cmpletYn", 			label : "완료여부", 			align : "center", width : 60},
+						{key : "isDiv", 			label : "발주구분", 			align : "center", width : 70},
+						{key : "salesCd", 			label : "Sales Code", 		align : "left", width : 110},
+						{key : "dsgnNo", 			label : "대표도번", 			align : "left", width : 180},
+						{key : "ordrsCoCd", 		label : "수주회사CD", 			align : "center", width : 70, hidden:true},
+						{key : "ordrsCoCdNm", 		label : "수주회사", 			align : "center", width : 70},
+						{key : "clntPjtNm",			label : "고객사PJT", 			align : "center", width : 80},
+						{key : "inQty", 			label : "입고수량",      		align : "right",	width: 70, formatter : "money"},
+						{key : "badQty", 			label : "불량수량",      		align : "right",	width: 70, formatter : "money"},
+						{key : "inDtlAmt", 			label : "입고합계",      		align : "right",	width: 110, formatter : "money"},
+						{key : "inDt", 				label : "최종입고일",      	align : "center",	width: 80},
+						{key : "userChkV", 			label : "확정여부", 			align : "center", width : 70, formatter : "chkIcon", hidden : true}, /* 개별확정으로 사용안함 */
+						{key : "coCd", 				label : "회사", hidden : true},
+						{key : "coCdNm", 			label : "회사명", hidden : true},
+						{key : "pchsClntCd", 		label : "구매처", 			align : "center", width : 120, hidden : true},
+						{key : "matrCd", 			label : "matrCd", 			align : "left", width : 150, hidden : true},
+						{key : "ordrgNo", 			label : "발주(비용,반품)번호", 	align : "center", width : 120, hidden : true},
+						{key : "ordrgSeq", 			label : "발주순번", 			align : "center", width : 70, hidden : true}, /* 발주순번 제거 20231026 */
+						{key : "isCost", 			label : "isCost", 			align : "center", width : 70, hidden : true},
+	];
+
 	var gridView = {
 		initView: function(){
 			this.target = new ax5.ui.grid();
+			// 사용자별 컬럼설정 적용 (순서/숨김/너비) - 합계행도 이 순서 기준으로 재생성
+			var colsBottom = GridColumnConfig.apply("SM1401M14", "first-grid", defaultColumnsBottom);
 			this.target.setConfig({
 				//		showLineNumber    : true,
 				showRowSelector : true,
@@ -548,61 +605,10 @@
 
 				footSum :
 					[
-						[
-							{label : "합계", colspan : 5, align : "center"},
-							{key : "ordrgAmt", collector : "sum", formatter : "money", align : "right"},
-							{key : "inTotAmt", collector : "sum", formatter : "money", align : "right"},
-							{},
-							{key : "remainAmt", collector : "sum", formatter : "money", align : "right"},
-							{key : "pchsAmt", collector : "sum", formatter : "money", align : "right"},
-							{key : "pchsVat", collector : "sum", formatter : "money", align : "right"},
-							{key : "pchsAmtVat", collector : "sum", formatter : "money", align : "right"},
-						]
+						// 사용자 컬럼설정 반영된 최종 순서에 맞춰 합계 행 자동 생성
+						GridColumnConfig.buildSumRow(colsBottom, {label: "합계", labelColspan: 5, sums: sm1401BottomSumCells})
 					],
-				columns :
-					[
-						{key : "rn", 				label : "No", 					align : "center", width : 40},
-						{key : "deptId", 			label : "관리부서", 			align : "center", width : 40, hidden : true},
-						{key : "pchsClntNm", 		label : "구매처명", 			align : "left", width : 140},
-						{key : "ordrgNo", 			label : "발주번호", 			align : "center", width : 90}, 	//발주번호
-						{key : "inNo", 				label : "입고번호", 			align : "center", width : 90}, 	//매입번호
-						{key : "pchsNo", 			label : "확정번호", 			align : "center", width : 80, hidden : false}, /* 매입확정번호 */
-// 						{key : "pchsSeq", 			label : "매입순번", 			align : "center", width : 70, hidden : true},
-						{key : "ordrgAmt", 			label : "발주총금액", 			align : "right", width : 110, formatter : "money", hidden : false},
-						{key : "inTotAmt", 			label : "입고총금액", 			align : "right", width : 110, formatter : "money", hidden : false},
-						{key : "inDt", 				label : "최종입고일", 			width : 80, align : "center"},
-						{key : "remainAmt", 		label : "미확정금액", 			align : "right", width : 110, formatter : "money", hidden : false,
-							styleClass : function() { return (parseInt(this.item.remainAmt) != 0) ? "grid-font-blue-bold" : ""; } },
-// 						{key : "isCnt", 			label : "확정건수", 			align : "center", width : 60,
-// 							styleClass : function() { return (parseInt(this.item.isCnt) > 0) ? "grid-font-red-bold" : ""; } },
-						{key : "pchsAmt", 			label : "매입확정금액", 		align : "right", width : 110, formatter : "money"},
-						{key : "pchsVat", 			label : "확정부가세", 			align : "right", width : 110, formatter : "money"},
-						{key : "pchsAmtVat", 		label : "매입확정합계", 		align : "right", width : 120, formatter : "money"},
-						{key : "totPchsDt", 		label : "최종확정일", 			width : 80, align : "center"},
-						{key : "payDiv", 	    	label : "영수", 				width:  60,		align: "center", 	hidden:true},
-						{key : "payDivNm", 	    	label : "영수", 				width:  60,		align: "center"},
-						{key : "pchsClmnDay", 	    label : "지급일", 				width:  60,		align: "center"},
-						{key : "totPchsNoAmtTot", 	label : "전체확정금액", 		align : "right", width : 120, formatter : "money"},
-// 						{key : "cmpletYn", 			label : "완료여부", 			align : "center", width : 60},
-						{key : "isDiv", 			label : "발주구분", 			align : "center", width : 70},
-						{key : "salesCd", 			label : "Sales Code", 		align : "left", width : 110},
-						{key : "dsgnNo", 			label : "대표도번", 			align : "left", width : 180},
-						{key : "ordrsCoCd", 		label : "수주회사CD", 			align : "center", width : 70, hidden:true},
-						{key : "ordrsCoCdNm", 		label : "수주회사", 			align : "center", width : 70},
-						{key : "clntPjtNm",			label : "고객사PJT", 			align : "center", width : 80},
-						{key : "inQty", 			label : "입고수량",      		align : "right",	width: 70, formatter : "money"},
-						{key : "badQty", 			label : "불량수량",      		align : "right",	width: 70, formatter : "money"},
-						{key : "inDtlAmt", 			label : "입고합계",      		align : "right",	width: 110, formatter : "money"},
-						{key : "inDt", 				label : "최종입고일",      	align : "center",	width: 80},
-						{key : "userChkV", 			label : "확정여부", 			align : "center", width : 70, formatter : "chkIcon", hidden : true}, /* 개별확정으로 사용안함 */
-						{key : "coCd", 				label : "회사", hidden : true},
-						{key : "coCdNm", 			label : "회사명", hidden : true},
-						{key : "pchsClntCd", 		label : "구매처", 			align : "center", width : 120, hidden : true},
-						{key : "matrCd", 			label : "matrCd", 			align : "left", width : 150, hidden : true},
-						{key : "ordrgNo", 			label : "발주(비용,반품)번호", 	align : "center", width : 120, hidden : true},
-						{key : "ordrgSeq", 			label : "발주순번", 			align : "center", width : 70, hidden : true}, /* 발주순번 제거 20231026 */
-						{key : "isCost", 			label : "isCost", 			align : "center", width : 70, hidden : true},
-					]
+				columns : colsBottom
 			});
 		return this;
 
@@ -1054,6 +1060,23 @@
 	function gridResizeMain(size) {
 		// 화면 해상도 꽉 채우기 지원을 위해 데이터 수 기반 리사이즈 대신 전체 화면 대응 리사이즈를 호출합니다.
 		adjustGridHeightToWindow();
+	}
+
+	// 상단 요약 그리드 컬럼 설정 팝업 (저장/복원 후 그리드 재구성)
+	function openGridColumnEditTop() {
+		GridColumnConfig.openEditor("SM1401M14", "clntCompGrid-grid", defaultColumnsTop, function() {
+			$('[data-ax5grid="clntCompGrid-grid"]').empty();
+			clntCompGridView.initView().setData(0);
+		});
+	}
+
+	// 하단 상세 그리드 컬럼 설정 팝업 (저장/복원 후 그리드 재구성)
+	function openGridColumnEdit() {
+		GridColumnConfig.openEditor("SM1401M14", "first-grid", defaultColumnsBottom, function() {
+			$('[data-ax5grid="first-grid"]').empty();
+			gridView.initView();
+			gridView.setData();
+		});
 	}
 
 	function initSplitter() {
