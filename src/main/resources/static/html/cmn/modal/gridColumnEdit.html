@@ -10,12 +10,16 @@
 	#gridColumnEdit .gce-move a { cursor: pointer; padding: 0 4px; color: #337ab7; }
 	#gridColumnEdit .gce-chk { text-align: center; }
 	#gridColumnEdit .gce-hidden-label { color: #aaa; }
+	#gridColumnEdit .gce-drag-handle { cursor: move; color: #999; padding: 0 6px; user-select: none; }
+	#gridColumnEdit tr.gce-dragging { opacity: 0.4; }
+	#gridColumnEdit tr.gce-drop-above td { border-top: 2px solid #337ab7; }
+	#gridColumnEdit tr.gce-drop-below td { border-bottom: 2px solid #337ab7; }
 </style>
 
 <div id="gridColumnEdit">
 	<div class="popup_table" style="padding: 10px 10px 0 10px;">
 		<span style="font-size: 12px; color: #666;">
-			체크 해제 시 컬럼이 숨겨집니다. 순서 이동(▲▼)은 같은 그룹 안에서만 가능합니다.
+			체크 해제 시 컬럼이 숨겨집니다. 순서 이동(▲▼ 클릭 또는 ☰ 드래그)은 같은 그룹 안에서만 가능합니다.
 		</span>
 		<div class="gce-list">
 			<table>
@@ -45,6 +49,7 @@
 
 	$(document).ready(function() {
 		gceRender();
+		gceBindDragEvents();
 	});
 
 	// label의 HTML 태그(<br> 등) 제거하여 표시
@@ -75,14 +80,17 @@
 		function renderRows(cols, parentPath, depth) {
 			$.each(cols, function(idx, col) {
 				var path = parentPath.concat(idx).join(',');
+				var parent = parentPath.join(',');
+				var rowAttr = ' data-path="' + path + '" data-parent="' + parent + '"';
 				var indent = 'padding-left:' + (5 + depth * 20) + 'px;';
 				var moveBtns =
+					'<span class="gce-drag-handle" draggable="true" title="드래그하여 이동">☰</span>' +
 					'<a onclick="gceMove(\'' + path + '\', -1);">▲</a>' +
 					'<a onclick="gceMove(\'' + path + '\', 1);">▼</a>';
 				if (col.columns) {
 					// 그룹 헤더 행: 체크박스는 하위 전체 표시/숨김 일괄 토글
 					var allHidden = gceAllLeavesHidden(col);
-					html += '<tr class="gce-group-row">'
+					html += '<tr class="gce-group-row"' + rowAttr + '>'
 						+ '<td class="gce-chk"><input type="checkbox" ' + (allHidden ? '' : 'checked') + ' onclick="gceToggleGroup(\'' + path + '\', this.checked);"></td>'
 						+ '<td class="gce-label" style="' + indent + '">' + gceLabelText(col.label) + '</td>'
 						+ '<td></td>'
@@ -90,7 +98,7 @@
 						+ '</tr>';
 					renderRows(col.columns, parentPath.concat(idx), depth + 1);
 				} else {
-					html += '<tr>'
+					html += '<tr' + rowAttr + '>'
 						+ '<td class="gce-chk"><input type="checkbox" ' + (col.hidden ? '' : 'checked') + ' onclick="gceToggleLeaf(\'' + path + '\', this.checked);"></td>'
 						+ '<td class="gce-label' + (col.hidden ? ' gce-hidden-label' : '') + '" style="' + indent + '">' + gceLabelText(col.label) + '</td>'
 						+ '<td class="gce-width"><input type="number" min="20" max="1000" value="' + (col.width || '') + '" onchange="gceChangeWidth(\'' + path + '\', this.value);"></td>'
@@ -153,6 +161,64 @@
 		arr[idx] = arr[newIdx];
 		arr[newIdx] = tmp;
 		gceRender();
+	}
+
+	// 드래그 이동: 같은 부모(그룹) 내의 원하는 위치로 삽입
+	function gceMoveTo(srcPathStr, tgtPathStr, insertAfter) {
+		if (srcPathStr === tgtPathStr) return;
+		var src = gceParsePath(srcPathStr);
+		var tgt = gceParsePath(tgtPathStr);
+		var arr = gceParentArr(src);
+		var node = arr.splice(src[src.length - 1], 1)[0];
+		var newIdx = tgt[tgt.length - 1] + (insertAfter ? 1 : 0);
+		if (src[src.length - 1] < newIdx) newIdx--;   // 앞에서 제거된 만큼 보정
+		arr.splice(newIdx, 0, node);
+		gceRender();
+	}
+
+	// HTML5 드래그앤드롭 바인딩 (tbody 위임 - 재렌더링 후에도 유지)
+	function gceBindDragEvents() {
+		var dragPath = null;
+
+		function clearIndicator() {
+			$('#gceTbody tr').removeClass('gce-drop-above gce-drop-below gce-dragging');
+		}
+		function sameParent(pathA, pathB) {
+			var a = gceParsePath(pathA), b = gceParsePath(pathB);
+			return a.slice(0, -1).join(',') === b.slice(0, -1).join(',');
+		}
+
+		$('#gceTbody').on('dragstart', '.gce-drag-handle', function(e) {
+			var $tr = $(this).closest('tr');
+			dragPath = $tr.data('path') + '';
+			$tr.addClass('gce-dragging');
+			e.originalEvent.dataTransfer.effectAllowed = 'move';
+			e.originalEvent.dataTransfer.setData('text/plain', dragPath); // Firefox 필수
+		}).on('dragover', 'tr', function(e) {
+			if (dragPath === null) return;
+			var tgtPath = $(this).data('path') + '';
+			if (tgtPath === dragPath || !sameParent(dragPath, tgtPath)) return;
+			e.preventDefault();  // drop 허용
+			e.originalEvent.dataTransfer.dropEffect = 'move';
+			var rect = this.getBoundingClientRect();
+			var below = (e.originalEvent.clientY - rect.top) > rect.height / 2;
+			$('#gceTbody tr').removeClass('gce-drop-above gce-drop-below');
+			$(this).addClass(below ? 'gce-drop-below' : 'gce-drop-above');
+		}).on('dragleave', 'tr', function() {
+			$(this).removeClass('gce-drop-above gce-drop-below');
+		}).on('drop', 'tr', function(e) {
+			if (dragPath === null) return;
+			var tgtPath = $(this).data('path') + '';
+			if (tgtPath === dragPath || !sameParent(dragPath, tgtPath)) return;
+			e.preventDefault();
+			var rect = this.getBoundingClientRect();
+			var below = (e.originalEvent.clientY - rect.top) > rect.height / 2;
+			gceMoveTo(dragPath, tgtPath, below);
+			dragPath = null;
+		}).on('dragend', '.gce-drag-handle', function() {
+			dragPath = null;
+			clearIndicator();
+		});
 	}
 
 	function gceSave() {
