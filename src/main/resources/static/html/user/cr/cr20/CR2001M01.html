@@ -50,6 +50,7 @@
 <script src="/static/js/jquery.blockUI.js"></script>
 <!-- 도움말 팝업 -->
 <script src="/static/js/manualPopup.js"></script>
+<script src="/static/js/common/GridColumnConfig.js"></script>
 </head>
 
 <body>
@@ -73,11 +74,11 @@
 				<table class="table_input type04">
 					<!-- 검색조건 1행 -->
 					<tr>
-						<th class="hit">회사</th> 
+						<th class="hit">회사</th>
 						<td>
 							<select id="coCd_S" name="coCd_S" data-kind="CO" data-search="coCd" required msg="회사"></select>
 						</td>
-					
+
 						<th>수주구분</th>
 						<td>
 							<select id="ordrsDiv_S" name="ordrsDiv_S" data-kind="ORDRSDIV" data-search="ordrsDiv">
@@ -146,8 +147,9 @@
         		</div>
 				<div class="add_btn_small pdl10">
 					<a onclick="excelDown();" style="height: 30px; line-height: 28px; width: 90px;"><i class="fas fa-file-excel"></i> 엑셀다운로드</a>
+					<a onclick="openGridColumnEdit();" style="height: 30px; line-height: 28px; width: 90px;"><i class="fas fa-cog"></i>그리드설정</a>
 				</div>
-				
+
 				<!-- 검색되는 ROW수 -->
 				<select id="recordCnt" class="prae_select" onchange="DataSearch();">
 					<option value="100">100</option>
@@ -172,7 +174,7 @@
 </html>
 
 <script type="text/javascript">
-	var isFirst = true; 
+	var isFirst = true;
 	var group_text = "";
 	ax5.ui.grid.formatter["useYn"] = function () {
 		var color = this.value == "Y" ? "color-circle_02.png" : "color-circle_01.png";
@@ -182,10 +184,52 @@
 			return '<img src="/static/img/'+color+'" style="width: 10px;height: 10px;"></img>';
 		}
 	};
-	
+
+	var cr2001SumCells = {
+		"ordrsAmt": {key: "sumOrdrsAmt", collector: "sum", formatter: "money", align: "right"},
+		"ordrsPrc": {key: "sumOrdrsPrc", collector: "sum", formatter: "money", align: "right"},
+		"unOrdrsPrc": {collector: "sum", formatter: "money", align: "right"},
+		"unUnsettledAmt": {key: "sumUnUnsettledAmt", collector: "sum", formatter: "money", align: "right"}
+	};
+
+	var defaultColumns = [
+		{key: "clntNm"				, label: "고객사"	, align: "left", width:140},
+		{key: "clntPjtNm"			, label: "프르젝트"	, align: "left", width:100},
+		{key: undefined				, label: "미정산 발생 수주정보",
+			columns: [
+				{key: "ordrsDivNm"	, label: "수주구분"	, align: "center", width:70},
+				{key: "eqpNm"		, label: "발생설비명"	, align: "left", width:200},
+				{key: "ordrger"		, label: "발주자"	, align: "center", width:80},
+				{key: "ordrsAmt"	, label: "수주금액"	, align: "right", width: 90, formatter: "money"},
+				{key: "pmntMtdNm"	, label: "결재방법"	, align: "center", width: 60},
+				{key: "mngIdNm"		, label: "담당자"	, align: "center", width: 60},
+				{key: "ordrsNo"		, label: "번호"		, align: "center", width: 60, styleClass: function () { return (this.item.ctrtDoc == "CONTRACT01") ? "grid-font-blue-bold" : "";}},
+				{key: "ordrsSeq"	, label: "순번"		, align: "center", width: 50, styleClass: function () { return (this.item.ctrtDoc == "CONTRACT01") ? "grid-font-blue-bold" : "";}},
+				{key: "ordrsDt"		, label: "수주일자"	, align: "center", width: 80, styleClass: function () { return (this.item.ctrtDoc == "CONTRACT01") ? "grid-font-blue-bold" : "";}},
+			]
+		},
+		{key: undefined				, label: "정산내역"	, columns: [
+			{key: "billYn"			, label: "완료"		, align: "center", width: 60, formatter: "useYn"},
+			{key: "ordrsPrc"		, label: "발생금액"	, align: "right", width: 100, formatter: "money", styleClass: function () { return "grid-row-blue grid-font-red-bold"; }},
+			{key: "unOrdrsPrc"		, label: "정산금액"	, align: "right", width: 100, formatter: "money", styleClass: function () { return "grid-row-blue grid-no-msg-font-blue-bold"; }},
+			{key: "unUnsettledAmt"	, label: "미정산잔액", align: "right", width: 100, formatter: "money"},
+		]},
+		{key: undefined				, label: "정산상계 수주정보"		,
+			columns: [
+				{key: "unOrdrsNo"	, label: "번호"		, align: "center", width: 60, styleClass: function () { return (this.item.ctrtDoc == "CONTRACT01") ? "grid-font-blue-bold" : "";}},
+				{key: "unOrdrsSeq"	, label: "순번"		, align: "center", width: 50, styleClass: function () { return (this.item.ctrtDoc == "CONTRACT01") ? "grid-font-blue-bold" : "";}},
+				{key: "unOrdrsDt"	, label: "수주일자"	, align: "center", width: 80, styleClass: function () { return (this.item.ctrtDoc == "CONTRACT01") ? "grid-font-blue-bold" : "";}},
+				{key: "unPmntMtdNm"	, label: "결재방법"	, align: "center", width: 60},
+				{key: "unClntPjtNm"	, label: "포르젝트"	, align: "left", width:100},
+				{key: "unEqpNm"		, label: "정산설비명"	, align: "left", width:260},
+			]
+		},
+	];
+
 	var gridView = {
 		initView : function() {
 			this.target = new ax5.ui.grid();
+			var cols = GridColumnConfig.apply("CR2001M01", "grid1", defaultColumns);
 			this.target.setConfig({
                 frozenColumnIndex: 5,
 				lineNumberColumnWidth: 40,
@@ -201,7 +245,7 @@
 				body: {
 					onClick: function () {
 					},
-					onDBLClick: function () { 
+					onDBLClick: function () {
 						if( this.colIndex > 13) {	//정산수주번호 이후 컬럼 더블클릭이면
 							updateProjectModal(this.item, 'BILL');	//정상처리용 수주내역 불러오기
 						} else {
@@ -213,56 +257,10 @@
 					mergeCells : [ "clntNm", "clntPjtNm", "eqpNm", "ordrsDivNm", "ordrsAmt",  "pmntMtdNm"
 					             , "mngIdNm", "yyyy", "ordrsNo", "ordrsSeq", "ordrsMmdd"
 								 , "billYn", "ordrsPrc", "unUnsettledAmt"],
-				},			
-				columns : [
-					{key: "clntNm"				, label: "고객사"	, align: "left", width:140},
-					{key: "clntPjtNm"			, label: "포르젝트"	, align: "left", width:100},
-					{key: undefined				, label: "미정산 발생 수주정보",
-						columns: [
-							{key: "ordrsDivNm"	, label: "수주구분"	, align: "center", width:70},
-							{key: "eqpNm"		, label: "발생설비명"	, align: "left", width:200},
-							{key: "ordrger"		, label: "발주자"	, align: "center", width:80},
-							{key: "ordrsAmt"	, label: "수주금액"	, align: "right", width: 90, formatter: "money"},
-							{key: "pmntMtdNm"	, label: "결재방법"	, align: "center", width: 60},
-							{key: "mngIdNm"		, label: "담당자"	, align: "center", width: 60},
-							{key: "ordrsNo"		, label: "번호"		, align: "center", width: 60, styleClass: function () { return (this.item.ctrtDoc == "CONTRACT01") ? "grid-font-blue-bold" : "";}},
-							{key: "ordrsSeq"	, label: "순번"		, align: "center", width: 50, styleClass: function () { return (this.item.ctrtDoc == "CONTRACT01") ? "grid-font-blue-bold" : "";}},
-							{key: "ordrsDt"		, label: "수주일자"	, align: "center", width: 80, styleClass: function () { return (this.item.ctrtDoc == "CONTRACT01") ? "grid-font-blue-bold" : "";}},
-						]
-					},
-					{key: undefined				, label: "정산내역"	, columns: [
-						{key: "billYn"			, label: "완료"		, align: "center", width: 60, formatter: "useYn"},
-						{key: "ordrsPrc"		, label: "발생금액"	, align: "right", width: 100, formatter: "money", styleClass: function () { return "grid-row-blue grid-font-red-bold"; }},
-						{key: "unOrdrsPrc"		, label: "정산금액"	, align: "right", width: 100, formatter: "money", styleClass: function () { return "grid-row-blue grid-no-msg-font-blue-bold"; }},
-						{key: "unUnsettledAmt"	, label: "미정산잔액", align: "right", width: 100, formatter: "money"},
-					]},
-					{key: undefined				, label: "정산상계 수주정보"		,
-						columns: [
-							{key: "unOrdrsNo"	, label: "번호"		, align: "center", width: 60, styleClass: function () { return (this.item.ctrtDoc == "CONTRACT01") ? "grid-font-blue-bold" : "";}},
-							{key: "unOrdrsSeq"	, label: "순번"		, align: "center", width: 50, styleClass: function () { return (this.item.ctrtDoc == "CONTRACT01") ? "grid-font-blue-bold" : "";}},
-							{key: "unOrdrsDt"	, label: "수주일자"	, align: "center", width: 80, styleClass: function () { return (this.item.ctrtDoc == "CONTRACT01") ? "grid-font-blue-bold" : "";}},
-							{key: "unPmntMtdNm"	, label: "결재방법"	, align: "center", width: 60},
-							{key: "unClntPjtNm"	, label: "포르젝트"	, align: "left", width:100},
-							{key: "unEqpNm"		, label: "정산설비명"	, align: "left", width:260},
-							
-						]
-					},
-				],
+				},
+				columns : cols,
 				footSum: [
-  			    	[
-  			    		{label: "총계", colspan:4, align:"center"},
-                        {key: "sumOrdrsAmt"		, collector: "sum", formatter: "money", align: "right"},
-                        {},
-                        {},
-                        {},
-                        {},
-                        {},
-                        {},
-                        {key: "sumOrdrsPrc"		, collector: "sum", formatter: "money", align: "right"},
-                        {key: "unOrdrsPrc"		, collector: "sum", formatter: "money", align: "right"},
-                        {key: "sumUnUnsettledAmt"	, collector: "sum", formatter: "money", align: "right"},
-
-  	                 ]
+					GridColumnConfig.buildSumRow(cols, {label: "총계", labelColspan: 4, sums: cr2001SumCells})
   			    ],
 				page: {
 	                navigationItemCount: 10,
@@ -278,7 +276,7 @@
 	            }
 			});
 			return this;
-		},		
+		},
 		setData : function(_pageNo) {
 			if (isFirst) return;
 			var targetObj = this.target;
@@ -293,7 +291,7 @@
 					try {
 						gridHeightResize(gridView, 195); // 224 = 919 - 695 : 화면 Body 높이 - 그리드 기본크기 695
 						var list = data.result;
-						
+
 						const seenNo2 = new Set();
 						for (let i = 0; i < list.length; i++) {
 							list[i].ordrsAmt = gPasFloatChk(list[i].ordrsAmt);
@@ -311,7 +309,7 @@
 							    list[i].sumUnUnsettledAmt = list[i].unUnsettledAmt;   // 첫 등장 번호면 원래 금액
 							}
 						}
-						
+
 						targetObj.setData({
 							list : list,
 							page : {
@@ -337,9 +335,9 @@
 			this.target = new ax5.ui.grid();
 			this.target.setConfig({
 				target: $('[data-ax5grid="grid1_excel"]'),
-				
-				body: { 
-				},	
+
+				body: {
+				},
 				columns : [
 					{key: "clntNm"				, label: "고객사"	, align: "left", width:140},
 					{key: "clntPjtNm"			, label: "포르젝트"	, align: "left", width:100},
@@ -368,7 +366,7 @@
 							{key: "unOrdrsNo"	, label: "번호"		, align: "center", width: 60, styleClass: function () { return (this.item.ctrtDoc == "CONTRACT01") ? "grid-font-blue-bold" : "";}},
 							{key: "unOrdrsSeq"	, label: "순번"		, align: "center", width: 50},
 							{key: "unOrdrsMmdd"	, label: "일자"		, align: "center", width: 50},
-							
+
 						]
 					},
 					{key: "unPmntMtdNm"			, label: "결재방법"	, align: "center", width: 60},
@@ -396,7 +394,7 @@
 			return this;
 		}
 	}
-	
+
 	//화면로드시
 	$(document).ready(function() {
 		mainDefaultLoad("영업관리", "수주 미정산현황 관리"); // 페이지 타이틀 설정
@@ -410,12 +408,12 @@
 		//그리드 초기화
 		gridView.initView();
 		excelView.initView();
-		
+
 		// 검색조건 이벤트 bind
   		$('[data-search]').on("change", function(){
   			DataSearch();
   		});
-		
+
   		DataSearch()
   		//권한체크
   		authChk();
@@ -468,7 +466,7 @@
 				    list[i].sumOrdrsPrc = list[i].ordrsPrc;   // 첫 등장 번호면 원래 금액
 				}
 			}
-			
+
 			excelView.target.setData({
 				list : list,
 				page : {
@@ -484,18 +482,18 @@
 	function openClntSearch(openType) {
 		var searchValueM = null;
 		searchValueM = $('#ordrsClntNm_S').val();
-		
+
 		var paramObj = {
 			"searchValue" :  searchValueM
 			, "clntDivCd" : "CLNTDIV12"  /*거래처 검색 기본값 고객사로 세팅 */
-			, "pchsClntCd" : "CLNTDIV12" /*구매처 팝업일 경우 구분자 고객사 제외하고 세팅 */				
-		}		
+			, "pchsClntCd" : "CLNTDIV12" /*구매처 팝업일 경우 구분자 고객사 제외하고 세팅 */
+		}
 		if(openType == "S") {
 			paramObj.clntDivCd = null;
 		}
 		//발주관리에서 호출 플래그 추가
 		paramObj.orderFlag = "Y";
-		
+
 		openSecondModal("/static/html/cmn/modal/clntSearch.html", 650, 650, "거래처 검색", paramObj, function (grid) {
 			var row = grid.target.getList("selected")[0];
 			$('#ordrsClntCd_S').val(row.clntCd);
@@ -503,14 +501,14 @@
 			DataSearch();
 		});
 	}
-	
+
 	//수주번호
 	function opendOrdrsSearch() {
 		var paramObj = {
 			"coCd"    : $('#coCd_S').val(),
 			"ordrsNo" : $('#ordrsNo_S').val()
 		};
-		
+
 		openSecondModal("/static/html/cmn/modal/ordrsSearch.html", 1200, 800, "수주번호 검색", paramObj, function(grid) {
 			//debugger;
 			var row = grid.target.getList("selected")[0];
@@ -523,7 +521,7 @@
 	function setByCoCd(value) {
 		$('#coCd_S option:not([value="'+value+'"])').remove();
     }
-    
+
 	// 담당자 검색
 	function openUserTree() {
 		var paramObj = {
@@ -532,7 +530,7 @@
 			"userNm" : $('#searchidnm_S').val(),
 			"useYn"  : "Y"
 		};
-		
+
 		openModal("/static/html/cmn/modal/userSearch.html", 450, 650, "사용자 검색", paramObj, function (tree){
 			var checkedId = tree.get_checked()[0];
 			var checkedNode = tree.get_node(checkedId);
@@ -541,7 +539,7 @@
 			DataSearch();
 		});
 	}
-	
+
 
     function updateProjectModal(row, part='') {
    		var paramObj = {
@@ -553,7 +551,7 @@
    			userId      : jwt.userId,
    			pgmId       : "CR0201M02"
    		};
-	   		
+
    		if (part == 'BILL') {
 			if (!row.unFileTrgtKey) return false;
    			paramObj.coCd 		 = row.unCoCd;
@@ -567,5 +565,13 @@
         });
     }
 
-	
+	function openGridColumnEdit() {
+		GridColumnConfig.openEditor("CR2001M01", "grid1", defaultColumns, function() {
+			if (gridView.target) {
+				try { gridView.target.destroy(); } catch(e) {}
+			}
+			$('[data-ax5grid="grid1"]').empty();
+			gridView.initView().setData(0);
+		});
+	}
 </script>
