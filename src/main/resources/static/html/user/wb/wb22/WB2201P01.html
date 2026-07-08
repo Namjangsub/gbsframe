@@ -266,6 +266,7 @@
 	var rsltDelteFlag = "N"
 
 	var SPECRTS01 = ""; //생산관리 권한 소유자
+	var SPECRTS13 = ""; //영업담당 대행 권한 소유자
 
 	var beforeGridSize = 0; //수주상세그리드의 갯수용 그리드컨텐츠 높이조절용
 	//카톡 정상알림 카운터 변수
@@ -354,9 +355,10 @@
 			jwt.userId == 'ssj' ||
 			prdMngIds.includes(jwt.userId);
 
-		// 총괄PM, 생산관리: 미확정일 때만 수정 가능
+		const salesAssistIds = SPECRTS13.replace(/\s/g,'').split(',').filter(Boolean);
+		// 총괄PM, 영업담당대행: 미확정일 때만 수정 가능
 		const privilegedUserUnconfirmed =
-			$('#smrizeId').val() == jwt.userId;
+			$('#smrizeId').val() == jwt.userId || salesAssistIds.includes(jwt.userId);
 
 		const unconfirmed = $("#wbsPlanCloseYn").val() !== "Y";
 
@@ -417,11 +419,21 @@
 							//  총괄PM 또는 일정관리 담당자 한동주 가능-->
 							// 등록내용은 전체 조회가 되고,  수정권한만 제거 함. 남장섭 231215 확인
 							// Validation 체크 - 2레벨 담당자 체크 버튼 보임 처리
+							var prdMngIds = SPECRTS01.replace(/\s/g,'').split(',').filter(Boolean);
+							var salesAssistIds = SPECRTS13.replace(/\s/g,'').split(',').filter(Boolean);
+							var isPrivilegedForLevel2 = 
+								jwt.authInfo.includes('AUTH999') || 
+								jwt.userId == 'js.nam' || 
+								jwt.userId == 'ssj' || 
+								prdMngIds.includes(jwt.userId) || 
+								$('#smrizeId').val() == jwt.userId ||
+								salesAssistIds.includes(jwt.userId);
+
 							if ($('#popForm #endYn').val() == 'Y') {
 								// 과제 마감 시 일정계획/TASK 버튼 모두 숨김
 								$("#popForm #addrow1").hide();
 								$("#popForm #addrow2").hide();
-							} else if (row != undefined && row.wbsPlanMngId != jwt.userId && this.item.closeYn != "Y") {
+							} else if (row != undefined && row.wbsPlanMngId != jwt.userId && !isPrivilegedForLevel2 && this.item.closeYn != "Y") {
 								$("#popForm #addrow2").hide();
 							} else {
 								$("#popForm #addrow2").show();
@@ -455,9 +467,10 @@
 								var checkedId = tree.get_checked()[0];
 								var checkedNode = tree.get_node(checkedId);
 
-								// 확정일 때만 부서 체크, 총괄PM/생산관리/시스템관리자는 부서 제한 없음
+								// 확정일 때만 부서 체크, 총괄PM/영업담당대행/생산관리/시스템관리자는 부서 제한 없음
 								var prdMngIds = SPECRTS01.replace(/\s/g, '').split(',').filter(Boolean);
-								var isPrivilegedUser = $('#smrizeId').val() == jwt.userId || prdMngIds.includes(jwt.userId) || jwt.authInfo.includes('AUTH999') || jwt.userId == 'js.nam' || jwt.userId == 'ssj';
+								var salesAssistIds = SPECRTS13.replace(/\s/g, '').split(',').filter(Boolean);
+								var isPrivilegedUser = $('#smrizeId').val() == jwt.userId || salesAssistIds.includes(jwt.userId) || prdMngIds.includes(jwt.userId) || jwt.authInfo.includes('AUTH999') || jwt.userId == 'js.nam' || jwt.userId == 'ssj';
 
 								if (closeYn == "Y" && !isPrivilegedUser && jwt.deptId.slice(0, 5) !== checkedNode.original.parent.slice(0, 5)) {
 									customAlert("같은 부서원만 선택 가능합니다.");
@@ -594,7 +607,7 @@
 							return true;
 						} else if (selectedRow.wbsPlanCodeId == 'WBSCODE06' && (jwt.deptId =='TRN5020' || jwt.deptId =='TRN5040')) {
 							return true;
-						} else if ($('#smrizeId').val() == jwt.userId || SPECRTS01.replace(/\s/g,'').split(',').includes(jwt.userId) || jwt.authInfo.includes('AUTH999') ) {
+						} else if ($('#smrizeId').val() == jwt.userId || SPECRTS13.replace(/\s/g,'').split(',').includes(jwt.userId) || SPECRTS01.replace(/\s/g,'').split(',').includes(jwt.userId) || jwt.authInfo.includes('AUTH999') ) {
 							return true;
 						} else {
 							return false;
@@ -732,8 +745,9 @@
 								var val2 = list[i].closeYn;
 								// 확정/Ver.Up 버튼 권한 체크
 								var prdMngIds = SPECRTS01.replace(/\s/g,'').split(',').filter(Boolean);
+								var salesAssistIds = SPECRTS13.replace(/\s/g,'').split(',').filter(Boolean);
 								var isElectUser = jwt.userId === 'canmtb' || jwt.userId === 'tjswlssky' || jwt.userId === 'famyg80';
-								var hasConfirmPermission = !isElectUser && ($('#smrizeId').val() == jwt.userId || prdMngIds.includes(jwt.userId) || jwt.authInfo.includes('AUTH999') || jwt.userId == 'js.nam' || jwt.userId == 'ssj');
+								var hasConfirmPermission = !isElectUser && ($('#smrizeId').val() == jwt.userId || salesAssistIds.includes(jwt.userId) || prdMngIds.includes(jwt.userId) || jwt.authInfo.includes('AUTH999') || jwt.userId == 'js.nam' || jwt.userId == 'ssj');
 
 								if (val2 == "Y") {
 									if (hasConfirmPermission) {
@@ -800,8 +814,9 @@
 			// Validation 체크 - 확정버튼 권한
 			var smrizeId = $('#smrizeId').val();
 			var prdMngIds = SPECRTS01.replace(/\s/g,'').split(',').filter(Boolean);
+			var salesAssistIds = SPECRTS13.replace(/\s/g,'').split(',').filter(Boolean);
 			var isElectUser = jwt.userId === 'canmtb' || jwt.userId === 'tjswlssky' || jwt.userId === 'famyg80';
-			var hasConfirmPermission = !isElectUser && (smrizeId == jwt.userId || prdMngIds.includes(jwt.userId) || jwt.authInfo.includes('AUTH999') || jwt.userId == 'js.nam' || jwt.userId == 'ssj');
+			var hasConfirmPermission = !isElectUser && (smrizeId == jwt.userId || salesAssistIds.includes(jwt.userId) || prdMngIds.includes(jwt.userId) || jwt.authInfo.includes('AUTH999') || jwt.userId == 'js.nam' || jwt.userId == 'ssj');
 			if(hasConfirmPermission){
 				$("#popForm #btn15").show();
 				$("#popForm #btn3").show();
@@ -1034,15 +1049,28 @@
 					}
 					// Validation 체크 - 2레벨 담당자 체크 버튼 보임 처리
 					var row1 = gridView1.target.getList("selected")[0];
-					if (row != undefined && row.wbsPlanMngId != jwt.userId || row1.closeYn == "N" || $('#wbsPopup #endYn').val() == 'Y') {
-						$("#popForm #addrow2").hide();
-					} else {
+					var prdMngIds = SPECRTS01.replace(/\s/g,'').split(',').filter(Boolean);
+					var salesAssistIds = SPECRTS13.replace(/\s/g,'').split(',').filter(Boolean);
+					var isPrivilegedForLevel2 = 
+						jwt.authInfo.includes('AUTH999') || 
+						jwt.userId == 'js.nam' || 
+						jwt.userId == 'ssj' || 
+						prdMngIds.includes(jwt.userId) || 
+						$('#smrizeId').val() == jwt.userId ||
+						salesAssistIds.includes(jwt.userId);
+
+					var isMng = row != undefined && row.wbsPlanMngId == jwt.userId;
+					var isConfirmed = row1 != undefined && row1.closeYn == "Y";
+					var isNotEnded = $('#wbsPopup #endYn').val() != 'Y';
+
+					if (isNotEnded && isConfirmed && (isMng || isPrivilegedForLevel2)) {
 						$("#popForm #addrow2").show();
-						// noGrid2List(list);
+					} else {
+						$("#popForm #addrow2").hide();
 					}
 
 					//전산실 관리용
-					if (jwt.userId == 'js.nam' || jwt.userId == 'ssj' && $('#wbsPopup #endYn').val() == 'N')  $("#popForm #addrow2").show();
+					if ((jwt.userId == 'js.nam' || jwt.userId == 'ssj') && isNotEnded)  $("#popForm #addrow2").show();
 					gridResize(gridView2.target.list.length); //그리드 높이 조정
 				} catch (error) {
 					alert("오류 발생!! 전산실 연락 바랍니다", error.message);
@@ -1096,6 +1124,11 @@
 		// 생산관리 권한자 조회
 		postAjaxSync("/admin/cm/cm05/selectChildCodeList", {"codeId":"SPECRTS01"}, null, function(data){
 			SPECRTS01 = data.childCodeList[0].codeEtc || "";
+		});
+
+		// 영업담당 대행 권한자 조회
+		postAjaxSync("/admin/cm/cm05/selectChildCodeList", {"codeId":"SPECRTS13"}, null, function(data){
+			SPECRTS13 = data.childCodeList[0].codeEtc || "";
 		});
 
 		coCd = modalStack.last().paramObj.coCd;
@@ -1209,6 +1242,7 @@
 			// 권한 조건
 			var hasAuth =
 				$('#smrizeId').val() == jwt.userId ||
+				SPECRTS13.replace(/\s/g,'').split(',').includes(jwt.userId) ||
 				SPECRTS01.replace(/\s/g,'').split(',').includes(jwt.userId) ||
 				jwt.authInfo.includes('AUTH999');
 
@@ -1475,8 +1509,18 @@
 				}
 				rowListObj["wbsPlanStsCodeId"] = wbsPlanStsCodeId;
 
-				// 전산관리자, 팀장이 Task 수정시 해당 Task의 담당자 id,nm이 들어가겠끔
-				if (jwt.userId == 'js.nam' || jwt.userId == 'ssj' || teamManagerYnFlag) {
+				var prdMngIds = SPECRTS01.replace(/\s/g,'').split(',').filter(Boolean);
+				var salesAssistIds = SPECRTS13.replace(/\s/g,'').split(',').filter(Boolean);
+				var isPrivilegedForLevel2 = 
+					jwt.userId == 'js.nam' || 
+					jwt.userId == 'ssj' || 
+					teamManagerYnFlag ||
+					prdMngIds.includes(jwt.userId) ||
+					$('#smrizeId').val() == jwt.userId ||
+					salesAssistIds.includes(jwt.userId);
+
+				// 전산관리자, 팀장, 생산관리, 총괄PM, 대행 권한자가 Task 수정시 해당 Task의 담당자 id,nm이 유지되도록 처리
+				if (isPrivilegedForLevel2) {
 					rowListObj["wbsPlanMngId"] = row1.wbsPlanMngId;
 					rowListObj["wbsPlanMngNm"] = row1.wbsPlanMngNm;
 				} else {
