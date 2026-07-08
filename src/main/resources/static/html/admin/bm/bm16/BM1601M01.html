@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="ko">
 <head>
 <meta charset="utf-8">
@@ -35,6 +35,7 @@
 <script src="/static/js/exceljs.min.js"></script>
 <!-- <script src="https://unpkg.com/exceljs/dist/exceljs.min.js"></script> -->
 <script src="/static/js/global.js"></script>
+  <script src="/static/js/common/GridColumnConfig.js"></script>
 <script src="/static/js/fileTree.js"></script>
 <script src="/static/js/jquery.blockUI.js"></script>
 <!-- 도움말 팝업 -->
@@ -137,6 +138,7 @@
           <a onclick="issueUpdate('C');" style="height: 30px; line-height: 28px; width: 80px;" title="프로젝트별 이슈를 처리합니다." authchk><i class="far fa-comment-dots"></i> 이슈</a>
 <!--           <a onclick="excelUpload();" style="height: 30px; line-height: 28px; width: 80px;" authChk><i class="fas fa-file-upload"></i> 엑셀업로드</a> -->
           <a onclick="jsonToExcel(gridView);" style="height: 30px; line-height: 28px; width: 60px;"><i class="fas fa-file-excel"></i> 엑셀</a>
+          <a onclick="openGridColumnEdit();" style="height: 30px; line-height: 28px; width: 90px;"><i class="fas fa-cog"></i> 그리드설정</a>
         </div>
         <select id="recordCnt"  data-search="recordCnt" class="prae_select" onchange="gridView.setData(0);" style="height: 30px;"">
           <option value="50">50</option>
@@ -170,59 +172,14 @@
 		}
 	};
 	
-	var gridView = {
-		initView : function() {
-  			this.target = new ax5.ui.grid();
-  			this.target.setConfig({
-  		    	showRowSelector: true,
-  		    	multipleSelect: false,
-  		    	sortable: true,
-  		        target: $('[data-ax5grid="first-grid"]'),
-  		        header: {
-  		        	align: "center",
-  		        	selector: false
-  		        },
-  		        body: {
-  		        	mergeCells : ["prjctSeq","yyyymm","inpexpNm","newPrdtNm","clntNm","clntMngNm","cdPrjctNm","clntMngNm","prjctNm","prjctCdNm"],
-  		        	 onClick: function () {
-  		                this.self.select(this.dindex);
-  		            },
-  		            onDBLClick: function () {
-						if (this.column.key === "issYn") {
-							if (this.value == "N") {
-								issueUpdate('U');
-							} else {
-								issueUpdate('C');
-							}
-						} else {
-							insertPrjctModal("U");
-						}
-  		            },
-  		        },
+	// 합계대상 컬럼 정의 (footSum 총계행, buildSumRow가 최종 컬럼 순서에 맞춰 위치 자동 생성)
+	var bm1601SumCells = {
+		"epctAmt"      : { collector: "sum", formatter: "money", align: "right" },
+		"ordrsPlanAmt" : { collector: "sum", formatter: "money", align: "right" },
+		"ordrsAmt"     : { collector: "sum", formatter: "money", align: "right" }
+	};
 
-				page : {
-					navigationItemCount : 9,
-					height : 30,
-					display : true,
-					firstIcon : '<i class="fa fa-step-backward" aria-hidden="true"></i>',
-					prevIcon : '<i class="fa fa-caret-left" aria-hidden="true"></i>',
-					nextIcon : '<i class="fa fa-caret-right" aria-hidden="true"></i>',
-					lastIcon : '<i class="fa fa-step-forward" aria-hidden="true"></i>',
-					onChange : function() {
-						gridView.setData(this.page.selectPage);
-					}
-				},
-
-				footSum: [
-  			    	[
-  			    		{label: "총계", colspan:21, align:"center"},
-  			    		{key: "epctAmt", 			collector: "sum", formatter:"money", align: "right"},
-  			    		{key: "ordrsPlanAmt",	collector: "sum", formatter:"money", align: "right"},
-  	                    {key: "ordrsAmt", 		collector: "sum", formatter:"money", align: "right"}
-  	                 ]
-  			    ],
-
-		    	columns : [
+	var defaultColumns = [
 						 {key: "prjctSeq",	    label: "프로젝트시퀀스",	width: 50,		align: "center", 	hidden:true}
 						,{key: "prjctCd",	    label: "프로젝트 코드",		width: 80,		align: "center", 	hidden:true}
 						,{key: "yyyymm",		label: "계약년월", 	    width: 80,		align: "center", 	formatter: function () {
@@ -264,12 +221,60 @@
 						,{key: "ordrsPct", 		label: "확률", 			width: 60,		align: "center"}
 						,{key: "mngId" ,	    label: "영업담당자", 		width: 80,		align: "center",	hidden:true}
 						,{key: "mngNm" ,	    label: "영업담당자", 		width: 80,		align: "center"}
-    	            ]
+	];
 
-							});
-        			return this;
-        		},
+	var gridView = {
+		initView : function() {
+  			this.target = new ax5.ui.grid();
+			var cols = GridColumnConfig.apply("BM1601M01", "first-grid", defaultColumns);
+  			this.target.setConfig({
+  		    	showRowSelector: true,
+  		    	multipleSelect: false,
+  		    	sortable: true,
+  		        target: $('[data-ax5grid="first-grid"]'),
+  		        header: {
+  		        	align: "center",
+  		        	selector: false
+  		        },
+  		        body: {
+  		        	mergeCells : ["prjctSeq","yyyymm","inpexpNm","newPrdtNm","clntNm","clntMngNm","cdPrjctNm","clntMngNm","prjctNm","prjctCdNm"],
+  		        	 onClick: function () {
+  		                this.self.select(this.dindex);
+  		            },
+  		            onDBLClick: function () {
+						if (this.column.key === "issYn") {
+							if (this.value == "N") {
+								issueUpdate('U');
+							} else {
+								issueUpdate('C');
+							}
+						} else {
+							insertPrjctModal("U");
+						}
+  		            },
+  		        },
 
+				page : {
+					navigationItemCount : 9,
+					height : 30,
+					display : true,
+					firstIcon : '<i class="fa fa-step-backward" aria-hidden="true"></i>',
+					prevIcon : '<i class="fa fa-caret-left" aria-hidden="true"></i>',
+					nextIcon : '<i class="fa fa-caret-right" aria-hidden="true"></i>',
+					lastIcon : '<i class="fa fa-step-forward" aria-hidden="true"></i>',
+					onChange : function() {
+						gridView.setData(this.page.selectPage);
+					}
+				},
+
+				footSum: [
+					GridColumnConfig.buildSumRow(cols, {label: "총계", labelColspan: 21, sums: bm1601SumCells})
+  			    ],
+
+				columns : cols
+			});
+        	return this;
+        },
 		setData : function(_pageNo, _rowNum='X') {  // _rowNum은 수정하고 나서 커서 포지션 이동을 하기 위함 --> popup 화면에서 컨트롤 함 BM1601P01.html
 			if (isFirst) return;
 	    	firstGrid = this.target;
@@ -428,6 +433,17 @@
 	}
 
 	// 영업담당자 검색 //
+
+	// 그리드 컬럼 설정 팝업 (저장/복원 후 그리드 재구성)
+	function openGridColumnEdit() {
+		GridColumnConfig.openEditor("BM1601M01", "first-grid", defaultColumns, function() {
+			if (gridView.target) {
+				try { gridView.target.destroy(); } catch(e) {}
+			}
+			$('[data-ax5grid="first-grid"]').empty();
+			gridView.initView().setData(0);
+		});
+	}
 	function openSecondUserSearch() {
 		var paramObj = {
 			  "coCd" : $('#coCd').val(),

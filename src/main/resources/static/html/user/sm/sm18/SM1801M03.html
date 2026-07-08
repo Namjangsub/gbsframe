@@ -46,6 +46,8 @@
 <script src="/static/js/jquery.blockUI.js"></script>
 <!-- 도움말 팝업 -->
 <script src="/static/js/manualPopup.js"></script>
+<!-- 그리드 컬럼 설정 -->
+<script src="/static/js/common/GridColumnConfig.js"></script>
 </head>
 
 <body>
@@ -149,6 +151,7 @@
 					<a onclick="setReportPchsSttus('Report');" style="height: 30px; line-height: 28px; width: 90px;"><i class="fas fa-print"></i> 출력</a>
 					<!-- 엑셀다운로드 버튼 -->
 					<a onclick="excelDown();" style="height: 30px; line-height: 28px; width: 90px;"><i class="fas fa-file-excel"></i> 엑셀다운로드</a>
+					<a onclick="openGridColumnEdit();" style="height: 30px; line-height: 28px; width: 90px;"><i class="fas fa-cog"></i>그리드설정</a>
 				</div>
 				<!-- 검색되는 ROW수 -->
 				<select id="recordCnt" class="prae_select" onchange="DataSearch();">
@@ -176,9 +179,51 @@
 <script type="text/javascript">
 
 	var isFirst = true;	
+	var sm1801SumCells = {
+		"inDtlAmt": { collector: "sum", formatter: "money", align: "right" },
+		"pchsAmt" : { collector: "sum", formatter: "money", align: "right" },
+		"pchsVat" : { collector: "sum", formatter: "money", align: "right" },
+		"pchsSumAmt": { collector: "sum", formatter: "money", align: "right" }
+	};
+
+	var defaultColumns = [
+			        	  {key: "rn",      					label: "No.",          	align: "center",	width: 60},
+			              {key: "ordrsNo",  				label: "수주번호",    		align: "center",	width: 70},              
+			              {key: "salesCd",  				label: "Sales Code",    align: "center",	width: 110},              
+			              {key: "dsgnNo",  					label: "대표도번",        align: "center",   	width: 180},        
+			              {key: "pchsClntNm",      			label: "구매처명",      	align: "left",   	width: 150},       
+			              {key: "isDiv", 					label: "발주구분",			align: "center",	width: 80},                          
+			              {key: "pchsNo",					label: "매입번호",      	align: "center",	width: 80},			/* 출력용 매입번호 */   
+			              {key: "inDtlAmt",	    			label: "입고금액",      	align: "right",		width: 110, 	 formatter: "money"},  
+						  {key: "pchsAmt", 					label: "매입금액",			align: "right", 	width: 110,		 formatter: "money"
+			            	  , 	styleClass: function () { return "grid-font-blue-bold"} 	
+						  },			    
+						  {key: "pchsVat", 					label: "부가세",			align: "right", 	width: 110,		 formatter: "money"},			    
+						  {key: "pchsSumAmt", 				label: "합계금액",			align: "right", 	width: 110,		 formatter: "money"},			    			  				    
+			 			  {key: "pchsDt", 					label: "확정일자", 		align: "center",	width: 80},	               
+			 			  {key: "creatIdNm", 				label: "담당자", 			align: "center",	width: 60},	               
+			 			  {key: "deptNm", 					label: "부서명", 			align: "center",	width: 80},	               
+			              {key: "partCdNm", 				label: "분류",      		align: "center",	width: 70, hidden: false},       			/* 발주요청서 분류 */		          
+						  {key: "pchsClmnDay", 				label: "결제일",			align: "center", 	width: 60 },			  
+						  {key: "pchsClmnRmk", 				label: "비고",			align: "left", 		width: 120 },			  
+			 			  {key: "pchsPmntMtdNm", 			label: "결제조건",			align: "center", 	width: 60 },			  		  
+			 			  {key: "pchsCostDiv10Nm", 			label: "비용구분",			align: "center", 	width: 70 },
+			 			  {key: "matrClntDivElec", 			label: "전기비용",			align: "center", 	width: 80, formatter: "money" },
+			              {key: "ordrgNo", 					label: "참고 번호",		align: "center",	width: 80, hidden: false},
+			              {key: "ordrgSeq", 				label: "발주순번",      	align: "center",	width: 70, hidden: false},		/* 발주순번 제거 20231026 */              
+			              {key: "reqNo", 					label: "요청번호",      	align: "center",	width: 90, hidden: false},       			/* 발주요청서번호 */		          
+			              {key: "pchsClntCd",    			label: "구매처",      	align: "center",	width: 80, hidden: false},
+			              {key: "ordrgAmt",     			label: "발주금액",      	align: "right",		width: 110, formatter: "money",          	hidden: true}, 
+			              {key: "isCost", 					label: "isCost",    	align: "center",	width: 70, hidden: true},   
+			              {key: "pchsCostDiv10", 			label: "비용구분",			align: "center", 	width: 70, hidden: true},	
+			              {key: "coCd",      				label: "회사",          	hidden: true},
+			              {key: "coCdNm",      				label: "회사명",          hidden: true},              
+	];
+
 	  var gridView = {
 			  	initView: function(){
 				this.target = new ax5.ui.grid();
+				var cols = GridColumnConfig.apply("SM1801M03", "grid1", defaultColumns);
 				this.target.setConfig({
 //					showLineNumber    : true,
 					showRowSelector   : false,
@@ -211,18 +256,13 @@
 			            },
 						grouping: {
 							by : ["pchsClntNm"],
-							columns : [
-								{
-									//고객사
-									label : function () {
-										return "[ " + this.groupBy.labels[0] + " 소계  ]";
-				                  }, colspan: 7, align: "center"
+							columns : GridColumnConfig.buildSumRow(cols, {
+								label: function () {
+									return "[ " + this.groupBy.labels[0] + " 소계  ]";
 								},
-					    		{key: "inDtlAmt", 		collector: "sum", formatter:"money", align: "right"},
-					    		{key: "pchsAmt",		collector: "sum", formatter:"money", align: "right"},
-					    		{key: "pchsVat",		collector: "sum", formatter:"money", align: "right"},
-					    		{key: "pchsSumAmt",		collector: "sum", formatter:"money", align: "right"},
-							]
+								labelColspan: 7,
+								sums: sm1801SumCells
+							})
 						}
 				   },
 			          page: {
@@ -239,47 +279,9 @@
 			          },
 			          
 						footSum: [
-						    	[
-						    		{label: "합계", colspan:7, align:"center"},
-						    		{key: "inDtlAmt", 		collector: "sum", formatter:"money", align: "right"},
-						    		{key: "pchsAmt",		collector: "sum", formatter:"money", align: "right"},
-						    		{key: "pchsVat",		collector: "sum", formatter:"money", align: "right"},
-						    		{key: "pchsSumAmt",		collector: "sum", formatter:"money", align: "right"},
-				                 ]
-						    ],          
-			          columns: [
-			        	  {key: "rn",      					label: "No.",          	align: "center",	width: 60},
-			              {key: "ordrsNo",  				label: "수주번호",    		align: "center",	width: 70},              
-			              {key: "salesCd",  				label: "Sales Code",    align: "center",	width: 110},              
-			              {key: "dsgnNo",  					label: "대표도번",        align: "center",   	width: 180},        
-			              {key: "pchsClntNm",      			label: "구매처명",      	align: "left",   	width: 150},       
-			              {key: "isDiv", 					label: "발주구분",			align: "center",	width: 80},                          
-			              {key: "pchsNo",					label: "매입번호",      	align: "center",	width: 80},			/* 출력용 매입번호 */   
-			              {key: "inDtlAmt",	    			label: "입고금액",      	align: "right",		width: 110, 	 formatter: "money"},  
-						  {key: "pchsAmt", 					label: "매입금액",			align: "right", 	width: 110,		 formatter: "money"
-			            	  , 	styleClass: function () { return "grid-font-blue-bold"} 	
-						  },			    
-						  {key: "pchsVat", 					label: "부가세",			align: "right", 	width: 110,		 formatter: "money"},			    
-						  {key: "pchsSumAmt", 				label: "합계금액",			align: "right", 	width: 110,		 formatter: "money"},			    			  				    
-			 			  {key: "pchsDt", 					label: "확정일자", 		align: "center",	width: 80},	               
-			 			  {key: "creatIdNm", 				label: "담당자", 			align: "center",	width: 60},	               
-			 			  {key: "deptNm", 					label: "부서명", 			align: "center",	width: 80},	               
-			              {key: "partCdNm", 				label: "분류",      		align: "center",	width: 70, hidden: false},       			/* 발주요청서 분류 */		          
-						  {key: "pchsClmnDay", 				label: "결제일",			align: "center", 	width: 60 },			  
-						  {key: "pchsClmnRmk", 				label: "비고",			align: "left", 		width: 120 },			  
-			 			  {key: "pchsPmntMtdNm", 			label: "결제조건",			align: "center", 	width: 60 },			  		  
-			 			  {key: "pchsCostDiv10Nm", 			label: "비용구분",			align: "center", 	width: 70 },
-			 			  {key: "matrClntDivElec", 			label: "전기비용",			align: "center", 	width: 80, formatter: "money" },
-			              {key: "ordrgNo", 					label: "참고 번호",		align: "center",	width: 80, hidden: false},
-			              {key: "ordrgSeq", 				label: "발주순번",      	align: "center",	width: 70, hidden: false},		/* 발주순번 제거 20231026 */              
-			              {key: "reqNo", 					label: "요청번호",      	align: "center",	width: 90, hidden: false},       			/* 발주요청서번호 */		          
-			              {key: "pchsClntCd",    			label: "구매처",      	align: "center",	width: 80, hidden: false},
-			              {key: "ordrgAmt",     			label: "발주금액",      	align: "right",		width: 110, formatter: "money",          	hidden: true}, 
-			              {key: "isCost", 					label: "isCost",    	align: "center",	width: 70, hidden: true},   
-			 			  {key: "pchsCostDiv10", 			label: "비용구분",			align: "center", 	width: 70, hidden: true},	
-			              {key: "coCd",      				label: "회사",          	hidden: true},
-			              {key: "coCdNm",      				label: "회사명",          hidden: true},              
-			             ]
+							GridColumnConfig.buildSumRow(cols, {label: "합계", labelColspan: 7, sums: sm1801SumCells})
+						],          
+			          columns: cols
 			       });
 			       return this;
 		},
@@ -444,6 +446,14 @@
 	    } else {
 	        return num.toString();
 	    }
+	}
+
+	// 그리드 컬럼 설정 팝업
+	function openGridColumnEdit() {
+		GridColumnConfig.openEditor("SM1801M03", "grid1", defaultColumns, function() {
+			$('[data-ax5grid="grid1"]').empty();
+			gridView.initView().setData(0);
+		});
 	}
 
 	// 초기화 버튼
