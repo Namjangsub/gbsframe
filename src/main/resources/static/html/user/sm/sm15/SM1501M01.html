@@ -93,6 +93,8 @@
 <script src="/static/js/jquery.blockUI.js"></script>
 <!-- 도움말 팝업 -->
 <script src="/static/js/manualPopup.js"></script>
+<!-- 그리드 컬럼 설정 -->
+<script src="/static/js/common/GridColumnConfig.js"></script>
 </head>
 
 <body>
@@ -152,8 +154,6 @@
 								<option value="N">미확정</option>
 						</select></td>
 						<th></th>
-						<td></td>
-						<th></th>
 						<td>
 							<select id="recordCnt" class="prae_select" data-search="recordCnt"
 								onchange="gridView.setData(0);">
@@ -164,9 +164,12 @@
 								<option value="9999999">전체</option>
 			 				</select>
 		 				</td>
+						<th></th>
+						<td></td>
 						<td>
-							<div class="add_btn_small pdl10">
+							<div class="add_btn_small pdl10" style="display: flex; gap: 5px; white-space: nowrap;">
 								<a onclick="jsonToExcel(clntCompGridView);" style="height: 30px; line-height: 28px; width: 90px;"><i class="fas fa-file-excel"></i> 엑셀다운로드</a>
+								<a onclick="openGridColumnEdit('clntCompGrid-grid');" style="height: 30px; line-height: 28px; width: 90px;"><i class="fas fa-cog"></i>그리드설정</a>
 							</div>
 						</td>
 					</tr>
@@ -199,6 +202,7 @@
 				<span style="height: 30px; line-height: 30px; font-size: 15px;">매입 확정 리스트 </span>
 				<div class="add_btn_small pdl10">
 					<a onclick="excelDown();" style="height: 30px; line-height: 28px; width: 90px;"><i class="fas fa-file-excel"></i> 엑셀다운로드</a>
+					<a onclick="openGridColumnEdit('first-grid');" style="height: 30px; line-height: 28px; width: 90px;"><i class="fas fa-cog"></i>그리드설정</a>
 				</div>
 <!-- 				<select id="recordCnt" class="prae_select" data-search="recordCnt" -->
 <!-- 					onchange="gridView.setData(0);"> -->
@@ -224,6 +228,109 @@
 
 <script type="text/javascript">
 	var isUserResized = localStorage.getItem('sm1501_row_ratio') ? true : false; // 사용자가 수동으로 그리드 크기를 조정했는지 여부
+
+	var clntCompGridSums = {
+		"inQty": { collector: "sum", formatter:"money", align: "right" },
+		"badQty": { collector: "sum", formatter:"money", align: "right" },
+		"inDtlAmt": { collector: "sum", formatter:"money", align: "right" },
+		"stdAmt": { collector: "sum", formatter:"money", align: "right" },
+		"badAmt": { collector: "sum", formatter:"money", align: "right" },
+		"asNonPayAmt": { collector: "sum", formatter:"money", align: "right" },
+		"asPayAmt": { collector: "sum", formatter:"money", align: "right" },
+		"transAmt": { collector: "sum", formatter:"money", align: "right" },
+		"gerAmt": { collector: "sum", formatter:"money", align: "right" },
+		"elecAmt": { collector: "sum", formatter:"money", align: "right" },
+		"trunAmt": { collector: "sum", formatter:"money", align: "right" },
+		"humanAmt": { collector: "sum", formatter:"money", align: "right" },
+		"pchsGoodsAmt": { collector: "sum", formatter:"money", align: "right" },
+		"rawMatAmt": { collector: "sum", formatter:"money", align: "right" },
+		"procGoodsAmt": { collector: "sum", formatter:"money", align: "right" },
+		"camAmt": { collector: "sum", formatter:"money", align: "right" },
+		"postProcAmt": { collector: "sum", formatter:"money", align: "right" },
+		"etcAmt": { collector: "sum", formatter:"money", align: "right" }
+	};
+
+	var gridViewSums = {
+		"inQty": { collector: "sum", formatter: "money", align: "right" },
+		"badQty": { collector: "sum", formatter: "money", align: "right" },
+		"inDtlAmt": { collector: "sum", formatter: "money", align: "right" }
+	};
+
+	var defaultColumns1 = [
+	            {key: "salesCd",      				label: "salesCd",      	align: "left",   	width: 180},
+	            {key: "reqNo",      				label: "발주요청번호",     align: "center",   	width: 90},
+	            {key: "partCdNm",      				label: "분류",      		align: "center",   	width: 70},
+	            {key: "reqCdNm",      				label: "요청구분",      	align: "center",   	width: 70},
+	            {key: "ordrgIdNm",      			label: "발행담당",      	align: "center",   	width: 70},
+				{key: "", label: "", width: 3, },
+	            {key: undefined, label: "처리(입고,기타,반품)내역", columns: [
+		            {key: "inQty",     				label: "입고수량",      	align: "right",		width: 70, formatter: "money",          	hidden: false},
+		            {key: "badQty",     			label: "불량수량",      	align: "right",		width: 70, formatter: "money",          	hidden: false},
+		            {key: "inDtlAmt",     			label: "입고금액",      	align: "right",		width: 110, formatter: "money",          	hidden: false},
+		            {key: "minInDt",     			label: "입고시작",     	align: "center",		width: 80,},
+		            {key: "inDt",     				label: "최종입고",     	align: "center",		width: 80,},
+				]},
+				{key: "", label: "", width: 3, styleClass: function () {return "grid-cell-red";},},
+		           {key: undefined, label: "실행 원가", columns: [
+		            {key: "stdAmt",      		label: "정상금액",      	align: "right",   	width: 90, formatter: "money"},
+		            {key: "badAmt",      		label: "장애금액",      	align: "right",   	width: 90, formatter: "money"},
+				   ]},
+			       {key: undefined, label: "원가 제외 내역", columns: [
+			           {key: "asNonPayAmt",     label: "무상AS금액",      	align: "right",   	width: 80, formatter: "money"},
+			           {key: "asPayAmt",      	label: "유상AS금액",      	align: "right",   	width: 80, formatter: "money"},
+			           {key: "transAmt",      	label: "운송",      		align: "right",   	width: 90, formatter: "money"},
+				   ]},
+				{key: "", label: "", width: 3, styleClass: function () {return "grid-cell-red";},},
+		           {key: undefined, label: "업무별 원가", columns: [
+		            {key: "gerAmt",      		label: "일반금액",      	align: "right",   	width: 90, formatter: "money"},
+		            {key: "elecAmt",      		label: "전기금액",      	align: "right",   	width: 90, formatter: "money"},
+		            {key: "trunAmt",      		label: "턴키금액",      	align: "right",   	width: 90, formatter: "money"},
+		            {key: "humanAmt",      		label: "외주용역",      	align: "right",   	width: 90, formatter: "money"},
+				   ]},
+				{key: "", label: "", width: 3, styleClass: function () {return "grid-cell-red";},},
+	            {key: undefined, label: "자재 품목 분류별 집계 (컬럼 선택시 세부내역 확인)", columns: [
+		           {key: "pchsGoodsAmt",      	label: "구매품",      	align: "right",   	width: 90, formatter: "money"},
+		           {key: "rawMatAmt",      		label: "소재",      		align: "right",   	width: 90, formatter: "money"},
+		           {key: "procGoodsAmt",      	label: "가공품",      	align: "right",   	width: 90, formatter: "money"},
+		           {key: "camAmt",      		label: "CAM/모델링",      align: "right",   	width: 90, formatter: "money"},
+		           {key: "postProcAmt",      	label: "후처리",      	align: "right",   	width: 90, formatter: "money"},
+		           {key: "etcAmt",      		label: "기타",      		align: "right",   	width: 90, formatter: "money"},
+				]},
+		        {key: "", label: "", width: 3, styleClass: function () {return "grid-cell-red";},},
+            	{key: "reqRmk",      		label: "내용",      	align: "left",   	width: 400},
+	            {key: "sts",      			label: "비 고",      	align: "left",   	width: 100},
+	];
+
+	var defaultColumns2 = [
+						{key : "inDt", 				label : "구매일자",      		align : "center",	width: 80},
+						{key : "clntNm", 			label : "구매처", 			align : "left", 	width : 120, hidden : false},
+						{key : "goodsDivNm", 		label : "품목구분", 			align : "center", 	width : 80},
+						{key : "dsgnNo", 			label : "도면번호", 			align : "left", 	width : 180, hidden : false},
+						{key : "matrCd", 			label : "자재코드", 			align : "center", 	width : 80,},
+						{key : "matrNm", 			label : "품명", 				align : "left", 	width : 150, hidden : false},
+						{key : "matrMat", 			label : "소재", 				align : "left", 	width : 150, hidden : false},
+						{key : "matrSpec", 			label : "규격", 				align : "left", 	width : 150, hidden : false},
+						{key : "matrSize", 			label : "크기", 				align : "left", 	width : 120, hidden : false},
+						{key : "inPrc", 			label : "단가", 				align : "right", 	width : 100, formatter : "money"},
+						{key : "inQty", 			label : "수량", 				align : "right",	width: 60, formatter : "money"},
+						{key : "badQty", 			label : "불량수량", 			align : "right",	width: 70, formatter : "money"},
+						{key : "inDtlAmt", 			label : "입고금액", 			align : "right",	width: 110, formatter : "money"},
+// 						{key : "currCd", 			label : "통화", 				align : "center",	 width : 90},
+// 						{key : "exrate", 			label : "환율", 				align : "center", 	width : 80, hidden : false},
+						{key : "matrTestDiv", 		label : "입고검사", 			align : "center", 	width : 80},
+						{key : "inDtlRmk",			label : "특이사항", 			align : "center", 	width : 120},
+						{key : "inNo", 				label : "입고번호", 			align : "center", 	width : 90},
+						{key : "partCdNm", 			label : "발주분류", 			align : "center", 	width : 80},
+						{key : "inSeq", 			label : "순번", 				align : "center", 	width : 40},
+						{key : "ordrgNo", 			label : "발주번호", 			align : "center", 	width : 80},
+						{key : "ordrgSeq", 			label : "순번", 				align : "center", 	width : 40},
+						{key : "reqNo", 			label : "요청번호", 			align : "center", 	width : 90},
+						{key : "salesCd", 			label : "salesCd", 			align : "center", 	width : 120},
+						{key : "inoutKey", 			label : "입고Key",      		align : "center",	width: 70},
+// 						{key : "creatId", 			label : "등록담당",      		align : "center",	width: 70},
+// 						{key : "creatPgm", 			label : "프로그램",      		align : "center",	width: 110},
+						{key : "creatDttm", 		label : "등록일자",      		align : "center",	width: 80},
+	];
 
 	//formatter
 	$('[data-ax5formatter]').ax5formatter();
@@ -303,6 +410,7 @@
 	var clntCompGridView = {
 		initView: function(){
 		this.target = new ax5.ui.grid();
+		var cols = GridColumnConfig.apply("SM1501M01", "clntCompGrid-grid", defaultColumns1);
 		this.target.setConfig({
 			/* showRowSelector: false, */
 			multipleSelect: false,
@@ -339,42 +447,10 @@
 	          },
 				grouping: {
 					by: ["salesCd"] ,
-					columns: [
-						{
-// 							label: function () {
-// 								return this.groupBy.labels.join(", ") ;
-// 							}, colspan: 2, align: "center"
-						},
-						{label:" 소계", colspan: 1, align: "center"},
-			    		{},
-			    		{},
-			    		{},
-			    		{},
-			    		{key: "inQty",			collector: "sum", formatter:"money", align: "right"},
-			    		{key: "badQty",			collector: "sum", formatter:"money", align: "right"},
-			    		{key: "inDtlAmt",		collector: "sum", formatter:"money", align: "right"},
-			    		{},
-			    		{},
-			    		{},
-			    		{key: "stdAmt",			collector: "sum", formatter:"money", align: "right"},
-			    		{key: "badAmt",			collector: "sum", formatter:"money", align: "right"},
-			    		{key: "asNonPayAmt",	collector: "sum", formatter:"money", align: "right"},
-			    		{key: "asPayAmt",		collector: "sum", formatter:"money", align: "right"},
-			    		{key: "transAmt",		collector: "sum", formatter:"money", align: "right"},
-			    		{},
-			    		{key: "gerAmt",			collector: "sum", formatter:"money", align: "right"},
-			    		{key: "elecAmt",		collector: "sum", formatter:"money", align: "right"},
-			    		{key: "trunAmt",		collector: "sum", formatter:"money", align: "right"},
-			    		{key: "humanAmt",		collector: "sum", formatter:"money", align: "right"},
-			    		{},
-			    		{key: "pchsGoodsAmt",	collector: "sum", formatter:"money", align: "right"},
-			    		{key: "rawMatAmt",		collector: "sum", formatter:"money", align: "right"},
-			    		{key: "procGoodsAmt",	collector: "sum", formatter:"money", align: "right"},
-			    		{key: "camAmt",			collector: "sum", formatter:"money", align: "right"},
-			    		{key: "postProcAmt",	collector: "sum", formatter:"money", align: "right"},
-			    		{key: "etcAmt",			collector: "sum", formatter:"money", align: "right"},
-			    		{},
-					]
+					columns: GridColumnConfig.buildSumRow(cols, {
+						label: " 소계",
+						sums: clntCompGridSums
+					})
 				}
 		   },
 	        page: {
@@ -389,80 +465,13 @@
 					clntCompGridView.setData(this.page.selectPage);
 				}
 	        },
-				footSum: [
-				    	[
-				    		{label: "합계", colspan:6, align:"center"},
-				    		{key: "inQty",			collector: "sum", formatter:"money", align: "right"},
-				    		{key: "badQty",			collector: "sum", formatter:"money", align: "right"},
-				    		{key: "inDtlAmt",		collector: "sum", formatter:"money", align: "right"},
-				    		{},
-				    		{},
-				    		{},
-				    		{key: "stdAmt",			collector: "sum", formatter:"money", align: "right"},
-				    		{key: "badAmt",			collector: "sum", formatter:"money", align: "right"},
-				    		{key: "asNonPayAmt",	collector: "sum", formatter:"money", align: "right"},
-				    		{key: "asPayAmt",		collector: "sum", formatter:"money", align: "right"},
-				    		{key: "transAmt",		collector: "sum", formatter:"money", align: "right"},
-				    		{},
-				    		{key: "gerAmt",			collector: "sum", formatter:"money", align: "right"},
-				    		{key: "elecAmt",		collector: "sum", formatter:"money", align: "right"},
-				    		{key: "trunAmt",		collector: "sum", formatter:"money", align: "right"},
-				    		{key: "humanAmt",		collector: "sum", formatter:"money", align: "right"},
-				    		{},
-				    		{key: "pchsGoodsAmt",	collector: "sum", formatter:"money", align: "right"},
-				    		{key: "rawMatAmt",		collector: "sum", formatter:"money", align: "right"},
-				    		{key: "procGoodsAmt",	collector: "sum", formatter:"money", align: "right"},
-				    		{key: "camAmt",			collector: "sum", formatter:"money", align: "right"},
-				    		{key: "postProcAmt",	collector: "sum", formatter:"money", align: "right"},
-				    		{key: "etcAmt",			collector: "sum", formatter:"money", align: "right"},
-				    		{},
-				    		{key:"", label: ""},
-		                 ]
-				    ],
-	        columns: [
-	            {key: "salesCd",      				label: "salesCd",      	align: "left",   	width: 180},
-	            {key: "reqNo",      				label: "발주요청번호",     align: "center",   	width: 90},
-	            {key: "partCdNm",      				label: "분류",      		align: "center",   	width: 70},
-	            {key: "reqCdNm",      				label: "요청구분",      	align: "center",   	width: 70},
-	            {key: "ordrgIdNm",      			label: "발행담당",      	align: "center",   	width: 70},
-				{key: "", label: "", width: 3, },
-	            {key: undefined, label: "처리(입고,기타,반품)내역", columns: [
-		            {key: "inQty",     				label: "입고수량",      	align: "right",		width: 70, formatter: "money",          	hidden: false},
-		            {key: "badQty",     			label: "불량수량",      	align: "right",		width: 70, formatter: "money",          	hidden: false},
-		            {key: "inDtlAmt",     			label: "입고금액",      	align: "right",		width: 110, formatter: "money",          	hidden: false},
-		            {key: "minInDt",     			label: "입고시작",     	align: "center",		width: 80,},
-		            {key: "inDt",     				label: "최종입고",     	align: "center",		width: 80,},
-				]},
-				{key: "", label: "", width: 3, styleClass: function () {return "grid-cell-red";},},
-		           {key: undefined, label: "실행 원가", columns: [
-		            {key: "stdAmt",      		label: "정상금액",      	align: "right",   	width: 90, formatter: "money"},
-		            {key: "badAmt",      		label: "장애금액",      	align: "right",   	width: 90, formatter: "money"},
-				   ]},
-			       {key: undefined, label: "원가 제외 내역", columns: [
-			           {key: "asNonPayAmt",     label: "무상AS금액",      	align: "right",   	width: 80, formatter: "money"},
-			           {key: "asPayAmt",      	label: "유상AS금액",      	align: "right",   	width: 80, formatter: "money"},
-			           {key: "transAmt",      	label: "운송",      		align: "right",   	width: 90, formatter: "money"},
-				   ]},
-				{key: "", label: "", width: 3, styleClass: function () {return "grid-cell-red";},},
-		           {key: undefined, label: "업무별 원가", columns: [
-		            {key: "gerAmt",      		label: "일반금액",      	align: "right",   	width: 90, formatter: "money"},
-		            {key: "elecAmt",      		label: "전기금액",      	align: "right",   	width: 90, formatter: "money"},
-		            {key: "trunAmt",      		label: "턴키금액",      	align: "right",   	width: 90, formatter: "money"},
-		            {key: "humanAmt",      		label: "외주용역",      	align: "right",   	width: 90, formatter: "money"},
-				   ]},
-				{key: "", label: "", width: 3, styleClass: function () {return "grid-cell-red";},},
-	            {key: undefined, label: "자재 품목 분류별 집계 (컬럼 선택시 세부내역 확인)", columns: [
-		           {key: "pchsGoodsAmt",      	label: "구매품",      	align: "right",   	width: 90, formatter: "money"},
-		           {key: "rawMatAmt",      		label: "소재",      		align: "right",   	width: 90, formatter: "money"},
-		           {key: "procGoodsAmt",      	label: "가공품",      	align: "right",   	width: 90, formatter: "money"},
-		           {key: "camAmt",      		label: "CAM/모델링",      align: "right",   	width: 90, formatter: "money"},
-		           {key: "postProcAmt",      	label: "후처리",      	align: "right",   	width: 90, formatter: "money"},
-		           {key: "etcAmt",      		label: "기타",      		align: "right",   	width: 90, formatter: "money"},
-				]},
-		        {key: "", label: "", width: 3, styleClass: function () {return "grid-cell-red";},},
-            	{key: "reqRmk",      		label: "내용",      	align: "left",   	width: 400},
-	            {key: "sts",      			label: "비 고",      	align: "left",   	width: 100},
-	           ]
+			footSum: [
+				GridColumnConfig.buildSumRow(cols, {
+					label: "합계",
+					sums: clntCompGridSums
+				})
+			],
+	        columns: cols
 	     });
 	     return this;
 
@@ -523,12 +532,12 @@
 					}
 	           });
 	      }
-		}
-
+		};
 
 	var gridView = {
 		initView: function(){
 			this.target = new ax5.ui.grid();
+			var cols = GridColumnConfig.apply("SM1501M01", "first-grid", defaultColumns2);
 			this.target.setConfig({
 				showLineNumber    : true,
 				lineNumberColumnWidth: 40,
@@ -587,48 +596,13 @@
 					}
 				},
 
-				footSum :
-					[
-						[
-							{label : "합계", colspan : 8, align : "center"},
-							{},
-							{},
-							{key : "inQty", collector : "sum", formatter : "money", align : "right"},
-							{key : "badQty", collector : "sum", formatter : "money", align : "right"},
-							{key : "inDtlAmt", collector : "sum", formatter : "money", align : "right"},
-						]
-					],
-				columns :
-					[
-						{key : "inDt", 				label : "구매일자",      		align : "center",	width: 80},
-						{key : "clntNm", 			label : "구매처", 			align : "left", 	width : 120, hidden : false},
-						{key : "goodsDivNm", 		label : "품목구분", 			align : "center", 	width : 80},
-						{key : "dsgnNo", 			label : "도면번호", 			align : "left", 	width : 180, hidden : false},
-						{key : "matrCd", 			label : "자재코드", 			align : "center", 	width : 80,},
-						{key : "matrNm", 			label : "품명", 				align : "left", 	width : 150, hidden : false},
-						{key : "matrMat", 			label : "소재", 				align : "left", 	width : 150, hidden : false},
-						{key : "matrSpec", 			label : "규격", 				align : "left", 	width : 150, hidden : false},
-						{key : "matrSize", 			label : "크기", 				align : "left", 	width : 120, hidden : false},
-						{key : "inPrc", 			label : "단가", 				align : "right", 	width : 100, formatter : "money"},
-						{key : "inQty", 			label : "수량", 				align : "right",	width: 60, formatter : "money"},
-						{key : "badQty", 			label : "불량수량", 			align : "right",	width: 70, formatter : "money"},
-						{key : "inDtlAmt", 			label : "입고금액", 			align : "right",	width: 110, formatter : "money"},
-// 						{key : "currCd", 			label : "통화", 				align : "center",	 width : 90},
-// 						{key : "exrate", 			label : "환율", 				align : "center", 	width : 80, hidden : false},
-						{key : "matrTestDiv", 		label : "입고검사", 			align : "center", 	width : 80},
-						{key : "inDtlRmk",			label : "특이사항", 			align : "center", 	width : 120},
-						{key : "inNo", 				label : "입고번호", 			align : "center", 	width : 90},
-						{key : "partCdNm", 			label : "발주분류", 			align : "center", 	width : 80},
-						{key : "inSeq", 			label : "순번", 				align : "center", 	width : 40},
-						{key : "ordrgNo", 			label : "발주번호", 			align : "center", 	width : 80},
-						{key : "ordrgSeq", 			label : "순번", 				align : "center", 	width : 40},
-						{key : "reqNo", 			label : "요청번호", 			align : "center", 	width : 90},
-						{key : "salesCd", 			label : "salesCd", 			align : "center", 	width : 120},
-						{key : "inoutKey", 			label : "입고Key",      		align : "center",	width: 70},
-// 						{key : "creatId", 			label : "등록담당",      		align : "center",	width: 70},
-// 						{key : "creatPgm", 			label : "프로그램",      		align : "center",	width: 110},
-						{key : "creatDttm", 		label : "등록일자",      		align : "center",	width: 80},
-					]
+				footSum : [
+					GridColumnConfig.buildSumRow(cols, {
+						label: "합계",
+						sums: gridViewSums
+					})
+				],
+				columns : cols
 			});
 		return this;
 
@@ -728,6 +702,21 @@
 					]
 		});
 		return this;
+		}
+	}
+
+	// 그리드 컬럼 설정 팝업
+	function openGridColumnEdit(gridId) {
+		if (gridId === 'clntCompGrid-grid') {
+			GridColumnConfig.openEditor("SM1501M01", "clntCompGrid-grid", defaultColumns1, function() {
+				$('[data-ax5grid="clntCompGrid-grid"]').empty();
+				clntCompGridView.initView().setData(0);
+			});
+		} else if (gridId === 'first-grid') {
+			GridColumnConfig.openEditor("SM1501M01", "first-grid", defaultColumns2, function() {
+				$('[data-ax5grid="first-grid"]').empty();
+				gridView.initView().setData(0);
+			});
 		}
 	}
 

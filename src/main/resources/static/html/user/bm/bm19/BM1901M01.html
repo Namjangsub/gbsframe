@@ -59,6 +59,8 @@
 	<script src="/static/js/commApproval.js"></script>
 	<!-- 도움말 팝업 -->
 	<script src="/static/js/manualPopup.js"></script>
+	<!-- 그리드 컬럼 설정 -->
+	<script src="/static/js/common/GridColumnConfig.js"></script>
 
 	<style>
 		/* 툴팁을 포함할 부모 요소 스타일 */
@@ -224,6 +226,7 @@
 					<a onclick="insertQualityReqModal();" style="height: 30px; line-height: 28px; width: 110px;"><i class="fa fa-folder"></i>요인별발주요청서</a>
 					<!-- <a onclick="excelDown();" style="height: 30px; line-height: 28px; width: 90px;"><i class="fa fa-file-excel"></i> 엑셀다운로드</a> -->
 					<a onclick="jsonToExcel(gridView);" style="height: 30px; line-height: 28px; width: 90px;"><i class="fa fa-file-excel"></i> 엑셀다운로드</a>
+					<a onclick="openGridColumnEdit();" style="height: 30px; line-height: 28px; width: 90px;"><i class="fa fa-cog"></i>그리드설정</a>
 				</div>
 				<select id="recordCnt" class="prae_select" data-search="recordCnt" onchange="gridView.setData(0);">
 					<option value="100" selected>100</option>
@@ -275,69 +278,18 @@
 		} 
 	};
 
-	var gridView = {
-		initView : function() {
-			this.target = new ax5.ui.grid();
-			var _this = this; 
-			this.target.setConfig({
-				target: $('[data-ax5grid="first-grid"]'),
-				showRowSelector: false,
-				multipleSelect: false,
-				sortable: true,
-				header: {
-					align: "center",
-					selector: true
-				},
-				body: {
-					mergeCells : ["workRptDt", ],
-					onClick: function () {
-						this.self.select(this.dindex);
-					},
-					onDBLClick: function () {
-						// this.self  : gridInstance
-						// this.dindex: 행 index
-						// this.item  : 행 데이터
-						// this.column: 컬럼 정보
-						var grid   = this.self;
-						var dindex = this.dindex;
-						var doindex = this.doindex;
-						var item   = this.item;
-						var colKey = this.column.key;
-						var evt    = '' //this.event;
-						var $cell  = '' //$(evt.target).closest("[data-ax5grid-column]"); // 여기서 셀 DOM 추출
-						_this.openFile(grid, dindex, doindex, item, $cell, colKey, evt);
-                    },
-					columnHeight: 50
-				},
-				page : {
-					navigationItemCount : 10,
-					height : 30,
-					display : true,
-					firstIcon : '<i class="fa fa-step-backward" aria-hidden="true"></i>',
-					prevIcon : '<i class="fa fa-caret-left" aria-hidden="true"></i>',
-					nextIcon : '<i class="fa fa-caret-right" aria-hidden="true"></i>',
-					lastIcon : '<i class="fa fa-step-forward" aria-hidden="true"></i>',
-					onChange : function() {
-						gridView.setData(this.page.selectPage);
-					}
-				},
+var bm1901SumCells = {
+	"delayDay": { collector: "sum", formatter: "money", align: "center" },
+	"actMh"   : { collector: "sum", formatter: "money", align: "center" },
+	"reqAmt"  : { collector: "sum", formatter: "money", align: "center" },
+	"sumTeamMd": { collector: "sum", formatter: "money", align: "center" },
+	"saleTeamMd": { collector: "sum", formatter: "money", align: "center" },
+	"dsgnTeamMd": { collector: "sum", formatter: "money", align: "center" },
+	"matrTeamMd": { collector: "sum", formatter: "money", align: "center" },
+	"prodTeamMd": { collector: "sum", formatter: "money", align: "center" }
+};
 
-				footSum: [
-  			    	[
-  			    		{label: "총계", colspan:6, align:"center"},
-						{key: "delayDay", 		collector: "sum", formatter:"money", align: "center"},
-						{label: "", colspan: 21, align:"center"},
-						{key: "actMh", 			collector: "sum", formatter:"money", align: "center"},
-						{key: "reqAmt", 		collector: "sum", formatter:"money", align: "center"},
-						{key: "sumTeamMd", 		collector: "sum", formatter:"money", align: "center"},
-						{key: "saleTeamMd", 	collector: "sum", formatter:"money", align: "center"},
-						{key: "dsgnTeamMd", 	collector: "sum", formatter:"money", align: "center"},
-						{key: "matrTeamMd", 	collector: "sum", formatter:"money", align: "center"},
-						{key: "prodTeamMd", 	collector: "sum", formatter:"money", align: "center"},
-						
-  	                 ],
-  			    ],
-				columns : [
+var defaultColumns = [
 					{key: "fileTrgtKey",	label: "파일대상KEY",		width: 50,		align: "center", 	hidden:true}
 					,{key: "coCd",	    	label: "회사코드",			width: 100,		align: "center", 	hidden:true}
 					,{key: "workRptId",	    label: "작성자ID",		width: 100,		align: "center", 	hidden:true}
@@ -404,7 +356,60 @@
 					,{key: "workRptNo", 	label: "문제등록번호", 		width: 90,		align: "center"}
 					,{key: "resFileTrgtKey",label: "결과번호",			width: 70,		align: "center", 	hidden: true}
 					,{key: "sameTimeResult",label: "결과동시등록",		width: 60,		align: "center", 	hidden: true}
-				]
+];
+
+	var gridView = {
+		initView : function() {
+			this.target = new ax5.ui.grid();
+			var _this = this; 
+			var cols = GridColumnConfig.apply("BM1901M01", "first-grid", defaultColumns);
+			this.target.setConfig({
+				target: $('[data-ax5grid="first-grid"]'),
+				showRowSelector: false,
+				multipleSelect: false,
+				sortable: true,
+				header: {
+					align: "center",
+					selector: true
+				},
+				body: {
+					mergeCells : ["workRptDt", ],
+					onClick: function () {
+						this.self.select(this.dindex);
+					},
+					onDBLClick: function () {
+						// this.self  : gridInstance
+						// this.dindex: 행 index
+						// this.item  : 행 데이터
+						// this.column: 컬럼 정보
+						var grid   = this.self;
+						var dindex = this.dindex;
+						var doindex = this.doindex;
+						var item   = this.item;
+						var colKey = this.column.key;
+						var evt    = '' //this.event;
+						var $cell  = '' //$(evt.target).closest("[data-ax5grid-column]"); // 여기서 셀 DOM 추출
+						_this.openFile(grid, dindex, doindex, item, $cell, colKey, evt);
+                    },
+					columnHeight: 50
+				},
+				page : {
+					navigationItemCount : 10,
+					height : 30,
+					display : true,
+					firstIcon : '<i class="fa fa-step-backward" aria-hidden="true"></i>',
+					prevIcon : '<i class="fa fa-caret-left" aria-hidden="true"></i>',
+					nextIcon : '<i class="fa fa-caret-right" aria-hidden="true"></i>',
+					lastIcon : '<i class="fa fa-step-forward" aria-hidden="true"></i>',
+					onChange : function() {
+						gridView.setData(this.page.selectPage);
+					}
+				},
+
+				footSum: [
+					GridColumnConfig.buildSumRow(cols, {label: "총계", labelColspan: 6, sums: bm1901SumCells})
+  			    ],
+				columns : cols
 			}); 
 			// 여기서 태블릿 롱터치 바인딩
 			bindTabletLongPressForGrid(this.target, function (grid, dindex, doindex, item, $cell, colKey, evt) {
@@ -538,6 +543,14 @@
 			$('#coCd_S option:not([value="'+jwt.coCd+'"])').remove();		//사용자 coCd 코드 외 제거
 			$('a[onclick="openUserSearch();"]').remove();					//사용자검색 돋보기 제거
 		}
+	}
+
+	// 그리드 컬럼 설정 팝업
+	function openGridColumnEdit() {
+		GridColumnConfig.openEditor("BM1901M01", "first-grid", defaultColumns, function() {
+			$('[data-ax5grid="first-grid"]').empty();
+			gridView.initView().setData(0);
+		});
 	}
 
 	// 초기화 버튼용

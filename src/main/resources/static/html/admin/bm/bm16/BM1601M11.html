@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="ko">
 <head>
 <meta charset="utf-8">
@@ -35,6 +35,7 @@
 <script src="/static/js/exceljs.min.js"></script>
 <!-- <script src="https://unpkg.com/exceljs/dist/exceljs.min.js"></script> -->
 <script src="/static/js/global.js"></script>
+  <script src="/static/js/common/GridColumnConfig.js"></script>
 <script src="/static/js/fileTree.js"></script>
 <script src="/static/js/jquery.blockUI.js"></script>
 <!-- 도움말 팝업 -->
@@ -137,6 +138,7 @@
 <!--           <a onclick="insertPrjctModal('C');" style="height: 30px; line-height: 28px;" authchk><i class="fas fa-plus"></i></a> -->
 <!--           <a onclick="deletePrjct();" style="height: 30px; line-height: 28px;" authchk><i class="fas fa-minus"></i></a> -->
           <a onclick="issueUpdate('C');" style="height: 30px; line-height: 28px; width: 80px;" title="프로젝트별 이슈를 처리합니다." ><i class="far fa-comment-dots"></i> 이슈</a>
+          <a onclick="openGridColumnEdit();" style="height: 30px; line-height: 28px; width: 90px;"><i class="fas fa-cog"></i> 그리드설정</a>
 <!--           <a onclick="excelUpload();" style="height: 30px; line-height: 28px; width: 80px;" authChk><i class="fas fa-file-upload"></i> 엑셀업로드</a> -->
 <!--           <a onclick="jsonToExcel(gridView);" style="height: 30px; line-height: 28px; width: 60px;"><i class="fas fa-file-excel"></i> 엑셀</a> -->
         </div>
@@ -172,9 +174,48 @@
 		}
 	};
 	
+	var defaultColumns = [
+						 {key: "prjctSeq",	    label: "프로젝트시퀀스",	width: 50,		align: "center", 	hidden:true}
+						,{key: "prjctCd",	    label: "프로젝트 코드",		width: 80,		align: "center", 	hidden:true}
+						,{key: "yyyymm",		label: "계약년월", 	    width: 80,		align: "center", 	formatter: function () {
+							return this.value.slice(0, 4) + '-' + this.value.slice(-2);}}
+						,{key: "clntCd", 		label: "거래처코드", 		width: 100,		align: "center",	hidden:true}
+						,{key: "clntNm", 		label: "고객사", 			width: 100,		align: "center"}
+						,{key: "clntMngNm",  	label: "담당자", 			width: 80,		align: "center",	hidden:true}
+						,{key: "prjctCd",	    label: "프로젝트 코드",		width: 80,		align: "center",	hidden:true}
+						,{key: "issYn", 		label: "이슈", 			width: 50,		align: "center",	formatter: "winYn"}						
+						,{key: "prjctCdNm", 	label: "고객사PJT", 			width: 110,		align: "left"  }
+						,{key: "prjctNm", 		label: "계약명", 		width: 300,		align: "left"  }
+						,{key: "eqpNm", 		label: "주요설비현황", 			width: 240,		align: "left"  }
+						,{key: "eqpQty", 		label: "수량", 			width: 50,		align: "center"}
+						,{key: "inpexpCd",		label: "국내외구분", 	    width: 60,		align: "center",	hidden:true}
+						,{key: "inpexpNm",		label: "국내외", 	  	  	width: 60,		align: "center"}
+						,{key: "newPrdtCd",		label: "신규여부코드", 		width: 100,		align: "center",	hidden:true}
+						,{key: "newPrdtNm",		label: "신규", 			width: 60,		align: "center"}
+						,{key: "odrCd", 		label: "구매방법", 		width: 100,		align: "center",	hidden:true}
+						,{key: "odrNm", 		label: "방법", 			width: 50,		align: "center", 	styleClass: function () {
+			                   return (this.item.winbdCd === "N") ? "grid-font-blue-bold" : "";}}
+						,{key: "ordrsPlanDt",	label: "수주예정일", 		width: 80,		align: "center", 	styleClass: function () {
+		                   return (this.item.winbdCd === "N") ? "grid-font-blue-bold" : "";}}
+						,{key: "winbdCd", 		label: "수주", 			width: 50,		align: "center",	formatter: "winYn"}
+						,{key: "ordrsDt", 		label: "수주일", 			width: 80,		align: "center",		align: "center", 	styleClass: function () {
+			                   return (this.item.winbdCd === "Y") ? "grid-font-blue-bold" : "";}}
+						
+						,{key: "dsgnDt",  label: "설계일자",      width: 80,      align: "center"}
+						,{key: "purchsDt",  label: "구매일자",      width: 80,      align: "center"}
+						,{key: "prdctnDt",  label: "생산일자",      width: 80,      align: "center"}
+						,{key: "acptncDt",  label: "검수일자",      width: 80,      align: "center"}
+						,{key: "dlivyDt",  label: "출고일자",      width: 80,      align: "center"}
+						
+						,{key: "dudtPlanDt", 	label: "예상납기", 		width: 80,		align: "center"}
+						,{key: "mngId" ,	    label: "영업담당자", 		width: 80,		align: "center",	hidden:true}
+						,{key: "mngNm" ,	    label: "영업담당자", 		width: 80,		align: "center"}
+	];
+
 	var gridView = {
 		initView : function() {
   			this.target = new ax5.ui.grid();
+			var cols = GridColumnConfig.apply("BM1601M11", "first-grid", defaultColumns);
   			this.target.setConfig({
   		    	showRowSelector: true,
   		    	multipleSelect: false,
@@ -215,63 +256,10 @@
 					}
 				},
 
-// 				footSum: [
-//   			    	[
-//   			    		{label: "총계", colspan:21, align:"center"},
-//   			    		{key: "epctAmt", 			collector: "sum", formatter:"money", align: "right"},
-//   			    		{key: "ordrsPlanAmt",	collector: "sum", formatter:"money", align: "right"},
-//   	                    {key: "ordrsAmt", 		collector: "sum", formatter:"money", align: "right"}
-//   	                 ]
-//   			    ],
-
-		    	columns : [
-						 {key: "prjctSeq",	    label: "프로젝트시퀀스",	width: 50,		align: "center", 	hidden:true}
-						,{key: "prjctCd",	    label: "프로젝트 코드",		width: 80,		align: "center", 	hidden:true}
-						,{key: "yyyymm",		label: "계약년월", 	    width: 80,		align: "center", 	formatter: function () {
-							return this.value.slice(0, 4) + '-' + this.value.slice(-2);}}
-						,{key: "clntCd", 		label: "거래처코드", 		width: 100,		align: "center",	hidden:true}
-						,{key: "clntNm", 		label: "고객사", 			width: 100,		align: "center"}
-						,{key: "clntMngNm",  	label: "담당자", 			width: 80,		align: "center",	hidden:true}
-						,{key: "prjctCd",	    label: "프로젝트 코드",		width: 80,		align: "center",	hidden:true}
-						,{key: "issYn", 		label: "이슈", 			width: 50,		align: "center",	formatter: "winYn"}						
-						,{key: "prjctCdNm", 	label: "고객사PJT", 			width: 110,		align: "left"  }
-						,{key: "prjctNm", 		label: "계약명", 		width: 300,		align: "left"  }
-						,{key: "eqpNm", 		label: "주요설비현황", 			width: 240,		align: "left"  }
-						,{key: "eqpQty", 		label: "수량", 			width: 50,		align: "center"}
-						,{key: "inpexpCd",		label: "국내외구분", 	    width: 60,		align: "center",	hidden:true}
-						,{key: "inpexpNm",		label: "국내외", 	  	  	width: 60,		align: "center"}
-						,{key: "newPrdtCd",		label: "신규여부코드", 		width: 100,		align: "center",	hidden:true}
-						,{key: "newPrdtNm",		label: "신규", 			width: 60,		align: "center"}
-						,{key: "odrCd", 		label: "구매방법", 		width: 100,		align: "center",	hidden:true}
-						,{key: "odrNm", 		label: "방법", 			width: 50,		align: "center", 	styleClass: function () {
-			                   return (this.item.winbdCd === "N") ? "grid-font-blue-bold" : "";}}
-						,{key: "ordrsPlanDt",	label: "수주예정일", 		width: 80,		align: "center", 	styleClass: function () {
-		                   return (this.item.winbdCd === "N") ? "grid-font-blue-bold" : "";}}
-						,{key: "winbdCd", 		label: "수주", 			width: 50,		align: "center",	formatter: "winYn"}
-						,{key: "ordrsDt", 		label: "수주일", 			width: 80,		align: "center",		align: "center", 	styleClass: function () {
-			                   return (this.item.winbdCd === "Y") ? "grid-font-blue-bold" : "";}}
-						
-						,{key: "dsgnDt",  label: "설계일자",      width: 80,      align: "center"}
-						,{key: "purchsDt",  label: "구매일자",      width: 80,      align: "center"}
-						,{key: "prdctnDt",  label: "생산일자",      width: 80,      align: "center"}
-						,{key: "acptncDt",  label: "검수일자",      width: 80,      align: "center"}
-						,{key: "dlivyDt",  label: "출고일자",      width: 80,      align: "center"}
-						
-						,{key: "dudtPlanDt", 	label: "예상납기", 		width: 80,		align: "center"}
-// 						,{key: "odrRmk", 		label: "수주가치", 		width: 120,		align: "left"  }
-// 						,{key: "winbdRmk", 		label: "영업상황", 		width: 200,		align: "center"}
-// 						,{key: "epctAmt", 		label: "예상물량", 		width: 100,		align: "right",		formatter: "money"}
-// 						,{key: "ordrsPlanAmt", 	label: "수주목표금액", 		width: 100,		align: "right",		formatter: "money"}
-// 						,{key: "ordrsAmt", 		label: "수주금액", 		width: 100,		align: "right", 	formatter: "money"}
-// 						,{key: "ordrsPct", 		label: "확률", 			width: 60,		align: "center"}
-						,{key: "mngId" ,	    label: "영업담당자", 		width: 80,		align: "center",	hidden:true}
-						,{key: "mngNm" ,	    label: "영업담당자", 		width: 80,		align: "center"}
-    	            ]
-
-							});
-        			return this;
-        		},
-
+				columns : cols
+			});
+        	return this;
+        },
 		setData : function(_pageNo, _rowNum='X') {  // _rowNum은 수정하고 나서 커서 포지션 이동을 하기 위함 --> popup 화면에서 컨트롤 함 BM1601P01.html
 			if (isFirst) return;
 	    	firstGrid = this.target;
@@ -431,6 +419,17 @@
 	}
 
 	// 영업담당자 검색 //
+
+	// 그리드 컬럼 설정 팝업 (저장/복원 후 그리드 재구성)
+	function openGridColumnEdit() {
+		GridColumnConfig.openEditor("BM1601M11", "first-grid", defaultColumns, function() {
+			if (gridView.target) {
+				try { gridView.target.destroy(); } catch(e) {}
+			}
+			$('[data-ax5grid="first-grid"]').empty();
+			gridView.initView().setData(0);
+		});
+	}
 	function openSecondUserSearch() {
 		var paramObj = {
 			  "coCd" : $('#coCd').val(),

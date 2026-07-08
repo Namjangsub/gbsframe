@@ -47,6 +47,8 @@
     <script src="/static/js/commApproval.js"></script>
     <!-- 도움말 팝업 -->
     <script src="/static/js/manualPopup.js"></script>
+	<!-- 그리드 컬럼 설정 -->
+	<script src="/static/js/common/GridColumnConfig.js"></script>
 </head>
 
 <body>
@@ -133,6 +135,7 @@
                     <a id="cretRsltsIss" onclick="wbsIssRsltsModal();" style="height: 30px; line-height: 28px; width: 90px;"><i class="fas fa-comment-medical"></i> 실적문제등록</a>
                     <a id="cretRsltsIss" onclick="insertQualityReqModal();" style="height: 30px; line-height: 28px; width: 100px;"><i class="fas fa-comment-medical"></i> 발주요청서등록</a>
                     <a onclick="excelDown();" style="height: 30px; line-height: 28px; width: 90px;"><i class="fas fa-file-excel"></i> 엑셀다운로드</a>
+                    <a onclick="openGridColumnEdit();" style="height: 30px; line-height: 28px; width: 90px;"><i class="fas fa-cog"></i>그리드설정</a>
                 </div>
                 <select id="recordCnt" class="prae_select" onchange="salesGridView.setData(0);">
                   <option value="50" selected>50</option>
@@ -186,51 +189,7 @@
 		}
 	};
 
-    var salesGridView = {
-        initView : function() {
-            this.target = new ax5.ui.grid();
-            this.target.setConfig({
-                showLineNumber  : false,
-                showRowSelector : true,
-                // multipleSelect  : true,
-                sortable : false,
-                target : $('[data-ax5grid="first-grid"]'),
-                header : {
-                    align : "center",
-                    selector : false
-                },
-                body: {
-                    mergeCells : ["clntNm","clntPjtNm","sjNm","salesCd"],
-                    columnHeight: 26,
-                    onClick: function () {
-                        var list = salesGridView.target.getList("selected");
-                        $.each(list, function(idx, obj) {
-                            salesGridView.target.select(obj.__origin_index__, {selected: false});
-                        });
-                        this.self.select(this.dindex);
-                    },
-                    onDBLClick: function () {
-                        var list = salesGridView.target.getList("selected");
-                        $.each(list, function(idx, obj) {
-                            salesGridView.target.select(obj.__origin_index__, {selected: false});
-                        })
-                        this.self.select(this.dindex);
-  		  	           if(this.column.key == "reqNo"){    //reqNo = 발주요청번호 필드 선택시
-							if (this.item.issStsNm === "완료") {
-								customAlert("문제조치가 완료된 건입니다.");
-								return false;
-							} else {
-	  		  	        		insertQualityReqModal(); 	//발주요청서 수정으로 진입
-							}
-						} else{
-								wbsIssModal();
-						}
-                    },
-                    onDataChanged: function () {
-
-                    }
-                },
-                columns: [
+    var defaultColumns = [
                     {key: "coCd",                label: "회사코드",          hidden:true},
                     {key: "clntCd",              label: "고객코드",          hidden:true},
                     {key: "clntPjt",             label: "고객사프로젝트",      hidden:true},
@@ -295,7 +254,53 @@
                     {key: "mcPartCd",            label: "기계분류", 		hidden:true},
                     {key: "importantCd",         label: "중요도", 		hidden:true},
                     {key: "impactCd",            label: "영향도", 		hidden:true},
-                ],
+    ];
+
+    var salesGridView = {
+        initView : function() {
+            this.target = new ax5.ui.grid();
+            this.target.setConfig({
+                showLineNumber  : false,
+                showRowSelector : true,
+                // multipleSelect  : true,
+                sortable : false,
+                target : $('[data-ax5grid="first-grid"]'),
+                header : {
+                    align : "center",
+                    selector : false
+                },
+                body: {
+                    mergeCells : ["clntNm","clntPjtNm","sjNm","salesCd"],
+                    columnHeight: 26,
+                    onClick: function () {
+                        var list = salesGridView.target.getList("selected");
+                        $.each(list, function(idx, obj) {
+                            salesGridView.target.select(obj.__origin_index__, {selected: false});
+                        });
+                        this.self.select(this.dindex);
+                    },
+                    onDBLClick: function () {
+                        var list = salesGridView.target.getList("selected");
+                        $.each(list, function(idx, obj) {
+                            salesGridView.target.select(obj.__origin_index__, {selected: false});
+                        })
+                        this.self.select(this.dindex);
+  		  	           if(this.column.key == "reqNo"){    //reqNo = 발주요청번호 필드 선택시
+							if (this.item.issStsNm === "완료") {
+								customAlert("문제조치가 완료된 건입니다.");
+								return false;
+							} else {
+	  		  	        		insertQualityReqModal(); 	//발주요청서 수정으로 진입
+							}
+						} else{
+								wbsIssModal();
+						}
+                    },
+                    onDataChanged: function () {
+
+                    }
+                },
+                columns: GridColumnConfig.apply("WB2401M01", "first-grid", defaultColumns),
                 tree: {
                     use: true,
                     indentWidth: 15,
@@ -490,7 +495,15 @@
 		authChk();
 	});
 
-    // 초기화 버튼용
+	// 그리드 컬럼 설정 팝업
+	function openGridColumnEdit() {
+		GridColumnConfig.openEditor("WB2401M01", "first-grid", defaultColumns, function() {
+			$('[data-ax5grid="first-grid"]').empty();
+			salesGridView.initView().setData(0);
+		});
+	}
+
+	// 초기화 버튼용
     function initSearch() {
         $('[data-search]').off("change");   //바인딩기능 오프
         $('.contents.search select, .contents.search input').val("");
@@ -729,10 +742,10 @@
         	alert("조치결과가 있는 자료는 삭제할 수 없습니다.");
         	return false;
         }
-        if (row.creatId != jwt.userId) {
-        	alert("문제등록 자료는 등록한 사람만 삭제 가능합니다.");
-        	return false;
-        }
+        // if (row.creatId != jwt.userId) {
+        // 	alert("문제등록 자료는 등록한 사람만 삭제 가능합니다.");
+        // 	return false;
+        // }
 		var formData = {
 				"fileTrgtKey" 	: row.issFileTrgtKey,
 		       	"fileTrgtTyp"   : row.issFileTrgtTyp,
