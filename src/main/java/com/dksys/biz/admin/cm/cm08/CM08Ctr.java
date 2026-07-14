@@ -6,6 +6,7 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -317,8 +318,11 @@ public class CM08Ctr {
 		PaginationInfo paginationInfo = new PaginationInfo(param, totalCnt);
     	model.addAttribute("paginationInfo", paginationInfo);
     	
-    	List<Map<String, String>> fileList = cm08Svc.selectTreeFileList(param);
-    	model.addAttribute("fileList", fileList);
+		List<Map<String, String>> fileList = cm08Svc.selectTreeFileList(param);
+		if (fileList == null) {
+			fileList = Collections.emptyList();
+		}
+		model.addAttribute("fileList", fileList);
         return "jsonView";
     }
     
@@ -335,6 +339,9 @@ public class CM08Ctr {
 		model.addAttribute("paginationInfo", paginationInfo);
 
 		List<Map<String, String>> fileList = cm08Svc.selectTreeFileModule(param);
+		if (fileList == null) {
+			fileList = Collections.emptyList();
+		}
 		model.addAttribute("fileList", fileList);
 		return "jsonView";
 	}
