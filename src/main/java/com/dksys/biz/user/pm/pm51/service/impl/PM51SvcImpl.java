@@ -405,6 +405,13 @@ public class PM51SvcImpl implements PM51Svc {
 		}
 	}
 
+	private void normalizeTripRptExpenseDate(Map<String, String> expenseDtlMap) {
+		String useDt = expenseDtlMap.get("useDt");
+		if (useDt != null) {
+			expenseDtlMap.put("useDt", useDt.replace("-", ""));
+		}
+	}
+
 	@Override
 	public int updateTripReqPayDone(Map<String, String> paramMap) throws Exception {
 		if (!isAccountingDept(paramMap.get("deptId"))) {
@@ -501,6 +508,7 @@ public class PM51SvcImpl implements PM51Svc {
 			for (Map<String, String> expenseDtlMap : expenseDtlArr) {
 				expenseDtlMap.put("tripRptNo", paramMap.get("tripRptNo"));
 				expenseDtlMap.put("coCd", paramMap.get("coCd"));
+				normalizeTripRptExpenseDate(expenseDtlMap);
 				pm51Mapper.insertTripRptD03(expenseDtlMap);
 			}
 		}
@@ -613,6 +621,7 @@ public class PM51SvcImpl implements PM51Svc {
 			for (Map<String, String> expenseDtlMap : expenseDtlArr) {
 				expenseDtlMap.put("tripRptNo", paramMap.get("tripRptNo"));
 				expenseDtlMap.put("coCd", paramMap.get("coCd"));
+				normalizeTripRptExpenseDate(expenseDtlMap);
 				pm51Mapper.insertTripRptD03(expenseDtlMap);
 			}
 		}

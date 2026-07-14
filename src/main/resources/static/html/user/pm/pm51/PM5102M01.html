@@ -104,13 +104,15 @@
 			<div class="contents_tit">
 				<span style="height: 30px; line-height: 30px;font-size: 15px;margin-left: 15px">출장복명서 목록</span>
 				<div class="add_btn_small pdl10">
-					<a onclick="insertTripRptModal();" style="height: 30px; line-height: 28px; width: 60px;" authchk>신규</a>
+					<a onclick="insertTripRptModal();" style="height: 30px; line-height: 28px; width: 60px;" authchk><i class="fas fa-plus"></i>신규</a>
+					<a onclick="deleteTripRptM01();" style="height: 30px; line-height: 28px; width: 60px;" authchk><i class="fas fa-trash"></i>삭제</a>
+					<a onclick="printTripRptM01();" style="height: 30px; line-height: 28px; width: 120px;" title="출장복명서가 출력됩니다."><i class="fas fa-print"></i>출장복명서출력</a>
 					<a onclick="excelDown();" style="height: 30px; line-height: 28px; width: 90px;"><i class="fas fa-file-excel"></i>엑셀다운로드</a>
 				</div>
 				<select id="recordCnt_S" name="recordCnt_S" class="prae_select" data-search="recordCnt" onchange="gridView.setData(0);">
-					<option value="25">25</option>
 					<option value="50">50</option>
 					<option value="100" selected>100</option>
+					<option value="500" selected>500</option>
 					<option value="9999999">전체</option>
 				</select>
 			</div>
@@ -139,6 +141,27 @@
 		</div>
 	</div>
 <script type="text/javascript">
+
+	function formatApprovalStatus(totCnt, doneCnt, stsNm) {
+		var tot = totCnt || 0;
+		var nm = stsNm || "미상신";
+		if (tot === 0) nm = "결재자없음";
+		var done = doneCnt || 0;
+		var color = "red";
+
+		if (tot === 0) {
+			color = "red";
+		} else if (tot > 0 && done === 0) {
+			color = "gray";
+		} else if (tot > 0 && done > 0 && done < tot) {
+			color = "green";
+		} else if (tot > 0 && done === tot) {
+			color = "blue";
+		}
+
+		return '<i class="fas fa-circle" style="color: ' + color + ';" title="' + nm + '"></i>';
+	}
+
 	var gridView = {
 		initView: function () {
 			this.target = new ax5.ui.grid();
@@ -163,15 +186,46 @@
 				},
 				page: { display: false },
 				columns: [
-					{ key: 'tripRptNo', label: '\ubcf5\uba85\ubc88\ud638', width: 120, align: 'center' },
-					{ key: 'tripReqNo', label: '\uc2e0\uccad\ubc88\ud638', width: 120, align: 'center' },
-					{ key: 'tripDiv', label: '\uad6c\ubd84', width: 80, align: 'center' },
-					{ key: 'travelerList', label: '\ucd9c\uc7a5\uc790', width: 150, align: 'left' },
-					{ key: 'actPeriod', label: '\uae30\uac04', width: 120, align: 'center' },
-					{ key: 'totalAmt', label: '\ud569\uacc4', width: 150, align: 'right', formatter: "money" },
-					{ key: 'settleAmt', label: '\uc815\uc0b0\uacb0\uacfc', width: 150, align: 'right', formatter: "money" },
-					{ key: 'finalEvalCd', label: '\ud3c9\uac00', width: 100, align: 'center' },
-					{ key: 'aprvStsCd', label: '\uacb0\uc7ac\uc0c1\ud0dc', width: 100, align: 'center' }
+					{ key: "rptDt", label: "복명서일자", width: 80, align: "center", formatter: function() {
+						if (!this.value) return "";
+						var val = this.value.replace(/[^0-9]/g, "");
+						if (val.length >= 8) return val.substring(0, 4) + "-" + val.substring(4, 6) + "-" + val.substring(6, 8);
+						return this.value;
+					}},
+					{ key: "clntNm", label: "고객사", width: 150, align: "left" },
+					{ key: "clntPjtNm", label: "프로젝트", width: 80, align: "left" },
+					{ key: "tripDivNm", label: "구분", width: 60, align: "center" },
+					{ key: "actPeriod", label: "출장기간", width: 150, align: "center", formatter: function() {
+						if (!this.value) return "";
+						var parts = this.value.split("~");
+						var res = [];
+						parts.forEach(function(p) {
+							var val = p.replace(/[^0-9]/g, "");
+							if (val.length >= 8) {
+								res.push(val.substring(0,4) + "-" + val.substring(4,6) + "-" + val.substring(6,8));
+							} else {
+								res.push(p);
+							}
+						});
+						return res.join(" ~ ");
+					}},
+					{ 
+						key: "aprvStsNm", label: "결재상태", width: 70, align: "center",
+						formatter: function() {
+							return formatApprovalStatus(this.item.appTotCnt, this.item.appDoneCnt, this.item.aprvStsNm);
+						}
+					},
+					{ key: "tripTypeCdsNm", label: "유형", width: 100, align: "left" },
+					{ key: "travelerList", label: "출장자", width: 100, align: "left" },
+					{ key: "tripPlace", label: "출장지", width: 150, align: "left" },
+					{ key: "salesCd", label: "SalesCd", width: 120, align: "center" },
+					{ key: "equipNm", label: "장비명", width: 120, align: "left" },
+					{ key: "currCdNm", label: "통화단위", width: 80, align: "center" },
+					{ key: 'settleAmtKrw', label: '정산(KRW)', width: 100, align: 'right', formatter: "money" },
+					{ key: 'settleAmtUsd', label: '정산(USD)', width: 100, align: 'right', formatter: "money" },
+					{ key: 'finalEvalNm', label: '평가', width: 60, align: 'center' },
+					{ key: 'tripRptNo', label: '복명번호', width: 120, align: 'center' },
+					{ key: 'tripReqNo', label: '신청번호', width: 120, align: 'center' }
 				]
 			});
 
@@ -303,11 +357,11 @@
 			},
 			page: { display: false },
 			columns: [
-				{ key: 'tripReqNo', label: '\uc2e0\uccad\ubc88\ud638', width: 120, align: 'center' },
-				{ key: 'tripDiv', label: '\uad6c\ubd84', width: 80, align: 'center' },
-				{ key: 'tripPlace', label: '\ucd9c\uc7a5\uc9c0', width: 150, align: 'left' },
-				{ key: 'equipNm', label: '\uc124\ube44\uba85', width: 120, align: 'left' },
-				{ key: 'tripPeriod', label: '\uae30\uac04', width: 150, align: 'center' }
+				{ key: 'tripReqNo', label: '신청번호', width: 120, align: 'center' },
+				{ key: 'tripDiv', label: '구분', width: 80, align: 'center' },
+				{ key: 'tripPlace', label: '출장지', width: 150, align: 'left' },
+				{ key: 'equipNm', label: '설비명', width: 120, align: 'left' },
+				{ key: 'tripPeriod', label: '기간', width: 150, align: 'center' }
 			]
 		});
 	}
@@ -340,7 +394,7 @@
 			"tripReqNo": selectedRow.tripReqNo,
 			"pgmId": "PM5102P01"
 		};
-		openModal("/static/html/user/pm/pm51/PM5102P01.html", 1200, 900, "출장복명서 등록", paramObj, function (data) {
+		openModal("/static/html/user/pm/pm51/PM5102P01.html", 1700, 860, "출장복명서 등록", paramObj, function (data) {
 			gridView.setData(0);
 		});
 	}
@@ -352,9 +406,70 @@
 			"tripRptNo": tripRptNo,
 			"pgmId": "PM5102P01"
 		};
-		openModal("/static/html/user/pm/pm51/PM5102P01.html", 1200, 900, "출장복명서 수정", paramObj, function (data) {
+		openModal("/static/html/user/pm/pm51/PM5102P01.html", 1700, 860, "출장복명서 수정", paramObj, function (data) {
 			gridView.setData(0);
 		});
+	}
+
+	// 삭제
+	function deleteTripRptM01() {
+		var selectedRows = gridView.target.getList("selected");
+		if (selectedRows.length === 0) {
+			alert("삭제할 항목을 선택해주세요.");
+			return;
+		}
+
+		if (selectedRows.length > 1) {
+			alert("삭제는 1건씩 가능합니다.");
+			return;
+		}
+
+		var row = selectedRows[0];
+		
+		if (row.appTotCnt > 0) {
+			alert("결재가 진행중이거나 완료된 복명서는 삭제할 수 없습니다.");
+			return;
+		}
+
+		if (!confirm("선택한 출장복명서를 삭제하시겠습니까?")) return;
+
+		var param = {
+			tripRptNo: row.tripRptNo,
+			fileTrgtKey: row.tripRptNo,
+			userId: jwt.userId
+		};
+
+		putAjax("/user/pm/pm51/deleteTripRpt", param, null, function(data) {
+			if (data.resultCode == 200) {
+				alert(data.resultMessage);
+				gridView.setData(0);
+			} else {
+				alert(data.resultMessage);
+			}
+		});
+	}
+
+	// 출력
+	function printTripRptM01() {
+		var selectedRows = gridView.target.getList("selected");
+		if (selectedRows.length === 0) {
+			alert("출력할 항목을 선택해주세요.");
+			return;
+		}
+
+		if (selectedRows.length > 1) {
+			alert("출력은 1건씩 가능합니다.");
+			return;
+		}
+
+		var row = selectedRows[0];
+		
+		var fileName = "PM5102R01.jrf";
+		var arg = "coCd#" + jwt.coCd
+				+ "#tripRptNo#" + row.tripRptNo
+				+ "#";
+
+		callReport(fileName, arg, 1150, 720, '출장복명서');
 	}
 
 	// 엑셀 다운로드
