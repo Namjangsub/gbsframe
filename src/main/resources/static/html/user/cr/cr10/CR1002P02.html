@@ -1,0 +1,157 @@
+<div id="bomCostSearch" class="popup_area of_a" style="width: 100%; height: 100%;">
+	<div class="tit_contents">
+		<h4 class="tit">구매이력 BOM 조회</h4>
+	</div>
+
+	<div class="popup_table">
+		<input type="hidden" id="coCd" name="coCd">
+		<input type="hidden" id="ordrsNo" name="ordrsNo">
+		<input type="hidden" id="salesCd" name="salesCd">
+
+		<table style="width:100%; margin-bottom:8px;">
+			<tr>
+				<th style="width:120px;">Sales Code</th>
+				<td><input type="text" id="salesCd_view" class="form-control" readonly="readonly" style="background-color:#f0f0f0;"></td>
+				<td style="width:120px; text-align:right;">
+					<button type="button" class="btn btn-default btn-sm" onclick="bomCostGridView.setData();">재조회</button>
+				</td>
+			</tr>
+		</table>
+
+		<div class="layout">
+			<div class="main_box" style="height: 720px;">
+				<div class="contents_wrap_p">
+					<div data-ax5grid="bom-cost-grid" data-ax5grid-config="{}" style="height: 720px; width: 100%;"></div>
+				</div>
+			</div>
+		</div>
+	</div>
+
+	<!-- Bottom button area -->
+	<div class="popup_bottom_btn">
+		<button type="button" class="btn btn-success btn-sm" onclick="executeBomCostCallback();">선택추가</button>
+		<button type="button" class="btn btn-default btn-sm" onclick="modalStack.close();">닫기</button>
+	</div>
+</div>
+
+<script type="text/javascript">
+	var bomCostGridView = {
+		initView: function () {
+			this.target = new ax5.ui.grid();
+			this.target.setConfig({
+				showLineNumber: true,
+				showRowSelector: true,
+				multipleSelect: true,
+				sortable: true,
+				target: $('[data-ax5grid="bom-cost-grid"]'),
+				header: {
+					align: "center",
+					selector: true
+				},
+				body: {
+					onDBLClick: function () {
+						this.self.select(this.dindex);
+					}
+				},
+				columns: [
+					{ key: "bomType", label: "자재", align: "center", width: 50, formatter: function () { return this.value == "M" ? "자재" : ""; } },
+					{ key: "viewId", label: "도번코드", align: "left", width: 200, treeControl: true },
+					{ key: "matrNm", label: "품명", align: "left", width: 220 },
+					{ key: "matrSpec", label: "형번/규격", align: "left", width: 160 },
+					{ key: "matrUnitCdNm", label: "단위", align: "center", width: 60 },
+					{ key: "bomQty", label: "수량", align: "right", width: 60, formatter: "money" },
+					{ key: "inPrc", label: "매입단가", align: "right", width: 90, formatter: "money" },
+					{key: undefined, label: "실행 원가", columns: [
+					{ key: "stdAmt", label: "정상금액", align: "right", width: 90, formatter: "money" },
+					{ key: "badAmt", label: "장애금액", align: "right", width: 90, formatter: "money" },
+					]},
+		            {key: undefined, label: "자재 마스터 정보", columns: [
+					{ key: "matrUpr", label: "단가", align: "right", width: 90, formatter: "money" },
+					{ key: "partAmt", label: "금액", align: "right", width: 90, formatter: "money" },
+					{ key: "matrMat", label: "소재/제조사", align: "left", width: 120 },
+					]},
+					{ key: "clntNm", label: "공급사", align: "left", width: 140 },
+					{ key: "matrRmk", label: "비고", align: "left", width: 200 }
+				],
+				tree: {
+					use: true,
+					indentWidth: 15,
+					arrowWidth: 15,
+					iconWidth: 18,
+					icons: {
+						openedArrow: '<i class="fa fa-caret-down" aria-hidden="true"></i>',
+						collapsedArrow: '<i class="fa fa-caret-right" aria-hidden="true"></i>',
+						groupIcon: '<i class="fa fa-folder-open" aria-hidden="true"></i>',
+						collapsedGroupIcon: '<i class="fa fa-folder" aria-hidden="true"></i>',
+						itemIcon: '<i class="fa fa-cog" aria-hidden="true"></i>'
+					},
+					columnKeys: {
+						parentKey: "pid",
+						selfKey: "id"
+					}
+				}
+			});
+			return this;
+		},
+		setData: function () {
+			var targetObj = this.target;
+			var coCd = $('#bomCostSearch #coCd').val();
+			var salesCd = $('#bomCostSearch #salesCd').val();
+			var ordrsNo = $('#bomCostSearch #ordrsNo').val();
+
+			// selectBomAllCostList는 CONNECT BY START WITH T.LOWER_CD = #{fileTrgtKey} 로 순회하므로
+			// 먼저 해당 salesCd의 BOM 트리를 조회해 최상위(UPPER_CD='top', PARENT='#') 노드의 LOWER_CD를 fileTrgtKey로 구한다
+			postAjax("/user/sm/sm50/selectBomCostTreeList", { coCd: coCd, salesCd: salesCd, ordrsNo: ordrsNo, userId: jwt.userId }, null, function (treeData) {
+				var treeList = treeData.result || [];
+				var rootNode = treeList.find(function (n) { return n.parent === '#' || n.upperCd === 'top'; });
+				var fileTrgtKey = rootNode ? (rootNode.id || rootNode.lowerCd) : null;
+				if (!fileTrgtKey) {
+					targetObj.setData({ list: [], page: { totalElements: 0 } });
+					return;
+				}
+
+				var paramObj = {
+					"userId": jwt.userId,
+					"coCd": coCd,
+					"ordrsNo": ordrsNo,
+					"salesCd": salesCd,
+					"bomLevel": "",
+					"fileTrgtKey": fileTrgtKey
+				};
+				postAjax("/user/sm/sm50/selectBomAllCostList", paramObj, null, function (data) {
+					var list = data.result || [];
+					targetObj.setData({
+						list: list,
+						page: { totalElements: list.length }
+					});
+
+					// 이미 설비별 PART LIST에 등록되어 있는 항목을 미리 선택 표시
+					var want = new Set((modalStack.last().paramObj.precheckedIds || []).map(function (x) { return String(x).trim(); }));
+					if (want.size) {
+						var rows = targetObj.getList();
+						rows.forEach(function (r, i) {
+							var id = (r.id || '').toString().trim();
+							if (id && want.has(id)) targetObj.select(i, { selected: true });
+						});
+					}
+				});
+			});
+		}
+	};
+
+	function executeBomCostCallback() {
+		if (selectGridValidationM(bomCostGridView.target)) return;
+		modalStack.last().callback(bomCostGridView);
+		modalStack.close();
+	}
+
+	$(document).ready(function () {
+		var paramObj = modalStack.last().paramObj || {};
+		$('#bomCostSearch #coCd').val(paramObj.coCd || "");
+		$('#bomCostSearch #ordrsNo').val(paramObj.ordrsNo || "");
+		$('#bomCostSearch #salesCd').val(paramObj.salesCd || "");
+		$('#salesCd_view').val(paramObj.salesCd || "");
+
+		bomCostGridView.initView().setData();
+	});
+</script>
