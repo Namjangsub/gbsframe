@@ -13,6 +13,8 @@ public interface PM51Mapper {
 	List<Map<String, String>> selectTripReqList(Map<String, String> paramMap);
 
 	Map<String, String> selectTripReqM01(Map<String, String> paramMap);
+	
+	List<Map<String, String>> selectTripRptExpenseSummaryByReqNo(Map<String, String> paramMap);
 
 	List<Map<String, String>> selectTripReqD01(Map<String, String> paramMap);
 
@@ -49,6 +51,16 @@ public interface PM51Mapper {
 	int deleteTripReqMngApprovalLines(Map<String, String> paramMap);
 
 	List<Map<String, String>> selectSignResUserlstInit(Map<String, String> paramMap);
+
+	String selectTripRptSalesCd(Map<String, String> paramMap);
+
+	List<Map<String, String>> selectTripRptPayExpenseSum(Map<String, String> paramMap);
+
+	int selectTripRptEatCntSum(Map<String, String> paramMap);
+
+	Map<String, String> selectTripRptTravelerExpenseSum(Map<String, String> paramMap);
+
+	List<Map<String, String>> selectTripRptTravelerApprovalLines(Map<String, String> paramMap);
 
 	int selectTripRptListCount(Map<String, String> paramMap);
 

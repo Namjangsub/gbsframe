@@ -57,7 +57,8 @@
 			FN_CM06M01_ID_TO_NM(M.PAY_ID) AS PAY_NM,
 			M.CREAT_ID,
 			M.CREAT_DTTM,
-			NVL(RP.TRIP_RPT_NO, 'N') AS TRIP_RPT_YN,
+			RP.TRIP_RPT_NO AS TRIP_RPT_NO,
+			CASE WHEN RP.TRIP_RPT_NO IS NULL THEN 'N' ELSE 'Y' END AS TRIP_RPT_YN,
 			(SELECT COUNT(*) FROM TB_WB20M03 WHERE TODO_NO = M.TRIP_REQ_NO AND TODO_DIV2_CODE_ID = 'TODODIV2190') AS APP_TOT_CNT,
 			(SELECT COUNT(*) FROM TB_WB20M03 WHERE TODO_NO = M.TRIP_REQ_NO AND TODO_DIV2_CODE_ID = 'TODODIV2190' AND SANCTN_STTUS = 'Y') AS APP_DONE_CNT,
 			(SELECT COUNT(*) FROM TB_WB20M03 WHERE TODO_NO = M.TRIP_REQ_NO AND TODO_DIV2_CODE_ID = 'TODODIV2191') AS PAY_APP_TOT_CNT,
@@ -131,6 +132,29 @@
 			UDT_DTTM
 		FROM TB_PM51M01
 		WHERE TRIP_REQ_NO = #{tripReqNo}
+	</select>
+
+	<!-- 출장신청서에 기본 등록된 경비가 없으면 출장복명서에서 경비 합계 가져오기 -->
+	<select id="selectTripRptExpenseSummaryByReqNo" parameterType="Map" resultType="CamelMap">
+		SELECT
+			'교통비' AS EXP_ITEM_CD, 'KRW' AS CURR_CD, NVL(SUM(NVL(TRAFFIC_AMT, 0)), 0) AS KRW_AMT, 0 AS USD_AMT
+		FROM TB_PM52D02 WHERE TRIP_RPT_NO = (SELECT MAX(TRIP_RPT_NO) FROM TB_PM52M01 WHERE TRIP_REQ_NO = #{tripReqNo})
+		UNION ALL
+		SELECT
+			'숙박비' AS EXP_ITEM_CD, 'KRW' AS CURR_CD, NVL(SUM(NVL(LODGING_AMT, 0)), 0) AS KRW_AMT, 0 AS USD_AMT
+		FROM TB_PM52D02 WHERE TRIP_RPT_NO = (SELECT MAX(TRIP_RPT_NO) FROM TB_PM52M01 WHERE TRIP_REQ_NO = #{tripReqNo})
+		UNION ALL
+		SELECT
+			'식대' AS EXP_ITEM_CD, 'KRW' AS CURR_CD, NVL(SUM(NVL(MEAL_AMT, 0)), 0) AS KRW_AMT, 0 AS USD_AMT
+		FROM TB_PM52D02 WHERE TRIP_RPT_NO = (SELECT MAX(TRIP_RPT_NO) FROM TB_PM52M01 WHERE TRIP_REQ_NO = #{tripReqNo})
+		UNION ALL
+		SELECT
+			'일비' AS EXP_ITEM_CD, 'KRW' AS CURR_CD, NVL(SUM(NVL(DAILY_AMT, 0)), 0) AS KRW_AMT, 0 AS USD_AMT
+		FROM TB_PM52D02 WHERE TRIP_RPT_NO = (SELECT MAX(TRIP_RPT_NO) FROM TB_PM52M01 WHERE TRIP_REQ_NO = #{tripReqNo})
+		UNION ALL
+		SELECT
+			'특별비' AS EXP_ITEM_CD, 'KRW' AS CURR_CD, NVL(SUM(NVL(SPECIAL_AMT, 0)), 0) AS KRW_AMT, 0 AS USD_AMT
+		FROM TB_PM52D02 WHERE TRIP_RPT_NO = (SELECT MAX(TRIP_RPT_NO) FROM TB_PM52M01 WHERE TRIP_REQ_NO = #{tripReqNo})
 	</select>
 
 	<!-- 출장신청서 출장자 상세 -->
@@ -337,22 +361,20 @@
 		SELECT COUNT(*) AS CNT
 		FROM TB_WB20M03
 		WHERE TODO_NO = #{reqNo}
-			AND TODO_DIV2_CODE_ID = 'TODODIV2191'
+			AND TODO_DIV2_CODE_ID IN ('TODODIV2191', 'TODODIV2201')
 			AND SANCTN_STTUS = 'Y'
 	</select>
 
 	<delete id="deleteTripReqApprovalLines" parameterType="Map">
 		DELETE FROM TB_WB20M03
 		WHERE TODO_NO = #{reqNo}
-			AND SALES_CD = #{salesCd}
-			AND TODO_DIV2_CODE_ID IN ('TODODIV1190', 'TODODIV2190', 'TODODIV1191', 'TODODIV2191')
+			AND TODO_DIV2_CODE_ID IN ('TODODIV1190', 'TODODIV2190', 'TODODIV1191', 'TODODIV2191', 'TODODIV1200', 'TODODIV2200', 'TODODIV1201', 'TODODIV2201')
 	</delete>
 
 	<delete id="deleteTripReqMngApprovalLines" parameterType="Map">
 		DELETE FROM TB_WB20M03
 		WHERE TODO_NO = #{reqNo}
-			AND SALES_CD = #{salesCd}
-			AND TODO_DIV2_CODE_ID IN ('TODODIV1191', 'TODODIV2191')
+			AND TODO_DIV2_CODE_ID IN ('TODODIV1191', 'TODODIV2191', 'TODODIV1201', 'TODODIV2201')
 			AND NVL(SANCTN_STTUS, 'N') != 'Y'
 	</delete>
 
@@ -396,6 +418,136 @@
 				AND T.RNK = 1
 			) AS A
 		)
+	</select>
+
+	<!-- 출장복명서의 연결 신청서 Sales Code 조회 -->
+	<select id="selectTripRptSalesCd" parameterType="Map" resultType="String">
+		SELECT M.SALES_CD
+		FROM TB_PM52M01 R
+		INNER JOIN TB_PM51M01 M
+			ON M.TRIP_REQ_NO = R.TRIP_REQ_NO
+		WHERE R.TRIP_RPT_NO = #{tripRptNo}
+	</select>
+
+	<!-- 지급완료 처리용: 복명서 경비 세부내역 통화별 항목 합계 -->
+	<select id="selectTripRptPayExpenseSum" parameterType="Map" resultType="CamelMap">
+		SELECT
+			CASE
+				WHEN D.CURR_CD = 'CURR01' THEN 'KRW'	/* 공통코드 CURR: CURR01=원화 */
+				WHEN D.CURR_CD = 'CURR02' THEN 'USD'	/* 공통코드 CURR: CURR02=달러 */
+				ELSE 'ETC'
+			END AS CURR_CLASS,
+			NVL(SUM(D.TRAFFIC_AMT), 0) AS TRAFFIC_AMT,
+			NVL(SUM(D.CAR_AMT), 0) AS CAR_AMT,
+			NVL(SUM(D.LODGING_AMT), 0) AS LODGING_AMT,
+			NVL(SUM(D.DAILY_AMT), 0) AS DAILY_AMT,
+			NVL(SUM(D.SPECIAL_AMT), 0) AS SPECIAL_AMT
+		FROM TB_PM52M01 R
+		INNER JOIN TB_PM52D01 D
+			ON D.TRIP_RPT_NO = R.TRIP_RPT_NO
+		WHERE R.TRIP_REQ_NO = #{tripReqNo}
+		GROUP BY
+			CASE
+				WHEN D.CURR_CD = 'CURR01' THEN 'KRW'
+				WHEN D.CURR_CD = 'CURR02' THEN 'USD'
+				ELSE 'ETC'
+			END
+	</select>
+
+	<!-- 지급완료 처리용: 복명서 출장자 식수 총합 -->
+	<select id="selectTripRptEatCntSum" parameterType="Map" resultType="int">
+		SELECT NVL(SUM(T.EAT_CNT), 0)
+		FROM TB_PM52M01 R
+		INNER JOIN TB_PM52D02 T
+			ON T.TRIP_RPT_NO = R.TRIP_RPT_NO
+		WHERE R.TRIP_REQ_NO = #{tripReqNo}
+	</select>
+
+	<!-- 지급완료 처리용: 복명서 출장자별 경비(일비/숙박비) 합계 -->
+	<select id="selectTripRptTravelerExpenseSum" parameterType="Map" resultType="CamelMap">
+		SELECT
+			NVL(SUM(T.DAILY_AMT), 0) AS DAILY_AMT_SUM,
+			NVL(SUM(T.LODGING_AMT), 0) AS LODGING_AMT_SUM
+		FROM TB_PM52M01 R
+		INNER JOIN TB_PM52D02 T
+			ON T.TRIP_RPT_NO = R.TRIP_RPT_NO
+		WHERE R.TRIP_REQ_NO = #{tripReqNo}
+	</select>
+
+	<!-- 출장복명서 신청인 및 신청인 팀장 결재선 -->
+	<select id="selectTripRptTravelerApprovalLines" parameterType="Map" resultType="CamelMap">
+		SELECT USR_NM, TODO_ID, NAME, EMP_NO, TEL_NO, EMAIL, DT_NM, JIK, GB, TODO_DIV2_CODE_ID, FLAG
+		FROM (
+			SELECT DISTINCT
+				M.ID AS USR_NM,
+				M.ID AS TODO_ID,
+				M.NAME,
+				M.EMP_NO,
+				M.TEL_NO,
+				M.EMAIL,
+				D.DEPT_NM AS DT_NM,
+				L.LEVEL_NM AS JIK,
+				'결재' AS GB,
+				'TODODIV2200' AS TODO_DIV2_CODE_ID,
+				'I' AS FLAG,
+				1 AS SORT_ORD
+			FROM TB_PM52M01 P
+			INNER JOIN TB_PM51M01 R ON R.TRIP_REQ_NO = P.TRIP_REQ_NO
+			INNER JOIN TB_CM06M01 M
+				ON M.ID = R.USER_ID
+			LEFT JOIN TB_CM04M01 D
+				ON D.DEPT_ID = M.DEPT_ID
+			LEFT JOIN TB_CM07M01 L
+				ON L.LEVEL_CD = M.LEVEL_CD
+			WHERE P.TRIP_RPT_NO = #{tripRptNo, jdbcType=VARCHAR}
+			UNION ALL
+			-- 출장자 본인이 팀장(타인의 APPDIV02 결재자)인 경우 본인을 팀장 결재선에 추가
+			SELECT DISTINCT
+				M.ID AS USR_NM,
+				M.ID AS TODO_ID,
+				M.NAME,
+				M.EMP_NO,
+				M.TEL_NO,
+				M.EMAIL,
+				D.DEPT_NM AS DT_NM,
+				L.LEVEL_NM AS JIK,
+				'결재' AS GB,
+				'TODODIV2200' AS TODO_DIV2_CODE_ID,
+				'I' AS FLAG,
+				1 AS SORT_ORD
+			FROM TB_PM52M01 P
+			INNER JOIN TB_PM51M01 R ON R.TRIP_REQ_NO = P.TRIP_REQ_NO
+			INNER JOIN TB_BM13M01 B
+				ON B.ID = R.USER_ID AND B.APP_DIV = 'APPDIV02'
+			INNER JOIN TB_CM06M01 M
+				ON M.ID = B.APP_ID
+			LEFT JOIN TB_CM04M01 D
+				ON D.DEPT_ID = M.DEPT_ID
+			LEFT JOIN TB_CM07M01 L
+				ON L.LEVEL_CD = M.LEVEL_CD
+			WHERE P.TRIP_RPT_NO = #{tripRptNo, jdbcType=VARCHAR}
+			UNION ALL
+			SELECT
+				M.ID AS USR_NM,
+				M.ID AS TODO_ID,
+				M.NAME,
+				M.EMP_NO,
+				M.TEL_NO,
+				M.EMAIL,
+				D.DEPT_NM AS DT_NM,
+				L.LEVEL_NM AS JIK,
+				'결재' AS GB,
+				'TODODIV2200' AS TODO_DIV2_CODE_ID,
+				'I' AS FLAG,
+				2 AS SORT_ORD
+			FROM TB_CM06M01 M
+			LEFT JOIN TB_CM04M01 D
+				ON D.DEPT_ID = M.DEPT_ID
+			LEFT JOIN TB_CM07M01 L
+				ON L.LEVEL_CD = M.LEVEL_CD
+			WHERE 1 = 0
+		)
+		ORDER BY SORT_ORD, NAME
 	</select>
 
 	<!-- 출장복명서 목록 건수 -->
@@ -507,6 +659,8 @@
 			ADV_RCV_AMT_USD,
 			SETTLE_AMT_KRW,
 			SETTLE_AMT_USD,
+			SPRT_EVAL_CD,
+			APRV_EVAL_CD,
 			APRV_STS_CD,
 			FILE_TRGT_KEY,
 			CREAT_ID,
@@ -527,6 +681,11 @@
 			PERSON_CNT,
 			AMT,
 			CURR_CD,
+			LODGING_AMT,
+			DAILY_AMT,
+			SPECIAL_AMT,
+			TRAFFIC_AMT,
+			CAR_AMT,
 			EXP_ITEM_CD,
 			PAY_MTHD_CD,
 			REMARK
@@ -569,12 +728,16 @@
 		INSERT INTO TB_PM52M01 (
 			TRIP_RPT_NO, CO_CD, TRIP_REQ_NO, ACT_ST_DTM, ACT_ED_DTM, TRIP_PURPOSE, TRIP_RESULT,
 			SELF_EVAL_CD, DEPT_EVAL_CD, FINAL_EVAL_CD, SPECIAL_NOTE, EXTEND_RSN, MINUTES_MISS_RSN,
-			ADV_RCV_AMT_KRW, ADV_RCV_AMT_USD, SETTLE_AMT_KRW, SETTLE_AMT_USD, APRV_STS_CD, FILE_TRGT_KEY,
+			ADV_RCV_AMT_KRW, ADV_RCV_AMT_USD, SETTLE_AMT_KRW, SETTLE_AMT_USD,
+			SPRT_EVAL_CD, APRV_EVAL_CD,
+			APRV_STS_CD, FILE_TRGT_KEY,
 			CREAT_ID, CREAT_PGM, CREAT_DTTM
 		) VALUES (
 			#{tripRptNo}, #{coCd}, #{tripReqNo}, #{actStDtm}, #{actEdDtm}, #{tripPurpose}, #{tripResult},
 			#{selfEvalCd}, #{deptEvalCd}, #{finalEvalCd}, #{specialNote}, #{extendRsn}, #{minutesMissRsn},
-			#{advRcvAmtKrw}, #{advRcvAmtUsd}, #{settleAmtKrw}, #{settleAmtUsd}, 'APRVSTS01', #{tripRptNo},
+			#{advRcvAmtKrw}, #{advRcvAmtUsd}, #{settleAmtKrw}, #{settleAmtUsd},
+			#{sprtEvalCd}, #{aprvEvalCd},
+			'APRVSTS01', #{tripRptNo},
 			#{userId}, #{pgmId}, SYSDATE
 		)
 	</insert>
@@ -596,10 +759,14 @@
 	<!-- 출장복명서 경비 세부내역 등록 -->
 	<insert id="insertTripRptD03" parameterType="Map">
 		INSERT INTO TB_PM52D01 (
-			TRIP_RPT_NO, SEQ, USE_DT, USE_DESC, PERSON_CNT, AMT, CURR_CD, EXP_ITEM_CD, PAY_MTHD_CD, REMARK
+			TRIP_RPT_NO, SEQ, USE_DT, USE_DESC, PERSON_CNT, AMT, CURR_CD,
+			LODGING_AMT, DAILY_AMT, SPECIAL_AMT, TRAFFIC_AMT, CAR_AMT,
+			EXP_ITEM_CD, PAY_MTHD_CD, REMARK
 		) VALUES (
 			#{tripRptNo}, NVL((SELECT MAX(SEQ) FROM TB_PM52D01 WHERE TRIP_RPT_NO = #{tripRptNo}), 0) + 1,
-			#{useDt}, #{useDesc}, #{personCnt}, #{amt}, #{currCd}, #{expItemCd}, #{payMthdCd}, #{remark}
+			#{useDt, jdbcType=VARCHAR}, #{useDesc, jdbcType=VARCHAR}, #{personCnt, jdbcType=NUMERIC}, #{amt, jdbcType=NUMERIC}, #{currCd, jdbcType=VARCHAR},
+			#{lodgingAmt, jdbcType=NUMERIC}, #{dailyAmt, jdbcType=NUMERIC}, #{specialAmt, jdbcType=NUMERIC}, #{trafficAmt, jdbcType=NUMERIC}, #{carAmt, jdbcType=NUMERIC},
+			#{expItemCd, jdbcType=VARCHAR}, #{payMthdCd, jdbcType=VARCHAR}, #{remark, jdbcType=VARCHAR}
 		)
 	</insert>
 
@@ -621,6 +788,8 @@
 			ADV_RCV_AMT_USD = #{advRcvAmtUsd},
 			SETTLE_AMT_KRW = #{settleAmtKrw},
 			SETTLE_AMT_USD = #{settleAmtUsd},
+			SPRT_EVAL_CD = #{sprtEvalCd},
+			APRV_EVAL_CD = #{aprvEvalCd},
 			UDT_ID = #{userId},
 			UDT_PGM = #{pgmId},
 			UDT_DTTM = SYSDATE

@@ -2,9 +2,11 @@ package com.dksys.biz.user.pm.pm51.service.impl;
 
 import java.lang.reflect.Type;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -56,6 +58,36 @@ public class PM51SvcImpl implements PM51Svc {
 		Map<String, String> m01 = pm51Mapper.selectTripReqM01(paramMap);
 		List<Map<String, String>> d01 = pm51Mapper.selectTripReqD01(paramMap);
 		List<Map<String, String>> d02 = pm51Mapper.selectTripReqD02(paramMap);
+
+		boolean hasData = false;
+		if (d02 != null) {
+			for (Map<String, String> map : d02) {
+				double krw = map.get("krwAmt") != null ? Double.parseDouble(String.valueOf(map.get("krwAmt"))) : 0;
+				double usd = map.get("usdAmt") != null ? Double.parseDouble(String.valueOf(map.get("usdAmt"))) : 0;
+				if (krw > 0 || usd > 0) {
+					hasData = true;
+					break;
+				}
+			}
+		}
+
+		if (!hasData) {
+			List<Map<String, String>> rptExpense = pm51Mapper.selectTripRptExpenseSummaryByReqNo(paramMap);
+			boolean hasRptData = false;
+			if (rptExpense != null && !rptExpense.isEmpty()) {
+				for (Map<String, String> rpt : rptExpense) {
+					double krw = rpt.get("krwAmt") != null ? Double.parseDouble(String.valueOf(rpt.get("krwAmt"))) : 0;
+					if (krw > 0) {
+						hasRptData = true;
+						break;
+					}
+				}
+				if (hasRptData) {
+					d02 = rptExpense;
+				}
+			}
+		}
+
 		result.put("m01", m01);
 		result.put("d01", d01);
 		result.put("d02", d02);
@@ -92,15 +124,15 @@ public class PM51SvcImpl implements PM51Svc {
 		}
 
 		paramMap.put("fileTrgtKey", paramMap.get("tripReqNo"));
-		paramMap.put("pgmId", "PM5101P01");
+		paramMap.put("pgmId", "Y".equals(paramMap.get("payMode")) ? "PM5101P02" : "PM5101P01");
 		cm08Svc.fileUpload(paramMap, mRequest);
 
 		if (paramMap.containsKey("approvalArr")) {
 			List<Map<String, String>> approvalArr = gsonDtl.fromJson(paramMap.get("approvalArr"), dtlMap);
+			approvalArr = appendTripReqApplicantApprovals(paramMap, approvalArr);
 			if (approvalArr != null && approvalArr.size() > 0) {
 				paramMap.put("reqNo", paramMap.get("tripReqNo"));
 				paramMap.put("fileTrgtKey", paramMap.get("tripReqNo"));
-				paramMap.put("salesCd", paramMap.get("tripReqNo"));
 
 				String pgParam1 = "{\"actionType\":\"" + "T" + "\",";
 				pgParam1 += "\"gubun\":\"" + "개인" + "\",";
@@ -179,9 +211,9 @@ public class PM51SvcImpl implements PM51Svc {
 		if (salesDept && "APRVSTS03".equals(aprvStsCd)) {
 			throw new RuntimeException("결재완료 이후에는 회계팀만 수정할 수 있습니다.");
 		}
-		if (accountingDept && !payMode && !"APRVSTS03".equals(aprvStsCd)) {
-			throw new RuntimeException("회계팀 경비 수정은 결재완료 이후 가능합니다.");
-		}
+//		if (accountingDept && !payMode && !"APRVSTS03".equals(aprvStsCd)) {
+//			throw new RuntimeException("회계팀 경비 수정은 결재완료 이후 가능합니다.");
+//		}
 		if (!payMode) {
 			normalizeTripReqMasterParam(paramMap);
 			validateTripReqMasterParam(paramMap);
@@ -204,11 +236,10 @@ public class PM51SvcImpl implements PM51Svc {
 		Map<String, String> delParam = new HashMap<>();
 		delParam.put("tripReqNo", paramMap.get("tripReqNo"));
 		delParam.put("reqNo", paramMap.get("tripReqNo"));
-		delParam.put("salesCd", paramMap.get("tripReqNo"));
+		delParam.put("salesCd", paramMap.get("salesCd"));
 
 		if (!hasCompletedApproval) {
 			pm51Mapper.deleteTripReqApprovalLines(delParam);
-			deleteLegacyApprovalRowsIfNeeded(delParam, paramMap.get("salesCd"));
 		} else if (accountingDept && !hasCompletedMngApproval) {
 			pm51Mapper.deleteTripReqMngApprovalLines(delParam);
 		}
@@ -239,11 +270,12 @@ public class PM51SvcImpl implements PM51Svc {
 		}
 
 		paramMap.put("fileTrgtKey", paramMap.get("tripReqNo"));
-		paramMap.put("pgmId", "PM5101P01");
+		paramMap.put("pgmId", "Y".equals(paramMap.get("payMode")) ? "PM5101P02" : "PM5101P01");
 		cm08Svc.fileUpload(paramMap, mRequest);
 
 		if (!hasCompletedApproval && paramMap.containsKey("approvalArr")) {
 			List<Map<String, String>> approvalArr = gsonDtl.fromJson(paramMap.get("approvalArr"), dtlMap);
+			approvalArr = appendTripReqApplicantApprovals(paramMap, approvalArr);
 			if (approvalArr != null && approvalArr.size() > 0) {
 				String pgParam1 = "{\"actionType\":\"" + "T" + "\",";
 				pgParam1 += "\"gubun\":\"" + "팀" + "\",";
@@ -307,16 +339,18 @@ public class PM51SvcImpl implements PM51Svc {
 			return;
 		}
 
+		String documentNoKey = hasText(paramMap.get("tripRptNo")) ? "tripRptNo" : "tripReqNo";
+		String documentNo = paramMap.get(documentNoKey);
 		String pgParam1 = "{\"actionType\":\"" + "T" + "\",";
 		pgParam1 += "\"gubun\":\"" + gubun + "\",";
 		pgParam1 += "\"coCd\":\"" + paramMap.get("coCd") + "\",";
-		pgParam1 += "\"tripReqNo\":\"" + paramMap.get("tripReqNo") + "\",";
+		pgParam1 += "\"" + documentNoKey + "\":\"" + documentNo + "\",";
 		pgParam1 += "\"userId\":\"" + paramMap.get("userId") + "\"}";
 
 		String pgParam2 = "{\"actionType\":\"" + "S" + "\",";
 		pgParam2 += "\"gubun\":\"" + gubun + "\",";
 		pgParam2 += "\"coCd\":\"" + paramMap.get("coCd") + "\",";
-		pgParam2 += "\"tripReqNo\":\"" + paramMap.get("tripReqNo") + "\",";
+		pgParam2 += "\"" + documentNoKey + "\":\"" + documentNo + "\",";
 		pgParam2 += "\"userId\":\"" + paramMap.get("userId") + "\"}";
 
 		int iSharng = 1;
@@ -365,10 +399,19 @@ public class PM51SvcImpl implements PM51Svc {
 			}
 		}
 
+		Map<String, String> m01 = pm51Mapper.selectTripReqM01(paramMap);
+		String salesCd = paramMap.get("tripReqNo");
+		if (m01 != null) {
+			String m01SalesCd = m01.get("salesCd");
+			if (hasText(m01SalesCd)) {
+				salesCd = m01SalesCd;
+			}
+		}
+
 		Map<String, String> delParam = new HashMap<>();
 		delParam.put("tripReqNo", paramMap.get("tripReqNo"));
 		delParam.put("reqNo", paramMap.get("tripReqNo"));
-		delParam.put("salesCd", paramMap.get("tripReqNo"));
+		delParam.put("salesCd", salesCd);
 
 		List<Map<String, String>> sharngChk = qm01Mapper.deleteWbsSharngListChk(delParam);
 		if (sharngChk.size() > 0) {
@@ -517,12 +560,17 @@ public class PM51SvcImpl implements PM51Svc {
 		paramMap.put("pgmId", "PM5102P01");
 		cm08Svc.fileUpload(paramMap, mRequest);
 
+		paramMap.put("salesCd", pm51Mapper.selectTripRptSalesCd(paramMap));
+
+		if (!paramMap.containsKey("approvalArr")) {
+			paramMap.put("approvalArr", "[]");
+		}
 		if (paramMap.containsKey("approvalArr")) {
 			List<Map<String, String>> approvalArr = gsonDtl.fromJson(paramMap.get("approvalArr"), dtlMap);
+			approvalArr = appendTripRptTravelerLeaders(paramMap, approvalArr);
 			if (approvalArr != null && approvalArr.size() > 0) {
 				paramMap.put("reqNo", paramMap.get("tripRptNo"));
 				paramMap.put("fileTrgtKey", paramMap.get("tripRptNo"));
-				paramMap.put("salesCd", paramMap.get("tripRptNo"));
 
 				String pgParam1 = "{\"actionType\":\"" + "T" + "\",";
 				pgParam1 += "\"gubun\":\"" + "개인" + "\",";
@@ -557,6 +605,7 @@ public class PM51SvcImpl implements PM51Svc {
 						if (approvalMap.get("userId").equals(approvalMap.get("usrNm"))) {
 							approvalMap.put("todoCfOpn", "자체승인");
 							approvalMap.put("todoNo", approvalMap.get("reqNo"));
+							approvalMap.put("sanctnSn", approvalMap.get("sanCtnSn"));
 
 							Object value = approvalMap.get("toDoKey");
 							if (value != null) {
@@ -569,6 +618,7 @@ public class PM51SvcImpl implements PM51Svc {
 				}
 			}
 		}
+		processTripReqApprovalArr(paramMap, gsonDtl, dtlMap, "mngApprovalArr", "관리부서");
 
 		return result;
 	}
@@ -581,7 +631,7 @@ public class PM51SvcImpl implements PM51Svc {
 
 		paramMap.put("reqNo", paramMap.get("tripRptNo"));
 		paramMap.put("fileTrgtKey", paramMap.get("tripRptNo"));
-		paramMap.put("salesCd", paramMap.get("tripRptNo"));
+		paramMap.put("salesCd", pm51Mapper.selectTripRptSalesCd(paramMap));
 
 		List<Map<String, String>> approvalChkList = pm51Mapper.selectApprovalChk(paramMap);
 		if (approvalChkList != null && approvalChkList.size() > 0) {
@@ -597,7 +647,13 @@ public class PM51SvcImpl implements PM51Svc {
 		Map<String, String> delParam = new HashMap<>();
 		delParam.put("tripRptNo", paramMap.get("tripRptNo"));
 		delParam.put("reqNo", paramMap.get("tripRptNo"));
-		delParam.put("salesCd", paramMap.get("tripRptNo"));
+		delParam.put("salesCd", paramMap.get("salesCd"));
+		if (!hasCompletedApproval(paramMap, false)) {
+			pm51Mapper.deleteTripReqApprovalLines(delParam);
+		}
+		if (!hasCompletedApproval(paramMap, true)) {
+			pm51Mapper.deleteTripReqMngApprovalLines(delParam);
+		}
 
 		List<Map<String, String>> sharngChk = qm01Mapper.deleteWbsSharngListChk(delParam);
 		if (sharngChk.size() > 0) {
@@ -630,8 +686,12 @@ public class PM51SvcImpl implements PM51Svc {
 		paramMap.put("pgmId", "PM5102P01");
 		cm08Svc.fileUpload(paramMap, mRequest);
 
+		if (!paramMap.containsKey("approvalArr")) {
+			paramMap.put("approvalArr", "[]");
+		}
 		if (paramMap.containsKey("approvalArr")) {
 			List<Map<String, String>> approvalArr = gsonDtl.fromJson(paramMap.get("approvalArr"), dtlMap);
+			approvalArr = appendTripRptTravelerLeaders(paramMap, approvalArr);
 			if (approvalArr != null && approvalArr.size() > 0) {
 				String pgParam1 = "{\"actionType\":\"" + "T" + "\",";
 				pgParam1 += "\"gubun\":\"" + "팀" + "\",";
@@ -666,6 +726,7 @@ public class PM51SvcImpl implements PM51Svc {
 						if (approvalMap.get("userId").equals(approvalMap.get("usrNm"))) {
 							approvalMap.put("todoCfOpn", "자체승인");
 							approvalMap.put("todoNo", approvalMap.get("reqNo"));
+							approvalMap.put("sanctnSn", approvalMap.get("sanCtnSn"));
 
 							Object value = approvalMap.get("toDoKey");
 							if (value != null) {
@@ -678,6 +739,7 @@ public class PM51SvcImpl implements PM51Svc {
 				}
 			}
 		}
+		processTripReqApprovalArr(paramMap, gsonDtl, dtlMap, "mngApprovalArr", "관리부서");
 
 		return result;
 	}
@@ -720,23 +782,13 @@ public class PM51SvcImpl implements PM51Svc {
 	}
 
 	private String approvalSalesCd(Map<String, String> paramMap) {
+		if (hasText(paramMap.get("salesCd"))) {
+			return paramMap.get("salesCd");
+		}
 		if (hasText(paramMap.get("tripRptNo"))) {
 			return paramMap.get("tripRptNo");
 		}
-		if (hasText(paramMap.get("tripReqNo"))) {
-			return paramMap.get("tripReqNo");
-		}
-		return paramMap.get("salesCd");
-	}
-
-	private void deleteLegacyApprovalRowsIfNeeded(Map<String, String> delParam, String legacySalesCd) {
-		if (!hasText(legacySalesCd) || legacySalesCd.equals(delParam.get("salesCd"))) {
-			return;
-		}
-
-		Map<String, String> legacyParam = new HashMap<>(delParam);
-		legacyParam.put("salesCd", legacySalesCd);
-		pm51Mapper.deleteTripReqApprovalLines(legacyParam);
+		return paramMap.get("tripReqNo");
 	}
 
 	private boolean hasCompletedApproval(Map<String, String> paramMap, boolean managementOnly) {
@@ -748,6 +800,102 @@ public class PM51SvcImpl implements PM51Svc {
 		}
 		String cnt = approvalChkList.get(0).get("cnt");
 		return cnt != null && !"0".equals(cnt);
+	}
+
+	private List<Map<String, String>> appendTripRptTravelerLeaders(Map<String, String> paramMap,
+			List<Map<String, String>> approvalArr) {
+		List<Map<String, String>> sourceArr = approvalArr == null ? new ArrayList<>() : approvalArr;
+
+		// 화면에서 온 결재선 자체의 중복 아이디 제거 (결재/공유 각각 첫 행만 유지)
+		List<Map<String, String>> mergedApprovalArr = new ArrayList<>();
+		Set<String> registeredUserIds = new HashSet<>();
+		Set<String> sharedUserIds = new HashSet<>();
+		for (Map<String, String> approvalMap : sourceArr) {
+			String userId = approvalMap.get("usrNm");
+			if (!hasText(userId)) {
+				userId = approvalMap.get("todoId");
+			}
+			Set<String> idSet = "공유".equals(approvalMap.get("gb")) ? sharedUserIds : registeredUserIds;
+			if (hasText(userId) && !idSet.add(userId)) {
+				continue;
+			}
+			mergedApprovalArr.add(approvalMap);
+		}
+
+		List<Map<String, String>> leaderArr = pm51Mapper.selectTripRptTravelerApprovalLines(paramMap);
+		if (leaderArr == null || leaderArr.isEmpty()) {
+			return mergedApprovalArr;
+		}
+
+		for (Map<String, String> leaderRow : leaderArr) {
+			String userId = leaderRow.get("usrNm");
+			if (!hasText(userId) || !registeredUserIds.add(userId)) {
+				continue;
+			}
+			// 조회 결과(CamelMap)는 put 시 키가 변형되므로 일반 HashMap으로 복사해서 사용
+			Map<String, String> leaderMap = new HashMap<>(leaderRow);
+			leaderMap.put("gb", "결재");
+			leaderMap.put("todoDiv2CodeId", "TODODIV2200");
+			leaderMap.put("flag", "I");
+			leaderMap.put("coCd", paramMap.get("coCd"));
+			mergedApprovalArr.add(leaderMap);
+		}
+		return mergedApprovalArr;
+	}
+
+	private List<Map<String, String>> appendTripReqApplicantApprovals(Map<String, String> paramMap,
+			List<Map<String, String>> approvalArr) {
+		List<Map<String, String>> mergedApprovalArr = approvalArr == null ? new ArrayList<>() : approvalArr;
+		Set<String> registeredUserIds = new HashSet<>();
+		for (Map<String, String> approvalMap : mergedApprovalArr) {
+			String userId = hasText(approvalMap.get("usrNm")) ? approvalMap.get("usrNm") : approvalMap.get("todoId");
+			if (hasText(userId)) {
+				registeredUserIds.add(userId);
+			}
+		}
+
+		String reqId = paramMap.get("reqId");
+		if (!hasText(reqId)) {
+			return mergedApprovalArr;
+		}
+		if (registeredUserIds.add(reqId)) {
+			Map<String, String> applicantMap = new HashMap<>();
+			applicantMap.put("gb", "결재");
+			applicantMap.put("usrNm", reqId);
+			applicantMap.put("todoId", reqId);
+			applicantMap.put("name", hasText(paramMap.get("reqNm")) ? paramMap.get("reqNm") : reqId);
+			applicantMap.put("todoDiv2CodeId", "TODODIV2190");
+			applicantMap.put("flag", "I");
+			mergedApprovalArr.add(applicantMap);
+		}
+
+
+		return mergedApprovalArr;
+	}
+
+	private List<Map<String, String>> appendPayMngApprovals(Map<String, String> paramMap,
+			List<Map<String, String>> approvalArr) {
+		List<Map<String, String>> mergedApprovalArr = approvalArr == null ? new ArrayList<>() : approvalArr;
+		Set<String> registeredUserIds = new HashSet<>();
+		for (Map<String, String> approvalMap : mergedApprovalArr) {
+			String userId = hasText(approvalMap.get("usrNm")) ? approvalMap.get("usrNm") : approvalMap.get("todoId");
+			if (hasText(userId)) {
+				registeredUserIds.add(userId);
+			}
+		}
+		for (String userId : new String[] { "cjm", "youngman", "EMJ8105" }) {
+			if (registeredUserIds.add(userId)) {
+				Map<String, String> approvalMap = new HashMap<>();
+				approvalMap.put("gb", "결재");
+				approvalMap.put("usrNm", userId);
+				approvalMap.put("todoId", userId);
+				approvalMap.put("name", userId);
+				approvalMap.put("todoDiv2CodeId", "TODODIV2191");
+				approvalMap.put("flag", "I");
+				mergedApprovalArr.add(approvalMap);
+			}
+		}
+		return mergedApprovalArr;
 	}
 
 	private void fillApprovalBaseParam(Map<String, String> approvalMap, Map<String, String> paramMap) {
@@ -771,6 +919,9 @@ public class PM51SvcImpl implements PM51Svc {
 		if ("PM5102P01".equals(pgmId)) {
 			return "/user/pm/pm51/PM5102P01.html";
 		}
+		if ("PM5101P02".equals(pgmId)) {
+			return "/user/pm/pm51/PM5101P02.html";
+		}
 		return "/user/pm/pm51/PM5101P01.html";
 	}
 
@@ -785,7 +936,18 @@ public class PM51SvcImpl implements PM51Svc {
 		String todoDiv2CodeId = approvalMap.get("todoDiv2CodeId");
 		return "TODODIV1190".equals(todoDiv2CodeId)
 				|| "TODODIV1191".equals(todoDiv2CodeId)
-				|| "怨듭쑀".equals(approvalMap.get("gb"));
+				|| "TODODIV1200".equals(todoDiv2CodeId)
+				|| "TODODIV1201".equals(todoDiv2CodeId)
+				|| "공유".equals(approvalMap.get("gb"));
+	}
+
+	@Override
+	public Map<String, Object> selectTripRptPaySummary(Map<String, String> paramMap) {
+		Map<String, Object> result = new HashMap<>();
+		result.put("expenseSums", pm51Mapper.selectTripRptPayExpenseSum(paramMap));
+		result.put("eatCntSum", pm51Mapper.selectTripRptEatCntSum(paramMap));
+		result.put("travelerExpenseSum", pm51Mapper.selectTripRptTravelerExpenseSum(paramMap));
+		return result;
 	}
 
 }

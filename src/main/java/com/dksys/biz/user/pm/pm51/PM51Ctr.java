@@ -161,6 +161,13 @@ public class PM51Ctr {
 		return "jsonView";
 	}
 
+	@PostMapping("/selectTripRptPaySummary")
+	public String selectTripRptPaySummary(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		Map<String, Object> result = pm51Svc.selectTripRptPaySummary(paramMap);
+		model.addAttribute("result", result);
+		return "jsonView";
+	}
+
 	@PostMapping("/insertTripRpt")
 	public String insertTripRpt(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) {
 		try {

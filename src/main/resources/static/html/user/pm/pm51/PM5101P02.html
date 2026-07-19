@@ -39,7 +39,7 @@
 
 	<form id="popForm" onSubmit="return false;">
 		<div class="form-group popup_table">
-			<input type="hidden" id="pgmId" name="pgmId" value="PM5101P01">
+		<input type="hidden" id="pgmId" name="pgmId" value="PM5101P02">
 			<input type="hidden" id="tripReqNo" name="tripReqNo">
 			<input type="hidden" id="fileTrgtKey" name="fileTrgtKey">
 			<input type="hidden" id="actionType" name="actionType">
@@ -215,7 +215,9 @@
 							<tr>
 								<th rowspan="2" style="text-align: center; border: 1px solid #ddd; font-family: inherit; font-size: 12px;">구분</th>
 								<th colspan="3" style="text-align: center; border: 1px solid #ddd; font-family: inherit; font-size: 12px;">여비지급기준</th>
-								<th rowspan="1" colspan="3" class="pay-amount-head" style="text-align: center; border: 1px solid #ddd; font-family: inherit; font-size: 12px;">지급금액<span style="font-size:10px; font-weight:normal; font-family: inherit;">(※회계팀 작성)</span></th>
+								<th rowspan="1" colspan="3" class="pay-amount-head" style="text-align: center; border: 1px solid #ddd; font-family: inherit; font-size: 12px;">지급금액<span style="font-size:10px; font-weight:normal; font-family: inherit;">(※회계팀 작성)</span>
+									<button type="button" id="payAmtRecalcBtn" onclick="loadPayAmtFromTripRpt(true);" class="btn btn-default btn-xs" style="margin-left: 8px; font-size: 10px; padding: 1px 6px;">재계산</button>
+								</th>
 							</tr>
 							<tr>
 								<th style="text-align: center; border: 1px solid #ddd; font-family: inherit; font-size: 12px;">국내(원)</th>
@@ -370,7 +372,7 @@
 						<tr style="height: 30px;">
 							<td style="text-align: LEFT; border-right: 0px;; font-size: 13px; font-weight: bold; color: blue;">관리부서 결재 및 공유</td>
 							<td>
-								<div class="add_btn_small pdl10" style="display: none;">
+								<div class="add_btn_small pdl10">
 									<a onclick="insertShareUserModalMng();" style="height: 30px; line-height: 28px;" authchk>+</a>
 									<a onclick="deleteShareUserMng();" style="height: 30px; line-height: 28px;" authchk>-</a>
 								</div>
@@ -397,6 +399,7 @@
 	<!-- 하단 버튼 -->
 	<div class="popup_bottom_btn">
 		<button type="button" id="saveBtn" onclick="saveTripReq();" authchk>저장</button>
+		<button type="button" id="payBtn" onclick="payTripReq();" authchk style="display:none; background-color: #2e6da4; color: white; border-color: #2e6da4;">지급완료처리</button>
 		<button type="button" id="deleteBtn" onclick="deleteTripReq();" authchk style="display:none;">삭제</button>
 		<button type="button" id="fileSaveBtn" onclick="saveFileOnly();" authchk style="display:none; background-color: #5cb85c; color: white; border-color: #5cb85c;">첨부파일저장</button>
 		<button type="button" class="close_btn" onclick="modalStack.close();">닫기</button>
@@ -826,7 +829,7 @@
 
 		$('#fileList_area').empty();
 		var fileParam = {
-			fileTrgtTyp: 'PM5101P01',
+			fileTrgtTyp: 'PM5101P02',
 			fileTrgtKey: fileTrgtKey,
 			todoNo: $('#tripReqNo').val() || fileTrgtKey,
 			coCd: jwt.coCd || "",
@@ -934,12 +937,30 @@
 		var list = gridViewApprovalMng.target.getList() || [];
 		var registeredIds = {};
 		$.each(list, function(_, row) { registeredIds[row.usrNm || row.todoId] = true; });
+		
+		var currentApprovalCount = $.grep(list, function(row) { return row.gb === '결재'; }).length;
+
 		$.each(['cjm', 'youngman', 'EMJ8105'], function(_, userId) {
 			if (!registeredIds[userId]) {
-				list.push({
-					gb: '결재', usrNm: userId, todoId: userId, name: userId,
-					todoDiv2CodeId: 'TODODIV2191', flag: 'I', autoPayMngApproval: 'Y', coCd: jwt.coCd
+				var userInfo = null;
+				postAjaxSync("/admin/cm/cm06/selectUserInfo", {"userId": userId}, null, function(data) {
+					if(data.userInfo) userInfo = data.userInfo;
 				});
+				currentApprovalCount++;
+				if (userInfo) {
+					list.push({
+						gb: '결재', usrNm: userId, todoId: userId, name: userInfo.name,
+						jik: userInfo.levelNm || '', dtNm: userInfo.deptNm || '',
+						todoDiv2CodeId: 'TODODIV2191', flag: 'I', autoPayMngApproval: 'Y', coCd: jwt.coCd,
+						sanctnSn: currentApprovalCount
+					});
+				} else {
+					list.push({
+						gb: '결재', usrNm: userId, todoId: userId, name: userId,
+						todoDiv2CodeId: 'TODODIV2191', flag: 'I', autoPayMngApproval: 'Y', coCd: jwt.coCd,
+						sanctnSn: currentApprovalCount
+					});
+				}
 			}
 		});
 		gridViewApprovalMng.setData2(list);
@@ -1033,7 +1054,7 @@
 			"userId": "",
 			"userNm": "",
 			"pm20Flag": "Y", // 다중 선택 활성화 플래그
-			"pgmId": "PM5101P01"
+			"pgmId": "PM5101P02"
 		};
 
 		openSecondModal("/static/html/cmn/modal/userSearch.html", 450, 650, "사원 검색 (다중 선택)", paramObj, function (tree, personNodes) {
@@ -1289,6 +1310,7 @@
 				$('#payDt_value').text(formattedPayDt);
 				$('#payDt_display').show();
 				isPayDtExist = true;
+				$('#payAmtRecalcBtn').hide(); // 지급완료 후에는 재계산 불가
 			} else {
 				$('#payDt_display').hide();
 				isPayDtExist = false;
@@ -1337,6 +1359,9 @@
 
 			$('#fileTrgtKey').val(master.fileTrgtKey); //첨부파일
 			initFileTree(); //첨부파일
+			if (popParam.actionType === 'PAY') {
+				loadPayAmtFromTripRpt();
+			}
 		});
 	}
 
@@ -1548,6 +1573,33 @@
 			openProgress(false);
 		});
 	}
+
+	function payTripReq() {
+		if (blockApprovalEntryEdit()) return;
+		if (hasCompletedApprovalMng()) {
+			alert("관리부서 결재가 완료되어 지급완료 처리할 수 없습니다.");
+			applyEditPolicy(currentTripReqMaster);
+			return;
+		}
+		var mngList = gridViewApprovalMng.target.getList();
+		var hasApproval = false;
+		for (var i = 0; i < mngList.length; i++) {
+			if (mngList[i].gb === '결재') {
+				hasApproval = true;
+				break;
+			}
+		}
+		if (!hasApproval) {
+			alert("관리부서 결재자(결재)를 등록해야 지급완료 처리가 가능합니다.");
+			return;
+		}
+
+		if (!confirm("지급완료 처리하시겠습니까?\n(입력하신 지급비용 및 결재선이 저장된 후 지급완료 처리됩니다.)")) return;
+
+		window.isPayingNow = true;
+		saveTripReq();
+	}
+
 
 	// 삭제
 	function deleteTripReq() {
@@ -2420,6 +2472,69 @@
 		calcTableTotal();
 	}
 
+	// 지급금액 자동 집계: 출장복명서 경비 세부내역(통화별 항목 합계) + 식수×12,000
+	function loadPayAmtFromTripRpt(force) {
+		// force=true : 재계산 버튼 - 기존 입력값을 복명서 집계로 덮어씀 (지급완료 전에만 가능)
+		if (force) {
+			if (isPayDtExist) {
+				alert("지급완료된 출장신청서는 재계산할 수 없습니다.");
+				return;
+			}
+			if (!confirm("출장복명서 경비 기준으로 지급금액을 다시 계산하시겠습니까?\n(입력된 지급금액은 집계값으로 대체됩니다.)")) return;
+		} else {
+			// 자동 세팅: 기존 입력값이 하나라도 있으면 세팅하지 않음 (저장값 유지)
+			var items = ['traffic', 'lodging', 'meal', 'daily', 'special'];
+			var hasValue = false;
+			$.each(items, function(idx, item) {
+				var krwVal = parseMoney($expensePayInput(item).val());
+				var usdVal = parseMoney($expensePayUsdInput(item).val());
+				if (krwVal !== 0 || usdVal !== 0) {
+					hasValue = true;
+					return false;
+				}
+			});
+			if (hasValue) return;
+		}
+
+		postAjax("/user/pm/pm51/selectTripRptPaySummary", { "tripReqNo": $('#tripReqNo').val() }, null, function (data) {
+			if (!data.result) return;
+			var sums = data.result.expenseSums || [];
+			var krw = { traffic: 0, lodging: 0, daily: 0, special: 0 };
+			var usd = { traffic: 0, lodging: 0, daily: 0, special: 0 };
+			$.each(sums, function (idx, row) {
+				var target = row.currClass === 'KRW' ? krw : (row.currClass === 'USD' ? usd : null);
+				if (!target) return;
+				target.traffic += (Number(row.trafficAmt) || 0) + (Number(row.carAmt) || 0);
+				target.lodging += Number(row.lodgingAmt) || 0;
+				target.daily += Number(row.dailyAmt) || 0;
+				target.special += Number(row.specialAmt) || 0;
+			});
+			var mealKrw = (Number(data.result.eatCntSum) || 0) * 12000;
+
+			// 일비/숙박비(KRW): 경비 세부내역(D01) 집계 우선, 값이 없으면 출장자별 경비(D02) 합계로 대체
+			var tvSum = data.result.travelerExpenseSum || {};
+			if (!krw.daily) krw.daily = Number(tvSum.dailyAmtSum) || 0;
+			if (!krw.lodging) krw.lodging = Number(tvSum.lodgingAmtSum) || 0;
+
+			setPayAmtInput('traffic', krw.traffic);
+			setPayAmtInput('lodging', krw.lodging);
+			setPayAmtInput('meal', mealKrw);
+			setPayAmtInput('daily', krw.daily);
+			setPayAmtInput('special', krw.special);
+			setPayAmtInput('usd_traffic', usd.traffic);
+			setPayAmtInput('usd_lodging', usd.lodging);
+			setPayAmtInput('usd_meal', 0);
+			setPayAmtInput('usd_daily', usd.daily);
+			setPayAmtInput('usd_special', usd.special);
+			calcTableTotal();
+		});
+	}
+
+	function setPayAmtInput(item, amt) {
+		var id = item.indexOf('usd_') === 0 ? 'payAmtUsd_' + item.substring(4) : 'payAmt_' + item;
+		$('table.expense_detail_tablepopup input[id="' + id + '"]').val(Number(amt || 0).toLocaleString());
+	}
+
 	function gridResize(gridObj, size) {
 		var gridName = '';
 		if (gridObj && gridObj.target && gridObj.target.$target) {
@@ -2441,9 +2556,8 @@
 	}
 
     //신청인 검색
-	function openUserSearch(type) {
-		var previousReqId = $('#reqId').val() || '';
-		var paramObj = {};
+    function openUserSearch(type) {
+        var paramObj = {};
         paramObj["coCd"] = jwt.coCd || "";
         paramObj["userId"] = $('#reqId').val() || "";
         paramObj["useYn"] =  "Y";
@@ -2454,7 +2568,7 @@
             if (checkedNode && checkedNode.type === 'person') {
                 $('#reqId').val(checkedNode.id);
                 $('#reqNm').val(checkedNode.text);
-				setApplicantDefaultApprovalLine(checkedNode.id, checkedNode.text, previousReqId);
+				setApplicantDefaultApprovalLine(checkedNode.id, checkedNode.text);
 
                 // 신청인을 출장자 그리드에 자동 추가
                 var existingIds = travelerGridView.target.getList().map(function(r) { return r.userId; });
@@ -2606,7 +2720,7 @@
 			, "clntNm": clntNm
 			, "ordrgMngNm": jwt.userNm				//작성자(담당자)
 			, "ordrgMngTelNo": teleNo				//담당자전화번호
-			, "creatPgm": "PM5101P01"
+			, "creatPgm": "PM5101P02"
 			, "chkSentYn": "Y"					//기발송 수신자 제외(중복방지)
 			, "customMessage": buildTripReqKakaoMessage(sanctnDiv2, clntNm, teleNo)	//본문은 신청서 정보로 직접 조립 (제목은 기존 그대로)
 		};

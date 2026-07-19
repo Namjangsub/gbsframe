@@ -15,6 +15,8 @@
 <link rel="stylesheet" href="/static/css/ax5/ax5toast.css">
 <link rel="stylesheet" href="/static/css/ax5/ax5grid.css">
 <link rel="stylesheet" href="/static/css/ax5/ax5menu.css">
+<link rel="stylesheet" href="/static/css/ax5/ax5select.css">
+<link rel="stylesheet" href="/static/css/ax5/ax5picker.css">
 <link rel="stylesheet" href="/static/css/jstree/style.min.css">
 <link rel="stylesheet" href="/static/css/gnb.css">
 <link rel="stylesheet" href="/static/css/main.css">
@@ -33,6 +35,8 @@
 <script src="/static/js/ax5/ax5toast.min.js"></script>
 <script src="/static/js/ax5/ax5grid.min.js"></script>
 <script src="/static/js/ax5/ax5menu.min.js"></script>
+<script src="/static/js/ax5/ax5select.min.js"></script>
+<script src="/static/js/ax5/ax5picker.min.js"></script>
 <script src="/static/js/ax5/ax5formatter.min.js"></script>
 <script src="/static/js/jstree/jstree.min.js"></script>
 <script src="/static/js/global.js"></script>
@@ -106,7 +110,7 @@
 			<div class="contents_tit">
 				<span style="height: 30px; line-height: 30px;font-size: 15px;margin-left: 15px">출장신청서 목록</span>
 				<span style="margin-left: 15px; font-size: 12px; color: #666;">
-					[결재상태: 
+					[결재상태:
 					<i class="fas fa-circle" style="color: red;"></i> 결재자없음
 					<i class="fas fa-circle" style="color: gray; margin-left: 5px;"></i> 결재신청
 					<i class="fas fa-circle" style="color: green; margin-left: 5px;"></i> 결재진행중
@@ -211,7 +215,7 @@
 						});
 						return res.join(" ~ ");
 					}},
-					{ 
+					{
 						key: "aprvStsNm", label: "결재상태", width: 70, align: "center",
 						formatter: function() {
 							return formatApprovalStatus(this.item.appTotCnt, this.item.appDoneCnt, this.item.aprvStsNm);
@@ -222,7 +226,7 @@
 					{ key: "tripPlace", label: "출장지", width: 150, align: "left" },
 					{ key: "salesCd", label: "SalesCd", width: 120, align: "center" },
 					{ key: "equipNm", label: "장비명", width: 120, align: "left" },
-					{ 
+					{
 						key: "tripRptYn", label: "복명서", width: 60, align: "center",
 						formatter: function() {
 							var val = this.item.tripRptYn || 'N';
@@ -375,28 +379,42 @@
 	function createReportModal() {
 		var selectedRows = gridView.target.getList("selected");
 		if (!selectedRows || selectedRows.length === 0) {
-			alert("복명서 작성할 행을 선택해주세요.");
+			alert("복명서 작성/수정할 행을 선택해주세요.");
 			return;
 		}
 
 		if (selectedRows.length > 1) {
-			alert("복명서 작성은 한 건만 선택해주세요.");
+			alert("한 건만 선택해주세요.");
 			return;
 		}
 
-		// 복명서 미작성 행만 선택 확인
-		var validRows = selectedRows.filter(row => row.tripRptYn === 'N');
-		if (validRows.length === 0) {
-			alert("미복명된 항목을 선택해주세요.");
-			return;
+		var row = selectedRows[0];
+		if (row.tripRptNo) {
+			// 이미 복명서가 작성된 경우 -> 수정 모드로 진입
+			var openReport = function (tripRptNo) {
+				openModal("/static/html/user/pm/pm51/PM5102P01.html", 1600, 860, "출장복명서 수정", {
+					actionType: "U",
+					tripRptNo: tripRptNo,
+					pgmId: "PM5102P01"
+				}, function () {
+					gridView.setData(0);
+				});
+			};
+			if (row.tripRptNo) openReport(row.tripRptNo);
+			else postAjax("/user/pm/pm51/selectTripRptList", { tripReqNo: row.tripReqNo }, null, function (data) {
+				var rpt = data.result && data.result.length ? data.result[0] : null;
+				if (rpt && rpt.tripRptNo) openReport(rpt.tripRptNo);
+				else alert("출장복명서 정보를 찾을 수 없습니다.");
+			});
+		} else {
+			// 복명서가 작성되지 않은 경우 -> 신규 등록 모드로 진입
+			openModal("/static/html/user/pm/pm51/PM5102P01.html", 1600, 860, "출장복명서 등록", {
+				actionType: "C",
+				tripReqNo: row.tripReqNo
+			}, function () {
+				gridView.setData(0);
+			});
 		}
-
-		openModal("/static/html/user/pm/pm51/PM5102P01.html", 1600, 860, "출장복명서 등록", {
-			actionType: "C",
-			tripReqNo: validRows[0].tripReqNo
-		}, function () {
-			gridView.setData(0);
-		});
 	}
 
 	function isAccountingUser() {
@@ -415,7 +433,7 @@
 
 	function updatePayDone() {
 		if (!isAccountingUser()) {
-			alert("회계팀 및 전산실만 지급완료 처리할 수 있습니다.");
+			alert("회계팀만 지급완료 처리할 수 있습니다.");
 			return;
 		}
 		var row = getSelectedTripReqRow("지급완료 처리할 행을 선택해주세요.");
@@ -424,9 +442,8 @@
 			alert("이미 지급완료 처리된 출장신청서입니다.");
 			return;
 		}
-		if (!confirm("해당 출장신청서의 지급비용 및 결재선을 확인하기 위해 상세 팝업을 엽니다. 계속하시겠습니까?")) return;
 
-		openModal("/static/html/user/pm/pm51/PM5101P01.html", 1700, 860, "출장신청서 지급처리", {
+		openModal("/static/html/user/pm/pm51/PM5101P02.html", 1700, 860, "출장신청서 지급처리", {
 			actionType: "PAY",
 			tripReqNo: row.tripReqNo
 		}, function () {
@@ -472,7 +489,7 @@
 		}
 
 		var row = selectedRows[0];
-		
+
 		var fileName = "PM5101R01.jrf";
 		var arg = "coCd#" + jwt.coCd
 				+ "#tripReqNo#" + row.tripReqNo
@@ -499,11 +516,11 @@
 			list.forEach(row => {
 				excelData.push({
 					신청번호: row.tripReqNo,
-					출장일자: (function(v) { 
-						if (!v) return ""; 
-						var val = v.replace(/[^0-9]/g, ""); 
-						if (val.length >= 8) return val.substring(0, 4) + "-" + val.substring(4, 6) + "-" + val.substring(6, 8); 
-						return v; 
+					출장일자: (function(v) {
+						if (!v) return "";
+						var val = v.replace(/[^0-9]/g, "");
+						if (val.length >= 8) return val.substring(0, 4) + "-" + val.substring(4, 6) + "-" + val.substring(6, 8);
+						return v;
 					})(row.tripStDtm),
 					고객사: row.clntNm,
 					프로젝트: row.clntPjtNm,

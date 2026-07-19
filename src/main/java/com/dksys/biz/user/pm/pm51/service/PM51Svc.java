@@ -39,4 +39,6 @@ public interface PM51Svc {
 
 	int deleteTripRpt(Map<String, String> paramMap) throws Exception;
 
+	Map<String, Object> selectTripRptPaySummary(Map<String, String> paramMap);
+
 }
