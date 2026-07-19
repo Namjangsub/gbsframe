@@ -12,6 +12,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.dksys.biz.admin.cm.cm16.mapper.CM16Mapper;
 import com.dksys.biz.user.im.im01.mapper.IM01Mapper;
+import com.dksys.biz.user.pm.pm51.mapper.PM51Mapper;
 import com.dksys.biz.user.qm.qm01.mapper.QM01Mapper;
 import com.dksys.biz.user.wb.wb20.mapper.WB20Mapper;
 import com.dksys.biz.user.wb.wb20.service.WB20Svc;
@@ -39,6 +40,9 @@ public class WB20SvcImpl implements WB20Svc {
 
     @Autowired
     IM01Mapper im01Mapper;
+
+	@Autowired
+	PM51Mapper pm51Mapper;
 
 	@Autowired
 	ExceptionThrower thrower;
@@ -110,7 +114,6 @@ public class WB20SvcImpl implements WB20Svc {
 	public Map<String, String> insertApprovalLine(Map<String, String> paramMap) {
 
 		int result = 0;
-		result += wb20Mapper.updateApprovalLine(paramMap);
 		/*
 		 * paramMap 내용 { todoId=js.nam, todoCfOpn=, issNo=RES2400144, coCd=GUN, todoDiv1CodeId=TODODIV20, todoDiv2CodeId=TODODIV2030, pgmId=WB2001M01,
 		 * salesCd=24000-00DUMMY, todoDiv1CodeNm=결재, todoDiv2CodeNm=발주/출장요청(결과), todoFileTrgtKey=1287, todoTitl=(주)건양아이티티-기타정상발주및출장요청서결과,
@@ -119,6 +122,8 @@ public class WB20SvcImpl implements WB20Svc {
 		String tempReqNo = paramMap.get("todoNo");
 		String todoDiv2CodeId = paramMap.get("todoDiv2CodeId");
 		String todoCfOpn = paramMap.get("todoCfOpn");
+		validatePm51SalesApproval(paramMap);
+		result += wb20Mapper.updateApprovalLine(paramMap);
 		boolean pfuShareTarget = false;
 		// TODODIV2020:발주 및 출장 요청 상태코드 바꾸기
 		if ("TODODIV2020".equals(todoDiv2CodeId)) {
@@ -209,6 +214,9 @@ public class WB20SvcImpl implements WB20Svc {
 
 		// 최종결재 완료시 알림톡 발송 대상인지 확인
 		Map<String, String> resultMap = wb20Mapper.selectTodoFinalYn(paramMap);
+		if ("TODODIV2190".equals(todoDiv2CodeId)) {
+			updatePm51AprvSts(paramMap, "Y".equals(resultMap.get("todoYn")) ? "APRVSTS03" : "APRVSTS02");
+		}
 
 		// PFU결재완료 시 추가 공유자 설정
 		resultMap.put("RESULT_COUNT", Integer.toString(result));
@@ -231,6 +239,56 @@ public class WB20SvcImpl implements WB20Svc {
 	}
 
 	/* 공통결재 보완요청 insert */
+	private void validatePm51SalesApproval(Map<String, String> paramMap) {
+		if (!isPm51SalesApproval(paramMap)) {
+			return;
+		}
+
+		Map<String, String> tripParam = new HashMap<>();
+		tripParam.put("tripReqNo", paramMap.get("todoNo"));
+		Map<String, String> tripReq = pm51Mapper.selectTripReqM01(tripParam);
+		if (tripReq == null) {
+			throw new RuntimeException("출장신청서 정보를 찾을 수 없습니다.");
+		}
+
+		boolean supportChecked = checked(tripReq.get("sprtTrfcYn"))
+				|| checked(tripReq.get("sprtLdgYn"))
+				|| checked(tripReq.get("sprtMealYn"))
+				|| checked(tripReq.get("sprtEtcYn"));
+		if (!checked(tripReq.get("salesCnfrmYn")) || !hasText(tripReq.get("tripCondCd")) || !supportChecked) {
+			throw new RuntimeException("영업팀 확인, 출장조건, 고객사지원범위를 입력해야 결재처리할 수 있습니다.");
+		}
+	}
+
+	private boolean isPm51SalesApproval(Map<String, String> paramMap) {
+		return "TODODIV2190".equals(paramMap.get("todoDiv2CodeId"))
+				&& isSalesDept(paramMap.get("deptId"))
+				&& hasText(paramMap.get("todoNo"));
+	}
+
+	private void updatePm51AprvSts(Map<String, String> paramMap, String aprvStsCd) {
+		if (!hasText(paramMap.get("todoNo"))) {
+			return;
+		}
+		Map<String, String> tripParam = new HashMap<>();
+		tripParam.put("tripReqNo", paramMap.get("todoNo"));
+		tripParam.put("aprvStsCd", aprvStsCd);
+		tripParam.put("todoId", paramMap.get("todoId"));
+		pm51Mapper.updateTripReqAprvStsCd(tripParam);
+	}
+
+	private boolean isSalesDept(String deptId) {
+		return deptId != null && (deptId.startsWith("GUN30") || deptId.startsWith("TRN30"));
+	}
+
+	private boolean checked(String value) {
+		return "Y".equals(value);
+	}
+
+	private boolean hasText(String value) {
+		return value != null && value.trim().length() > 0;
+	}
+
 	@Override
 	public Map<String, String> insertApprovalMemoComment(Map<String, String> paramMap) {
 		

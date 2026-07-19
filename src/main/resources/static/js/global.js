@@ -3273,6 +3273,8 @@ function insertKakaoMessage(dStatus, talkDeJson, param){
 			, "nameTo": param.nameTo
 			, "creatId": jwt.userId
 			, "creatPgm": param.creatPgm
+			, "todoNo": param.todoNo
+			, "todoDiv2CodeId": param.todoDiv2CodeId
 	};
 	postAjax("/user/bm/bm18/insertKakaoMessage", formData, null, function(data) {
 		//customAlert(data.resultMessage);// 결과 메시지를 alert으로 출력

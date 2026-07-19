@@ -50,4 +50,6 @@ public interface CR10Svc {
   
   int updateLgistCompl(List<Map<String, String>> paramList) throws Exception;
 
+  List<Map<String, String>> selectLgistItemPartList(Map<String, String> paramMap);
+
 }

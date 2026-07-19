@@ -100,6 +100,32 @@ public class CR10SvcImpl implements CR10Svc {
 	  return list;
   }
 
+  @Override
+  public List<Map<String, String>> selectLgistItemPartList(Map<String, String> paramMap) {
+      List<Map<String, String>> list = cr10Mapper.selectLgistItemPartList(paramMap);
+
+      String lgistNo = paramMap.get("lgistNo");
+      for (Map<String, String> row : list) {
+          String lgistNoSeq = row.get("lgistNoSeq");
+          String itemPartNoSeq = row.get("lgistItemPartNoSeq");
+          String hasImg = row.get("hasImg");
+          if ("Y".equalsIgnoreCase(hasImg)) {
+              row.put("imgUrl", "/user/cr/cr10/itemPartListImage?lgistNo=" + lgistNo
+                      + "&lgistNoSeq=" + lgistNoSeq + "&lgistItemPartNoSeq=" + itemPartNoSeq + "&imgNo=1");
+          } else {
+              row.put("imgUrl", "");
+          }
+          String hasImg2 = row.get("hasImg2");
+          if ("Y".equalsIgnoreCase(hasImg2)) {
+              row.put("imgUrl2", "/user/cr/cr10/itemPartListImage?lgistNo=" + lgistNo
+                      + "&lgistNoSeq=" + lgistNoSeq + "&lgistItemPartNoSeq=" + itemPartNoSeq + "&imgNo=2");
+          } else {
+              row.put("imgUrl2", "");
+          }
+      }
+      return list;
+  }
+
 
   @Override
   public Map<String, Object> checkLgistItemImage(Map<String, String> paramMap) {
@@ -269,6 +295,8 @@ public class CR10SvcImpl implements CR10Svc {
 		//---------------------------------------------------------------
 		//첨부 화일 처리 시작  (처음 등록시에는 화일 삭제할게 없음)
 		//---------------------------------------------------------------
+		processItemPartS(paramMap, mRequest, gsonDtl, dtlMap, lgistNo);
+
 		if (uploadFileList.size() > 0) {
 		    paramMap.put("fileTrgtTyp", paramMap.get("pgmId"));
 //		    paramMap.put("fileTrgtKey", lgistNo);
@@ -559,6 +587,8 @@ public class CR10SvcImpl implements CR10Svc {
 	//---------------------------------------------------------------
 	//첨부 화일 처리 시작
 	//---------------------------------------------------------------
+    processItemPartS(paramMap, mRequest, gsonDtl, dtlMap, null);
+
     if (uploadFileList.size() > 0) {
 	    paramMap.put("fileTrgtTyp", paramMap.get("pgmId"));
 //	    paramMap.put("fileTrgtKey", paramMap.get("fileTrgtKey"));
@@ -669,6 +699,112 @@ public class CR10SvcImpl implements CR10Svc {
 	    return (name.length() > maxLen) ? name.substring(name.length() - maxLen) : name;
 	}
 
+  /**
+   * 설비별 PART LIST(BOM, TB_CR11D13) 저장 공통 처리.
+   * insertLgistMast / updateLgistMast / updateLgistlistImage 에서 공통으로 호출한다.
+   * lgistNoOverride가 null이 아니면(신규 등록 시 방금 채번된 lgistNo) 그 값으로 lgistNo를 덮어쓴다.
+   */
+  private int processItemPartS(Map<String, String> paramMap, MultipartHttpServletRequest mRequest,
+          Gson gsonDtl, Type dtlMap, String lgistNoOverride) throws IOException {
+
+      String raw = paramMap.get("itemPartS");
+      if (raw == null || raw.length() == 0 || "\"\"".equals(raw)) {
+          return 0;
+      }
+      List<Map<String, String>> itemPartS = gsonDtl.fromJson(raw, dtlMap);
+      if (itemPartS == null || itemPartS.isEmpty()) {
+          return 0;
+      }
+
+      List<MultipartFile> files = mRequest.getFiles("itemPartFiles");
+      String[] seqArr = mRequest.getParameterValues("itemPartFilesSeq");
+      Map<String, MultipartFile> fileMap = new HashMap<>();
+      if (files != null && seqArr != null) {
+          int n = Math.min(files.size(), seqArr.length);
+          for (int i = 0; i < n; i++) {
+              String seq = (seqArr[i] == null) ? "" : seqArr[i].trim();
+              MultipartFile mf = files.get(i);
+              if (seq.isEmpty() || mf == null || mf.isEmpty()) continue;
+              fileMap.put(seq, mf);
+          }
+      }
+
+      List<MultipartFile> files2 = mRequest.getFiles("itemPartFiles2");
+      String[] seqArr2 = mRequest.getParameterValues("itemPartFiles2Seq");
+      Map<String, MultipartFile> fileMap2 = new HashMap<>();
+      if (files2 != null && seqArr2 != null) {
+          int n = Math.min(files2.size(), seqArr2.length);
+          for (int i = 0; i < n; i++) {
+              String seq = (seqArr2[i] == null) ? "" : seqArr2[i].trim();
+              MultipartFile mf = files2.get(i);
+              if (seq.isEmpty() || mf == null || mf.isEmpty()) continue;
+              fileMap2.put(seq, mf);
+          }
+      }
+
+      int result = 0;
+      for (Map<String, String> dtl : itemPartS) {
+          if (lgistNoOverride != null) {
+              dtl.put("lgistNo", lgistNoOverride);
+          }
+          dtl.put("userId", paramMap.get("userId"));
+          dtl.put("pgmId", paramMap.get("pgmId"));
+
+          String seq = dtl.get("lgistItemPartNoSeq");
+          if (seq == null || seq.trim().isEmpty()) {
+              seq = dtl.get("workRptNoSeq");
+          }
+          MultipartFile mf = (seq == null) ? null : fileMap.get(seq);
+
+          if (mf != null && !mf.isEmpty()) {
+              byte[] blob = mf.getBytes();
+              String orgName = safeFileName(mf.getOriginalFilename(), 50);
+              String mime = (mf.getContentType() == null) ? "" : mf.getContentType();
+              dtl.put("lgistItemPartImgNm", orgName);
+              dtl.put("lgistItemPartImgMime", mime);
+              @SuppressWarnings("unchecked")
+              Map rawMap = (Map) dtl;
+              rawMap.put("lgistItemPartImg", blob);
+              dtl.put("lgistItemPartImgSetYn", "Y");
+          } else {
+              dtl.put("lgistItemPartImgNm", "");
+              dtl.put("lgistItemPartImgMime", "");
+              @SuppressWarnings("unchecked")
+              Map rawMap = (Map) dtl;
+              rawMap.put("lgistItemPartImg", null);
+              dtl.put("lgistItemPartImgSetYn", "Y".equalsIgnoreCase(dtl.get("imgDelYn")) ? "Y" : "N");
+          }
+
+          MultipartFile mf2 = (seq == null) ? null : fileMap2.get(seq);
+          if (mf2 != null && !mf2.isEmpty()) {
+              byte[] blob2 = mf2.getBytes();
+              String orgName2 = safeFileName(mf2.getOriginalFilename(), 50);
+              String mime2 = (mf2.getContentType() == null) ? "" : mf2.getContentType();
+              dtl.put("lgistItemPartImg2Nm", orgName2);
+              dtl.put("lgistItemPartImg2Mime", mime2);
+              @SuppressWarnings("unchecked")
+              Map rawMap2 = (Map) dtl;
+              rawMap2.put("lgistItemPartImg2", blob2);
+              dtl.put("lgistItemPartImg2SetYn", "Y");
+          } else {
+              dtl.put("lgistItemPartImg2Nm", "");
+              dtl.put("lgistItemPartImg2Mime", "");
+              @SuppressWarnings("unchecked")
+              Map rawMap2 = (Map) dtl;
+              rawMap2.put("lgistItemPartImg2", null);
+              dtl.put("lgistItemPartImg2SetYn", "Y".equalsIgnoreCase(dtl.get("imgDelYn2")) ? "Y" : "N");
+          }
+
+          String updCheck = dtl.get("updCheck");
+          if ("D".equals(updCheck)) {
+              result += cr10Mapper.deleteLgistItemPartImageDetail(dtl);
+          } else {
+              result += cr10Mapper.mergeLgistItemPartDetail(dtl);
+          }
+      }
+      return result;
+  }
+
   
   
   @Override
@@ -697,8 +833,12 @@ public class CR10SvcImpl implements CR10Svc {
 	
 
 
+    // 설비별 PART LIST(BOM) 그룹 단독 저장 시에는 tripRptS/lgistFiles 없이 itemPartS만 전달됨
+    String itemPartSRaw = paramMap.get("itemPartS");
+    boolean hasItemPartS = itemPartSRaw != null && itemPartSRaw.trim().length() > 2; // "[]" 초과 시에만 실 데이터 있음
+
     // 자료가 하나도 없으면 PASS
-    if ((tripRptS == null || tripRptS.isEmpty()) && fileMap.isEmpty()) {
+    if ((tripRptS == null || tripRptS.isEmpty()) && fileMap.isEmpty() && !hasItemPartS) {
         return 9999; // 처리할 게 없음, 9999 프론트엔드에서 처리해야함
     }
     
@@ -756,7 +896,9 @@ public class CR10SvcImpl implements CR10Svc {
     	}
     }
 
-	
+    result += processItemPartS(paramMap, mRequest, gsonDtl, dtlMap, null);
+
+
     return result;
   }
   
@@ -790,6 +932,7 @@ public class CR10SvcImpl implements CR10Svc {
 		result += cr10Mapper.deleteTodoDetail(paramMap);			// 결재삭제
 		result += cr10Mapper.deleteLgistItemDetailAll(paramMap);	// 출하설비List 삭제
 		result += cr10Mapper.deleteLgistPartDetailAll(paramMap);	// partList 삭제
+		result += cr10Mapper.deleteLgistItemPartDetailAll(paramMap);	// 설비별 partList(BOM) 삭제
 
 		//---------------------------------------------------------------
 		//첨부 화일 처리 시작  (처음 등록시에는 화일 삭제할게 없음)

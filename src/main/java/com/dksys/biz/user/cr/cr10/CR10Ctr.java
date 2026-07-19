@@ -78,9 +78,13 @@ public class CR10Ctr {
 
 			List<Map<String, String>> lgistPartList = cr10Svc.selectLgistPartList(paramMap);
 			model.addAttribute("lgistPartList", lgistPartList);
+
+			List<Map<String, String>> lgistItemPartList = cr10Svc.selectLgistItemPartList(paramMap);
+			model.addAttribute("lgistItemPartList", lgistItemPartList);
 		} else {
 			model.addAttribute("lgistItemList", java.util.Collections.emptyList());
 			model.addAttribute("lgistPartList", java.util.Collections.emptyList());
+			model.addAttribute("lgistItemPartList", java.util.Collections.emptyList());
 		}
 
 		return "jsonView";
@@ -207,8 +211,53 @@ public class CR10Ctr {
 	            .header("Cache-Control", "no-cache")
 	            .body(imgBytes);
 	}
-	
-	
+
+	@ResponseBody
+	@GetMapping("/itemPartListImage")
+	public ResponseEntity<byte[]> getItemPartListImage(
+	        @RequestParam("lgistNo") String lgistNo,
+	        @RequestParam("lgistNoSeq") int lgistNoSeq,
+	        @RequestParam("lgistItemPartNoSeq") int lgistItemPartNoSeq,
+	        @RequestParam(value = "imgNo", defaultValue = "1") int imgNo
+	) throws Exception {
+
+	    Map<String, Object> p = new HashMap<>();
+	    p.put("lgistNo", lgistNo);
+	    p.put("lgistNoSeq", lgistNoSeq);
+	    p.put("lgistItemPartNoSeq", lgistItemPartNoSeq);
+	    p.put("imgNo", imgNo);
+
+	    Map<String, Object> r = cr10Mapper.selectLgistItemPartListImage(p);
+	    if (r == null) return ResponseEntity.notFound().build();
+
+	    Object imgObj  = r.get("lgistItemPartImg");
+	    if (imgObj == null) imgObj = r.get("lgistitempartimg");
+	    Object mimeObj = r.get("lgistItemPartImgMime");
+	    if (mimeObj == null) mimeObj = r.get("lgistitempartimgmime");
+
+	    if (imgObj == null) return ResponseEntity.notFound().build();
+
+	    byte[] imgBytes;
+	    if (imgObj instanceof byte[]) {
+	        imgBytes = (byte[]) imgObj;
+	    } else if (imgObj instanceof java.sql.Blob) {
+	        imgBytes = blobToBytes((java.sql.Blob) imgObj);
+	    } else {
+	        throw new IllegalStateException("IMG type not supported: " + imgObj.getClass());
+	    }
+
+	    if (imgBytes == null || imgBytes.length == 0) return ResponseEntity.notFound().build();
+
+	    String mime = (mimeObj == null) ? "application/octet-stream" : String.valueOf(mimeObj).trim();
+	    if (mime.isEmpty()) mime = "application/octet-stream";
+
+	    return ResponseEntity.ok()
+	            .contentType(org.springframework.http.MediaType.parseMediaType(mime))
+	            .header("Cache-Control", "no-cache")
+	            .body(imgBytes);
+	}
+
+
     // 사진 정보 조회
     // [post body json : Map 방식]
     // [경로 지정 : http://localhost:7000/saveImage]

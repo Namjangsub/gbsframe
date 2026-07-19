@@ -134,6 +134,23 @@
 			   FROM TB_WB20M03 A
 		      WHERE A.TODO_NO = T.LGIST_NO
 		        AND A.TODO_DIV1_CODE_ID = 'TODODIV20') AS APP_STATUS
+      , ( SELECT
+            CASE
+              WHEN CNT.APP_CNT   > 0 AND CNT.APP_CNT = CNT.APP_OK_CNT THEN 'BLUE'    -- 결재완료: 결재신청 있고 전부 확인됨
+              WHEN CNT.APP_CNT   > 0                                 THEN 'GREEN'   -- 결재진행중: 결재신청 1건이라도 있음
+              WHEN CNT.SHRNG_OK_CNT > 0                               THEN 'ORANGE'  -- 공유확인: 공유된 것 중 1건이라도 확인됨
+              WHEN CNT.APP_CNT > 0 OR CNT.SHRNG_CNT > 0               THEN 'GRAY'    -- 결재요청: 공유/결재신청 1건이라도 있음(기본)
+            END
+            FROM (
+              SELECT SUM(CASE WHEN A.TODO_DIV1_CODE_ID = 'TODODIV20' THEN 1 ELSE 0 END) AS APP_CNT
+                   , SUM(CASE WHEN A.TODO_DIV1_CODE_ID = 'TODODIV20' AND A.SANCTN_STTUS = 'Y' THEN 1 ELSE 0 END) AS APP_OK_CNT
+                   , SUM(CASE WHEN A.TODO_DIV1_CODE_ID = 'TODODIV10' THEN 1 ELSE 0 END) AS SHRNG_CNT
+                   , SUM(CASE WHEN A.TODO_DIV1_CODE_ID = 'TODODIV10' AND A.TODO_CF_DT IS NOT NULL THEN 1 ELSE 0 END) AS SHRNG_OK_CNT
+                FROM TB_WB20M03 A
+               WHERE A.TODO_NO = T.LGIST_NO
+                 AND A.TODO_DIV1_CODE_ID IN ('TODODIV10', 'TODODIV20')
+            ) CNT
+        ) AS ROW_STATUS_COLOR
 	      , ( SELECT BIZ_ADDR FROM CO_ADDR )                                                                                     AS CO_ADDR   
 	  FROM (
 			SELECT DISTINCT ''                      AS UPPER_CD 
@@ -968,6 +985,8 @@ SELECT (SELECT FN_CM05M01_CD_TO_NM(T.CO_CD) FROM DUAL) AS CO_NM
 			, FN_CM06M01_ID_TO_NM(T.REQ_ID) AS REQ_ID_NM
 			, T.PART_NO
 			, T.REQ_FX_DT
+			, T.CURR_CD
+			, NVL(T.EXRATE, 1) AS EXRATE
 			, T.CLAS_DIV
 			, T.TRNS_DIV
 			, T.DMS_TRNS_AREA_DIV
@@ -1239,6 +1258,15 @@ SELECT (SELECT FN_CM05M01_CD_TO_NM(T.CO_CD) FROM DUAL) AS CO_NM
 			    A.LGIST_ITEM_NM,
 			    A.LGIST_ITEM_DIV,
 			    A.LGIST_ITEM_QTY,
+			    A.LGIST_ITEM_SALES_CD,
+			    A.LGIST_ITEM_PRD_AMT,
+			    A.LGIST_ITEM_WIDTH_SIZE,
+			    A.LGIST_ITEM_VRTICL_SIZE,
+			    A.LGIST_ITEM_HEIGHT_SIZE,
+			    A.LGIST_ITEM_FRMLC_BEFORE_WT,
+			    A.LGIST_ITEM_FRMLC_AFTER_WT,
+			    A.LGIST_ITEM_HS_CODE,
+			    A.LGIST_ITEM_RMK,
 			    A.LGIST_ITEM_IMG_NM,
 			    A.LGIST_ITEM_IMG_MIME,
 			    CASE WHEN A.LGIST_ITEM_IMG IS NULL THEN 'N' ELSE 'Y' END AS HAS_IMG
@@ -1326,6 +1354,8 @@ SELECT (SELECT FN_CM05M01_CD_TO_NM(T.CO_CD) FROM DUAL) AS CO_NM
 		, REQ_ID
 		, PART_NO
 		, REQ_FX_DT
+		, CURR_CD
+		, EXRATE
 		, CLAS_DIV
 		, TRNS_DIV
 		, DMS_TRNS_AREA_DIV
@@ -1372,6 +1402,8 @@ SELECT (SELECT FN_CM05M01_CD_TO_NM(T.CO_CD) FROM DUAL) AS CO_NM
 		, #{reqId, jdbcType=VARCHAR}
 		, #{partNo, jdbcType=VARCHAR}
 		, #{reqFxDt, jdbcType=VARCHAR}
+		, #{currCd, jdbcType=VARCHAR}
+		, #{exrate, jdbcType=NUMERIC}
 		, #{clasDiv, jdbcType=VARCHAR}
 		, #{trnsDiv, jdbcType=VARCHAR}
 		, #{dmsTrnsAreaDiv, jdbcType=VARCHAR}
@@ -1419,6 +1451,8 @@ SELECT (SELECT FN_CM05M01_CD_TO_NM(T.CO_CD) FROM DUAL) AS CO_NM
             , REQ_ID = #{reqId, jdbcType=VARCHAR}
             , PART_NO = #{partNo, jdbcType=VARCHAR}
             , REQ_FX_DT = #{reqFxDt, jdbcType=VARCHAR}
+            , CURR_CD = #{currCd, jdbcType=VARCHAR}
+            , EXRATE = #{exrate, jdbcType=NUMERIC}
             , CLAS_DIV = #{clasDiv, jdbcType=VARCHAR}
             , TRNS_DIV = #{trnsDiv, jdbcType=VARCHAR}
             , DMS_TRNS_AREA_DIV = #{dmsTrnsAreaDiv, jdbcType=VARCHAR}
@@ -1646,6 +1680,15 @@ SELECT (SELECT FN_CM05M01_CD_TO_NM(T.CO_CD) FROM DUAL) AS CO_NM
 		    #{lgistItemNm}   					AS LGIST_ITEM_NM,
 		    #{lgistItemDiv}  					AS LGIST_ITEM_DIV,
 		    #{lgistItemQty}  					AS LGIST_ITEM_QTY,
+		    #{lgistItemSalesCd, jdbcType=VARCHAR}       AS LGIST_ITEM_SALES_CD,
+		    #{lgistItemPrdAmt, jdbcType=VARCHAR}        AS LGIST_ITEM_PRD_AMT,
+		    #{lgistItemWidthSize, jdbcType=VARCHAR}     AS LGIST_ITEM_WIDTH_SIZE,
+		    #{lgistItemVrticlSize, jdbcType=VARCHAR}    AS LGIST_ITEM_VRTICL_SIZE,
+		    #{lgistItemHeightSize, jdbcType=VARCHAR}    AS LGIST_ITEM_HEIGHT_SIZE,
+		    #{lgistItemFrmlcBeforeWt, jdbcType=VARCHAR} AS LGIST_ITEM_FRMLC_BEFORE_WT,
+		    #{lgistItemFrmlcAfterWt, jdbcType=VARCHAR}  AS LGIST_ITEM_FRMLC_AFTER_WT,
+		    #{lgistItemHsCode, jdbcType=VARCHAR}        AS LGIST_ITEM_HS_CODE,
+		    #{lgistItemRmk, jdbcType=VARCHAR}           AS LGIST_ITEM_RMK,
 		    #{lgistItemImg, jdbcType=BLOB}      AS LGIST_ITEM_IMG,
 		    #{lgistItemImgNm}                   AS LGIST_ITEM_IMG_NM,
 		    #{lgistItemImgMime}                 AS LGIST_ITEM_IMG_MIME,
@@ -1662,6 +1705,15 @@ SELECT (SELECT FN_CM05M01_CD_TO_NM(T.CO_CD) FROM DUAL) AS CO_NM
 		    T.LGIST_ITEM_NM   = S.LGIST_ITEM_NM,
 		    T.LGIST_ITEM_DIV  = S.LGIST_ITEM_DIV,
 		    T.LGIST_ITEM_QTY  = S.LGIST_ITEM_QTY,
+		    T.LGIST_ITEM_SALES_CD       = S.LGIST_ITEM_SALES_CD,
+		    T.LGIST_ITEM_PRD_AMT        = S.LGIST_ITEM_PRD_AMT,
+		    T.LGIST_ITEM_WIDTH_SIZE     = S.LGIST_ITEM_WIDTH_SIZE,
+		    T.LGIST_ITEM_VRTICL_SIZE    = S.LGIST_ITEM_VRTICL_SIZE,
+		    T.LGIST_ITEM_HEIGHT_SIZE    = S.LGIST_ITEM_HEIGHT_SIZE,
+		    T.LGIST_ITEM_FRMLC_BEFORE_WT = S.LGIST_ITEM_FRMLC_BEFORE_WT,
+		    T.LGIST_ITEM_FRMLC_AFTER_WT  = S.LGIST_ITEM_FRMLC_AFTER_WT,
+		    T.LGIST_ITEM_HS_CODE        = S.LGIST_ITEM_HS_CODE,
+		    T.LGIST_ITEM_RMK            = S.LGIST_ITEM_RMK,
 		    T.UDT_ID          = S.CREAT_ID,
 		    T.UDT_DTTM        = SYSTIMESTAMP,
 		    T.UDT_PGM         = S.CREAT_PGM
@@ -1678,6 +1730,15 @@ SELECT (SELECT FN_CM05M01_CD_TO_NM(T.CO_CD) FROM DUAL) AS CO_NM
 		    LGIST_ITEM_NM,
 		    LGIST_ITEM_DIV,
 		    LGIST_ITEM_QTY,
+		    LGIST_ITEM_SALES_CD,
+		    LGIST_ITEM_PRD_AMT,
+		    LGIST_ITEM_WIDTH_SIZE,
+		    LGIST_ITEM_VRTICL_SIZE,
+		    LGIST_ITEM_HEIGHT_SIZE,
+		    LGIST_ITEM_FRMLC_BEFORE_WT,
+		    LGIST_ITEM_FRMLC_AFTER_WT,
+		    LGIST_ITEM_HS_CODE,
+		    LGIST_ITEM_RMK,
 		    LGIST_ITEM_IMG,
 		    LGIST_ITEM_IMG_NM,
 		    LGIST_ITEM_IMG_MIME,
@@ -1693,6 +1754,15 @@ SELECT (SELECT FN_CM05M01_CD_TO_NM(T.CO_CD) FROM DUAL) AS CO_NM
 		    S.LGIST_ITEM_NM,
 		    S.LGIST_ITEM_DIV,
 		    S.LGIST_ITEM_QTY,
+		    S.LGIST_ITEM_SALES_CD,
+		    S.LGIST_ITEM_PRD_AMT,
+		    S.LGIST_ITEM_WIDTH_SIZE,
+		    S.LGIST_ITEM_VRTICL_SIZE,
+		    S.LGIST_ITEM_HEIGHT_SIZE,
+		    S.LGIST_ITEM_FRMLC_BEFORE_WT,
+		    S.LGIST_ITEM_FRMLC_AFTER_WT,
+		    S.LGIST_ITEM_HS_CODE,
+		    S.LGIST_ITEM_RMK,
 		    S.LGIST_ITEM_IMG,
 		    S.LGIST_ITEM_IMG_NM,
 		    S.LGIST_ITEM_IMG_MIME,
@@ -1872,6 +1942,171 @@ SELECT (SELECT FN_CM05M01_CD_TO_NM(T.CO_CD) FROM DUAL) AS CO_NM
 	
 	<delete id="deleteLgistPartDetailAll" parameterType="Map">
 		DELETE TB_CR11D03
+		WHERE LGIST_NO = #{lgistNo}
+	</delete>
+
+	<!-- 설비별 PART LIST (BOM, 1레벨) : 출하설비(LGIST_NO_SEQ) 단위로 묶인 부품 목록 -->
+	<select id="selectLgistItemPartList" parameterType="Map" resultType="camelMap">
+		SELECT
+				A.LGIST_NO                    AS LGIST_NO,
+				A.LGIST_NO_SEQ                 AS LGIST_NO_SEQ,
+				A.LGIST_ITEM_PART_NO_SEQ       AS LGIST_ITEM_PART_NO_SEQ,
+				A.LGIST_ITEM_PART_SOURCE_ID    AS LGIST_ITEM_PART_SOURCE_ID,
+				A.LGIST_ITEM_PART_ITEM_NO      AS LGIST_ITEM_PART_ITEM_NO,
+				A.LGIST_ITEM_PART_ITEM_NM      AS LGIST_ITEM_PART_ITEM_NM,
+				A.LGIST_ITEM_PART_SPEC_MAT     AS LGIST_ITEM_PART_SPEC_MAT,
+				A.LGIST_ITEM_PART_MAKER        AS LGIST_ITEM_PART_MAKER,
+				A.LGIST_ITEM_PART_QTY          AS LGIST_ITEM_PART_QTY,
+				A.LGIST_ITEM_PART_PRICE        AS LGIST_ITEM_PART_PRICE,
+				A.LGIST_ITEM_PART_AMOUNT       AS LGIST_ITEM_PART_AMOUNT,
+				A.LGIST_ITEM_PART_WEIGHT       AS LGIST_ITEM_PART_WEIGHT,
+				A.LGIST_ITEM_PART_UNIT         AS LGIST_ITEM_PART_UNIT,
+				A.LGIST_ITEM_PART_DESC         AS LGIST_ITEM_PART_DESC,
+				A.LGIST_ITEM_PART_ORIGIN       AS LGIST_ITEM_PART_ORIGIN,
+				A.LGIST_ITEM_PART_NW           AS LGIST_ITEM_PART_NW,
+				A.LGIST_ITEM_PART_GW           AS LGIST_ITEM_PART_GW,
+				A.LGIST_ITEM_PART_HS_CODE      AS LGIST_ITEM_PART_HS_CODE,
+				A.LGIST_ITEM_PART_IMG_NM       AS LGIST_ITEM_PART_IMG_NM,
+				A.LGIST_ITEM_PART_IMG_MIME     AS LGIST_ITEM_PART_IMG_MIME,
+				CASE WHEN A.LGIST_ITEM_PART_IMG IS NULL THEN 'N' ELSE 'Y' END AS HAS_IMG,
+				A.LGIST_ITEM_PART_IMG2_NM      AS LGIST_ITEM_PART_IMG2_NM,
+				A.LGIST_ITEM_PART_IMG2_MIME    AS LGIST_ITEM_PART_IMG2_MIME,
+				CASE WHEN A.LGIST_ITEM_PART_IMG2 IS NULL THEN 'N' ELSE 'Y' END AS HAS_IMG2
+		 FROM TB_CR11D13 A
+		WHERE LGIST_NO = #{lgistNo}
+		ORDER BY A.LGIST_NO_SEQ, TO_NUMBER(A.LGIST_ITEM_PART_ITEM_NO)
+	</select>
+
+	<select id="selectLgistItemPartListImage" parameterType="map" resultType="map">
+		SELECT
+			<choose>
+				<when test='imgNo != null and imgNo.toString() == "2"'>
+				LGIST_ITEM_PART_IMG2      AS "lgistItemPartImg",
+				LGIST_ITEM_PART_IMG2_MIME AS "lgistItemPartImgMime"
+				</when>
+				<otherwise>
+				LGIST_ITEM_PART_IMG       AS "lgistItemPartImg",
+				LGIST_ITEM_PART_IMG_MIME  AS "lgistItemPartImgMime"
+				</otherwise>
+			</choose>
+		FROM TB_CR11D13
+		WHERE LGIST_NO = #{lgistNo}
+		  AND LGIST_NO_SEQ = #{lgistNoSeq}
+		  AND LGIST_ITEM_PART_NO_SEQ = #{lgistItemPartNoSeq}
+	</select>
+
+	<resultMap id="itemPartImgMap" type="hashMap">
+		<result property="lgistItemPartImg" column="lgistItemPartImg" jdbcType="BLOB" javaType="byte[]"/>
+	</resultMap>
+
+	<update id="mergeLgistItemPartDetail" parameterType="map">
+		MERGE INTO TB_CR11D13 T
+		USING DUAL S
+		ON (T.LGIST_NO = #{lgistNo}
+			AND T.LGIST_NO_SEQ = #{lgistNoSeq}
+			AND T.LGIST_ITEM_PART_NO_SEQ = #{lgistItemPartNoSeq})
+
+		WHEN MATCHED THEN
+		  UPDATE SET
+		    T.LGIST_ITEM_PART_SOURCE_ID = #{lgistItemPartSourceId, jdbcType=VARCHAR},
+		    T.LGIST_ITEM_PART_ITEM_NO   = #{lgistItemPartItemNo, jdbcType=VARCHAR},
+		    T.LGIST_ITEM_PART_ITEM_NM   = #{lgistItemPartItemNm, jdbcType=VARCHAR},
+		    T.LGIST_ITEM_PART_SPEC_MAT  = #{lgistItemPartSpecMat, jdbcType=VARCHAR},
+		    T.LGIST_ITEM_PART_MAKER     = #{lgistItemPartMaker, jdbcType=VARCHAR},
+		    T.LGIST_ITEM_PART_QTY       = #{lgistItemPartQty, jdbcType=NUMERIC},
+		    T.LGIST_ITEM_PART_PRICE     = #{lgistItemPartPrice, jdbcType=NUMERIC},
+		    T.LGIST_ITEM_PART_AMOUNT    = #{lgistItemPartAmount, jdbcType=NUMERIC},
+		    T.LGIST_ITEM_PART_WEIGHT    = #{lgistItemPartWeight, jdbcType=VARCHAR},
+		    T.LGIST_ITEM_PART_UNIT      = #{lgistItemPartUnit, jdbcType=VARCHAR},
+		    T.LGIST_ITEM_PART_DESC      = #{lgistItemPartDesc, jdbcType=VARCHAR},
+		    T.LGIST_ITEM_PART_ORIGIN    = #{lgistItemPartOrigin, jdbcType=VARCHAR},
+		    T.LGIST_ITEM_PART_NW        = #{lgistItemPartNw, jdbcType=NUMERIC},
+		    T.LGIST_ITEM_PART_GW        = #{lgistItemPartGw, jdbcType=NUMERIC},
+		    T.LGIST_ITEM_PART_HS_CODE   = #{lgistItemPartHsCode, jdbcType=VARCHAR},
+		    T.UDT_ID               = #{userId, jdbcType=VARCHAR},
+		    T.UDT_DTTM             = SYSTIMESTAMP,
+		    T.UDT_PGM              = #{pgmId, jdbcType=VARCHAR}
+		    <if test='lgistItemPartImgSetYn == "Y"'>
+		      , T.LGIST_ITEM_PART_IMG       = #{lgistItemPartImg, jdbcType=BLOB}
+		      , T.LGIST_ITEM_PART_IMG_NM    = #{lgistItemPartImgNm, jdbcType=VARCHAR}
+		      , T.LGIST_ITEM_PART_IMG_MIME  = #{lgistItemPartImgMime, jdbcType=VARCHAR}
+		    </if>
+		    <if test='lgistItemPartImg2SetYn == "Y"'>
+		      , T.LGIST_ITEM_PART_IMG2      = #{lgistItemPartImg2, jdbcType=BLOB}
+		      , T.LGIST_ITEM_PART_IMG2_NM   = #{lgistItemPartImg2Nm, jdbcType=VARCHAR}
+		      , T.LGIST_ITEM_PART_IMG2_MIME = #{lgistItemPartImg2Mime, jdbcType=VARCHAR}
+		    </if>
+
+		WHEN NOT MATCHED THEN
+		  INSERT (
+		    LGIST_NO,
+		    LGIST_NO_SEQ,
+		    LGIST_ITEM_PART_NO_SEQ,
+		    LGIST_ITEM_PART_SOURCE_ID,
+		    LGIST_ITEM_PART_ITEM_NO,
+		    LGIST_ITEM_PART_ITEM_NM,
+		    LGIST_ITEM_PART_SPEC_MAT,
+		    LGIST_ITEM_PART_MAKER,
+		    LGIST_ITEM_PART_QTY,
+		    LGIST_ITEM_PART_PRICE,
+		    LGIST_ITEM_PART_AMOUNT,
+		    LGIST_ITEM_PART_WEIGHT,
+		    LGIST_ITEM_PART_UNIT,
+		    LGIST_ITEM_PART_DESC,
+		    LGIST_ITEM_PART_ORIGIN,
+		    LGIST_ITEM_PART_NW,
+		    LGIST_ITEM_PART_GW,
+		    LGIST_ITEM_PART_HS_CODE,
+		    LGIST_ITEM_PART_IMG,
+		    LGIST_ITEM_PART_IMG_NM,
+		    LGIST_ITEM_PART_IMG_MIME,
+		    LGIST_ITEM_PART_IMG2,
+		    LGIST_ITEM_PART_IMG2_NM,
+		    LGIST_ITEM_PART_IMG2_MIME,
+		    CREAT_ID,
+		    CREAT_DTTM,
+		    CREAT_PGM
+		  )
+		  VALUES (
+		    #{lgistNo},
+		    #{lgistNoSeq},
+		    #{lgistItemPartNoSeq},
+		    #{lgistItemPartSourceId, jdbcType=VARCHAR},
+		    #{lgistItemPartItemNo, jdbcType=VARCHAR},
+		    #{lgistItemPartItemNm, jdbcType=VARCHAR},
+		    #{lgistItemPartSpecMat, jdbcType=VARCHAR},
+		    #{lgistItemPartMaker, jdbcType=VARCHAR},
+		    #{lgistItemPartQty, jdbcType=NUMERIC},
+		    #{lgistItemPartPrice, jdbcType=NUMERIC},
+		    #{lgistItemPartAmount, jdbcType=NUMERIC},
+		    #{lgistItemPartWeight, jdbcType=VARCHAR},
+		    #{lgistItemPartUnit, jdbcType=VARCHAR},
+		    #{lgistItemPartDesc, jdbcType=VARCHAR},
+		    #{lgistItemPartOrigin, jdbcType=VARCHAR},
+		    #{lgistItemPartNw, jdbcType=NUMERIC},
+		    #{lgistItemPartGw, jdbcType=NUMERIC},
+		    #{lgistItemPartHsCode, jdbcType=VARCHAR},
+		    #{lgistItemPartImg, jdbcType=BLOB},
+		    #{lgistItemPartImgNm, jdbcType=VARCHAR},
+		    #{lgistItemPartImgMime, jdbcType=VARCHAR},
+		    #{lgistItemPartImg2, jdbcType=BLOB},
+		    #{lgistItemPartImg2Nm, jdbcType=VARCHAR},
+		    #{lgistItemPartImg2Mime, jdbcType=VARCHAR},
+		    #{userId, jdbcType=VARCHAR},
+		    SYSTIMESTAMP,
+		    #{pgmId, jdbcType=VARCHAR}
+		  )
+	</update>
+
+	<delete id="deleteLgistItemPartImageDetail" parameterType="Map">
+		DELETE TB_CR11D13
+		WHERE LGIST_NO = #{lgistNo}
+		  AND LGIST_NO_SEQ = #{lgistNoSeq}
+		  AND LGIST_ITEM_PART_NO_SEQ = #{lgistItemPartNoSeq}
+	</delete>
+
+	<delete id="deleteLgistItemPartDetailAll" parameterType="Map">
+		DELETE TB_CR11D13
 		WHERE LGIST_NO = #{lgistNo}
 	</delete>
 
