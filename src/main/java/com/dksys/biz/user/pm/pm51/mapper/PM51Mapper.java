@@ -36,6 +36,8 @@ public interface PM51Mapper {
 
 	int updateTripReqPayCancel(Map<String, String> paramMap);
 
+	int updateTripReqSalesInfo(Map<String, String> paramMap);
+
 	int deleteTripReqD01(Map<String, String> paramMap);
 
 	int deleteTripReqD02(Map<String, String> paramMap);
@@ -81,6 +83,8 @@ public interface PM51Mapper {
 	int insertTripRptD03(Map<String, String> paramMap);
 
 	int updateTripRptM02(Map<String, String> paramMap);
+
+	int updateTripRptMngEval(Map<String, String> paramMap);
 
 	int deleteTripRptD02(Map<String, String> paramMap);
 

@@ -13,6 +13,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartHttpServletRequest;
 
+import com.dksys.biz.admin.cm.cm06.mapper.CM06Mapper;
 import com.dksys.biz.admin.cm.cm08.service.CM08Svc;
 import com.dksys.biz.user.pm.pm51.mapper.PM51Mapper;
 import com.dksys.biz.user.pm.pm51.service.PM51Svc;
@@ -41,6 +42,9 @@ public class PM51SvcImpl implements PM51Svc {
 
 	@Autowired
 	WB24Mapper wb24Mapper;
+
+	@Autowired
+	CM06Mapper cm06Mapper;
 
 	@Override
 	public int selectTripReqListCount(Map<String, String> paramMap) {
@@ -745,6 +749,112 @@ public class PM51SvcImpl implements PM51Svc {
 	}
 
 	@Override
+	public int updateTripRptMngEval(Map<String, String> paramMap) throws Exception {
+		Map<String, String> m02 = pm51Mapper.selectTripRptM02(paramMap);
+		if (m02 == null) {
+			throw new RuntimeException("출장복명서 정보를 찾을 수 없습니다.");
+		}
+
+		Map<String, String> reqParam = new HashMap<>();
+		reqParam.put("tripReqNo", m02.get("tripReqNo"));
+		Map<String, String> m01 = pm51Mapper.selectTripReqM01(reqParam);
+		if (m01 == null) {
+			throw new RuntimeException("출장신청서 정보를 찾을 수 없습니다.");
+		}
+		if (hasText(m01.get("payDt"))) {
+			throw new RuntimeException("지급완료된 출장신청서는 수정할 수 없습니다.");
+		}
+
+		String applicantId = m01.get("userId");
+		String callerId = paramMap.get("userId");
+
+		Map<String, String> userInfoParam = new HashMap<>();
+		userInfoParam.put("userId", applicantId);
+		Map<String, String> applicantInfo = cm06Mapper.selectUserInfo(userInfoParam);
+
+		boolean isApplicantTeamManager = applicantInfo != null && "Y".equals(applicantInfo.get("teamManager"));
+		boolean isSelfTeamManagerEdit = isApplicantTeamManager && hasText(applicantId) && applicantId.equals(callerId);
+		boolean isApproverTeamManager = applicantInfo != null
+				&& hasText(applicantInfo.get("mngId"))
+				&& applicantInfo.get("mngId").equals(callerId);
+
+		if (!isSelfTeamManagerEdit && !isApproverTeamManager) {
+			throw new RuntimeException("담당 팀장만 부서장평가를 수정할 수 있습니다.");
+		}
+
+		int result = pm51Mapper.updateTripRptMngEval(paramMap);
+
+		// 부서장평가 저장과 동시에, 호출자 본인의 미결 결재선(TODODIV2200)이 있으면 결재처리(승인완료)까지 진행
+		Map<String, String> approvalLineParam = new HashMap<>();
+		approvalLineParam.put("todoNo", paramMap.get("tripRptNo"));
+		approvalLineParam.put("todoDiv2CodeId", "TODODIV2200");
+		List<Map<String, String>> approvalLines = wb20Svc.selectGetApprovalList(approvalLineParam);
+		if (approvalLines != null) {
+			for (Map<String, String> line : approvalLines) {
+				if (callerId.equals(line.get("todoId")) && !"Y".equals(line.get("sanctnSttus"))) {
+					Map<String, String> approveParam = new HashMap<>(line);
+					approveParam.put("todoCfOpn", "");
+					approveParam.put("userId", callerId);
+					approveParam.put("pgmId", paramMap.get("pgmId"));
+					wb20Svc.insertApprovalLine(approveParam);
+					break;
+				}
+			}
+		}
+
+		return result;
+	}
+
+	@Override
+	public int updateTripReqSalesInfo(Map<String, String> paramMap) throws Exception {
+		Map<String, String> orgMap = pm51Mapper.selectTripReqM01(paramMap);
+		if (orgMap == null) {
+			throw new RuntimeException("출장신청서 정보를 찾을 수 없습니다.");
+		}
+		if (hasText(orgMap.get("payDt"))) {
+			throw new RuntimeException("지급완료된 출장신청서는 수정할 수 없습니다.");
+		}
+
+		String pmId = orgMap.get("pmId");
+		String callerId = paramMap.get("userId");
+		if (!hasText(pmId) || !pmId.equals(callerId)) {
+			throw new RuntimeException("등록된 영업PM만 이 항목을 수정할 수 있습니다.");
+		}
+
+		// 영업PM 본인의 결재선을 조회하여, 이미 결재완료(Y)했거나 결재 대상으로 등록되어 있지 않으면 거부
+		// (결재완료 후에는 영업PM이라도 조회만 가능해야 함 - 임의로 재수정/재결재 불가)
+		Map<String, String> approvalLineParam = new HashMap<>();
+		approvalLineParam.put("todoNo", paramMap.get("tripReqNo"));
+		approvalLineParam.put("todoDiv2CodeId", "TODODIV2190");
+		List<Map<String, String>> approvalLines = wb20Svc.selectGetApprovalList(approvalLineParam);
+		Map<String, String> myPendingLine = null;
+		if (approvalLines != null) {
+			for (Map<String, String> line : approvalLines) {
+				if (callerId.equals(line.get("todoId"))) {
+					if ("Y".equals(line.get("sanctnSttus"))) {
+						throw new RuntimeException("이미 결재를 완료하여 수정할 수 없습니다.");
+					}
+					myPendingLine = line;
+					break;
+				}
+			}
+		}
+		if (myPendingLine == null) {
+			throw new RuntimeException("결재 대상으로 등록되어 있지 않아 수정할 수 없습니다.");
+		}
+
+		int result = pm51Mapper.updateTripReqSalesInfo(paramMap);
+
+		Map<String, String> approveParam = new HashMap<>(myPendingLine);
+		approveParam.put("todoCfOpn", "");
+		approveParam.put("userId", callerId);
+		approveParam.put("pgmId", paramMap.get("pgmId"));
+		wb20Svc.insertApprovalLine(approveParam);
+
+		return result;
+	}
+
+	@Override
 	public int deleteTripRpt(Map<String, String> paramMap) throws Exception {
 		paramMap.put("reqNo", paramMap.get("tripRptNo"));
 
@@ -769,18 +879,22 @@ public class PM51SvcImpl implements PM51Svc {
 		return new java.text.SimpleDateFormat("yyyyMMdd").format(new java.util.Date());
 	}
 
+	//영업팀코드 앞자리 (TRN30, GUN30)
 	private boolean isSalesDept(String deptId) {
 		return deptId != null && (deptId.startsWith("GUN30") || deptId.startsWith("TRN30"));
 	}
 
+	//회계팀코드 앞자리 (GUN20, GUN80)
 	private boolean isAccountingDept(String deptId) {
 		return deptId != null && (deptId.startsWith("GUN20") || deptId.startsWith("GUN80"));
 	}
 
+	//공통 Util
 	private boolean hasText(String value) {
 		return value != null && value.trim().length() > 0;
 	}
 
+	//영업코드 조회
 	private String approvalSalesCd(Map<String, String> paramMap) {
 		if (hasText(paramMap.get("salesCd"))) {
 			return paramMap.get("salesCd");
@@ -791,6 +905,7 @@ public class PM51SvcImpl implements PM51Svc {
 		return paramMap.get("tripReqNo");
 	}
 
+	//출장비 결재확인
 	private boolean hasCompletedApproval(Map<String, String> paramMap, boolean managementOnly) {
 		List<Map<String, String>> approvalChkList = managementOnly
 				? pm51Mapper.selectApprovalMngChk(paramMap)

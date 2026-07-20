@@ -47,6 +47,10 @@
 <script src="/static/js/jquery.blockUI.js"></script>
 <script src="/static/js/manualPopup.js"></script>
 <script src="/static/js/common/GridColumnConfig.js"></script>
+	<!-- 공통결재 -->
+	<script src="/static/js/commApproval.js"></script>
+	<!-- 도움말 팝업 -->
+	<script src="/static/js/manualPopup.js"></script>
 </head>
 
 <body>
@@ -97,7 +101,12 @@
 						<td>
 							<input type="text" id="travelerNm_S" name="travelerNm_S" data-search="travelerNm" placeholder="출장자명">
 						</td>
-						<th colspan="3"></th>
+						<th>SalesCode</th>
+						<td>
+							<input type="text" id="salesCd_S" name="salesCd_S" data-search="salesCd" placeholder="SalesCode">
+						</td>
+						<th></th>
+						<td></td>
 					</tr>
 				</table>
 				<input type="hidden" id="userId" name="userId">
@@ -111,7 +120,7 @@
 			<div class="contents_tit">
 				<span style="height: 30px; line-height: 30px;font-size: 15px;margin-left: 15px">출장복명서 목록</span>
 				<span style="margin-left: 15px; font-size: 12px; color: #666;">
-					[결재상태: 
+					[결재상태:
 					<i class="fas fa-circle" style="color: red;"></i> 결재자없음
 					<i class="fas fa-circle" style="color: gray; margin-left: 5px;"></i> 결재신청
 					<i class="fas fa-circle" style="color: green; margin-left: 5px;"></i> 결재진행중
@@ -201,15 +210,9 @@
 				},
 				page: { display: false },
 				columns: [
-					{ key: "rptDt", label: "복명서일자", width: 80, align: "center", formatter: function() {
-						if (!this.value) return "";
-						var val = this.value.replace(/[^0-9]/g, "");
-						if (val.length >= 8) return val.substring(0, 4) + "-" + val.substring(4, 6) + "-" + val.substring(6, 8);
-						return this.value;
-					}},
 					{ key: "clntNm", label: "고객사", width: 150, align: "left" },
 					{ key: "clntPjtNm", label: "프로젝트", width: 80, align: "left" },
-					{ key: "tripDivNm", label: "구분", width: 60, align: "center" },
+					{ key: "tripDivNm", label: "구분", width: 50, align: "center" },
 					{ key: "actPeriod", label: "출장기간", width: 150, align: "center", formatter: function() {
 						if (!this.value) return "";
 						var parts = this.value.split("~");
@@ -224,23 +227,23 @@
 						});
 						return res.join(" ~ ");
 					}},
-					{ 
+					{
 						key: "aprvStsNm", label: "결재상태", width: 70, align: "center",
 						formatter: function() {
 							return formatApprovalStatus(this.item.appTotCnt, this.item.appDoneCnt, this.item.aprvStsNm);
 						}
 					},
-					{ key: "tripTypeCdsNm", label: "유형", width: 100, align: "left" },
+					{ key: "tripTypeCdsNm", label: "유형", width: 90, align: "left" },
 					{ key: "travelerList", label: "출장자", width: 100, align: "left" },
 					{ key: "tripPlace", label: "출장지", width: 150, align: "left" },
 					{ key: "salesCd", label: "SalesCd", width: 120, align: "center" },
 					{ key: "equipNm", label: "장비명", width: 120, align: "left" },
 					{ key: "currCdNm", label: "통화단위", width: 80, align: "center" },
-					{ key: 'settleAmtKrw', label: '정산(KRW)', width: 100, align: 'right', formatter: "money" },
-					{ key: 'settleAmtUsd', label: '정산(USD)', width: 100, align: 'right', formatter: "money" },
+					{ key: 'settleAmtKrw', label: '정산(KRW)', width: 90, align: 'right', formatter: "money" },
+					{ key: 'settleAmtUsd', label: '정산(USD)', width: 90, align: 'right', formatter: "money" },
 					{ key: 'finalEvalNm', label: '평가', width: 60, align: 'center' },
-					{ key: 'tripRptNo', label: '복명번호', width: 120, align: 'center' },
-					{ key: 'tripReqNo', label: '신청번호', width: 120, align: 'center' }
+					{ key: 'tripRptNo', label: '출장복명서번호', width: 120, align: 'center' },
+					{ key: 'tripReqNo', label: '출장신청서번호', width: 120, align: 'center' }
 				]
 			});
 
@@ -401,16 +404,29 @@
 		}
 
 		var selectedRow = selectedRows[0];
-		closeSelectReqModal();
 
-		// PM5102P01 팝업 열기
-		var paramObj = {
-			"actionType": "C",
-			"tripReqNo": selectedRow.tripReqNo,
-			"pgmId": "PM5102P01"
+		// 백엔드 API를 호출하여 해당 신청서(tripReqNo)로 복명서(동일 회계자료)가 이미 존재(생성)하는지 실시간 판별
+		var checkParam = {
+			tripReqNo: selectedRow.tripReqNo,
+			coCd: jwt.coCd
 		};
-		openModal("/static/html/user/pm/pm51/PM5102P01.html", 1400, 860, "출장복명서 등록", paramObj, function (data) {
-			gridView.setData(0);
+		postAjax("/user/pm/pm51/selectTripRptList", checkParam, null, function (data) {
+			var list = data.resultList || [];
+			if (list.length > 0) {
+				alert("선택하신 신청서로 작성된 복명서(회계자료)가 이미 존재합니다.");
+				closeSelectReqModal();
+				gridView.setData(0);
+			} else {
+				closeSelectReqModal();
+				var paramObj = {
+					"actionType": "C",
+					"tripReqNo": selectedRow.tripReqNo,
+					"pgmId": "PM5102P01"
+				};
+				openModal("/static/html/user/pm/pm51/PM5102P01.html", 1400, 860, "출장복명서 등록", paramObj, function (data) {
+					gridView.setData(0);
+				});
+			}
 		});
 	}
 
@@ -440,7 +456,7 @@
 		}
 
 		var row = selectedRows[0];
-		
+
 		if (row.appTotCnt > 0) {
 			alert("결재가 진행중이거나 완료된 복명서는 삭제할 수 없습니다.");
 			return;
@@ -478,7 +494,7 @@
 		}
 
 		var row = selectedRows[0];
-		
+
 		var fileName = "PM5102R01.jrf";
 		var arg = "coCd#" + jwt.coCd
 				+ "#tripRptNo#" + row.tripRptNo

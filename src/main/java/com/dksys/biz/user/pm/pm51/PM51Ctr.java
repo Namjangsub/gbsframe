@@ -220,4 +220,30 @@ public class PM51Ctr {
 		return "jsonView";
 	}
 
+	@PostMapping("/updateTripRptMngEval")
+	public String updateTripRptMngEval(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		try {
+			pm51Svc.updateTripRptMngEval(paramMap);
+			model.addAttribute("resultCode", 200);
+			model.addAttribute("resultMessage", messageUtils.getMessage("save"));
+		} catch (Exception e) {
+			model.addAttribute("resultCode", 900);
+			model.addAttribute("resultMessage", e.getMessage());
+		}
+		return "jsonView";
+	}
+
+	@PostMapping("/updateTripReqSalesInfo")
+	public String updateTripReqSalesInfo(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		try {
+			pm51Svc.updateTripReqSalesInfo(paramMap);
+			model.addAttribute("resultCode", 200);
+			model.addAttribute("resultMessage", messageUtils.getMessage("save"));
+		} catch (Exception e) {
+			model.addAttribute("resultCode", 900);
+			model.addAttribute("resultMessage", e.getMessage());
+		}
+		return "jsonView";
+	}
+
 }

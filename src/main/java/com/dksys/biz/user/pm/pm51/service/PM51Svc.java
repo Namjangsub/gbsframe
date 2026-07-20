@@ -41,4 +41,8 @@ public interface PM51Svc {
 
 	Map<String, Object> selectTripRptPaySummary(Map<String, String> paramMap);
 
+	int updateTripRptMngEval(Map<String, String> paramMap) throws Exception;
+
+	int updateTripReqSalesInfo(Map<String, String> paramMap) throws Exception;
+
 }

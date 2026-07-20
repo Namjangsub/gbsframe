@@ -83,6 +83,9 @@
 		<if test="aprvStsCd != null and aprvStsCd != ''">
 			AND M.APRV_STS_CD = #{aprvStsCd}
 		</if>
+		<if test="salesCd != null and salesCd != ''">
+			AND M.SALES_CD LIKE '%' || #{salesCd} || '%'
+		</if>
 		ORDER BY M.CREAT_DTTM DESC
 	</select>
 
@@ -114,6 +117,8 @@
 			SPRT_MEAL_YN,
 			SPRT_ETC_YN,
 			SPRT_ETC_TXT,
+			SPRT_TRFC_TXT,
+			SPRT_MEAL_TXT,
 			SALES_CD,
 			CLNT_CD,
 			CLNT_PJT,
@@ -208,7 +213,7 @@
 			TRIP_REQ_NO, CO_CD, TRIP_DIV, TRIP_TYPE_CDS, TRIP_PLACE, EQUIP_NM, TRIP_PLAN,
 			TRIP_ST_DTM, TRIP_ED_DTM, NIGHT_CNT, DAY_CNT, TRIP_PURPOSE,
 			PAY_AMT_KRW, PAY_AMT_USD, SALES_CNFRM_YN, USER_ID, SALES_CNFRM_DT, TRIP_COND_CD, ETC,
-			SPRT_TRFC_YN, SPRT_LDG_YN, SPRT_MEAL_YN, SPRT_ETC_YN, SPRT_ETC_TXT,
+			SPRT_TRFC_YN, SPRT_LDG_YN, SPRT_MEAL_YN, SPRT_ETC_YN, SPRT_ETC_TXT, SPRT_TRFC_TXT, SPRT_MEAL_TXT,
 			SALES_CD, CLNT_CD, CLNT_PJT, PM_ID, CURR_CD, EXRATE, PAY_DT, PAY_ID,
 			APRV_STS_CD, FILE_TRGT_KEY,
 			CREAT_ID, CREAT_PGM, CREAT_DTTM
@@ -216,7 +221,7 @@
 			#{tripReqNo}, #{coCd, jdbcType=VARCHAR}, #{tripDiv, jdbcType=VARCHAR}, #{tripTypeCds, jdbcType=VARCHAR}, #{tripPlace, jdbcType=VARCHAR}, #{equipNm, jdbcType=VARCHAR}, #{tripPlan, jdbcType=VARCHAR},
 			#{tripStDtm, jdbcType=VARCHAR}, #{tripEdDtm, jdbcType=VARCHAR}, #{nightCnt, jdbcType=NUMERIC}, #{dayCnt, jdbcType=NUMERIC}, #{tripPurpose, jdbcType=VARCHAR},
 			#{payAmtKrw, jdbcType=NUMERIC}, #{payAmtUsd, jdbcType=NUMERIC}, #{salesCnfrmYn, jdbcType=VARCHAR}, #{reqId, jdbcType=VARCHAR}, #{salesCnfrmDt, jdbcType=VARCHAR}, #{tripCondCd, jdbcType=VARCHAR}, #{etc, jdbcType=VARCHAR},
-			#{sprtTrfcYn, jdbcType=VARCHAR}, #{sprtLdgYn, jdbcType=VARCHAR}, #{sprtMealYn, jdbcType=VARCHAR}, #{sprtEtcYn, jdbcType=VARCHAR}, #{sprtEtcTxt, jdbcType=VARCHAR},
+			#{sprtTrfcYn, jdbcType=VARCHAR}, #{sprtLdgYn, jdbcType=VARCHAR}, #{sprtMealYn, jdbcType=VARCHAR}, #{sprtEtcYn, jdbcType=VARCHAR}, #{sprtEtcTxt, jdbcType=VARCHAR}, #{sprtTrfcTxt, jdbcType=VARCHAR}, #{sprtMealTxt, jdbcType=VARCHAR},
 			#{salesCd, jdbcType=VARCHAR}, #{clntCd, jdbcType=VARCHAR}, #{clntPjt, jdbcType=VARCHAR}, #{pmId, jdbcType=VARCHAR}, #{currCd, jdbcType=VARCHAR}, #{exrate, jdbcType=NUMERIC}, #{payDt, jdbcType=VARCHAR}, #{payId, jdbcType=VARCHAR},
 			'APRVSTS01', #{tripReqNo},
 			#{userId}, #{pgmId}, SYSDATE
@@ -273,6 +278,8 @@
 			SPRT_MEAL_YN = #{sprtMealYn, jdbcType=VARCHAR},
 			SPRT_ETC_YN = #{sprtEtcYn, jdbcType=VARCHAR},
 			SPRT_ETC_TXT = #{sprtEtcTxt, jdbcType=VARCHAR},
+			SPRT_TRFC_TXT = #{sprtTrfcTxt, jdbcType=VARCHAR},
+			SPRT_MEAL_TXT = #{sprtMealTxt, jdbcType=VARCHAR},
 			SALES_CD = #{salesCd, jdbcType=VARCHAR},
 			CLNT_CD = #{clntCd, jdbcType=VARCHAR},
 			CLNT_PJT = #{clntPjt, jdbcType=VARCHAR},
@@ -326,6 +333,27 @@
 		SET
 			PAY_DT = NULL,
 			PAY_ID = NULL,
+			UDT_ID = #{userId},
+			UDT_PGM = #{pgmId},
+			UDT_DTTM = SYSDATE
+		WHERE TRIP_REQ_NO = #{tripReqNo}
+	</update>
+
+	<!-- 출장신청서 영업PM 본인 전용: 영업확인/출장조건/고객사지원범위만 수정 (본인 결재가 미결인 경우에만 호출됨) -->
+	<update id="updateTripReqSalesInfo" parameterType="Map">
+		UPDATE TB_PM51M01
+		SET
+			SALES_CNFRM_YN = #{salesCnfrmYn, jdbcType=VARCHAR},
+			SALES_CNFRM_DT = #{salesCnfrmDt, jdbcType=VARCHAR},
+			TRIP_COND_CD = #{tripCondCd, jdbcType=VARCHAR},
+			ETC = #{etc, jdbcType=VARCHAR},
+			SPRT_TRFC_YN = #{sprtTrfcYn, jdbcType=VARCHAR},
+			SPRT_TRFC_TXT = #{sprtTrfcTxt, jdbcType=VARCHAR},
+			SPRT_LDG_YN = #{sprtLdgYn, jdbcType=VARCHAR},
+			SPRT_MEAL_YN = #{sprtMealYn, jdbcType=VARCHAR},
+			SPRT_MEAL_TXT = #{sprtMealTxt, jdbcType=VARCHAR},
+			SPRT_ETC_YN = #{sprtEtcYn, jdbcType=VARCHAR},
+			SPRT_ETC_TXT = #{sprtEtcTxt, jdbcType=VARCHAR},
 			UDT_ID = #{userId},
 			UDT_PGM = #{pgmId},
 			UDT_DTTM = SYSDATE
@@ -616,6 +644,20 @@
 		<if test="aprvStsCd != null and aprvStsCd != ''">
 			AND M.APRV_STS_CD = #{aprvStsCd}
 		</if>
+		<if test="tripReqNo != null and tripReqNo != ''">
+			AND M.TRIP_REQ_NO = #{tripReqNo}
+		</if>
+		<if test="salesCd != null and salesCd != ''">
+			AND R.SALES_CD LIKE '%' || #{salesCd} || '%'
+		</if>
+		<if test="travelerNm != null and travelerNm != ''">
+			AND EXISTS (
+				SELECT 1 
+				FROM TB_PM52D02 D 
+				WHERE D.TRIP_RPT_NO = M.TRIP_RPT_NO 
+				  AND D.USER_NM LIKE '%' || #{travelerNm} || '%'
+			)
+		</if>
 		ORDER BY M.CREAT_DTTM DESC
 	</select>
 
@@ -790,6 +832,18 @@
 			SETTLE_AMT_USD = #{settleAmtUsd},
 			SPRT_EVAL_CD = #{sprtEvalCd},
 			APRV_EVAL_CD = #{aprvEvalCd},
+			UDT_ID = #{userId},
+			UDT_PGM = #{pgmId},
+			UDT_DTTM = SYSDATE
+		WHERE TRIP_RPT_NO = #{tripRptNo}
+	</update>
+
+	<!-- 출장복명서 담당팀장 평가/판정만 수정 (결재 진행중에도 본인 결재 차례에 수정 가능) -->
+	<update id="updateTripRptMngEval" parameterType="Map">
+		UPDATE TB_PM52M01
+		SET
+			DEPT_EVAL_CD = #{deptEvalCd, jdbcType=VARCHAR},
+			APRV_EVAL_CD = #{aprvEvalCd, jdbcType=VARCHAR},
 			UDT_ID = #{userId},
 			UDT_PGM = #{pgmId},
 			UDT_DTTM = SYSDATE
