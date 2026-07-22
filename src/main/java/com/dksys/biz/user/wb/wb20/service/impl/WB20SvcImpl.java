@@ -124,6 +124,18 @@ public class WB20SvcImpl implements WB20Svc {
 		String todoCfOpn = paramMap.get("todoCfOpn");
 		validatePm51SalesApproval(paramMap);
 		result += wb20Mapper.updateApprovalLine(paramMap);
+		
+		// 출장신청 관리부서 회계 승인(TODODIV2191) 시 신청서 자동 지급완료 처리 연동
+		if ("TODODIV2191".equals(todoDiv2CodeId) && "Y".equals(paramMap.get("sanctnSttus"))) {
+			java.util.Map<String, String> payParam = new java.util.HashMap<>(paramMap);
+			payParam.put("tripReqNo", tempReqNo);
+			payParam.put("userId", paramMap.get("todoId"));
+			java.util.Map<String, String> m01 = pm51Mapper.selectTripReqM01(payParam);
+			if (m01 != null && (m01.get("payDt") == null || "".equals(m01.get("payDt").toString().trim()))) {
+				pm51Mapper.updateTripReqPayDone(payParam);
+			}
+		}
+
 		boolean pfuShareTarget = false;
 		// TODODIV2020:발주 및 출장 요청 상태코드 바꾸기
 		if ("TODODIV2020".equals(todoDiv2CodeId)) {
