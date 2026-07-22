@@ -45,4 +45,12 @@ public interface PM51Svc {
 
 	int updateTripReqSalesInfo(Map<String, String> paramMap) throws Exception;
 
+	List<Map<String, Object>> selectTripExpenseStatusList(Map<String, Object> paramMap);
+
+	int updateTripExpenseStatus(Map<String, Object> paramMap) throws Exception;
+
+	int updateTripRptAcctSettle(Map<String, Object> paramMap) throws Exception;
+
+	List<Map<String, String>> selectTripDateOverlapList(Map<String, String> paramMap);
+
 }

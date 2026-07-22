@@ -137,6 +137,13 @@ public class PM51Ctr {
 		return "jsonView";
 	}
 
+	@PostMapping("/selectTripDateOverlapList")
+	public String selectTripDateOverlapList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		List<Map<String, String>> result = pm51Svc.selectTripDateOverlapList(paramMap);
+		model.addAttribute("result", result);
+		return "jsonView";
+	}
+
 	@PostMapping("/selectTripRptList")
 	public String selectTripRptList(@RequestBody Map<String, String> paramMap, ModelMap model) {
 		int totalCnt = pm51Svc.selectTripRptListCount(paramMap);
@@ -239,6 +246,49 @@ public class PM51Ctr {
 			pm51Svc.updateTripReqSalesInfo(paramMap);
 			model.addAttribute("resultCode", 200);
 			model.addAttribute("resultMessage", messageUtils.getMessage("save"));
+		} catch (Exception e) {
+			model.addAttribute("resultCode", 900);
+			model.addAttribute("resultMessage", e.getMessage());
+		}
+		return "jsonView";
+	}
+
+	@PostMapping("/selectTripExpenseStatusList")
+	public String selectTripExpenseStatusList(@RequestBody Map<String, Object> paramMap, ModelMap model) {
+		List<Map<String, Object>> result = pm51Svc.selectTripExpenseStatusList(paramMap);
+		model.addAttribute("result", result);
+		return "jsonView";
+	}
+
+	@PostMapping("/updateTripExpenseStatus")
+	public String updateTripExpenseStatus(@RequestBody Map<String, Object> paramMap, ModelMap model) {
+		try {
+			int result = pm51Svc.updateTripExpenseStatus(paramMap);
+			if (result > 0) {
+				model.addAttribute("resultCode", 200);
+				model.addAttribute("resultMessage", messageUtils.getMessage("save"));
+			} else {
+				model.addAttribute("resultCode", 500);
+				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+			}
+		} catch (Exception e) {
+			model.addAttribute("resultCode", 900);
+			model.addAttribute("resultMessage", e.getMessage());
+		}
+		return "jsonView";
+	}
+
+	@PostMapping("/updateTripRptAcctSettle")
+	public String updateTripRptAcctSettle(@RequestBody Map<String, Object> paramMap, ModelMap model) {
+		try {
+			int result = pm51Svc.updateTripRptAcctSettle(paramMap);
+			if (result > 0) {
+				model.addAttribute("resultCode", 200);
+				model.addAttribute("resultMessage", messageUtils.getMessage("save"));
+			} else {
+				model.addAttribute("resultCode", 500);
+				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+			}
 		} catch (Exception e) {
 			model.addAttribute("resultCode", 900);
 			model.addAttribute("resultMessage", e.getMessage());

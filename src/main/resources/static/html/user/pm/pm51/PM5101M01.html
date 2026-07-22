@@ -362,9 +362,21 @@
 		var row = getSelectedTripReqRow("삭제할 행을 선택해주세요.");
 		if (!row) return;
 
-		// 결재 진행 중이거나 완료된 경우 삭제 불가 처리 방어
-		if (row.aprvStsCd && row.aprvStsCd !== 'APRVSTS01') {
-			alert("결재 진행 중이거나 완료된 출장신청서는 삭제할 수 없습니다.");
+		// 1. 1명이라도 결재처리를 완료한 신청서는 삭제 불가
+		if (row.appDoneCnt > 0) {
+			alert("결재처리가 이미 진행중이거나 완료된 출장신청서는 삭제할 수 없습니다.");
+			return;
+		}
+
+		// 2. 복명서가 작성된 경우 삭제 불가 처리
+		if (row.tripRptYn === 'Y') {
+			alert("이미 복명서가 작성된 출장신청서는 삭제할 수 없습니다.");
+			return;
+		}
+
+		// 3. 본인이 작성/신청한 문서인지 확인 (관리자 예외 처리 필요시 수정)
+		if (jwt.userId !== row.creatId && jwt.userId !== row.reqId) {
+			alert("본인이 작성하거나 신청한 출장신청서만 삭제할 수 있습니다.");
 			return;
 		}
 
@@ -398,6 +410,28 @@
 		}
 
 		var row = selectedRows[0];
+		if (!row.tripRptNo) {
+			postAjax("/user/pm/pm51/selectTripRptList", { tripReqNo: row.tripReqNo }, null, function (data) {
+				var rpt = data.result && data.result.length ? data.result[0] : null;
+				if (rpt && rpt.tripRptNo) {
+					openModal("/static/html/user/pm/pm51/PM5102P01.html", 1600, 860, "출장복명서 수정", {
+						actionType: "U",
+						tripRptNo: rpt.tripRptNo,
+						pgmId: "PM5102P01"
+					}, function () {
+						gridView.setData(0);
+					});
+				} else {
+					openModal("/static/html/user/pm/pm51/PM5102P01.html", 1600, 860, "출장복명서 등록", {
+						actionType: "C",
+						tripReqNo: row.tripReqNo
+					}, function () {
+						gridView.setData(0);
+					});
+				}
+			});
+			return;
+		}
 		if (row.tripRptNo) {
 			// 이미 복명서가 작성된 경우 -> 수정 모드로 진입
 			var openReport = function (tripRptNo) {
@@ -452,7 +486,7 @@
 			return;
 		}
 
-		openModal("/static/html/user/pm/pm51/PM5101P02.html", 1700, 860, "출장신청서 지급처리", {
+		openModal("/static/html/user/pm/pm51/PM5101P01.html", 1700, 860, "출장신청서 지급처리", {
 			actionType: "PAY",
 			tripReqNo: row.tripReqNo
 		}, function () {

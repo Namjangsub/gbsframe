@@ -36,6 +36,8 @@ public interface PM51Mapper {
 
 	int updateTripReqPayCancel(Map<String, String> paramMap);
 
+	int updateTripReqPayCancelMngApproval(Map<String, String> paramMap);
+
 	int updateTripReqSalesInfo(Map<String, String> paramMap);
 
 	int deleteTripReqD01(Map<String, String> paramMap);
@@ -93,5 +95,13 @@ public interface PM51Mapper {
 	int deleteTripRptM02(Map<String, String> paramMap);
 
 	int selectTripRptExists(Map<String, String> paramMap);
+
+	List<Map<String, Object>> selectTripExpenseStatusList(Map<String, Object> paramMap);
+
+	int updateTripExpenseStatus(Map<String, Object> paramMap);
+
+	int updateTripRptAcctSettle(Map<String, Object> paramMap);
+
+	List<Map<String, String>> selectTripDateOverlapList(Map<String, String> paramMap);
 
 }

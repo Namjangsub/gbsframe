@@ -95,6 +95,7 @@
 			TRIP_REQ_NO,
 			CO_CD,
 			TRIP_DIV,
+			TRIP_AREA_DIV,
 			TRIP_TYPE_CDS,
 			TRIP_PLACE,
 			EQUIP_NM,
@@ -134,7 +135,8 @@
 			CREAT_ID,
 			CREAT_DTTM,
 			UDT_ID,
-			UDT_DTTM
+			UDT_DTTM,
+			CASE WHEN EXISTS (SELECT 1 FROM TB_PM52M01 R WHERE R.TRIP_REQ_NO = TB_PM51M01.TRIP_REQ_NO) THEN 'Y' ELSE 'N' END AS TRIP_RPT_YN
 		FROM TB_PM51M01
 		WHERE TRIP_REQ_NO = #{tripReqNo}
 	</select>
@@ -210,7 +212,7 @@
 			SELECT 'BT' || TO_CHAR(SYSDATE, 'YYYYMMDD') || '-' || LPAD(MOD(TB_PM51M01_SQ01.NEXTVAL, 10000), 4, '0') FROM DUAL
 		</selectKey>
 		INSERT INTO TB_PM51M01 (
-			TRIP_REQ_NO, CO_CD, TRIP_DIV, TRIP_TYPE_CDS, TRIP_PLACE, EQUIP_NM, TRIP_PLAN,
+			TRIP_REQ_NO, CO_CD, TRIP_DIV, TRIP_AREA_DIV, TRIP_TYPE_CDS, TRIP_PLACE, EQUIP_NM, TRIP_PLAN,
 			TRIP_ST_DTM, TRIP_ED_DTM, NIGHT_CNT, DAY_CNT, TRIP_PURPOSE,
 			PAY_AMT_KRW, PAY_AMT_USD, SALES_CNFRM_YN, USER_ID, SALES_CNFRM_DT, TRIP_COND_CD, ETC,
 			SPRT_TRFC_YN, SPRT_LDG_YN, SPRT_MEAL_YN, SPRT_ETC_YN, SPRT_ETC_TXT, SPRT_TRFC_TXT, SPRT_MEAL_TXT,
@@ -218,7 +220,7 @@
 			APRV_STS_CD, FILE_TRGT_KEY,
 			CREAT_ID, CREAT_PGM, CREAT_DTTM
 		) VALUES (
-			#{tripReqNo}, #{coCd, jdbcType=VARCHAR}, #{tripDiv, jdbcType=VARCHAR}, #{tripTypeCds, jdbcType=VARCHAR}, #{tripPlace, jdbcType=VARCHAR}, #{equipNm, jdbcType=VARCHAR}, #{tripPlan, jdbcType=VARCHAR},
+			#{tripReqNo}, #{coCd, jdbcType=VARCHAR}, #{tripDiv, jdbcType=VARCHAR}, #{tripAreaDiv, jdbcType=VARCHAR}, #{tripTypeCds, jdbcType=VARCHAR}, #{tripPlace, jdbcType=VARCHAR}, #{equipNm, jdbcType=VARCHAR}, #{tripPlan, jdbcType=VARCHAR},
 			#{tripStDtm, jdbcType=VARCHAR}, #{tripEdDtm, jdbcType=VARCHAR}, #{nightCnt, jdbcType=NUMERIC}, #{dayCnt, jdbcType=NUMERIC}, #{tripPurpose, jdbcType=VARCHAR},
 			#{payAmtKrw, jdbcType=NUMERIC}, #{payAmtUsd, jdbcType=NUMERIC}, #{salesCnfrmYn, jdbcType=VARCHAR}, #{reqId, jdbcType=VARCHAR}, #{salesCnfrmDt, jdbcType=VARCHAR}, #{tripCondCd, jdbcType=VARCHAR}, #{etc, jdbcType=VARCHAR},
 			#{sprtTrfcYn, jdbcType=VARCHAR}, #{sprtLdgYn, jdbcType=VARCHAR}, #{sprtMealYn, jdbcType=VARCHAR}, #{sprtEtcYn, jdbcType=VARCHAR}, #{sprtEtcTxt, jdbcType=VARCHAR}, #{sprtTrfcTxt, jdbcType=VARCHAR}, #{sprtMealTxt, jdbcType=VARCHAR},
@@ -257,6 +259,7 @@
 		UPDATE TB_PM51M01
 		SET
 			TRIP_DIV = #{tripDiv, jdbcType=VARCHAR},
+			TRIP_AREA_DIV = #{tripAreaDiv, jdbcType=VARCHAR},
 			TRIP_TYPE_CDS = #{tripTypeCds, jdbcType=VARCHAR},
 			TRIP_PLACE = #{tripPlace, jdbcType=VARCHAR},
 			EQUIP_NM = #{equipNm, jdbcType=VARCHAR},
@@ -299,6 +302,7 @@
 		SET
 			PAY_AMT_KRW = #{payAmtKrw, jdbcType=NUMERIC},
 			PAY_AMT_USD = #{payAmtUsd, jdbcType=NUMERIC},
+			TRIP_AREA_DIV = #{tripAreaDiv, jdbcType=VARCHAR},
 			UDT_ID = #{userId},
 			UDT_PGM = #{pgmId},
 			UDT_DTTM = SYSDATE
@@ -337,6 +341,18 @@
 			UDT_PGM = #{pgmId},
 			UDT_DTTM = SYSDATE
 		WHERE TRIP_REQ_NO = #{tripReqNo}
+	</update>
+
+	<update id="updateTripReqPayCancelMngApproval" parameterType="Map">
+		UPDATE TB_WB20M03
+		SET
+			SANCTN_STTUS = 'N',
+			TODO_CF_DT = '',
+			UDT_ID = #{userId},
+			UDT_PGM = #{pgmId},
+			UDT_DTTM = SYSDATE
+		WHERE TODO_NO = #{tripReqNo}
+		  AND TODO_DIV2_CODE_ID = 'TODODIV2191'
 	</update>
 
 	<!-- 출장신청서 영업PM 본인 전용: 영업확인/출장조건/고객사지원범위만 수정 (본인 결재가 미결인 경우에만 호출됨) -->
@@ -798,6 +814,29 @@
 		)
 	</insert>
 
+	<!-- 출장자 출장일자 중복 체크 (기등록된 출장신청서/출장복명서, 삭제건은 물리삭제되어 자동 제외) -->
+	<select id="selectTripDateOverlapList" parameterType="Map" resultType="CamelMap">
+		SELECT '출장신청서' AS DOC_TYPE, M.TRIP_REQ_NO AS DOC_NO, D.TRIP_ST_DTM, D.TRIP_ED_DTM
+		FROM TB_PM51D01 D
+		INNER JOIN TB_PM51M01 M ON M.TRIP_REQ_NO = D.TRIP_REQ_NO
+		WHERE D.USER_ID = #{userId}
+		<if test="tripReqNo != null and tripReqNo != ''">
+			AND D.TRIP_REQ_NO != #{tripReqNo}
+		</if>
+		AND SUBSTR(D.TRIP_ST_DTM, 1, 8) &lt;= #{tripEdDate}
+		AND SUBSTR(D.TRIP_ED_DTM, 1, 8) &gt;= #{tripStDate}
+		UNION ALL
+		SELECT '출장복명서' AS DOC_TYPE, R.TRIP_RPT_NO AS DOC_NO, D2.TRIP_ST_DTM, D2.TRIP_ED_DTM
+		FROM TB_PM52D02 D2
+		INNER JOIN TB_PM52M01 R ON R.TRIP_RPT_NO = D2.TRIP_RPT_NO
+		WHERE D2.USER_ID = #{userId}
+		<if test="tripReqNo != null and tripReqNo != ''">
+			AND R.TRIP_REQ_NO != #{tripReqNo}
+		</if>
+		AND SUBSTR(D2.TRIP_ST_DTM, 1, 8) &lt;= #{tripEdDate}
+		AND SUBSTR(D2.TRIP_ED_DTM, 1, 8) &gt;= #{tripStDate}
+	</select>
+
 	<!-- 출장복명서 경비 세부내역 등록 -->
 	<insert id="insertTripRptD03" parameterType="Map">
 		INSERT INTO TB_PM52D01 (
@@ -844,6 +883,72 @@
 		SET
 			DEPT_EVAL_CD = #{deptEvalCd, jdbcType=VARCHAR},
 			APRV_EVAL_CD = #{aprvEvalCd, jdbcType=VARCHAR},
+			UDT_ID = #{userId},
+			UDT_PGM = #{pgmId},
+			UDT_DTTM = SYSDATE
+		WHERE TRIP_RPT_NO = #{tripRptNo}
+	</update>
+
+	<!-- 회계팀 자금담당자 작성 영역: 출장 경비 신청 현황 (작업일보 출장경비 TB_PM01D01/TB_PM01M01 조회, SPECRTS15 등록자 건) -->
+	<select id="selectTripExpenseStatusList" parameterType="Map" resultType="CamelMap">
+		SELECT
+			T.CO_CD,
+			T.WORK_RPT_NO AS ROUND_NO,
+			T.WORK_RPT_NO_SEQ,
+			T.WORK_RPT_ID,
+			FN_CM06M01_ID_TO_NM(T.WORK_RPT_ID) AS WORK_RPT_ID_NM,
+			TO_CHAR(M.WORK_RPT_DT, 'YYYY-MM-DD') AS WORK_RPT_DT,
+			T.TRIP_RPT_TYP,
+			FN_CM05M01_CD_TO_NM(T.TRIP_RPT_TYP) AS TRIP_RPT_TYP_NM,
+			T.TRIP_RPT_RMK,
+			T.TRIP_RPT_CUR_TYP,
+			FN_CM05M01_CD_TO_NM(T.TRIP_RPT_CUR_TYP) AS TRIP_RPT_CUR_TYP_NM,
+			T.TRIP_RPT_CARD_NO,
+			T.TRIP_RPT_CURR,
+			FN_CM05M01_CD_TO_NM(T.TRIP_RPT_CURR) AS TRIP_RPT_CURR_NM,
+			T.TRIP_RPT_AMT,
+			T.TRIP_RPT_ROUND,
+			T.TRIP_RPT_RSV_DIV,
+			T.TRIP_RPT_CARD_EXRATE,
+			T.ACCT_REG_ID,
+			TO_CHAR(T.ACCT_REG_DTTM, 'YYYY-MM-DD HH24:MI:SS') AS ACCT_REG_DTTM
+		FROM TB_PM01D01 T
+		INNER JOIN TB_PM01M01 M ON T.WORK_RPT_NO = M.WORK_RPT_NO
+		WHERE T.CO_CD = #{coCd}
+			AND T.TRIP_RPT_AMT IS NOT NULL
+			AND M.WORK_RPT_DT BETWEEN TO_DATE(#{stDt}, 'YYYY-MM-DD') AND TO_DATE(#{edDt}, 'YYYY-MM-DD')
+			AND T.WORK_RPT_ID IN
+			<foreach collection="userIds" item="userId" open="(" separator="," close=")">
+				#{userId}
+			</foreach>
+		ORDER BY M.WORK_RPT_DT, T.WORK_RPT_NO, T.WORK_RPT_NO_SEQ
+	</select>
+
+	<!-- 회계팀 자금담당자 확정값 저장 (결정회차/예비구분/카드사환율 + 회계등록자/일시) -->
+	<update id="updateTripExpenseStatus" parameterType="Map">
+		UPDATE TB_PM01D01
+		SET
+			TRIP_RPT_ROUND = #{tripRptRound, jdbcType=VARCHAR},
+			TRIP_RPT_RSV_DIV = #{tripRptRsvDiv, jdbcType=VARCHAR},
+			TRIP_RPT_CARD_EXRATE = #{tripRptCardExrate, jdbcType=NUMERIC},
+			ACCT_REG_ID = #{userId},
+			ACCT_REG_DTTM = SYSDATE,
+			UDT_ID = #{userId},
+			UDT_PGM = #{pgmId},
+			UDT_DTTM = SYSDATE
+		WHERE CO_CD = #{coCd}
+			AND WORK_RPT_NO = #{workRptNo}
+			AND WORK_RPT_NO_SEQ = #{workRptNoSeq}
+	</update>
+
+	<!-- 출장복명서 정산금액(수령금/정산결과) 저장 -->
+	<update id="updateTripRptAcctSettle" parameterType="Map">
+		UPDATE TB_PM52M01
+		SET
+			ADV_RCV_AMT_KRW = #{advRcvAmtKrw, jdbcType=NUMERIC},
+			ADV_RCV_AMT_USD = #{advRcvAmtUsd, jdbcType=NUMERIC},
+			SETTLE_AMT_KRW = #{settleAmtKrw, jdbcType=NUMERIC},
+			SETTLE_AMT_USD = #{settleAmtUsd, jdbcType=NUMERIC},
 			UDT_ID = #{userId},
 			UDT_PGM = #{pgmId},
 			UDT_DTTM = SYSDATE
