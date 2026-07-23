@@ -90,4 +90,6 @@ public interface WB20Mapper {
 
 	List<Map<String, String>> selectToDoMindMap(Map<String, String> paramMap);
 
+	List<Map<String, String>> selectApprovalLineOrder(Map<String, String> paramMap);
+
 }

@@ -169,10 +169,18 @@
 					<th class="hit">출장지<br><span style="font-size: 10px; font-weight: normal; color: #888;">(회사명)</span></th>
 					<td colspan="1"><input type="text" id="tripPlace" name="tripPlace" class="form-control input-sm" required msg="출장지" style="width: 100%;"></td>
 					<!-- 출장목적 -->
-					<th class="hit" rowspan="2">출장목적</th>
-					<td rowspan="2" colspan="3" style="padding: 2px;">
+					<th class="hit" rowspan="3">출장목적</th>
+					<td rowspan="3" colspan="3" style="padding: 2px;">
 						<textarea id="tripPurpose" name="tripPurpose" class="form-control input-sm" required msg="출장목적" style="width: 100%; height: 50px; resize: none;"></textarea>
 					</td>
+				</tr>
+				<tr>
+					<!-- 출장국가명 (해외 출장인 경우에만 노출/필수) -->
+					<th class="hit" id="tripNationNmTh">출장국가명</th>
+					<td colspan="1" id="tripNationNmTd"><input type="text" id="tripNationNm" name="tripNationNm" class="form-control input-sm" msg="출장국가명" style="width: 100%;"></td>
+					<th class="hit">프로젝트명</th>
+					<td colspan="1"><input type="text" id="clntPjtNm" name="clntPjtNm" class="form-control input-sm" readonly required msg="프로젝트명" style="width: 100%; background: #fafafa !important;"></td>
+
 				</tr>
 				<tr>
 					<th class="hit">출장유형</th>
@@ -181,9 +189,8 @@
 							<option value="">선택</option>
 						</select>
 					</td>
-					<th class="hit">프로젝트명</th>
-					<td colspan="1"><input type="text" id="clntPjtNm" name="clntPjtNm" class="form-control input-sm" readonly required msg="프로젝트명" style="width: 100%; background: #fafafa !important;"></td>
-
+					<th>출장계획</th>
+					<td colspan="1"><input type="text" id="tripPlan" name="tripPlan" class="form-control input-sm" readonly style="width: 100%; background: #fafafa !important;"></td>
 				</tr>
 				<tr>
 					<!-- 출장자 타이틀 -->
@@ -209,10 +216,6 @@
 					<col width="13%">
 					<col width="35%">
 				</colgroup>
-				<tr>
-					<th>출장계획</th>
-					<td colspan="4"><input type="text" id="tripPlan" name="tripPlan" class="form-control input-sm" readonly style="width: 100%; background: #fafafa !important;"></td>
-				</tr>
 			</table>
 
 			<!-- 결재선 (신청인 등록/관리) -->
@@ -527,6 +530,76 @@
 	var currentTripReqMaster = null;
 	var gridViewApprovalMng = null;
 
+	// 신청부서(TODODIV2190) 일반결재 순차 재구성용 상태값
+	// - pm51ApplicantIsTeamMgr: 신청인 본인이 팀장(TEAM_MANAGER='TEAM01')인지 여부
+	// - pm51TeamMgrId: 신청인이 팀장이 아닌 경우, 신청인의 담당자팀장 ID (selectTeamManagerInfo 결과)
+	var pm51ApplicantIsTeamMgr = false;
+	var pm51TeamMgrId = '';
+	var vpUserIdsCache = null;
+
+	// 부사장 고정 ID 목록 (공통코드 CODE_ID='SPECRTS08'의 CODE_ETC, 콤마 구분) - SPECRTS14/15와 동일 패턴
+	function getVpUserIds() {
+		if (vpUserIdsCache !== null) return vpUserIdsCache;
+		var ids = [];
+		postAjaxSync("/admin/cm/cm05/selectChildCodeList", { codeId: 'SPECRTS08' }, null, function(data) {
+			var list = data.childCodeList || data.resultList || data.result || [];
+			$.each(list, function(idx, item) {
+				var codeEtc = item.codeEtc || '';
+				if (codeEtc) {
+					ids = ids.concat(codeEtc.replace(/\s/g, '').split(',').filter(function(v) { return !!v; }));
+				}
+			});
+		});
+		vpUserIdsCache = ids;
+		return ids;
+	}
+
+	// 신청부서(TODODIV2190) 일반결재선을 "신청인(담당자/팀장) → 영업PM → (신청인이 담당자인 경우만)담당자팀장 → 부사장" 순서로
+	// 재구성하고 순번(sanctnSn)을 1부터 다시 부여한다. ID 매칭 기반으로 동작하므로 DB에서 재로드된 행에도 안전하게 적용된다.
+	// 결재(gb='결재') 행만 순서를 재구성하며, 공유(gb='공유') 행은 기존 상대 순서를 그대로 유지한다.
+	function reorderGeneralApprovalLine(rows) {
+		var reqId = String($('#reqId').val() || '').trim();
+		var pmId = String($('#pmId').val() || '').trim();
+		var vpIds = getVpUserIds();
+
+		var approvalRows = $.grep(rows, function(r) { return r.gb === '결재'; });
+		var shareRows = $.grep(rows, function(r) { return r.gb !== '결재'; });
+
+		function extractById(list, id) {
+			if (!id) return null;
+			for (var i = 0; i < list.length; i++) {
+				var rowId = String(list[i].usrNm || list[i].todoId || '').trim();
+				if (rowId === String(id).trim()) {
+					return list.splice(i, 1)[0];
+				}
+			}
+			return null;
+		}
+
+		var remaining = approvalRows.slice();
+		var applicantRow = extractById(remaining, reqId);
+		var pmRow = extractById(remaining, pmId);
+		var teamMgrRow = pm51ApplicantIsTeamMgr ? null : extractById(remaining, pm51TeamMgrId);
+		var vpRows = [];
+		$.each(vpIds, function(idx, vid) {
+			var row = extractById(remaining, vid);
+			if (row) vpRows.push(row);
+		});
+
+		var ordered = [];
+		if (applicantRow) ordered.push(applicantRow);
+		if (pmRow) ordered.push(pmRow);
+		if (teamMgrRow) ordered.push(teamMgrRow);
+		ordered = ordered.concat(vpRows);
+		// 위 4가지 역할(신청인/PM/팀장/부사장)에 매칭되지 않은 나머지 결재 행(수동 추가분 등)은 뒤에 그대로 유지
+		ordered = ordered.concat(remaining);
+
+		var sn = 1;
+		$.each(ordered, function(idx, row) { row.sanctnSn = sn++; });
+
+		return ordered.concat(shareRows);
+	}
+
 	function isSalesDeptUser() {
 		var deptId = jwt.deptId || '';
 		return deptId.indexOf('GUN30') === 0 || deptId.indexOf('TRN30') === 0;
@@ -553,11 +626,6 @@
 			}
 		});
 		return pending;
-	}
-
-	function isAccountingUser() {
-		var deptId = jwt.deptId || '';
-		return deptId.substring(0, 5) === 'GUN20' || deptId.substring(0, 5) === 'GUN80';
 	}
 
 	// 결재선 그리드 정의
@@ -697,6 +765,13 @@
 			} else if (this.value === 'ETC' && !this.checked) { //고객사 지원범위 기타 체크 해제
 					$('#sprtEtcTxt').hide().val('');
 				}
+		});
+
+		// 출장지역구분(A/B/C) 변경 시 지급금액 자동 재계산 (미선택으로 되돌리는 경우는 재계산하지 않음)
+		$('#tripAreaDiv').on('change', function () {
+			if (['A', 'B', 'C'].indexOf($(this).val()) > -1) {
+				recalculatePaymentByTravelerGrid();
+			}
 		});
 
 		setCommonSelect($("select[data-kind]"));
@@ -990,12 +1065,12 @@
 					{ key: 'eatCnt', label: '식', width: 40, align: 'center', editor: { type: "number", disabled: isTravelerGridEditBlocked } },
 				]},
 				{ key: undefined, label: "출장경비", columns: [
-					{ key: 'trafficAmt', label: '교통비', width: 90, align: 'right', editor: { type: "number", disabled: isTravelerGridEditBlocked }, formatter: "money" },
-					{ key: 'lodgingAmt', label: '숙박비', width: 90, align: 'right', editor: { type: "number", disabled: isTravelerGridEditBlocked }, formatter: "money" },
-					{ key: 'mealAmt', label: '식대', width: 85, align: 'right', editor: { type: "number", disabled: isTravelerGridEditBlocked }, formatter: "money" },
-					{ key: 'dailyAmt', label: '일비', width: 85, align: 'right', editor: { type: "number", disabled: isTravelerGridEditBlocked }, formatter: "money" },
-					{ key: 'specialAmt', label: '특별비', width: 90, align: 'right', editor: { type: "number", disabled: isTravelerGridEditBlocked }, formatter: "money" },
-					{ key: 'totalAmt', label: '합계', width: 95, align: 'right', formatter: "money" },
+// 					{ key: 'trafficAmt', label: '교통비', width: 90, align: 'right', editor: { type: "number", disabled: isTravelerGridEditBlocked }, formatter: "money" },
+// 					{ key: 'lodgingAmt', label: '숙박비', width: 90, align: 'right', editor: { type: "number", disabled: isTravelerGridEditBlocked }, formatter: "money" },
+// 					{ key: 'mealAmt', label: '식대', width: 85, align: 'right', editor: { type: "number", disabled: isTravelerGridEditBlocked }, formatter: "money" },
+// 					{ key: 'dailyAmt', label: '일비', width: 85, align: 'right', editor: { type: "number", disabled: isTravelerGridEditBlocked }, formatter: "money" },
+					{ key: 'specialAmt', label: '예비비', width: 90, align: 'right', editor: { type: "number", disabled: isTravelerGridEditBlocked }, formatter: "money" },
+// 					{ key: 'totalAmt', label: '합계', width: 95, align: 'right', formatter: "money" },
 				]},
 				{ key: 'etc', label: '비고', width: 160, align: 'left', editor: { type: "text", disabled: isTravelerGridEditBlocked } }
 			]
@@ -1084,11 +1159,12 @@
 		var userJik = '';
 		var userDeptNm = '';
 
-		// 동기식 Ajax 호출로 신청인 정보(직위, 부서) 조회
+		// 동기식 Ajax 호출로 신청인 정보(직위, 부서, 팀장여부) 조회
 		postAjaxSync("/admin/cm/cm06/selectUserInfo", { userId: reqId }, null, function(data) {
 			if (data && data.userInfo) {
 				userJik = data.userInfo.levelNm || '';
 				userDeptNm = data.userInfo.deptNm || '';
+				pm51ApplicantIsTeamMgr = data.userInfo.teamManager === 'TEAM01';
 			}
 		});
 
@@ -1097,21 +1173,43 @@
 			todoDiv2CodeId: 'TODODIV2190', flag: 'I', autoApplicantApproval: 'Y', coCd: jwt.coCd
 		}];
 
-		postAjaxSync("/user/wb/wb24/selectTeamManagerInfo", { userId: reqId }, null, function(data) {
-			if (data.result != '' && data.result != null) {
-				var list = data.result;
-				if (list.id !== reqId) {
-					autoList.push({
-						gb: '결재', usrNm: list.id, todoId: list.id, name: list.name,
-						jik: list.levelNm, dtNm: list.deptNm,
-						todoDiv2CodeId: 'TODODIV2190', flag: 'I', autoApplicantApproval: 'Y', coCd: jwt.coCd
-					});
+		// 신청인이 팀장 본인이 아닌 경우에만 담당자팀장을 결재선에 추가 (팀장 본인이면 중복 결재행 불필요)
+		pm51TeamMgrId = '';
+		if (!pm51ApplicantIsTeamMgr) {
+			postAjaxSync("/user/wb/wb24/selectTeamManagerInfo", { userId: reqId }, null, function(data) {
+				if (data.result != '' && data.result != null) {
+					var list = data.result;
+					if (list.id !== reqId) {
+						pm51TeamMgrId = list.id;
+						autoList.push({
+							gb: '결재', usrNm: list.id, todoId: list.id, name: list.name,
+							jik: list.levelNm, dtNm: list.deptNm,
+							todoDiv2CodeId: 'TODODIV2190', flag: 'I', autoApplicantApproval: 'Y', coCd: jwt.coCd
+						});
+					}
 				}
-			}
+			});
+		}
+
+		// 부사장(SPECRTS08) 자동 추가
+		$.each(getVpUserIds(), function(idx, vpId) {
+			if (!vpId) return;
+			var vpJik = '', vpDeptNm = '', vpNm = vpId;
+			postAjaxSync("/admin/cm/cm06/selectUserInfo", { userId: vpId }, null, function(data) {
+				if (data && data.userInfo) {
+					vpJik = data.userInfo.levelNm || '';
+					vpDeptNm = data.userInfo.deptNm || '';
+					vpNm = data.userInfo.name || vpId;
+				}
+			});
+			autoList.push({
+				gb: '결재', usrNm: vpId, todoId: vpId, name: vpNm, jik: vpJik, dtNm: vpDeptNm,
+				todoDiv2CodeId: 'TODODIV2190', flag: 'I', autoVpApproval: 'Y', coCd: jwt.coCd
+			});
 		});
 
 		// 기존 그리드의 수동 추가된 결재/공유자는 유지 (자동 추가분만 갱신)
-		// DB에서 재로드된 행에는 autoApplicantApproval 표시가 없으므로, 자동 행과 같은 ID의 기존 행도 제거 (중복 누적 방지)
+		// DB에서 재로드된 행에는 auto* 플래그가 없으므로, 자동 행과 같은 ID의 기존 행도 제거 (중복 누적 방지)
 		var autoIds = $.map(autoList, function(r) { return String(r.usrNm || '').toLowerCase(); });
 		var existingList = gridViewApproval.target.getList() || [];
 		var preservedList = [];
@@ -1120,12 +1218,12 @@
 			var oldApplicantId = String(previousReqId || '').toLowerCase();
 			var isPreviousApplicant = oldApplicantId && rowUserId === oldApplicantId;
 			var isAutoTarget = $.inArray(rowUserId, autoIds) > -1;
-			if (row.autoApplicantApproval !== 'Y' && !isPreviousApplicant && !isAutoTarget) {
+			if (row.autoApplicantApproval !== 'Y' && row.autoVpApproval !== 'Y' && !isPreviousApplicant && !isAutoTarget) {
 				preservedList.push(row);
 			}
 		});
 
-		var newList = autoList.concat(preservedList);
+		var newList = reorderGeneralApprovalLine(autoList.concat(preservedList));
 		gridViewApproval.setData2(newList);
 		gridResize(gridViewApproval, newList.length);
 	}
@@ -1160,6 +1258,39 @@
 			return;
 		}
 		$field.prop('required', isAccounting).prop('disabled', !isAccounting);
+	}
+
+	// 출장국가명: 해외 출장인 경우에만 노출 + 필수, 국내 출장이면 숨기고 값 초기화
+	function updateTripNationNmField() {
+		var $popForm = $('#popForm');
+		var isOverseas = $popForm.find('#tripDiv').val() === 'PM51DIV20';
+		// 출장국가명은 프로젝트명과 같은 행을 공유하므로 행 전체가 아니라 해당 th/td만 visibility로 토글한다
+		// (display:none을 쓰면 같은 행의 프로젝트명 칸이 앞으로 당겨져 배치가 흐트러짐)
+		var $th = $popForm.find('#tripNationNmTh');
+		var $td = $popForm.find('#tripNationNmTd');
+		var $field = $popForm.find('#tripNationNm');
+		$th.css('visibility', isOverseas ? 'visible' : 'hidden');
+		$td.css('visibility', isOverseas ? 'visible' : 'hidden');
+		$field.prop('required', isOverseas);
+		if (!isOverseas) {
+			$field.val('');
+		}
+	}
+
+	// 지급금액(※회계팀 작성) 입력 필드 전체 선택자 (applyEditPolicyInner 내 여러 분기에서 공용으로 사용)
+	function $payAmtEditableFields() {
+		return $('#popForm').find('#payAmt_traffic, #payAmt_lodging, #payAmt_meal, #payAmt_daily, #payAmt_special, #payAmtUsd_traffic, #payAmtUsd_lodging, #payAmtUsd_meal, #payAmtUsd_daily, #payAmtUsd_special, #payAmtTrafficTxt, #payAmtLodgingTxt, #payAmtMealTxt, #payAmtDailyTxt, #payAmtSpecialTxt, #payAmtTotalTxt, #meal_days, #meal_meals, #meal_peeps, #daily_days, #daily_peeps');
+	}
+
+	// 해외 출장 시 출장지역구분 필수 입력 검증 (saveTripReq/payTripReq 공용)
+	// 통과: true, 실패: alert + focus 후 false
+	function validateTripAreaDivRequired() {
+		if ($('#tripDiv').val() === 'PM51DIV20' && !$('#tripAreaDiv').val()) {
+			alert('해외 출장의 출장지역구분을 선택해주세요.');
+			$('#tripAreaDiv').focus();
+			return false;
+		}
+		return true;
 	}
 
 	function onTripDivChange(isInit) {
@@ -1202,6 +1333,7 @@
 			}
 		}
 		updateTripAreaDiv();
+		updateTripNationNmField();
 
 		// 재계산
 		calcTableMeal();
@@ -1505,6 +1637,8 @@
 			// CamelMap/환경별 응답 키 차이를 모두 지원
 			$('#tripAreaDiv').val(master.tripAreaDiv || master.TRIP_AREA_DIV || '');
 			updateTripAreaDiv();
+			$('#tripNationNm').val(master.tripNationNm || master.TRIP_NATION_NM || '');
+			updateTripNationNmField();
 			if (master.tripCondCd === 'TRIPCOND99') {
 				$('#tripCondEtc').show();
 			} else {
@@ -1614,7 +1748,7 @@
 			return;
 		}
 		if (!isPaymentFlow && hasCompletedApproval()) {
-			var isAuthorizedDept = isAccountingUser() || isSalesDeptUser();
+			var isAuthorizedDept = checkUserAccountingAuth() || isSalesDeptUser();
 			if (!isAuthorizedDept) {
 				alert("결재 진행 이후에는 영업팀 또는 회계팀만 수정할 수 있습니다.");
 				applyEditPolicy(currentTripReqMaster);
@@ -1667,11 +1801,7 @@
 			}
 		}
 
-		if (!isPaymentFlow && $('#tripDiv').val() === 'PM51DIV20' && isAccountingUser() && !$('#tripAreaDiv').val()) {
-			alert('해외 출장의 출장지역구분을 선택해주세요.');
-			$('#tripAreaDiv').focus();
-			return;
-		}
+		if (!isPaymentFlow && checkUserAccountingAuth() && !validateTripAreaDivRequired()) return;
 
 		var formData = new FormData();
 		var $popForm = $('#popForm');
@@ -1712,6 +1842,7 @@
 		formData.append('tripDiv', $popForm.find('#tripDiv').val()); //출장구분
 			formData.append('tripTypeCds', $popForm.find('#tripTypeCds').val()); //출장유형
 			formData.append('tripPlace', $popForm.find('#tripPlace').val()); //출장지
+			formData.append('tripNationNm', $popForm.find('#tripNationNm').val()); //출장국가명(해외 출장인 경우)
 			formData.append('equipNm', $popForm.find('#equipNm').val()); //장비명
 			formData.append('salesCd', $popForm.find('#salesCd').val()); //영업담당
 			formData.append('clntCd', $popForm.find('#clntCd').val()); //고객사코드
@@ -1857,14 +1988,19 @@
 					}, null, function (payData) {
 						alert(payData.resultMessage);
 						if (payData.resultCode === 200) {
-							modalStack.last().callback(data);
+							// 팝업을 호출한 화면이 콜백을 넘기지 않은 경우(callback 미정의)에도 모달이 닫히도록 typeof 체크 후 호출
+							if (modalStack.last() && typeof modalStack.last().callback === 'function') {
+								modalStack.last().callback(data);
+							}
 							modalStack.close();
 						}
 						window.isPayingNow = false;
 					});
 				} else {
 					alert(data.resultMessage);
-					modalStack.last().callback(data);
+					if (modalStack.last() && typeof modalStack.last().callback === 'function') {
+						modalStack.last().callback(data);
+					}
 					modalStack.close();
 				}
 			} else if (data.resultCode === 900) {
@@ -1897,6 +2033,15 @@
 		if (!hasApproval) {
 			alert("관리부서 결재자(결재)를 등록해야 지급완료 처리가 가능합니다.");
 			return;
+		}
+
+		// 지급완료 처리는 saveTripReq() 내부에서 isPaymentFlow(지급 흐름)로 처리되어 일반 필수값 검증(!isPaymentFlow 조건)이 대부분 건너뛰어지므로,
+		// 해외 출장 출장지역구분 필수 입력은 여기서 별도로 검증한다.
+		if (!validateTripAreaDivRequired()) return;
+
+		var payTotals = getPaymentTotals();
+		if (payTotals.krw === 0 && payTotals.usd === 0) {
+			if (!confirm("지급금액없이 승인처리하시겠습니까?")) return;
 		}
 
 		if (!confirm("지급완료 처리하시겠습니까?\n(입력하신 지급비용 및 결재선이 저장된 후 지급완료 처리됩니다.)")) return;
@@ -2264,6 +2409,16 @@
 
 		postAjax("/user/pm/pm51/updateTripReqSalesInfo", param, null, function (data) {
 			if (data.resultCode === 200) {
+				// 화면에 남아있는 결재선 데이터는 방금 서버에 반영된 본인(영업PM) 승인완료 상태를 아직 반영하지 못하므로,
+				// kakaoTodo()가 다음 차례 결재자를 정확히 찾을 수 있도록 본인 행만 완료 처리로 로컬 갱신한다.
+				if (gridViewApproval && gridViewApproval.target && gridViewApproval.target.getList) {
+					$.each(gridViewApproval.target.getList() || [], function(idx, row) {
+						if (String(row.usrNm || row.todoId || '') === String(jwt.userId)) {
+							row.sanctnSttus = 'Y';
+							row.todoCfDt = row.todoCfDt || moment().format('YYYY-MM-DD');
+						}
+					});
+				}
 				// 결재처리(승인완료)와 1 set: 남은 결재자에게 결재요청 알림톡 재발송(기발송자는 자동 제외됨)
 				kakaoTodo(param.tripReqNo);
 				alert(data.resultMessage);
@@ -2332,7 +2487,17 @@
 		}
 	}
 
+	// 통화단위(원화/외화)에 따른 지급금액 USD($) 입력 가능 여부를 정책 적용 마지막 단계에서 강제하기 위한 래퍼.
+	// applyEditPolicyInner 내부에는 조기 return이 여러 곳에 있어, 그 안에서 직접 호출하면 일부 분기를 놓칠 수 있음.
 	function applyEditPolicy(master) {
+		applyEditPolicyInner(master);
+		applyPayAmtUsdCurrencyLock();
+		// 해외 출장 출장지역구분: 일반 담당자는 입력 제외(비활성), 회계담당자(SPECRTS15)가 진입한 경우에만 필수 입력.
+		// applyEditPolicyInner의 분기(early return)마다 값이 흐트러질 수 있어 정책 적용 마지막 단계에서 다시 강제한다.
+		updateTripAreaDiv();
+	}
+
+	function applyEditPolicyInner(master) {
 		// 최초 진입 시 통화단위 연동 보장
 		applyCurrExrateFromSelect();
 
@@ -2342,7 +2507,7 @@
 		// 최초 등록(C) 모드이거나 master가 없는 초기 상태인 경우 무조건 영업 확인 영역 잠금 처리
 		// 단, 지급금액은 SPECRTS15(회계담당자) 등록 아이디로 접근한 경우 예외적으로 편집 가능해야 함
 		if (!master || $('#actionType').val() === 'C') {
-			var $payAmtFields = $('#popForm').find('#payAmt_traffic, #payAmt_lodging, #payAmt_meal, #payAmt_daily, #payAmt_special, #payAmtUsd_traffic, #payAmtUsd_lodging, #payAmtUsd_meal, #payAmtUsd_daily, #payAmtUsd_special, #payAmtTrafficTxt, #payAmtLodgingTxt, #payAmtMealTxt, #payAmtDailyTxt, #payAmtSpecialTxt, #payAmtTotalTxt, #meal_days, #meal_meals, #meal_peeps, #daily_days, #daily_peeps');
+			var $payAmtFields = $payAmtEditableFields();
 			if (checkUserAccountingAuth()) {
 				$payAmtFields.prop('readonly', false).css('background', '#ffffff');
 				$payAmtFields.filter('select, input[type="checkbox"], input[type="radio"]').prop('disabled', false);
@@ -2434,7 +2599,7 @@
 		if (actionType !== 'PAY' && checkUserAccountingAuth() && !paid) {
 			setFormDisabled(true);
 			$actionButtons.add($editButtons).hide();
-			var $payAmtFields = $('#popForm').find('#payAmt_traffic, #payAmt_lodging, #payAmt_meal, #payAmt_daily, #payAmt_special, #payAmtUsd_traffic, #payAmtUsd_lodging, #payAmtUsd_meal, #payAmtUsd_daily, #payAmtUsd_special, #payAmtTrafficTxt, #payAmtLodgingTxt, #payAmtMealTxt, #payAmtDailyTxt, #payAmtSpecialTxt, #payAmtTotalTxt, #meal_days, #meal_meals, #meal_peeps, #daily_days, #daily_peeps');
+			var $payAmtFields = $payAmtEditableFields();
 			$payAmtFields.prop('disabled', false).prop('readonly', false).css('background', '#ffffff');
 			// 자금집행담당자는 해외 출장지역구분을 선택할 수 있도록 별도 편집 허용
 			updateTripAreaDiv();
@@ -2458,9 +2623,9 @@
 			$actionButtons.add($editButtons).hide();
 			$popArea.find('.add_btn_small a').hide();
 
-			if (!hasCompletedMng && isAccountingUser()) {
+			if (!hasCompletedMng && checkUserAccountingAuth()) {
 				$popArea.find('#payBtn').show();
-				$popArea.find('#payAmt_traffic, #payAmt_lodging, #payAmt_meal, #payAmt_daily, #payAmt_special, #payAmtUsd_traffic, #payAmtUsd_lodging, #payAmtUsd_meal, #payAmtUsd_daily, #payAmtUsd_special, #payAmtTrafficTxt, #payAmtLodgingTxt, #payAmtMealTxt, #payAmtDailyTxt, #payAmtSpecialTxt, #payAmtTotalTxt, #meal_days, #meal_meals, #meal_peeps, #daily_days, #daily_peeps').prop('disabled', false);
+				$payAmtEditableFields().prop('disabled', false);
 				$popArea.find('a[onclick="insertShareUserModalMng();"], a[onclick="deleteShareUserMng();"]').show();
 				$('#popTitle').text('출장신청서 수정 [지급처리]');
 			} else if (hasCompletedMng && isFileChanged()) {
@@ -2490,13 +2655,13 @@
 			// 결재 및 공유 추가/삭제 버튼 숨김
 			$popArea.find('a[onclick="insertShareUserModal();"], a[onclick="deleteShareUser();"]').hide();
 
-			if (actionType === 'PAY' && hasCompletedGen && isAccountingUser() && aprvStsCd === 'APRVSTS03' && !hasCompletedMng) {
+			if (actionType === 'PAY' && hasCompletedGen && checkUserAccountingAuth() && aprvStsCd === 'APRVSTS03' && !hasCompletedMng) {
 				$popArea.find('#saveBtn').hide();
 				$popArea.find('#payBtn').show();
-				$popArea.find('#payAmt_traffic, #payAmt_lodging, #payAmt_meal, #payAmt_daily, #payAmt_special, #payAmtUsd_traffic, #payAmtUsd_lodging, #payAmtUsd_meal, #payAmtUsd_daily, #payAmtUsd_special, #payAmtTrafficTxt, #payAmtLodgingTxt, #payAmtMealTxt, #payAmtDailyTxt, #payAmtSpecialTxt, #payAmtTotalTxt, #meal_days, #meal_meals, #meal_peeps, #daily_days, #daily_peeps').prop('disabled', false);
+				$payAmtEditableFields().prop('disabled', false);
 				$popArea.find('a[onclick="insertShareUserModalMng();"], a[onclick="deleteShareUserMng();"]').show();
 				$('#popTitle').text('출장신청서 수정 [지급처리]');
-			} else if (actionType === 'PAY' && hasCompletedGen && isAccountingUser() && aprvStsCd === 'APRVSTS03' && hasCompletedMng && isFileChanged()) {
+			} else if (actionType === 'PAY' && hasCompletedGen && checkUserAccountingAuth() && aprvStsCd === 'APRVSTS03' && hasCompletedMng && isFileChanged()) {
 				$popArea.find('#saveBtn').hide();
 				$popArea.find('#payBtn').hide();
 				$popArea.find('#fileSaveBtn').show();
@@ -2529,10 +2694,10 @@
 			if ((isCurrentPm || isSalesPmApprovalPending()) && aprvStsCd !== 'APRVSTS03') {
 				if (actionType !== 'PAY') $popArea.find('#saveBtn').show();
 				$popForm.find('#salesCnfrmYn, input[name="tripCondCd"], #tripCondEtc, input[name="sprtChk"], input[name="sprtTrfcSub"], input[name="sprtMealSub"], #sprtEtcTxt').prop('disabled', false).css('pointer-events', 'auto');
-			} else if (actionType === 'PAY' && isAccountingUser() && aprvStsCd === 'APRVSTS03') {
+			} else if (actionType === 'PAY' && checkUserAccountingAuth() && aprvStsCd === 'APRVSTS03') {
 				$popArea.find('#saveBtn').hide();
 				if (actionType !== 'PAY') $popArea.find('#payBtn').show();
-				$popArea.find('#payAmt_traffic, #payAmt_lodging, #payAmt_meal, #payAmt_daily, #payAmt_special, #payAmtUsd_traffic, #payAmtUsd_lodging, #payAmtUsd_meal, #payAmtUsd_daily, #payAmtUsd_special, #payAmtTrafficTxt, #payAmtLodgingTxt, #payAmtMealTxt, #payAmtDailyTxt, #payAmtSpecialTxt, #payAmtTotalTxt, #meal_days, #meal_meals, #meal_peeps, #daily_days, #daily_peeps').prop('disabled', false);
+				$payAmtEditableFields().prop('disabled', false);
 				$popArea.find('a[onclick="insertShareUserModalMng();"], a[onclick="deleteShareUserMng();"]').show();
 			} else {
 				$popArea.find('#saveBtn').hide();
@@ -2542,7 +2707,7 @@
 		// 회계담당자(SPECRTS15 등록 여부) 판정 — JS 체크만 사용 (SQL IS_ACCOUNTING_AUTH 이중 AND 제거)
 		var isAccountingAuth = checkUserAccountingAuth();
 		var isFormReadOnly = !isAccountingAuth || (isApprovalMode && !isMyApprovalPending()) || paid;
-		var $payAmtFields = $('#popForm').find('#payAmt_traffic, #payAmt_lodging, #payAmt_meal, #payAmt_daily, #payAmt_special, #payAmtUsd_traffic, #payAmtUsd_lodging, #payAmtUsd_meal, #payAmtUsd_daily, #payAmtUsd_special, #payAmtTrafficTxt, #payAmtLodgingTxt, #payAmtMealTxt, #payAmtDailyTxt, #payAmtSpecialTxt, #payAmtTotalTxt, #meal_days, #meal_meals, #meal_peeps, #daily_days, #daily_peeps');
+		var $payAmtFields = $payAmtEditableFields();
 		if (isFormReadOnly) {
 			$payAmtFields.prop('readonly', true).css('background', '#fafafa');
 			$payAmtFields.filter('select, input[type="checkbox"], input[type="radio"]').prop('disabled', true);
@@ -3159,6 +3324,30 @@
 
 		var currCdNm = optEl.text || 'USD';
 		$('#payAmtUsdHead').text(currCdNm + '($)');
+
+		applyPayAmtUsdCurrencyLock();
+	}
+
+	// 통화단위가 원화(WON/KRW, CURR01)인 경우 지급금액(※회계팀 작성)의 USD($) 항목은 입력 금지, 원화가 아닌 경우에만 입력 가능.
+	// 회계담당자 편집 가능 여부(모드/권한별 정책)는 이미 applyEditPolicy에서 결정된 KRW쪽 필드(payAmt_traffic)의
+	// disabled 상태를 기준으로 판단하여, 기존 편집 권한 정책 위에 통화 조건만 추가로 덧씌운다.
+	function applyPayAmtUsdCurrencyLock() {
+		var $popForm = $('#popForm');
+		var $usdFields = $popForm.find('#payAmtUsd_traffic, #payAmtUsd_lodging, #payAmtUsd_meal, #payAmtUsd_daily, #payAmtUsd_special');
+		if ($usdFields.length === 0) return;
+
+		var basePayAmtEditable = !$popForm.find('#payAmt_traffic').prop('disabled');
+		var selectEl = $popForm.find('#currCd')[0];
+		var optEl = selectEl ? selectEl.options[selectEl.selectedIndex] : null;
+		var currCdNm = optEl ? (optEl.text || '') : '';
+		var currCdVal = selectEl ? (selectEl.value || '') : '';
+		var isWon = currCdVal === 'CURR01' || /원|WON|KRW/i.test(currCdNm);
+
+		if (basePayAmtEditable && !isWon) {
+			$usdFields.prop('disabled', false).prop('readonly', false).css('background', '#ffffff');
+		} else {
+			$usdFields.prop('disabled', true).prop('readonly', true).css('background', '#fafafa');
+		}
 	}
 
 	function onExchangeRateChanged(el) {
@@ -3255,6 +3444,30 @@
 	var kakaoCnt = 0;
 	var kakaoErr = [];
 
+	// gb='결재' 행 중 아직 미완료(확인일자 없음 && sanctnSttus!=='Y')인 첫 행의 순번(배열순서 1-base)을 반환. 모두 완료/행없음이면 null.
+	function getFirstPendingApprovalSn(gridView) {
+		if (!gridView || !gridView.target || !gridView.target.getList) return null;
+		var rows = $.grep(gridView.target.getList() || [], function(r) { return r.gb === '결재'; });
+		for (var i = 0; i < rows.length; i++) {
+			var isDone = $.trim(rows[i].todoCfDt || '') || rows[i].sanctnSttus === 'Y';
+			if (!isDone) return i + 1;
+		}
+		return null;
+	}
+
+	// gb='결재' 행이 (1개 이상 존재하며) 모두 완료되었는지 확인
+	function isApprovalFullyCompleted(gridView) {
+		if (!gridView || !gridView.target || !gridView.target.getList) return false;
+		var rows = $.grep(gridView.target.getList() || [], function(r) { return r.gb === '결재'; });
+		if (rows.length === 0) return false;
+		var allDone = true;
+		$.each(rows, function(idx, row) {
+			var isDone = $.trim(row.todoCfDt || '') || row.sanctnSttus === 'Y';
+			if (!isDone) { allDone = false; return false; }
+		});
+		return allDone;
+	}
+
 	function kakaoTodo(docNo) {
 		if (!docNo) return;
 		//message load
@@ -3285,18 +3498,28 @@
 			}
 		});
 
-		// 결재선 구분코드별 결재요청 알림톡 발송 (수신자는 DB에 등록된 미결 결재선 기준 - 자동추가 결재자 포함)
-		kakaoSendBody(docNo, 'TODODIV20', 'TODODIV2190', '결재', clntNm, teleNo);	// 개인 결재
-		kakaoSendBody(docNo, 'TODODIV10', 'TODODIV1190', '공유', clntNm, teleNo);	// 개인 공유
-		kakaoSendBody(docNo, 'TODODIV20', 'TODODIV2191', '결재', clntNm, teleNo);	// 관리부서 결재
-		kakaoSendBody(docNo, 'TODODIV10', 'TODODIV1191', '공유', clntNm, teleNo);	// 관리부서 공유
+		// 순차결재: 신청부서(TODODIV2190) 결재는 현재 차례(첫 미결 순번)인 사람에게만 발송
+		var reqActiveSn = getFirstPendingApprovalSn(gridViewApproval);
+		if (reqActiveSn) {
+			kakaoSendBody(docNo, 'TODODIV20', 'TODODIV2190', '결재', clntNm, teleNo, reqActiveSn);	// 개인 결재
+		}
+		kakaoSendBody(docNo, 'TODODIV10', 'TODODIV1190', '공유', clntNm, teleNo);	// 개인 공유 (순서 무관, 전체 발송)
+
+		// 관리부서 결재/공유는 신청부서 결재가 모두 완료된 이후에만 시작 (관리부서 내에서도 SPECRTS14 등록순 순차결재)
+		if (isApprovalFullyCompleted(gridViewApproval)) {
+			var mngActiveSn = getFirstPendingApprovalSn(gridViewApprovalMng);
+			if (mngActiveSn) {
+				kakaoSendBody(docNo, 'TODODIV20', 'TODODIV2191', '결재', clntNm, teleNo, mngActiveSn);	// 관리부서 결재
+			}
+			kakaoSendBody(docNo, 'TODODIV10', 'TODODIV1191', '공유', clntNm, teleNo);	// 관리부서 공유
+		}
 
 		if (kakaoCnt > 0) {
 			kakaoCnt = 0;
 		}
 	}
 
-	function kakaoSendBody(docNo, todoDiv1CodeId, todoDiv2CodeId, sanctnDiv2, clntNm, teleNo) {
+	function kakaoSendBody(docNo, todoDiv1CodeId, todoDiv2CodeId, sanctnDiv2, clntNm, teleNo, sanctnSn) {
 		var param = {
 			"tmplatDiv": "TMPLATDIV02"
 			, "coCd": jwt.coCd
@@ -3314,6 +3537,9 @@
 			, "chkSentYn": "Y"					//기발송 수신자 제외(중복방지)
 			, "customMessage": buildTripReqKakaoMessage(sanctnDiv2, clntNm, teleNo)	//본문은 신청서 정보로 직접 조립 (제목은 기존 그대로)
 		};
+		if (sanctnSn) {
+			param.sanctnSn = sanctnSn;	// 순차결재: 지정 시 해당 순번(현재 차례)의 결재자에게만 발송
+		}
 		commKaKaoSendTodo(param);
 	}
 
@@ -3586,13 +3812,6 @@
 					}
 				});
 
-				var maxSn = 0;
-				$.each(filteredList, function(idx, item) {
-					if (item.gb === '결재' && Number(item.sanctnSn || 0) > maxSn) {
-						maxSn = Number(item.sanctnSn);
-					}
-				});
-
 				filteredList.push({
 					gb: '결재',
 					usrNm: newPmId,
@@ -3601,7 +3820,6 @@
 					dtNm: userDeptNm,
 					todoId: newPmId,
 					todoDiv2CodeId: 'TODODIV2190',
-					sanctnSn: maxSn + 1,
 					sanctnSttus: 'N',
 					flag: 'I',
 					coCd: jwt.coCd
@@ -3609,16 +3827,10 @@
 			}
 		}
 
-		// 순번 재정렬
-		var finalApprovalSn = 1;
-		$.each(filteredList, function(idx, item) {
-			if (item.gb === '결재') {
-				item.sanctnSn = finalApprovalSn++;
-			}
-		});
-
-		gridViewApproval.target.setData({ list: filteredList, page: { totalElements: filteredList.length } });
-		gridResize(gridViewApproval, filteredList.length);
+		// 신청인(담당자/팀장) → 영업PM → (담당자인 경우만) 담당자팀장 → 부사장 순서로 재구성 + 순번 재부여
+		var orderedList = reorderGeneralApprovalLine(filteredList);
+		gridViewApproval.target.setData({ list: orderedList, page: { totalElements: orderedList.length } });
+		gridResize(gridViewApproval, orderedList.length);
 	}
 
 </script>

@@ -123,6 +123,7 @@ public class WB20SvcImpl implements WB20Svc {
 		String todoDiv2CodeId = paramMap.get("todoDiv2CodeId");
 		String todoCfOpn = paramMap.get("todoCfOpn");
 		validatePm51SalesApproval(paramMap);
+		validatePm51SequentialApproval(paramMap);
 		result += wb20Mapper.updateApprovalLine(paramMap);
 		
 		// 출장신청 관리부서 회계 승인(TODODIV2191) 시 신청서 자동 지급완료 처리 연동
@@ -269,6 +270,57 @@ public class WB20SvcImpl implements WB20Svc {
 				|| checked(tripReq.get("sprtEtcYn"));
 		if (!checked(tripReq.get("salesCnfrmYn")) || !hasText(tripReq.get("tripCondCd")) || !supportChecked) {
 			throw new RuntimeException("영업팀 확인, 출장조건, 고객사지원범위를 입력해야 결재처리할 수 있습니다.");
+		}
+	}
+
+	private void validatePm51SequentialApproval(Map<String, String> paramMap) {
+		String todoDiv1CodeId = paramMap.get("todoDiv1CodeId");
+		String todoDiv2CodeId = paramMap.get("todoDiv2CodeId");
+		if (!"TODODIV20".equals(todoDiv1CodeId)) {
+			return;
+		}
+		if (!"TODODIV2190".equals(todoDiv2CodeId) && !"TODODIV2191".equals(todoDiv2CodeId)) {
+			return;
+		}
+		String todoNo = paramMap.get("todoNo");
+		if (!hasText(todoNo)) {
+			return;
+		}
+		int currentSn;
+		try {
+			currentSn = Integer.parseInt(String.valueOf(paramMap.get("sanctnSn")));
+		} catch (Exception e) {
+			return;
+		}
+
+		if ("TODODIV2191".equals(todoDiv2CodeId)) {
+			Map<String, String> reqParam = new HashMap<>();
+			reqParam.put("todoNo", todoNo);
+			reqParam.put("todoDiv1CodeId", "TODODIV20");
+			reqParam.put("todoDiv2CodeId", "TODODIV2190");
+			List<Map<String, String>> reqLines = wb20Mapper.selectApprovalLineOrder(reqParam);
+			for (Map<String, String> line : reqLines) {
+				if (!"Y".equals(line.get("sanctnSttus"))) {
+					throw new RuntimeException("신청부서 결재가 모두 완료되어야 관리부서 결재를 진행할 수 있습니다.");
+				}
+			}
+		}
+
+		Map<String, String> selfParam = new HashMap<>();
+		selfParam.put("todoNo", todoNo);
+		selfParam.put("todoDiv1CodeId", "TODODIV20");
+		selfParam.put("todoDiv2CodeId", todoDiv2CodeId);
+		List<Map<String, String>> lines = wb20Mapper.selectApprovalLineOrder(selfParam);
+		for (Map<String, String> line : lines) {
+			int sn;
+			try {
+				sn = Integer.parseInt(String.valueOf(line.get("sanctnSn")));
+			} catch (Exception e) {
+				continue;
+			}
+			if (sn < currentSn && !"Y".equals(line.get("sanctnSttus"))) {
+				throw new RuntimeException("이전 순번 결재자의 승인이 완료되어야 결재를 진행할 수 있습니다.");
+			}
 		}
 	}
 
