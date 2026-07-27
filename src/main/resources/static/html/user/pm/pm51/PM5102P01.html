@@ -291,7 +291,7 @@
 				<div style="width: 49%;">
 					<table style="border: 0px; width: 100%;" class="issAct">
 						<tr style="height: 30px;">
-							<td style="text-align: LEFT; border-right: 0px;; font-size: 13px; font-weight: bold; color: blue;">결재 및 공유</td>
+							<td style="text-align: LEFT; border-right: 0px;; font-size: 13px; font-weight: bold; color: blue;">결재 및 공유 <span style="font-size: 11px; font-weight: normal; color: #aa6600; margin-left: 6px;">(번호순서에 따라 순차결재진행됨)</span></td>
 							<td>
 								<div class="add_btn_small pdl10">
 									<a onclick="insertShareUserModal();" style="height: 30px; line-height: 28px;" authchk>+</a>
@@ -310,7 +310,7 @@
 				<div class="mng-approval-area" style="width: 49%;">
 					<table style="border: 0px; width: 100%;" class="issAct">
 						<tr style="height: 30px;">
-							<td style="text-align: LEFT; border-right: 0px;; font-size: 13px; font-weight: bold; color: blue;">관리부서 결재 및 공유</td>
+							<td style="text-align: LEFT; border-right: 0px;; font-size: 13px; font-weight: bold; color: blue;">관리부서 결재 및 공유 <span style="font-size: 11px; font-weight: normal; color: #aa6600; margin-left: 6px;">(번호순서에 따라 순차결재진행됨)</span></td>
 							<td>
 								<div class="add_btn_small pdl10" style="display: none;">
 									<a onclick="insertShareUserModalMng();" style="height: 30px; line-height: 28px;" authchk>+</a>
@@ -644,6 +644,23 @@
 		initFileTree();
 
 		gridViewApprovalMng = createApprovalGrid('[data-ax5grid="approval_grid_mng_modal"]');
+
+		// SPECRTS15(회계담당자) 등록 아이디는 공통 fileTree.js가 동적으로 추가하는 결재/공유 처리 버튼
+		// (callApprovalWorking)을 노출하지 않는다. 회계담당자는 저장버튼("지급완료처리")으로만 정산 확정과
+		// 결재처리를 함께 진행해야 하기 때문 (PM5101P01.html의 영업PM 예외 처리와 동일 패턴).
+		// 공통모듈은 수정하지 않고, 버튼이 popup_bottom_btn에 추가되는 시점을 감지해 즉시 숨긴다.
+		(function() {
+			var $popBottomBtn = $('#popForm').closest('.popup_area').find('.popup_bottom_btn');
+			if ($popBottomBtn.length && window.MutationObserver) {
+				var callApprovalBtnObserver = new MutationObserver(function() {
+					if (isAccountingUser()) {
+						$popBottomBtn.find('.callApprovalWorking').hide();
+					}
+				});
+				callApprovalBtnObserver.observe($popBottomBtn[0], { childList: true });
+			}
+		})();
+
 		initApprovalArea();
 		gridViewApprovalMng.initView();
 		gridResize(gridViewApproval, 0);
@@ -694,7 +711,7 @@
 		} else {
 			$('#popTitle').text('출장복명서 등록');
 			$('#actionType').val('C');
-			loadTripReqCitation(popParam.tripReqNo, popParam.chgNo);
+			loadTripReqCitation(popParam.tripReqNo);
 			setApplicantDefaultApprovalLineMng();
 		}
 		}, 0);
@@ -831,7 +848,7 @@
 					{ key: 'eatCnt', label: '식', width: 40, align: 'center', editor: { type: 'number', disabled: isRptTravelerGridEditBlocked } },
 				]},
 				{ key: undefined, label: "출장경비", columns: [
-					{ key: 'specialAmt', label: '특별비', width: 100, align: 'right', editor: { type: 'number', disabled: isRptTravelerGridEditBlocked }, formatter: "money" },
+					{ key: 'specialAmt', label: '예비비', width: 100, align: 'right', editor: { type: 'number', disabled: isRptTravelerGridEditBlocked }, formatter: "money" },
 				]},
 				{ key: 'etc', label: '비고', width: 260, align: 'left', editor: { type: 'text', disabled: isRptTravelerGridEditBlocked } },
 				{ key: 'trafficAmt', label: '교통비', width: 80, align: 'right', editor: { type: 'number', disabled: isRptTravelerGridEditBlocked }, formatter: "money" , hidden: true},
@@ -1164,8 +1181,17 @@
 				dailyRows.push({ userNm: userNm, firstSchedule: firstSchedule, actualSchedule: actualSchedule, currNm: '달러', dailyAdvance: reqAdvUsd, dailyFinal: finalUsd, dailyDiff: reqAdvUsd - finalUsd });
 			}
 		});
-		var totalPayAmtKrw = getSettlementNumber($('#totalPayAmt_display').val() || $('#totalPayAmt_display').text() || (currentTripReqMaster || {}).payAmt_special || (currentTripReqMaster || {}).payAmtKrw || 0);
-		var totalPayAmtUsd = getSettlementNumber($('#totalPayAmtUsd_display').val() || $('#totalPayAmtUsd_display').text() || (currentTripReqMaster || {}).payAmtUsd_special || (currentTripReqMaster || {}).payAmtUsd || 0);
+		// 실비정산 최초전도금은 출장신청서 전체 지급합계가 아니라 예비비 지급금액만 사용
+		var reservePayKrw = 0, reservePayUsd = 0;
+		$.each(currentReqExpItems || [], function(idx, item) {
+			var itemCd = String(item.expItemCd || item.expItemCdNm || item.itemNm || item.name || '').trim();
+			if (itemCd === '예비비' || itemCd === '특별비') {
+				reservePayKrw += getSettlementNumber(item.krwAmt || 0);
+				reservePayUsd += getSettlementNumber(item.usdAmt || 0);
+			}
+		});
+		var totalPayAmtKrw = reservePayKrw;
+		var totalPayAmtUsd = reservePayUsd;
 		var expenseMonths = [];
 		$.each(expenses, function(idx, row) {
 			var month = getExpenseMonth(row.workRptDt);
@@ -1182,6 +1208,7 @@
 		};
 		var actualGroups = {};
 		$.each(expenses, function(idx, row) {
+			if (!isReserveTripExpense(row)) return;
 			var roundNo = getExpenseRoundName(row);
 			var payMthdNm = row.tripRptCurTypNm || '';
 			var cardNo = row.tripRptCardNo || '';
@@ -1189,6 +1216,25 @@
 			var groupKey = [roundNo, payMthdNm, cardNo, currNm].join('|');
 			if (!actualGroups[groupKey]) actualGroups[groupKey] = { roundNo: roundNo, payMthdNm: payMthdNm, cardNo: cardNo, currNm: currNm, usedAmt: 0 };
 			actualGroups[groupKey].usedAmt += getSettlementNumber(row.tripRptAmt || 0);
+		});
+		// 집계 경비가 없어도 예비비 지급금액이 있으면 통화별 최초전도금 행을 표시
+		var advanceRoundNo = expenseMonths.length === 1 ? '최종' : '1차';
+		$.each([
+			{ amount: reservePayKrw, currNm: 'WON' },
+			{ amount: reservePayUsd, currNm: 'USD' }
+		], function(idx, advance) {
+			if (advance.amount <= 0) return;
+			var hasCashGroup = false;
+			$.each(actualGroups, function(key, group) {
+				if (String(group.payMthdNm || '').indexOf('현금') > -1 && String(group.currNm || '').toUpperCase() === advance.currNm) {
+					hasCashGroup = true;
+					return false;
+				}
+			});
+			if (!hasCashGroup) {
+				var advanceKey = [advanceRoundNo, '현금', '', advance.currNm].join('|');
+				actualGroups[advanceKey] = { roundNo: advanceRoundNo, payMthdNm: '현금', cardNo: '', currNm: advance.currNm, usedAmt: 0 };
+			}
 		});
 		var actualRows = $.map(actualGroups, function(group) {
 			var isFirstCash = (group.roundNo === '1차' || (expenseMonths.length === 1 && group.roundNo === '최종')) && String(group.payMthdNm || '').indexOf('현금') > -1;
@@ -1323,10 +1369,7 @@
 					var firstRound = $.grep(comboTripRptRound || [], function(item) { return String(item.NM || '').indexOf('1차') > -1; })[0];
 					row.tripRptRound = firstRound ? firstRound.CD : ((comboTripRptRound || [])[0] || {}).CD || '';
 				}
-				if (!row.tripRptRsvDiv) {
-					var normalBudget = $.grep(comboTripRptRsvDiv || [], function(item) { return String(item.NM || '').indexOf('일반') > -1; })[0];
-					row.tripRptRsvDiv = normalBudget ? normalBudget.CD : '';
-				}
+				row.tripRptRsvDiv = getAutoTripRptRsvDiv(row);
 				if (isKrwCurrency(row.tripRptCurr)) {
 					row.krwAmt = Number(row.tripRptAmt || 0);
 				} else if (isUsdCurrency(row.tripRptCurr)) {
@@ -1345,6 +1388,24 @@
 		});
 	}
 
+	// 출장 경비 신청 현황 자동 구분: 숙박비/식비는 일반, 그 외 항목은 예비비
+	function getAutoTripRptRsvDiv(row) {
+		var expenseType = String(row.tripRptTypNm || row.tripRptTyp || '').trim();
+		var isGeneral = expenseType.indexOf('숙박비') > -1 || expenseType.indexOf('식비') > -1 || expenseType.indexOf('식대') > -1;
+		var targetName = isGeneral ? '일반' : '예비비';
+		var target = $.grep(comboTripRptRsvDiv || [], function(item) {
+			return String(item.NM || '').indexOf(targetName) > -1;
+		})[0];
+		return target ? target.CD : '';
+	}
+
+	function isReserveTripExpense(row) {
+		var reserveDiv = $.grep(comboTripRptRsvDiv || [], function(item) {
+			return String(item.NM || '').indexOf('예비비') > -1;
+		})[0];
+		return !!reserveDiv && String(row.tripRptRsvDiv || '') === String(reserveDiv.CD || '');
+	}
+
 	function calculateTripExpenseStatusKrw() {
 		if (!tripExpenseStatusGridView || !tripExpenseStatusGridView.target) return;
 		var masterExrate = getSettlementNumber($('#reqViewExrate').val() || 0);
@@ -1354,7 +1415,7 @@
 			var currency = row.tripRptCurrNm || row.tripRptCurr || '';
 			var currencyText = String(currency).toUpperCase();
 			var isWon = row.tripRptCurr === 'KRW' || row.tripRptCurr === 'WON' || row.tripRptCurr === 'CURR01'
-				|| currencyText.indexOf('WON') > -1 || currencyText.indexOf('\uC6D0') > -1;
+				|| currencyText.indexOf('WON') > -1 || currencyText.indexOf('원') > -1;
 			var calculatedKrw;
 			if (isWon) {
 				calculatedKrw = amount;
@@ -1628,6 +1689,23 @@
 			}
 		});
 
+		// 부사장(SPECRTS08) 자동 추가 (PM51의 setApplicantDefaultApprovalLine과 동일 패턴)
+		$.each(getRptVpUserIds(), function(idx, vpId) {
+			if (!vpId) return;
+			var vpJik = '', vpDeptNm = '', vpNm = vpId;
+			postAjaxSync("/admin/cm/cm06/selectUserInfo", { userId: vpId }, null, function(data) {
+				if (data && data.userInfo) {
+					vpJik = data.userInfo.levelNm || '';
+					vpDeptNm = data.userInfo.deptNm || '';
+					vpNm = data.userInfo.name || vpId;
+				}
+			});
+			autoList.push({
+				gb: '결재', usrNm: vpId, todoId: vpId, name: vpNm, jik: vpJik, dtNm: vpDeptNm,
+				todoDiv2CodeId: 'TODODIV2200', flag: 'I', autoApplicantApproval: 'Y', coCd: jwt.coCd
+			});
+		});
+
 		// DB에서 재로드된 행에는 autoApplicantApproval 표시가 없으므로, 자동 행과 같은 ID의 기존 행도 제거 (중복 누적 방지)
 		var autoIds = $.map(autoList, function(r) { return r.usrNm; });
 		var preservedList = $.grep(gridViewApproval.target.getList() || [], function(row) {
@@ -1640,11 +1718,9 @@
 		gridResize(gridViewApproval, newList.length);
 	}
 
-	// 신청서 인용 정보 로드 - chgNo가 있으면(=마지막으로 등록된 변경신청이 있음) 아직 결재 완료 전이라도
-	// 원본(TB_PM51M01)이 아니라 그 변경신청 내용(TB_PM51C01)을 인용한다("마지막에 등록한 출장신청서내용" 기준).
-	function loadTripReqCitation(tripReqNo, chgNo) {
-		var useChgDtl = !!chgNo;
-		postAjax(useChgDtl ? "/user/pm/pm51/selectTripReqChgDtl" : "/user/pm/pm51/selectTripReqDtl", useChgDtl ? { chgNo: chgNo } : { tripReqNo: tripReqNo }, null, function (data) {
+	// 신청서 인용 정보 로드 - TB_PM51M01(현재본)을 인용한다.
+	function loadTripReqCitation(tripReqNo) {
+		postAjax("/user/pm/pm51/selectTripReqDtl", { tripReqNo: tripReqNo }, null, function (data) {
 			if (!data.result) return;
 
 			var m01 = data.result.m01 || {};
@@ -2828,6 +2904,9 @@
 			if (data.resultCode === 200) {
 				kakaoTodo(data.tripRptNo || $('#tripRptNo').val());
 				alert(data.resultMessage);
+				if (modalStack.last() && typeof modalStack.last().callback === 'function') {
+					modalStack.last().callback(data);
+				}
 				modalStack.close();
 			} else if (data.resultCode === 900) {
 				alert(data.resultMessage);
@@ -2864,6 +2943,9 @@
 				// 결재처리(승인완료)와 1 set: 남은 결재자에게 결재요청 알림톡 재발송(기발송자는 자동 제외됨)
 				kakaoTodo(param.tripRptNo);
 				alert(data.resultMessage);
+				if (modalStack.last() && typeof modalStack.last().callback === 'function') {
+					modalStack.last().callback(data);
+				}
 				modalStack.close();
 			} else if (data.resultCode === 900) {
 				alert(data.resultMessage);
@@ -2916,6 +2998,13 @@
 		}
 
 		// 2단계: 정산 금액 저장 + 자동 승인 (서버측에서 처리)
+		var dailySettlementList = dailySettlementGridView.target.getList() || [];
+		var actualSettlementList = actualSettlementGridView.target.getList() || [];
+		// 목록 화면 집계용: 일비정산 차이 합계 / 실비정산 정산후금액 합계 (통화별, +반납 -지급)
+		var isKrwCurrName = function(text) {
+			text = String(text || '').toUpperCase();
+			return text.indexOf('WON') > -1 || text.indexOf('KRW') > -1 || text.indexOf('원') > -1;
+		};
 		var settleParam = {
 			tripRptNo: tripRptNo,
 			advRcvAmtKrw: getSettlementNumber($('#advRcvAmtKrw').val()),
@@ -2932,11 +3021,12 @@
 		postAjaxSync("/user/pm/pm51/updateTripRptAcctSettle", settleParam, null, function(data) {
 			if (data.resultCode !== 200) {
 				errorOccurred = true;
+				settleParam.errorMessage = data.resultMessage || '';
 			}
 		});
 
 		if (errorOccurred) {
-			alert("정산정보 저장 또는 결재처리에 실패했습니다.");
+			alert("정산정보 저장 또는 결재처리에 실패했습니다.\n" + (settleParam.errorMessage || '서버 오류 내용을 확인할 수 없습니다.'));
 			return;
 		}
 
@@ -2944,6 +3034,9 @@
 		// (결재처리(자동 승인)와 1 set: 남은 결재자에게 결재요청 알림톡 재발송)
 		kakaoTodo(tripRptNo);
 		alert(saveCount + "건의 경비정보와 정산정보가 저장되었습니다.");
+		if (modalStack.last() && typeof modalStack.last().callback === 'function') {
+			modalStack.last().callback({ tripRptNo: tripRptNo });
+		}
 		modalStack.close();
 	}
 
@@ -2958,6 +3051,9 @@
 		postAjax("/user/pm/pm51/deleteTripRpt", { tripRptNo: tripRptNo }, null, function (data) {
 			if (data.resultCode === 200) {
 				alert(data.resultMessage);
+				if (modalStack.last() && typeof modalStack.last().callback === 'function') {
+					modalStack.last().callback(data);
+				}
 				modalStack.close();
 			} else if (data.resultCode === 900) {
 				alert(data.resultMessage);
@@ -3125,6 +3221,22 @@
 		return popParam.actionType === 'V' || !!popParam.todoFileTrgtKey || !!popParam.sanctnSn || !!popParam.todoDiv1CodeId;
 	}
 
+	// 현재 로그인 사용자 본인의 일반결재선(TODODIV2200) 결재행이 이미 완료(Y)되었는지
+	function hasOwnGeneralApprovalCompleted() {
+		var completed = false;
+		if (gridViewApproval && gridViewApproval.target && gridViewApproval.target.getList) {
+			$.each(gridViewApproval.target.getList(), function(idx, elem) {
+				if (elem.gb === '결재' && String(elem.usrNm || elem.todoId || '') === jwt.userId) {
+					if ($.trim(elem.todoCfDt || '') || elem.sanctnSttus === 'Y') {
+						completed = true;
+					}
+					return false;
+				}
+			});
+		}
+		return completed;
+	}
+
 	function hasCompletedRptApproval() {
 		var hasCompleted = false;
 		if (gridViewApproval && gridViewApproval.target && gridViewApproval.target.getList) {
@@ -3212,6 +3324,8 @@
 		var isApproverTeamManager = isCurrentApproverTeamManager(applicantId); // 결재자 팀장 여부
 		var isAccounting = isAccountingUser(); // 회계 담당자 여부
 		var applicant = isRptApplicant(); // 신청인 여부
+		// 회계담당자가 실제로 정산 확정(=지급완료 처리)을 진행할 수 있는 상태인지
+		var isAccountingActive = isAccounting && !isRptPaid() && !hasCompletedMngApproval();
 
 		// 결재 진입 상태 시 락 판정 (기본적으로 결재선 승인이 완료되었거나 회계 지급 완료된 경우 하드 락)
 		var locked = isApprovalEntryMode() || hasCompletedRptApproval() || isRptPaid();
@@ -3223,7 +3337,7 @@
 			$popArea.find('.add_btn_small a').hide();
 			setRptGridEditable(false);
 			// 회계담당자 예외: locked 상태에서도 영역 2 활성화
-			if (isAccounting && !isRptPaid() && !hasCompletedMngApproval()) {
+			if (isAccountingActive) {
 				setArea2Enabled(true);
 				$popArea.find('#saveBtn').show();
 			}
@@ -3244,19 +3358,30 @@
 			}
 
 			// [영역 2 제어] 회계담당자만 영역 2 활성화
-			if (isAccounting && !isRptPaid() && !hasCompletedMngApproval()) {
+			if (isAccountingActive) {
 				setArea2Enabled(true);
 			} else {
 				setArea2Disabled(true);
 			}
 		}
 
+		// 회계담당자가 수정/결재처리로 진입한 경우: 저장버튼을 "지급완료처리"로 표시해 실제 동작(정산 확정 + 결재처리)을
+		// 명확히 알린다. 공통모듈이 추가하는 결재/공유 처리 버튼(callApprovalWorking)은 위 MutationObserver가 숨긴다.
+		$popArea.find('#saveBtn').text(isAccountingActive ? '지급완료처리' : '저장');
+
+		// 실제로 수정 가능한 자료가 하나도 없는 상태(하드 락이면서 회계담당자 예외도 아님)이면
+		// 팝업 타이틀을 "수정"이 아닌 "[조회]"로 표시한다.
+		if (popParam.actionType !== 'V') {
+			var canEditAnything = !locked || isAccountingActive;
+			$('#popTitle').text(canEditAnything ? '출장복명서 수정' : '출장복명서 [조회]');
+		}
+
 		// [특별 권한 정책] 신청인이 팀장이거나 현재 로그인한 사용자가 신청인의 팀장(결재자)인 경우
 		// 이 블록은 반드시 마지막에 실행되어 다른 로직에 덮이지 않도록 함
 		if ((isTeamManager || isApproverTeamManager) && !isAccounting) {
-			// 지급 완료되었거나, 부서장평가가 이미 있는 상태에서 관리부서(회계) 결재가 진행됐다면
-			// 부서장이 재조회해도 부서장평가/결재자판단을 다시 바꿀 수 없다.
-			var isCompleted = isRptPaid() || (!!$.trim($('#deptEvalCd').val() || '') && hasCompletedMngApproval());
+			// 팀장이 수정 가능한 조건: 회계 지급 전이면서, 담당팀장 본인의 일반결재가 아직 완료되지 않은 경우에만.
+			// 본인 결재가 이미 완료된 상태면 재조회해도 저장버튼/부서장평가영역을 다시 열어주지 않는다.
+			var isCompleted = isRptPaid() || hasOwnGeneralApprovalCompleted();
 			if (!isCompleted) {
 				// 전체 폼이 락(disabled) 상태일지라도, 이 두 곳(부서장평가, 결재자판단)만 예외적으로 활성화(수정 가능) 처리
 				$('#deptEvalCd').prop('required', true).attr('msg', '부서장평가');

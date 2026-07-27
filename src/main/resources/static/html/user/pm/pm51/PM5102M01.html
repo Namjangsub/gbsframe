@@ -130,6 +130,7 @@
 				<div class="add_btn_small pdl10">
 					<a onclick="insertTripRptModal();" style="height: 30px; line-height: 28px; width: 60px;" authchk><i class="fas fa-plus"></i>신규</a>
 					<a onclick="deleteTripRptM01();" style="height: 30px; line-height: 28px; width: 60px;" authchk><i class="fas fa-trash"></i>삭제</a>
+					<a onclick="updateRptPayCancel();" style="height: 30px; line-height: 28px; width: 115px;" authchk><i class="fas fa-undo"></i> 지급완료취소</a>
 					<a onclick="printTripRptM01();" style="height: 30px; line-height: 28px; width: 120px;" title="출장복명서가 출력됩니다."><i class="fas fa-print"></i>출장복명서출력</a>
 					<a onclick="excelDown();" style="height: 30px; line-height: 28px; width: 90px;"><i class="fas fa-file-excel"></i>엑셀다운로드</a>
 				</div>
@@ -239,6 +240,14 @@
 					{ key: "salesCd", label: "SalesCd", width: 120, align: "center" },
 					{ key: "equipNm", label: "장비명", width: 120, align: "left" },
 					{ key: "currCdNm", label: "통화단위", width: 80, align: "center" },
+					{
+						key: "payAprvStsNm", label: "지급결재", width: 70, align: "center",
+						formatter: function() {
+							return formatApprovalStatus(this.item.payAppTotCnt, this.item.payAppDoneCnt, this.item.payAprvStsNm);
+						}
+					},
+					{ key: "payDt", label: "지급일자", width: 80, align: "center" },
+					{ key: "payNm", label: "지급담당", width: 70, align: "center" },
 					{ key: 'settleAmtKrw', label: '정산(KRW)', width: 90, align: 'right', formatter: "money" },
 					{ key: 'settleAmtUsd', label: '정산(USD)', width: 90, align: 'right', formatter: "money" },
 					{ key: 'finalEvalNm', label: '평가', width: 60, align: 'center' },
@@ -339,13 +348,19 @@
 					return;
 				}
 
+				// 모달을 먼저 보이게 한 뒤 그리드를 초기화해야 함 (display:none 상태에서 그리드를 초기화하면
+				// 컨테이너 크기가 0으로 계산되어 데이터를 넣어도 화면에 표시되지 않음)
+				$('#selectReqModal').css('display', 'flex');
+
 				// 선택 그리드 초기화 및 표시
 				initSelectReqGrid();
 				selectReqGridView.setData({
 					list: list,
 					page: { totalElements: list.length }
 				});
-				$('#selectReqModal').css('display', 'flex');
+				if (selectReqGridView.repaint) {
+					selectReqGridView.repaint();
+				}
 			} catch (error) {
 				customAlert("오류 발생: " + error.message);
 			}
@@ -477,6 +492,57 @@
 			} else {
 				alert(data.resultMessage);
 			}
+		});
+	}
+
+	// 회계담당자 판정 (공통코드 SPECRTS15 등록 여부 기준 - PM5102P01.html의 isAccountingUser()와 동일 로직)
+	function isAccountingUserM01() {
+		var auth = false;
+		postAjaxSync("/admin/cm/cm05/selectChildCodeList", { codeId: 'SPECRTS15' }, null, function(data) {
+			var list = data.childCodeList || data.resultList || data.result || [];
+			var allUserIds = [];
+			$.each(list, function(idx, item) {
+				var codeEtc = item.codeEtc || '';
+				if (codeEtc) {
+					allUserIds = allUserIds.concat(codeEtc.replace(/\s/g, '').split(','));
+				}
+			});
+			if ($.inArray(jwt.userId, allUserIds) > -1) {
+				auth = true;
+			}
+		});
+		return auth;
+	}
+
+	// 지급완료취소
+	function updateRptPayCancel() {
+		if (!isAccountingUserM01()) {
+			alert("회계담당자만 지급완료 취소할 수 있습니다.");
+			return;
+		}
+		var selectedRows = gridView.target.getList("selected");
+		if (selectedRows.length === 0) {
+			alert("지급완료 취소할 행을 선택해주세요.");
+			return;
+		}
+		if (selectedRows.length > 1) {
+			alert("지급완료 취소는 1건씩 가능합니다.");
+			return;
+		}
+		var row = selectedRows[0];
+		if (!row.payDt) {
+			alert("지급완료 처리된 출장복명서가 아닙니다.");
+			return;
+		}
+		if (!confirm("지급완료를 취소하시겠습니까?")) return;
+
+		putAjax("/user/pm/pm51/updateTripRptPayCancel", {
+			tripRptNo: row.tripRptNo,
+			userId: jwt.userId,
+			pgmId: "PM5102M01"
+		}, null, function(data) {
+			alert(data.resultMessage);
+			if (data.resultCode === 200) gridView.setData(0);
 		});
 	}
 

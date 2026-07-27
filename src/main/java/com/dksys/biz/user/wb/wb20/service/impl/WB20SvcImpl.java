@@ -227,45 +227,8 @@ public class WB20SvcImpl implements WB20Svc {
 
 		// 최종결재 완료시 알림톡 발송 대상인지 확인
 		Map<String, String> resultMap = wb20Mapper.selectTodoFinalYn(paramMap);
-		if ("TODODIV2190".equals(todoDiv2CodeId) || "TODODIV2191".equals(todoDiv2CodeId)) {
-			Map<String, String> chgParam = new HashMap<>();
-			chgParam.put("chgNo", tempReqNo);
-			Map<String, String> tripChange = pm51Mapper.selectTripReqChgM01(chgParam);
-			if (tripChange != null) {
-				// 변경신청은 일반결재(TODODIV2190)와 관리부서결재(TODODIV2191) 두 라인이 모두 완료되어야
-				// 최종 신청서에 반영한다. 지금 처리 중인 라인만 보고 판단하면 안 되므로 두 라인을 각각 다시 조회한다.
-				Map<String, String> genFinalParam = new HashMap<>();
-				genFinalParam.put("todoNo", tempReqNo);
-				genFinalParam.put("todoDiv2CodeId", "TODODIV2190");
-				Map<String, String> genFinal = wb20Mapper.selectTodoFinalYn(genFinalParam);
-
-				Map<String, String> mngFinalParam = new HashMap<>();
-				mngFinalParam.put("todoNo", tempReqNo);
-				mngFinalParam.put("todoDiv2CodeId", "TODODIV2191");
-				Map<String, String> mngFinal = wb20Mapper.selectTodoFinalYn(mngFinalParam);
-
-				boolean genDone = genFinal != null && "Y".equals(genFinal.get("todoYn"));
-				boolean mngDone = mngFinal != null && "Y".equals(mngFinal.get("todoYn"));
-
-				if (genDone && mngDone) {
-					chgParam.put("userId", paramMap.get("todoId"));
-					chgParam.put("tripReqNo", tripChange.get("tripReqNo"));
-					if (pm51Mapper.selectTripReqHistCount(chgParam) == 0) {
-						pm51Mapper.insertTripReqHistM01(chgParam);
-						pm51Mapper.insertTripReqHistD01(chgParam);
-						pm51Mapper.insertTripReqHistD02(chgParam);
-					}
-					pm51Mapper.applyTripReqChgM01(chgParam);
-					pm51Mapper.deleteTripReqD01ForChg(chgParam);
-					pm51Mapper.applyTripReqChgD01(chgParam);
-					pm51Mapper.insertTripReqHistAppliedM01(chgParam);
-					pm51Mapper.insertTripReqHistAppliedD01(chgParam);
-					pm51Mapper.insertTripReqHistAppliedD02(chgParam);
-					pm51Mapper.completeTripReqChg(chgParam);
-				}
-			} else if ("TODODIV2190".equals(todoDiv2CodeId)) {
-				updatePm51AprvSts(paramMap, "Y".equals(resultMap.get("todoYn")) ? "APRVSTS03" : "APRVSTS02");
-			}
+		if ("TODODIV2190".equals(todoDiv2CodeId)) {
+			updatePm51AprvSts(paramMap, "Y".equals(resultMap.get("todoYn")) ? "APRVSTS03" : "APRVSTS02");
 		}
 
 		// PFU결재완료 시 추가 공유자 설정
@@ -310,13 +273,23 @@ public class WB20SvcImpl implements WB20Svc {
 		}
 	}
 
+	// 신청부서(일반) 결재코드 -> 관리부서 결재코드 매핑 (순차결재: 신청부서 결재가 모두 완료되어야 관리부서 결재 진행 가능)
+	// PM51(출장신청서): TODODIV2190 -> TODODIV2191, PM52(출장복명서): TODODIV2200 -> TODODIV2201
+	private static final Map<String, String> GENERAL_TO_MNG_TODODIV2 = new HashMap<>();
+	static {
+		GENERAL_TO_MNG_TODODIV2.put("TODODIV2191", "TODODIV2190");
+		GENERAL_TO_MNG_TODODIV2.put("TODODIV2201", "TODODIV2200");
+	}
+
 	private void validatePm51SequentialApproval(Map<String, String> paramMap) {
 		String todoDiv1CodeId = paramMap.get("todoDiv1CodeId");
 		String todoDiv2CodeId = paramMap.get("todoDiv2CodeId");
 		if (!"TODODIV20".equals(todoDiv1CodeId)) {
 			return;
 		}
-		if (!"TODODIV2190".equals(todoDiv2CodeId) && !"TODODIV2191".equals(todoDiv2CodeId)) {
+		boolean isGeneralLine = "TODODIV2190".equals(todoDiv2CodeId) || "TODODIV2200".equals(todoDiv2CodeId);
+		boolean isMngLine = GENERAL_TO_MNG_TODODIV2.containsKey(todoDiv2CodeId);
+		if (!isGeneralLine && !isMngLine) {
 			return;
 		}
 		String todoNo = paramMap.get("todoNo");
@@ -330,17 +303,23 @@ public class WB20SvcImpl implements WB20Svc {
 			return;
 		}
 
-		if ("TODODIV2191".equals(todoDiv2CodeId)) {
+		if (isMngLine) {
 			Map<String, String> reqParam = new HashMap<>();
 			reqParam.put("todoNo", todoNo);
 			reqParam.put("todoDiv1CodeId", "TODODIV20");
-			reqParam.put("todoDiv2CodeId", "TODODIV2190");
+			reqParam.put("todoDiv2CodeId", GENERAL_TO_MNG_TODODIV2.get(todoDiv2CodeId));
 			List<Map<String, String>> reqLines = wb20Mapper.selectApprovalLineOrder(reqParam);
 			for (Map<String, String> line : reqLines) {
 				if (!"Y".equals(line.get("sanctnSttus"))) {
 					throw new RuntimeException("신청부서 결재가 모두 완료되어야 관리부서 결재를 진행할 수 있습니다.");
 				}
 			}
+		}
+		// 지급처리 등록자가 관리부서 1번 결재자(cjm)인 경우에는 결재선 생성 직후
+		// 동일 문서의 이전 관리부서 이력이 남아 있어도 자동승인을 막지 않는다.
+		// 신청부서 결재 완료 검증은 위에서 그대로 수행된다.
+		if (isMngLine && currentSn == 1 && "자동승인".equals(paramMap.get("todoCfOpn"))) {
+			return;
 		}
 
 		Map<String, String> selfParam = new HashMap<>();

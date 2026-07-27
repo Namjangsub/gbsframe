@@ -88,7 +88,6 @@
 			<input type="hidden" id="pgmId" name="pgmId" value="PM5101P01">
 			<input type="hidden" id="fileTrgtKey" name="fileTrgtKey">
 			<input type="hidden" id="actionType" name="actionType">
-			<input type="hidden" id="chgNo" name="chgNo">
 			<input type="hidden" id="clntCd" name="clntCd">
 			<input type="hidden" id="clntPjt" name="clntPjt">
 			<input type="hidden" id="pmId" name="pmId">
@@ -896,11 +895,9 @@
 				$('#actionType').val('U'); // 백엔드 저장을 위해 U로 유지
 			}
 			loadTripReqDetail(targetReqNo);
-			if (popParam.actionType !== 'CHG' || popParam.chgNo) {
-				// CHG_VIEW(결재함 조회) 또는 CHG 초안 이어작성은 결재선도 원본(tripReqNo)이 아니라 그 리비전(chgNo) 기준으로 불러와야 한다.
-				var approvalTargetNo = popParam.chgNo ? popParam.chgNo : targetReqNo;
-				loadApprovalLine(approvalTargetNo, ['TODODIV2190', 'TODODIV1190']);
-				loadApprovalLineMng(approvalTargetNo, ['TODODIV2191', 'TODODIV1191']);
+			if (popParam.actionType !== 'CHG') {
+				loadApprovalLine(targetReqNo, ['TODODIV2190', 'TODODIV1190']);
+				loadApprovalLineMng(targetReqNo, ['TODODIV2191', 'TODODIV1191']);
 			}
 		} else {
 			$('#popTitle').text('출장신청서 등록');
@@ -1292,9 +1289,28 @@
 		gridResize(gridViewApproval, newList.length);
 	}
 
+	var mngFixedOrderUserIdsCache = null;
+	function getMngFixedOrderUserIds() {
+		if (mngFixedOrderUserIdsCache !== null) return mngFixedOrderUserIdsCache;
+
+		var ids = [];
+		postAjaxSync("/admin/cm/cm05/selectChildCodeList", { codeId: 'SPECRTS14' }, null, function(data) {
+			var list = data.childCodeList || data.resultList || data.result || [];
+			if (list.length > 0) {
+				var codeEtc = list[0].codeEtc || '';
+				if (codeEtc) {
+					var splitIds = codeEtc.replace(/\s/g, '').split(',');
+					ids = $.grep(splitIds, function(s) { return !!s; });
+				}
+			}
+		});
+		if (ids.length > 0) mngFixedOrderUserIdsCache = ids;
+		return ids;
+	}
+
 	// 관리(자금)결재선 고정 순서: 자금담당자(cjm) → 회계팀장(youngman) → 부사장(EMJ8105)
 	function reorderPayMngApprovalLine(rows) {
-		var fixedOrder = ['cjm', 'youngman', 'EMJ8105'];
+		var fixedOrder = getMngFixedOrderUserIds();
 		var approvalRows = $.grep(rows, function(r) { return r.gb === '결재'; });
 		var shareRows = $.grep(rows, function(r) { return r.gb !== '결재'; });
 
@@ -1326,7 +1342,7 @@
 		var list = gridViewApprovalMng.target.getList() || [];
 		var registeredIds = {};
 		$.each(list, function(_, row) { registeredIds[row.usrNm || row.todoId] = true; });
-		$.each(['cjm', 'youngman', 'EMJ8105'], function(_, userId) {
+		$.each(getMngFixedOrderUserIds(), function(_, userId) {
 			if (!registeredIds[userId]) {
 				list.push({
 					gb: '결재', usrNm: userId, todoId: userId, name: userId,
@@ -1711,10 +1727,7 @@
 
 	// 상세 정보 로드
 	function loadTripReqDetail(tripReqNo) {
-		var isChangeView = popParam && popParam.actionType === 'CHG_VIEW' && popParam.chgNo;
-		var isChangeEdit = popParam && popParam.actionType === 'CHG' && popParam.chgNo;
-		var useChgDtl = isChangeView || isChangeEdit;
-		postAjax(useChgDtl ? "/user/pm/pm51/selectTripReqChgDtl" : "/user/pm/pm51/selectTripReqDtl", useChgDtl ? { chgNo: popParam.chgNo, userId: jwt.userId } : { tripReqNo: tripReqNo, userId: jwt.userId }, null, function (data) {
+		postAjax("/user/pm/pm51/selectTripReqDtl", { tripReqNo: tripReqNo, userId: jwt.userId }, null, function (data) {
 			if (!data.result) return;
 
 			var master = data.result.m01 || {};
@@ -1724,9 +1737,6 @@
 			currentTripReqMaster = master;
 			renderLastChgReason(master);
 			$popForm.find('#tripReqNo').val(master.tripReqNo);
-			if (useChgDtl && master.chgNo) {
-				$popForm.find('#chgNo').val(master.chgNo);
-			}
 			$popForm.find('#actionType').val(popParam.actionType === 'CHG' ? 'CHG' : 'U');
 			$popForm.find('#reqId').val(master.userId);
 			$popForm.find('#reqNm').val(master.userNm || master.userId);
@@ -1843,9 +1853,8 @@
 
 			// 예상경비 테이블 데이터 바인딩
 			bindExpenseTableData(expenseList); //예상경비
-			if (popParam && popParam.actionType === 'CHG' && !popParam.chgNo) {
-				// 변경신청 신규 작성은 기존 결재 이력을 재사용하지 않고 새 결재선을 생성한다.
-				// (초안 이어작성은 위쪽에서 loadApprovalLine으로 이미 기존 결재선을 불러왔으므로 여기서 지우지 않는다)
+			if (popParam && popParam.actionType === 'CHG') {
+				// 변경신청은 결재를 생성하지 않으므로 결재선 그리드는 항상 비워둔다.
 				gridViewApproval.setData2([]);
 				setApplicantDefaultApprovalLine(master.userId, master.userNm || master.userId);
 				setApplicantDefaultApprovalLineMng();
@@ -1857,35 +1866,19 @@
 			$('#fileTrgtKey').val(master.fileTrgtKey); //첨부파일
 			initFileTree(); //첨부파일
 
-			// CHG/CHG_VIEW 모드: 원본 스냅샷 저장
-			if (popParam && (popParam.actionType === 'CHG' || popParam.actionType === 'CHG_VIEW')) {
-				var hasChgNo = !!popParam.chgNo;
-				if (hasChgNo) {
-					// CHG_VIEW 또는 CHG 초안 이어작성: data.result는 초안(TB_PM51C01)이므로,
-					// diff 비교 기준이 될 진짜 원본은 별도 API로 tripReqNo 기준 M01을 가져온다.
-					postAjax("/user/pm/pm51/selectTripReqDtl", { tripReqNo: master.tripReqNo, userId: jwt.userId }, null, function (origData) {
-						if (origData.result) {
-							originalTripReqSnapshot = $.extend({}, origData.result.m01 || {});
-							originalTravelerSnapshot = mapTravelerDtmFields($.map(origData.result.d01 || [], function (r) { return $.extend({}, r); }));
-							renderTripReqChgDiff();
-							$('#chgDiffArea').show();
-						}
-					});
-				} else {
-					// CHG 신규 작성: data.result가 이미 원본(M01)
-					originalTripReqSnapshot = $.extend({}, data.result.m01 || {});
-					originalTravelerSnapshot = $.map(data.result.d01 || [], function (r) { return $.extend({}, r); });
-					renderTripReqChgDiff();
-					$('#chgDiffArea').show();
-				}
+			// CHG 모드: 원본 스냅샷 저장 및 diff 표시
+			if (popParam && popParam.actionType === 'CHG') {
+				originalTripReqSnapshot = $.extend({}, data.result.m01 || {});
+				originalTravelerSnapshot = $.map(data.result.d01 || [], function (r) { return $.extend({}, r); });
+				renderTripReqChgDiff();
+				$('#chgDiffArea').show();
 			}
 		});
 	}
 
 	// 완료(CHGSTS03 등)된 변경신청이 있으면 마지막 변경사유를 읽기전용으로 표시 (목록의 "변경사유" 컬럼과 동일한 데이터)
 	function renderLastChgReason(master) {
-		// selectTripReqM01(일반 조회)/selectTripReqChgM01(CHG_VIEW, TB_PM51C01 SELECT *) 모두 chgReason으로 내려온다.
-		// REV 번호만 별칭이 달라서(CUR_REV_NO -> curRevNo, TB_PM51C01.REV_NO -> revNo) 둘 다 확인한다.
+		// selectTripReqM01 응답의 chgReason(TB_PM51H01 최신 이력 사유)을 그대로 표시한다.
 		var reason = master && master.chgReason;
 		if (!reason) {
 			$('#lastChgReasonArea').hide();
@@ -2084,7 +2077,6 @@
 		formData.append('actionType', actionType); //행위구분
 		if (actionType === 'CHG') {
 			formData.append('chgReason', changeReason);
-			formData.append('chgNo', $('#chgNo').val() || '');
 		}
 		formData.append('payMode', isPaymentFlow ? 'Y' : 'N');
 
@@ -2186,7 +2178,9 @@
 		formData.append('travelerArr', JSON.stringify(travelerList));
 
 		// 결재선 배열
-		var approvalList = gridViewApproval.target.list || [];
+		// getList()를 써야 한다: setData2()로 재정렬(예: reorderPayMngApprovalLine)한 결과가 반영된다.
+		// target.list는 그리드 내부 원시 속성으로 setData() 이후에도 갱신되지 않을 수 있어 재정렬 전 순서가 그대로 제출되는 문제가 있었다.
+		var approvalList = gridViewApproval.target.getList() || [];
 		var approvalArr = [];
 		var sanctnSnApproval = 0;
 		var sanctnSnShare = 0;
@@ -2213,7 +2207,9 @@
 
 		formData.append('approvalArr', JSON.stringify(approvalArr));
 		if (isPaymentFlow || (popParam && popParam.actionType === 'CHG')) ensurePayMngApprovalUsers();
-		var mngApprovalList = gridViewApprovalMng.target.list || [];
+		// getList()를 써야 한다: 바로 위 ensurePayMngApprovalUsers()가 reorderPayMngApprovalLine()으로 순서를
+		// 재정렬한 뒤 setData2()로 반영한 결과는 getList()에서만 확인되고, target.list(원시 속성)는 갱신되지 않는다.
+		var mngApprovalList = gridViewApprovalMng.target.getList() || [];
 		var mngApprovalArr = [];
 		var mngSanctnSnApproval = 0;
 		var mngSanctnSnShare = 0;
@@ -2253,8 +2249,7 @@
 		if (actionType === 'C') {
 			url = '/user/pm/pm51/insertTripReq';
 		} else if (actionType === 'CHG') {
-			var chgNo = $.trim($('#chgNo').val() || '');
-			url = chgNo ? '/user/pm/pm51/updateTripReqChg' : '/user/pm/pm51/insertTripReqChg';
+			url = '/user/pm/pm51/insertTripReqChg';
 		} else {
 			url = '/user/pm/pm51/updateTripReq';
 		}
@@ -2262,7 +2257,7 @@
 		openProgress(true);
 		filePostAjax(url, formData, function (data) {
 			if (data.resultCode === 200) {
-				kakaoTodo(data.chgNo || data.tripReqNo || $('#tripReqNo').val());
+				kakaoTodo(data.tripReqNo || $('#tripReqNo').val());
 				if (window.isPayingNow) {
 					putAjax("/user/pm/pm51/updateTripReqPayDone", {
 						tripReqNo: $('#tripReqNo').val(),
@@ -2751,8 +2746,7 @@
 
 	function isApprovalEntryMode() {
 		if (!popParam) return false;
-		// CHG_VIEW는 결재함(TO-DO LIST)에서 변경신청을 조회 목적으로 열 때만 쓰는 값이므로 항상 결재진입(읽기전용)으로 판정한다.
-		return popParam.actionType === 'V' || popParam.actionType === 'CHG_VIEW' || !!popParam.todoFileTrgtKey || !!popParam.sanctnSn || !!popParam.todoDiv1CodeId;
+		return popParam.actionType === 'V' || !!popParam.todoFileTrgtKey || !!popParam.sanctnSn || !!popParam.todoDiv1CodeId;
 	}
 
 	function blockApprovalEntryEdit() {
