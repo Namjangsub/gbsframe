@@ -44,6 +44,12 @@ public class PM51Ctr {
 		return "jsonView";
 	}
 
+	@PostMapping("/selectTripReqChgDtl")
+	public String selectTripReqChgDtl(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		model.addAttribute("result", pm51Svc.selectTripReqChgDtl(paramMap));
+		return "jsonView";
+	}
+
 	@PostMapping("/insertTripReq")
 	public String insertTripReq(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) {
 		try {
@@ -76,6 +82,28 @@ public class PM51Ctr {
 			model.addAttribute("resultCode", 900);
 			model.addAttribute("resultMessage", e.getMessage());
 		}
+		return "jsonView";
+	}
+
+	@PostMapping("/insertTripReqChg")
+	public String insertTripReqChg(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) {
+		try {
+			if (pm51Svc.insertTripReqChg(paramMap, mRequest) != 0) {
+				model.addAttribute("resultCode", 200);
+				model.addAttribute("resultMessage", messageUtils.getMessage("save"));
+				model.addAttribute("chgNo", paramMap.get("chgNo"));
+			} else { model.addAttribute("resultCode", 500); model.addAttribute("resultMessage", messageUtils.getMessage("fail")); }
+		} catch (Exception e) { model.addAttribute("resultCode", 900); model.addAttribute("resultMessage", e.getMessage()); }
+		return "jsonView";
+	}
+
+	@PostMapping("/updateTripReqChg")
+	public String updateTripReqChg(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) {
+		try {
+			if (pm51Svc.updateTripReqChg(paramMap, mRequest) != 0) {
+				model.addAttribute("resultCode", 200); model.addAttribute("resultMessage", messageUtils.getMessage("save"));
+			} else { model.addAttribute("resultCode", 500); model.addAttribute("resultMessage", messageUtils.getMessage("fail")); }
+		} catch (Exception e) { model.addAttribute("resultCode", 900); model.addAttribute("resultMessage", e.getMessage()); }
 		return "jsonView";
 	}
 
@@ -140,6 +168,13 @@ public class PM51Ctr {
 	@PostMapping("/selectTripDateOverlapList")
 	public String selectTripDateOverlapList(@RequestBody Map<String, String> paramMap, ModelMap model) {
 		List<Map<String, String>> result = pm51Svc.selectTripDateOverlapList(paramMap);
+		model.addAttribute("result", result);
+		return "jsonView";
+	}
+
+	@PostMapping("/selectTripScheduleByMonth")
+	public String selectTripScheduleByMonth(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		List<Map<String, String>> result = pm51Svc.selectTripScheduleByMonth(paramMap);
 		model.addAttribute("result", result);
 		return "jsonView";
 	}

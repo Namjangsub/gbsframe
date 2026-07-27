@@ -127,6 +127,7 @@
 					]
 				</span>
 				<div class="add_btn_small pdl10">
+					<a onclick="insertTripReqChgModal();" style="height: 30px; line-height: 28px; width: 90px;" authchk><i class="fas fa-exchange-alt"></i> 변경신청</a>
 					<a onclick="insertTripReqModal();" style="height: 30px; line-height: 28px; width: 70px;" authchk><i class="fas fa-plus"></i> 1.신규</a>
 					<a onclick="deleteTripReq();" style="height: 30px; line-height: 28px; width: 70px;" authchk><i class="fas fa-trash"></i> 삭제</a>
 					<a onclick="createReportModal();" style="height: 30px; line-height: 28px; width: 110px;" authchk><i class="fas fa-edit"></i> 2.복명서작성</a>
@@ -194,7 +195,7 @@
 						this.self.select(this.dindex);
 					},
 					onDBLClick: function () {
-						updateTripReqModal(this.item.tripReqNo);
+						updateTripReqModal(this.item.tripReqNo, this.item.curChgNo);
 					}
 				},
 				page: {
@@ -255,6 +256,14 @@
 					{ key: "payDt", label: "지급일자", width: 80, align: "center" },
 					{ key: "payNm", label: "지급담당", width: 70, align: "center" },
 					{ key: "tripReqNo", label: "출장신청서번호", width: 120, align: "center" },
+					{ key: "curRevNo", label: "변경신청", width: 90, align: "center",
+						formatter: function() {
+							if (!this.item.curRevNo) return "";
+							var stsNm = { CHGSTS01: "작성중", CHGSTS02: "결재중", CHGSTS03: "완료" }[this.item.chgStsCd] || this.item.chgStsCd || "";
+							return "REV" + this.item.curRevNo + (stsNm ? " (" + stsNm + ")" : "");
+						}
+					},
+					{ key: "chgReason", label: "변경사유", width: 160, align: "left" },
 				]
 			});
 
@@ -345,9 +354,14 @@
 		});
 	}
 
-	// 수정 팝업
-	function updateTripReqModal(tripReqNo) {
-		var paramObj = {
+	// 수정 팝업 - 변경신청이 있는 건이면 마지막(최신) 변경신청 결과를 조회 모드로 연다
+	function updateTripReqModal(tripReqNo, curChgNo) {
+		var paramObj = curChgNo ? {
+			"actionType": "CHG_VIEW",
+			"tripReqNo": tripReqNo,
+			"chgNo": curChgNo,
+			"pgmId": "PM5101P01"
+		} : {
 			"actionType": "U",
 			"tripReqNo": tripReqNo,
 			"pgmId": "PM5101P01"
@@ -355,6 +369,32 @@
 		openModal("/static/html/user/pm/pm51/PM5101P01.html", 1700, 860, "출장신청서 수정", paramObj, function (data) {
 			gridView.setData(0);
 		});
+	}
+
+	function insertTripReqChgModal() {
+		var row = getSelectedTripReqRow('변경신청할 출장신청서를 선택해주세요.');
+		if (!row) return;
+		if (row.aprvStsCd !== 'APRVSTS03') {
+			alert('일반결재가 완료된 출장신청서만 변경신청할 수 있습니다.');
+			return;
+		}
+
+		// 진행 중인 초안 감지
+		if (row.curChgNo && (row.chgStsCd === 'CHGSTS01' || row.chgStsCd === 'CHGSTS02')) {
+			if (confirm('진행중인 변경신청이 있습니다.. 이어서 작성하시겠습니까?')) {
+				openModal('/static/html/user/pm/pm51/PM5101P01.html', 1700, 860, '출장 변경신청', {
+					actionType: 'CHG', tripReqNo: row.tripReqNo, chgNo: row.curChgNo, pgmId: 'PM5101P01'
+				}, function () { gridView.setData(0); });
+			} else {
+				openModal('/static/html/user/pm/pm51/PM5101P01.html', 1700, 860, '출장 변경신청', {
+					actionType: 'CHG', tripReqNo: row.tripReqNo, pgmId: 'PM5101P01'
+				}, function () { gridView.setData(0); });
+			}
+		} else {
+			openModal('/static/html/user/pm/pm51/PM5101P01.html', 1700, 860, '출장 변경신청', {
+				actionType: 'CHG', tripReqNo: row.tripReqNo, pgmId: 'PM5101P01'
+			}, function () { gridView.setData(0); });
+		}
 	}
 
 	// 삭제
@@ -422,9 +462,11 @@
 						gridView.setData(0);
 					});
 				} else {
+					// 마지막으로 등록된 변경신청이 있으면(결재 완료 전이라도) 그 내용으로 복명서를 작성한다.
 					openModal("/static/html/user/pm/pm51/PM5102P01.html", 1600, 860, "출장복명서 등록", {
 						actionType: "C",
-						tripReqNo: row.tripReqNo
+						tripReqNo: row.tripReqNo,
+						chgNo: row.curChgNo || ''
 					}, function () {
 						gridView.setData(0);
 					});

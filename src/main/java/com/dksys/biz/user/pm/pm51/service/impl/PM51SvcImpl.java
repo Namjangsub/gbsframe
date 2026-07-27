@@ -103,6 +103,121 @@ public class PM51SvcImpl implements PM51Svc {
 	}
 
 	@Override
+	public Map<String, Object> selectTripReqChgDtl(Map<String, String> paramMap) {
+		Map<String, Object> result = new HashMap<>();
+		result.put("m01", pm51Mapper.selectTripReqChgM01(paramMap));
+		result.put("d01", pm51Mapper.selectTripReqChgD01(paramMap));
+		result.put("d02", pm51Mapper.selectTripReqChgD02(paramMap));
+		return result;
+	}
+
+	@Override
+	public int insertTripReqChg(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
+		Map<String, String> current = pm51Mapper.selectTripReqM01(paramMap);
+		if (current == null) throw new RuntimeException("출장신청서를 찾을 수 없습니다.");
+		if (!"APRVSTS03".equals(current.get("aprvStsCd"))) throw new RuntimeException("결재 완료된 신청서만 변경신청할 수 있습니다.");
+		paramMap.put("tripReqNo", current.get("tripReqNo"));
+		if (pm51Mapper.selectTripReqChgOpenCount(paramMap) > 0) throw new RuntimeException("진행 중인 변경신청이 있습니다.");
+		if (!hasText(paramMap.get("chgReason"))) throw new RuntimeException("변경사유를 입력해주세요.");
+		normalizeTripReqMasterParam(paramMap);
+		validateTripReqMasterParam(paramMap);
+		int result = pm51Mapper.insertTripReqChgM01(paramMap);
+		return saveTripReqChgDetail(paramMap, mRequest, result);
+	}
+
+	@Override
+	public int updateTripReqChg(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
+		Map<String, String> change = pm51Mapper.selectTripReqChgM01(paramMap);
+		if (change == null) throw new RuntimeException("변경신청서를 찾을 수 없습니다.");
+		if (!"CHGSTS01".equals(change.get("chgStsCd"))) throw new RuntimeException("작성 중인 변경신청만 수정할 수 있습니다.");
+		paramMap.put("tripReqNo", change.get("tripReqNo"));
+		if (!hasText(paramMap.get("chgReason"))) throw new RuntimeException("변경사유를 입력해주세요.");
+		normalizeTripReqMasterParam(paramMap);
+		validateTripReqMasterParam(paramMap);
+		int result = pm51Mapper.updateTripReqChgM01(paramMap);
+		pm51Mapper.deleteTripReqChgD01(paramMap);
+		pm51Mapper.deleteTripReqChgD02(paramMap);
+		return saveTripReqChgDetail(paramMap, mRequest, result);
+	}
+
+	private int saveTripReqChgDetail(Map<String, String> paramMap, MultipartHttpServletRequest mRequest, int result) throws Exception {
+		Gson gson = new GsonBuilder().disableHtmlEscaping().create();
+		Type listType = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
+		List<Map<String, String>> travelers = gson.fromJson(paramMap.get("travelerArr"), listType);
+		validateTravelerDateOverlap(paramMap, travelers);
+		if (travelers != null) for (Map<String, String> row : travelers) { row.put("chgNo", paramMap.get("chgNo")); row.put("coCd", paramMap.get("coCd")); row.put("tripReqNo", paramMap.get("tripReqNo")); pm51Mapper.insertTripReqChgD01(row); }
+		List<Map<String, String>> expenses = gson.fromJson(paramMap.get("expenseArr"), listType);
+		if (expenses != null) for (Map<String, String> row : expenses) { row.put("chgNo", paramMap.get("chgNo")); row.put("coCd", paramMap.get("coCd")); row.put("tripReqNo", paramMap.get("tripReqNo")); pm51Mapper.insertTripReqChgD02(row); }
+
+		paramMap.put("reqNo", paramMap.get("chgNo"));
+		paramMap.put("fileTrgtKey", paramMap.get("chgNo"));
+		paramMap.put("pgmId", "PM5101P01");
+		cm08Svc.fileUpload(paramMap, mRequest);
+		if (paramMap.containsKey("approvalArr")) {
+			pm51Mapper.submitTripReqChg(paramMap);
+			// 재상신(초안 이어작성 후 재저장)인 경우 이전에 등록된 결재선 중 아직 결재처리되지 않은 것만 지우고 새로 등록한다.
+			// 이미 결재완료된 행은 보존되므로, 그대로 재전송되면 동일 결재자에 대해 행이 중복될 수 있다(기존 승인 이력 + 신규 행).
+			pm51Mapper.deleteTripReqChgPendingApprovalLine(paramMap);
+			processTripReqChangeApprovalArr(paramMap, gson, listType, "approvalArr", true);
+			processTripReqChangeApprovalArr(paramMap, gson, listType, "mngApprovalArr", false);
+		}
+		return result;
+	}
+
+	// 변경신청 결재선 저장 (일반 approvalArr: TODODIV2190/1190, 관리부서 mngApprovalArr: TODODIV2191/1191 - 코드값은 프론트가 행마다 태깅해서 보낸다)
+	private void processTripReqChangeApprovalArr(Map<String, String> paramMap, Gson gson, Type listType, String arrKey, boolean requireVp) {
+		if (!paramMap.containsKey(arrKey)) {
+			return;
+		}
+		List<Map<String, String>> rows = gson.fromJson(paramMap.get(arrKey), listType);
+		if (requireVp) {
+			rows = appendTripReqChangeVpApprovals(paramMap, rows);
+		}
+		if (rows == null || rows.isEmpty()) {
+			if (requireVp) throw new RuntimeException("변경결재선을 등록해주세요.");
+			return;
+		}
+		String pgParam = "{\"actionType\":\"CHG_VIEW\",\"tripReqNo\":\"" + paramMap.get("tripReqNo") + "\",\"chgNo\":\"" + paramMap.get("chgNo") + "\"}";
+		int approvalNo = 1;
+		int shareNo = 1;
+		for (Map<String, String> row : rows) {
+			row.put("reqNo", paramMap.get("chgNo")); row.put("fileTrgtKey", paramMap.get("chgNo")); row.put("salesCd", approvalSalesCd(paramMap));
+			fillApprovalBaseParam(row, paramMap);
+			row.put("pgParam", pgParam);
+			if (isShareApproval(row)) {
+				row.put("sanCtnSn", Integer.toString(shareNo++));
+				qm01Mapper.insertWbsSharngList(row);
+			} else {
+				row.put("sanCtnSn", Integer.toString(approvalNo++));
+				qm01Mapper.insertWbsApprovalList(row);
+				if (paramMap.get("userId").equals(row.get("usrNm"))) {
+					row.put("todoCfOpn", "자동승인"); row.put("todoNo", paramMap.get("chgNo")); row.put("sanctnSn", row.get("sanCtnSn"));
+					Object toDoKeyValue = row.get("toDoKey");
+					if (toDoKeyValue != null) { row.put("todoKey", toDoKeyValue.toString()); }
+					wb20Svc.insertApprovalLine(row);
+				}
+			}
+		}
+	}
+
+	private List<Map<String, String>> appendTripReqChangeVpApprovals(Map<String, String> paramMap, List<Map<String, String>> rows) {
+		List<Map<String, String>> result = rows == null ? new ArrayList<Map<String, String>>() : new ArrayList<Map<String, String>>(rows);
+		Set<String> ids = new HashSet<>();
+		for (Map<String, String> row : result) { String id = hasText(row.get("usrNm")) ? row.get("usrNm") : row.get("todoId"); if (hasText(id)) ids.add(id); }
+		Map<String, String> codeParam = new HashMap<>(); codeParam.put("codeId", "SPECRTS08");
+		Map<String, String> codeInfo = cm05Svc.selectCodeInfo(codeParam);
+		List<Map<String, String>> codeList = codeInfo != null ? java.util.Collections.singletonList(codeInfo) : null;
+		boolean vpConfigured = false;
+		if (codeList != null) for (Map<String, String> code : codeList) {
+			String codeEtc = code.get("codeEtc");
+			if (!hasText(codeEtc)) continue;
+			for (String rawId : codeEtc.split(",")) { String id = rawId.trim(); if (hasText(id)) { vpConfigured = true; if (ids.add(id)) { Map<String, String> vp = new HashMap<>(); vp.put("gb", "결재"); vp.put("usrNm", id); vp.put("todoId", id); vp.put("name", id); vp.put("flag", "I"); result.add(vp); } } }
+		}
+		if (!vpConfigured) throw new RuntimeException("부사장 결재자(SPECRTS08)가 등록되어 있지 않습니다.");
+		return result;
+	}
+
+	@Override
 	public int insertTripReq(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
 		Gson gsonDtl = new GsonBuilder().disableHtmlEscaping().create();
 		Type dtlMap = new TypeToken<ArrayList<Map<String, String>>>() {
@@ -466,6 +581,9 @@ public class PM51SvcImpl implements PM51Svc {
 	}
 
 	private void validateTravelerDateOverlap(Map<String, String> paramMap, List<Map<String, String>> travelerArr) {
+		if ("Y".equals(paramMap.get("forceOverlap"))) {
+			return;
+		}
 		if (travelerArr == null) return;
 		for (Map<String, String> travelerMap : travelerArr) {
 			String userId = travelerMap.get("userId");
@@ -535,6 +653,11 @@ public class PM51SvcImpl implements PM51Svc {
 	@Override
 	public List<Map<String, String>> selectTripDateOverlapList(Map<String, String> paramMap) {
 		return pm51Mapper.selectTripDateOverlapList(paramMap);
+	}
+
+	@Override
+	public List<Map<String, String>> selectTripScheduleByMonth(Map<String, String> paramMap) {
+		return pm51Mapper.selectTripScheduleByMonth(paramMap);
 	}
 
 	@Override
@@ -1193,10 +1316,10 @@ public class PM51SvcImpl implements PM51Svc {
 		// 정산 금액 저장
 		int result = pm51Mapper.updateTripRptAcctSettle(paramMap);
 
-		// 호출자 본인의 미결 결재선(TODODIV2191)이 있으면 결재처리(승인완료) 진행
+		// 호출자 본인의 미결 결재선(TODODIV2201)이 있으면 결재처리(승인완료) 진행
 		Map<String, String> approvalLineParam = new HashMap<>();
 		approvalLineParam.put("todoNo", tripRptNo);
-		approvalLineParam.put("todoDiv2CodeId", "TODODIV2191");
+		approvalLineParam.put("todoDiv2CodeId", "TODODIV2201");
 		List<Map<String, String>> approvalLines = wb20Svc.selectGetApprovalList(approvalLineParam);
 		if (approvalLines != null) {
 			for (Map<String, String> line : approvalLines) {
@@ -1206,6 +1329,13 @@ public class PM51SvcImpl implements PM51Svc {
 					approveParam.put("userId", userId);
 					approveParam.put("pgmId", (String) paramMap.get("pgmId"));
 					wb20Svc.insertApprovalLine(approveParam);
+
+					// 자금담당자(SPECRTS15) 본인 결재처리 시점에만 복명서 지급완료 처리
+					Map<String, String> payDoneParam = new HashMap<>();
+					payDoneParam.put("tripRptNo", tripRptNo);
+					payDoneParam.put("userId", userId);
+					payDoneParam.put("pgmId", (String) paramMap.get("pgmId"));
+					pm51Mapper.updateTripRptPayDone(payDoneParam);
 					break;
 				}
 			}

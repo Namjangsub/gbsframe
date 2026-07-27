@@ -13,9 +13,15 @@ public interface PM51Svc {
 
 	Map<String, Object> selectTripReqDtl(Map<String, String> paramMap);
 
+	Map<String, Object> selectTripReqChgDtl(Map<String, String> paramMap);
+
 	int insertTripReq(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
 
 	int updateTripReq(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
+
+	int insertTripReqChg(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
+
+	int updateTripReqChg(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
 
 	int deleteTripReq(Map<String, String> paramMap) throws Exception;
 
@@ -52,5 +58,7 @@ public interface PM51Svc {
 	int updateTripRptAcctSettle(Map<String, Object> paramMap) throws Exception;
 
 	List<Map<String, String>> selectTripDateOverlapList(Map<String, String> paramMap);
+
+	List<Map<String, String>> selectTripScheduleByMonth(Map<String, String> paramMap);
 
 }

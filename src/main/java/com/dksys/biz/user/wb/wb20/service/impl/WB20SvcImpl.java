@@ -227,8 +227,45 @@ public class WB20SvcImpl implements WB20Svc {
 
 		// 최종결재 완료시 알림톡 발송 대상인지 확인
 		Map<String, String> resultMap = wb20Mapper.selectTodoFinalYn(paramMap);
-		if ("TODODIV2190".equals(todoDiv2CodeId)) {
-			updatePm51AprvSts(paramMap, "Y".equals(resultMap.get("todoYn")) ? "APRVSTS03" : "APRVSTS02");
+		if ("TODODIV2190".equals(todoDiv2CodeId) || "TODODIV2191".equals(todoDiv2CodeId)) {
+			Map<String, String> chgParam = new HashMap<>();
+			chgParam.put("chgNo", tempReqNo);
+			Map<String, String> tripChange = pm51Mapper.selectTripReqChgM01(chgParam);
+			if (tripChange != null) {
+				// 변경신청은 일반결재(TODODIV2190)와 관리부서결재(TODODIV2191) 두 라인이 모두 완료되어야
+				// 최종 신청서에 반영한다. 지금 처리 중인 라인만 보고 판단하면 안 되므로 두 라인을 각각 다시 조회한다.
+				Map<String, String> genFinalParam = new HashMap<>();
+				genFinalParam.put("todoNo", tempReqNo);
+				genFinalParam.put("todoDiv2CodeId", "TODODIV2190");
+				Map<String, String> genFinal = wb20Mapper.selectTodoFinalYn(genFinalParam);
+
+				Map<String, String> mngFinalParam = new HashMap<>();
+				mngFinalParam.put("todoNo", tempReqNo);
+				mngFinalParam.put("todoDiv2CodeId", "TODODIV2191");
+				Map<String, String> mngFinal = wb20Mapper.selectTodoFinalYn(mngFinalParam);
+
+				boolean genDone = genFinal != null && "Y".equals(genFinal.get("todoYn"));
+				boolean mngDone = mngFinal != null && "Y".equals(mngFinal.get("todoYn"));
+
+				if (genDone && mngDone) {
+					chgParam.put("userId", paramMap.get("todoId"));
+					chgParam.put("tripReqNo", tripChange.get("tripReqNo"));
+					if (pm51Mapper.selectTripReqHistCount(chgParam) == 0) {
+						pm51Mapper.insertTripReqHistM01(chgParam);
+						pm51Mapper.insertTripReqHistD01(chgParam);
+						pm51Mapper.insertTripReqHistD02(chgParam);
+					}
+					pm51Mapper.applyTripReqChgM01(chgParam);
+					pm51Mapper.deleteTripReqD01ForChg(chgParam);
+					pm51Mapper.applyTripReqChgD01(chgParam);
+					pm51Mapper.insertTripReqHistAppliedM01(chgParam);
+					pm51Mapper.insertTripReqHistAppliedD01(chgParam);
+					pm51Mapper.insertTripReqHistAppliedD02(chgParam);
+					pm51Mapper.completeTripReqChg(chgParam);
+				}
+			} else if ("TODODIV2190".equals(todoDiv2CodeId)) {
+				updatePm51AprvSts(paramMap, "Y".equals(resultMap.get("todoYn")) ? "APRVSTS03" : "APRVSTS02");
+			}
 		}
 
 		// PFU결재완료 시 추가 공유자 설정

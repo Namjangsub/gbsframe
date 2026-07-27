@@ -4408,3 +4408,177 @@ window.SingleDatePicker = (function(){
 })();
 // ===== Global Single Date Picker End =====
 
+// ===== Trip Schedule Calendar Modal =====
+window.TripScheduleCalendarModal = (function(){
+    var s = {
+        userNm: null, newStDt: null, newEdDt: null, schedules: [],
+        onForceSave: null, onCancel: null, inited: false
+    };
+
+    var SCHEDULE_COLORS = [
+        '#FFE5E5', '#E5F3FF', '#E5FFE5', '#FFF9E5', '#F0E5FF',
+        '#FFE5F0', '#E5FFFF', '#FFF0E5', '#FFFFE5', '#E5E5FF'
+    ];
+
+    function getDayOfWeek(d) {
+        return d.format('d');
+    }
+
+    function getMonthCalendarGrid(year, month) {
+        var firstDay = moment([year, month - 1, 1]);
+        var lastDay = moment([year, month - 1, 1]).endOf('month');
+        var startDow = firstDay.format('d');
+
+        var grid = [];
+        var row = new Array(parseInt(startDow)).fill(null);
+        for (var d = 1; d <= lastDay.date(); d++) {
+            row.push(d);
+            if (row.length === 7) {
+                grid.push(row);
+                row = [];
+            }
+        }
+        if (row.length > 0) {
+            while (row.length < 7) row.push(null);
+            grid.push(row);
+        }
+        return grid;
+    }
+
+    function getSchedulesForDate(dtStr) {
+        return (s.schedules || []).filter(function(sch) {
+            var stDt = sch.tripStDtm ? sch.tripStDtm.substring(0, 8) : null;
+            var edDt = sch.tripEdDtm ? sch.tripEdDtm.substring(0, 8) : null;
+            return stDt && edDt && stDt <= dtStr && dtStr <= edDt;
+        });
+    }
+
+    function isInNewRange(dtStr) {
+        return s.newStDt && s.newEdDt && s.newStDt <= dtStr && dtStr <= s.newEdDt;
+    }
+
+    function buildCalendarHTML() {
+        var stMoment = moment(s.newStDt, 'YYYY-MM-DD');
+        var edMoment = moment(s.newEdDt, 'YYYY-MM-DD');
+
+        var months = [];
+        var current = stMoment.clone().startOf('month');
+        var end = edMoment.clone().endOf('month');
+
+        while (current.isSameOrBefore(end)) {
+            months.push({ year: current.year(), month: current.month() + 1 });
+            current.add(1, 'month');
+        }
+
+        var html = '<div class="tsc-legend">' +
+            '<span class="tsc-legend-item"><span class="tsc-legend-new">신청하려는 일정</span></span>' +
+            '<span class="tsc-legend-item"><span class="tsc-legend-existing">기존 출장 일정</span></span>' +
+            '</div>' +
+            '<div class="tsc-calendars">';
+
+        months.forEach(function(m) {
+            var grid = getMonthCalendarGrid(m.year, m.month);
+            var monthStr = m.year + '년 ' + (m.month < 10 ? '0' : '') + m.month + '월';
+            html += '<div class="tsc-month"><div class="tsc-month-title">' + monthStr + '</div>' +
+                '<table class="tsc-calendar"><thead><tr>';
+
+            var dayNames = ['일', '월', '화', '수', '목', '금', '토'];
+            dayNames.forEach(function(d) {
+                html += '<th class="tsc-dow">' + d + '</th>';
+            });
+            html += '</tr></thead><tbody>';
+
+            grid.forEach(function(row) {
+                html += '<tr>';
+                row.forEach(function(day) {
+                    var dtStr = '';
+                    var cellSchedules = [];
+                    if (day) {
+                        dtStr = m.year + (m.month < 10 ? '0' : '') + m.month + (day < 10 ? '0' : '') + day;
+                        cellSchedules = getSchedulesForDate(dtStr);
+                    }
+                    var isNew = day && isInNewRange(dtStr);
+                    var classes = 'tsc-cell' + (isNew ? ' tsc-cell-new' : '') + (!day ? ' tsc-cell-empty' : '');
+                    html += '<td class="' + classes + '">';
+                    if (day) {
+                        html += '<div class="tsc-day-num">' + day + '</div>';
+                        if (cellSchedules.length > 0) {
+                            html += '<div class="tsc-schedules">';
+                            cellSchedules.forEach(function(sch, idx) {
+                                var color = SCHEDULE_COLORS[idx % SCHEDULE_COLORS.length];
+                                html += '<div class="tsc-schedule-item" style="background-color:' + color + ';">' +
+                                    sch.docType + ' ' + (sch.docNo || '') + '</div>';
+                            });
+                            html += '</div>';
+                        }
+                    }
+                    html += '</td>';
+                });
+                html += '</tr>';
+            });
+            html += '</tbody></table></div>';
+        });
+
+        html += '</div>';
+        return html;
+    }
+
+    function buildModalHTML() {
+        var calendarHTML = buildCalendarHTML();
+        return '<div id="tscModal" class="tsc-modal">' +
+            '<div class="tsc-modal-content">' +
+            '<div class="tsc-modal-header">' +
+            '<span class="tsc-modal-title">' + (s.userNm || '') + '님의 출장 일정</span>' +
+            '<button class="tsc-modal-close" id="tscClose">&#x2715;</button>' +
+            '</div>' +
+            '<div class="tsc-modal-body">' + calendarHTML + '</div>' +
+            '<div class="tsc-modal-footer">' +
+            '<button class="tsc-btn tsc-btn-force" id="tscForceSave">그래도 저장</button>' +
+            '<button class="tsc-btn tsc-btn-cancel" id="tscCancel">취소</button>' +
+            '</div>' +
+            '</div>' +
+            '<div class="tsc-modal-backdrop"></div>' +
+            '</div>';
+    }
+
+    function ensureDOM() {
+        if (!$('#tscModal').length) {
+            var html = buildModalHTML();
+            $('body').append(html);
+            attachEventHandlers();
+        } else {
+            $('#tscModal').replaceWith(buildModalHTML());
+            attachEventHandlers();
+        }
+    }
+
+    function attachEventHandlers() {
+        $('#tscClose, #tscCancel').on('click', function() { hide(); if (s.onCancel) s.onCancel(); });
+        $('#tscForceSave').on('click', function() {
+            if (s.onForceSave) s.onForceSave();
+            hide();
+        });
+        $('.tsc-modal-backdrop').on('click', function() { hide(); if (s.onCancel) s.onCancel(); });
+    }
+
+    function hide() {
+        $('#tscModal').remove();
+    }
+
+    function open(opts) {
+        opts = opts || {};
+        s.userNm = opts.userNm || '';
+        s.newStDt = opts.newStDt || null;
+        s.newEdDt = opts.newEdDt || null;
+        s.schedules = opts.schedules || [];
+        s.onForceSave = opts.onForceSave || null;
+        s.onCancel = opts.onCancel || null;
+
+        ensureDOM();
+        $('#tscModal').fadeIn(200);
+    }
+
+    return { open: open, hide: hide };
+})();
+// ===== Trip Schedule Calendar Modal End =====
+
