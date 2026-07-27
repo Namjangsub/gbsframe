@@ -578,6 +578,24 @@
 		return ids;
 	}
 
+	// 관리(자금)결재선 고정 순서 ID 목록 (공통코드 CODE_ID='SPECRTS14'의 CODE_ETC, 콤마 구분 순서가 곧 결재 순번)
+	var mngFixedOrderUserIdsCache = null;
+	function getMngFixedOrderUserIds() {
+		if (mngFixedOrderUserIdsCache !== null) return mngFixedOrderUserIdsCache;
+		var ids = [];
+		postAjaxSync("/admin/cm/cm05/selectChildCodeList", { codeId: 'SPECRTS14' }, null, function(data) {
+			var list = data.childCodeList || data.resultList || data.result || [];
+			$.each(list, function(idx, item) {
+				var codeEtc = item.codeEtc || '';
+				if (codeEtc) {
+					ids = ids.concat(codeEtc.replace(/\s/g, '').split(',').filter(function(v) { return !!v; }));
+				}
+			});
+		});
+		mngFixedOrderUserIdsCache = ids;
+		return ids;
+	}
+
 	// 신청부서(TODODIV2190) 일반결재선을 "신청인(담당자/팀장) → 영업PM → (신청인이 담당자인 경우만)담당자팀장 → 부사장" 순서로
 	// 재구성하고 순번(sanctnSn)을 1부터 다시 부여한다. ID 매칭 기반으로 동작하므로 DB에서 재로드된 행에도 안전하게 적용된다.
 	// 결재(gb='결재') 행만 순서를 재구성하며, 공유(gb='공유') 행은 기존 상대 순서를 그대로 유지한다.
@@ -1292,9 +1310,9 @@
 		gridResize(gridViewApproval, newList.length);
 	}
 
-	// 관리(자금)결재선 고정 순서: 자금담당자(cjm) → 회계팀장(youngman) → 부사장(EMJ8105)
+	// 관리(자금)결재선 고정 순서: getMngFixedOrderUserIds()가 반환하는 SPECRTS14 CODE_ETC 등록 순서
 	function reorderPayMngApprovalLine(rows) {
-		var fixedOrder = ['cjm', 'youngman', 'EMJ8105'];
+		var fixedOrder = getMngFixedOrderUserIds();
 		var approvalRows = $.grep(rows, function(r) { return r.gb === '결재'; });
 		var shareRows = $.grep(rows, function(r) { return r.gb !== '결재'; });
 
@@ -1322,11 +1340,12 @@
 	}
 
 	function ensurePayMngApprovalUsers() {
-		if (!popParam || (popParam.actionType !== 'PAY' && popParam.actionType !== 'CHG') || !gridViewApprovalMng || !gridViewApprovalMng.target) return;
+		var isPaymentFlowNow = window.isPayingNow === true || (popParam && popParam.actionType === 'PAY');
+		if (!popParam || (!isPaymentFlowNow && popParam.actionType !== 'CHG') || !gridViewApprovalMng || !gridViewApprovalMng.target) return;
 		var list = gridViewApprovalMng.target.getList() || [];
 		var registeredIds = {};
 		$.each(list, function(_, row) { registeredIds[row.usrNm || row.todoId] = true; });
-		$.each(['cjm', 'youngman', 'EMJ8105'], function(_, userId) {
+		$.each(getMngFixedOrderUserIds(), function(_, userId) {
 			if (!registeredIds[userId]) {
 				list.push({
 					gb: '결재', usrNm: userId, todoId: userId, name: userId,
