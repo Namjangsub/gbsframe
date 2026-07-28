@@ -417,6 +417,9 @@ public class QM01SvcImpl implements QM01Svc {
             paramMap.put("rsltNo", rsltNoCopy);
 
 			String fdmtSolutCd = paramMap.get("FDMTSOLUT");
+			if (fdmtSolutCd != null && fdmtSolutCd.length() > 50) {
+				fdmtSolutCd = fdmtSolutCd.substring(0, 50);
+			}
 			paramMap.put("fdmtSolutCd", fdmtSolutCd);		// 선택된 근본대책 추가 (FDMTSOLUT=FDMTSOLUT01,FDMTSOLUT02,FDMTSOLUT03..)
 
             // 현재 날짜를 yyyyMMdd 형식으로 저장
@@ -507,9 +510,31 @@ public class QM01SvcImpl implements QM01Svc {
 //                        QM01Mapper.updateReqSt(sharngMap);
                         sharngMap.put("todoCfOpn", "자체승인");
                         sharngMap.put("todoNo", sharngMap.get("reqNo"));
-						if ("결과일괄등록".equals(procType)) {
-							sharngMap.put("etcField1", paramMap.get("actMh"));
+
+                        // 문제에서 넘어온 발주건 중 결과를 동시에 처리하는 경우(sameTimeResult == 'Y')에 한해서만 투입공수 매칭
+                        String workRptNo = paramMap.get("workRptNo");
+                        if (workRptNo == null || workRptNo.isEmpty()) {
+                            workRptNo = paramMap.get("issNo");
+                        }
+                        if (workRptNo != null && !workRptNo.isEmpty() && "Y".equals(paramMap.get("sameTimeResult"))) {
+                            sharngMap.put("actMh", paramMap.get("actMh"));
+                            sharngMap.put("etcField1", paramMap.get("actMh"));
+                        }
+
+						String appDeptId = sharngMap.get("deptId");
+						if (appDeptId == null || appDeptId.isEmpty()) {
+							appDeptId = paramMap.get("deptId");
 						}
+						if (appDeptId == null || appDeptId.isEmpty()) {
+							appDeptId = paramMap.get("resDeptCd");
+						}
+						if (appDeptId == null || appDeptId.isEmpty()) {
+							appDeptId = paramMap.get("deptCd");
+						}
+						if (appDeptId != null && appDeptId.length() >= 5) {
+							appDeptId = appDeptId.substring(0, 5);
+						}
+						sharngMap.put("deptId", appDeptId);
 
                         Object value = sharngMap.get("toDoKey");
 
@@ -521,6 +546,26 @@ public class QM01SvcImpl implements QM01Svc {
                         wb20Svc.insertApprovalLine(sharngMap);
                     }
 	        	}
+	        }
+	        // 팀장(자체승인)일 경우 결과를 동시/일괄 등록(sameTimeResult == 'Y')하는 건에 한해서만 투입공수(actMh) 업데이트
+	        boolean isTeamManagerSelfApproved = false;
+	        if (sharngArr != null) {
+	            for (Map<String, String> sharngMap : sharngArr) {
+	                if (sharngMap.get("userId") != null && sharngMap.get("userId").equals(sharngMap.get("usrNm"))) {
+	                    isTeamManagerSelfApproved = true;
+	                    break;
+	                }
+	            }
+	        }
+	        if (isTeamManagerSelfApproved && "Y".equals(paramMap.get("sameTimeResult")) && paramMap.get("actMh") != null && !paramMap.get("actMh").isEmpty()) {
+	            String actDeptId = paramMap.get("deptId");
+	            if (actDeptId == null || actDeptId.isEmpty()) actDeptId = paramMap.get("resDeptCd");
+	            if (actDeptId == null || actDeptId.isEmpty()) actDeptId = paramMap.get("deptCd");
+	            if (actDeptId == null || actDeptId.isEmpty()) actDeptId = paramMap.get("copArr");
+	            if (actDeptId == null || actDeptId.isEmpty()) actDeptId = paramMap.get("deptCd2");
+	            if (actDeptId != null && actDeptId.length() >= 5) actDeptId = actDeptId.substring(0, 5);
+	            paramMap.put("deptId", actDeptId);
+	            QM01Mapper.updateReqActMnRslt(paramMap);
 	        }
 		}
 		
@@ -565,6 +610,9 @@ public class QM01SvcImpl implements QM01Svc {
 			paramMap.put("rsltNo", rsltNoCopy);
 		}
 		String fdmtSolutCd = paramMap.get("FDMTSOLUT");
+		if (fdmtSolutCd != null && fdmtSolutCd.length() > 50) {
+			fdmtSolutCd = fdmtSolutCd.substring(0, 50);
+		}
 		paramMap.put("fdmtSolutCd", fdmtSolutCd);		// 선택된 근본대책 추가 (FDMTSOLUT=FDMTSOLUT01,FDMTSOLUT02,FDMTSOLUT03..)
 		int result = QM01Mapper.insertQualityResp(paramMap);		
 		int result2 = QM01Mapper.updateReqRsltChg(paramMap);// 실적등록 여부 갱신 

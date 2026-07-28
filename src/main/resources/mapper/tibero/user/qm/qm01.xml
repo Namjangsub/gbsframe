@@ -363,8 +363,7 @@
 						, (
 							SELECT CASE WHEN COUNT(1) <![CDATA[ > ]]> 0 THEN 'Y' ELSE 'N' END
 								FROM TB_CM06M01 C
-							WHERE C.ID = #{userId}
-								AND C.TEAM_MANAGER = 'TEAM01'
+							WHERE C.MNG_ID = #{userId}
 							) AS TEAM_MANAGER_YN	--팀장여부
 						</if>
 						-- 추가 물류 정보 --
@@ -508,7 +507,7 @@
 							 , A.TEL_NO AS TEL_NO
 							 , A.EMAIL AS EMAIL
 							 , A.DEPT_ID
-							 , DECODE(A.TEAM_MANAGER, 'TEAM01', 'Y', 'N') AS TEAM_MANAGER  -- 팀장여부
+							 , (SELECT CASE WHEN COUNT(1) <![CDATA[ > ]]> 0 THEN 'Y' ELSE 'N' END FROM TB_CM06M01 M WHERE M.MNG_ID = A.ID) AS TEAM_MANAGER  -- 팀장여부
 							 , B.DEPT_NM AS DT_NM
 							 , D.LEVEL_NM AS JIK
 							 , C.TODO_DIV1_CODE_ID AS TODO_DIV1_CODE_ID
@@ -1322,6 +1321,7 @@
 	            CREAT_DTTM,
 	            PG_PARAM,
 	            TODO_TITL,
+	            ETC_FIELD1,
 	            ETC_FIELD2,
 				ETC_FIELD3,
 				TODO_CODE_ID,
@@ -1355,6 +1355,7 @@
 	              ),
 	            #{pgParam},
 	            #{todoTitle, jdbcType=VARCHAR},
+	            NVL(#{etcField1, jdbcType=VARCHAR}, #{actMh, jdbcType=VARCHAR}),
 	            #{histNo, jdbcType=VARCHAR},
 				'N',
 				'insertWbsApprovalLi-',
@@ -1382,6 +1383,7 @@
 	            CREAT_DTTM,
 	            PG_PARAM,
 	            TODO_TITL,
+	            ETC_FIELD1,
 	            ETC_FIELD2,
 				ETC_FIELD3,
 				TODO_CODE_ID
@@ -1412,6 +1414,7 @@
 	              ),
 	            #{pgParam},
 	            #{todoTitle, jdbcType=VARCHAR},
+	            NVL(#{etcField1, jdbcType=VARCHAR}, #{actMh, jdbcType=VARCHAR}),
 	            #{histNo, jdbcType=VARCHAR},
 				'N',
 				'insertWbsApprovalLi-'
@@ -1780,19 +1783,10 @@
 		WHERE REQ_NO = #{reqNo}
 	      AND EXISTS (
 			         SELECT 1
-			           FROM (
-			                 SELECT C5.ID
-			                      , SUBSTR(NVL(C5.VIEW_DEPT_ID, C5.DEPT_ID), 1, 5) AS DEPT_ID
-								  , C5.MNG_ID
-			                   FROM TB_CM06M01 C5
-			                  WHERE C5.USE_YN = 'Y'
-			                ) C5
-			           JOIN TB_CM06M01 C6
-			             ON C6.ID = #{userId}
-			            AND C6.TEAM_MANAGER = 'TEAM01'
-			            <!-- AND SUBSTR(NVL(C6.VIEW_DEPT_ID, C6.DEPT_ID), 1, 5) = C5.DEPT_ID -->
+			           FROM TB_CM06M01 C5
+			          WHERE C5.USE_YN = 'Y'
 						AND C5.MNG_ID = #{userId}
-			          WHERE C5.ID = CASE
+			            AND C5.ID = CASE
 			                         WHEN T.ORDRG_ID LIKE 'gyrsult%' THEN T.REG_ID
 			                         ELSE T.ORDRG_ID
 			                         END
@@ -1802,18 +1796,18 @@
 <!-- 	영업팀, 기술연구소, 구매팀, 생산팀 팀장인경우에만 수정 -->
 	<update id="updateReqActMnRslt" parameterType="Map">
 		UPDATE TB_QM01P01
-		   SET
+		<trim prefix="SET" prefixOverrides=",">
 		<choose>
-			<when test="deptId == 'GUN30'">
+			<when test="deptId != null and (deptId == 'GUN30' or deptId.startsWith('GUN30'))">
 			  	SALE_TEAM_MD = #{actMh, jdbcType=DECIMAL}
 			</when>
-			<when test="deptId == 'GUN40'">
+			<when test="deptId != null and (deptId == 'GUN40' or deptId.startsWith('GUN40'))">
 			  	DSGN_TEAM_MD = #{actMh, jdbcType=DECIMAL}
 			</when>
-			<when test="deptId == 'TRN50'">
+			<when test="deptId != null and (deptId == 'TRN50' or deptId.startsWith('TRN50'))">
 			  	MATR_TEAM_MD = #{actMh, jdbcType=DECIMAL}
 			</when>
-			<when test="deptId == 'GUN60'">
+			<when test="deptId != null and (deptId == 'GUN60' or deptId.startsWith('GUN60') or deptId == 'GUN70' or deptId.startsWith('GUN70'))">
 			  	PROD_TEAM_MD = #{actMh, jdbcType=DECIMAL}
 			</when>
 			<otherwise>
@@ -1822,31 +1816,31 @@
 				, UDT_ID   = #{userId}
 				, UDT_PGM  = #{pgmId}
 				, UDT_DTTM = SYSDATE
+		</trim>
 		 WHERE REQ_NO = #{reqNo}
 		   AND EXISTS (
 				       SELECT 1
 				         FROM TB_CM06M01 C
 				        WHERE C.ID  = #{userId}
-				          AND NVL(C.TEAM_MANAGER, 'NNN') = 'TEAM01'
-		 		  		  AND substr(C.DEPT_ID, 1, 5)	IN ('GUN30', 'GUN40', 'TRN50', 'GUN60')
+		 		  		  AND substr(C.DEPT_ID, 1, 5)	IN ('GUN30', 'GUN40', 'TRN50', 'GUN60', 'GUN70')
 		   			  )		
 	</update>
 
 <!-- 	영업팀, 기술연구소, 구매팀, 생산팀 팀장인경우에만 수정 -->
 	<update id="updateReqActMdCancle" parameterType="map">
 		UPDATE TB_QM01P01
-		   SET
+		<trim prefix="SET" prefixOverrides=",">
 		<choose>
-			<when test="deptId == 'GUN30'">
+			<when test="deptId != null and (deptId == 'GUN30' or deptId.startsWith('GUN30'))">
 			  	SALE_TEAM_MD = 0
 			</when>
-			<when test="deptId == 'GUN40'">
+			<when test="deptId != null and (deptId == 'GUN40' or deptId.startsWith('GUN40'))">
 			  	DSGN_TEAM_MD = 0
 			</when>
-			<when test="deptId == 'TRN50'">
+			<when test="deptId != null and (deptId == 'TRN50' or deptId.startsWith('TRN50'))">
 			  	MATR_TEAM_MD = 0
 			</when>
-			<when test="deptId == 'GUN60'">
+			<when test="deptId != null and (deptId == 'GUN60' or deptId.startsWith('GUN60') or deptId == 'GUN70' or deptId.startsWith('GUN70'))">
 			  	PROD_TEAM_MD = 0
 			</when>
 			<otherwise>
@@ -1855,13 +1849,13 @@
 				, UDT_ID   = #{userId}
 				, UDT_PGM  = #{pgmId}
 				, UDT_DTTM = SYSDATE
+		</trim>
 		 WHERE REQ_NO = #{reqNo}
 		   AND EXISTS (
 				       SELECT 1
 				         FROM TB_CM06M01 C
 				        WHERE C.ID  = #{userId}
-				          AND NVL(C.TEAM_MANAGER, 'NNN') = 'TEAM01'
-		 		  		  AND substr(C.DEPT_ID, 1, 5)	IN ('GUN30', 'GUN40', 'TRN50', 'GUN60')
+		 		  		  AND substr(C.DEPT_ID, 1, 5)	IN ('GUN30', 'GUN40', 'TRN50', 'GUN60', 'GUN70')
 		   			  )		
 	</update>
 

@@ -384,12 +384,25 @@ public class WB24SvcImpl implements WB24Svc {
 						approvalMap2.put("todoNo", paramMap.get("issNo"));
 						approvalMap2.put("issNo", paramMap.get("issNo"));
 
-						if ("GUN30".equals(approvalMap2.get("deptId")) ||
-							"GUN40".equals(approvalMap2.get("deptId")) ||
-							"TRN50".equals(approvalMap2.get("deptId")) ||
-							"GUN60".equals(approvalMap2.get("deptId"))) {
+						String appDeptId = approvalMap2.get("deptId");
+						if (appDeptId == null || appDeptId.isEmpty()) {
+							appDeptId = paramMap.get("actDeptId");
+						}
+						if (appDeptId == null || appDeptId.isEmpty()) {
+							appDeptId = paramMap.get("deptId");
+						}
+						if (appDeptId != null && appDeptId.length() >= 5) {
+							appDeptId = appDeptId.substring(0, 5);
+						}
+
+						if ("GUN30".equals(appDeptId) ||
+							"GUN40".equals(appDeptId) ||
+							"TRN50".equals(appDeptId) ||
+							"GUN60".equals(appDeptId) ||
+							"GUN70".equals(appDeptId)) {
 								approvalMap2.put("actMh", paramMap.get("actMh"));
 								approvalMap2.put("etcField1", paramMap.get("actMh"));
+								approvalMap2.put("deptId", appDeptId);
 						}
                         wb20Svc.insertApprovalLine(approvalMap2);
 					}

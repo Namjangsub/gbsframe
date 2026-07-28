@@ -119,6 +119,29 @@ public class WB20SvcImpl implements WB20Svc {
 		 * salesCd=24000-00DUMMY, todoDiv1CodeNm=결재, todoDiv2CodeNm=발주/출장요청(결과), todoFileTrgtKey=1287, todoTitl=(주)건양아이티티-기타정상발주및출장요청서결과,
 		 * userId=js.nam, todoKey=8504, sanctnSn=1, todoNo=RES2400144 }
 		 */
+		// pgParam JSON 문자열 파싱하여 최상위 paramMap의 비어있는 핵심 정보(issNo, deptId, actMh, reqNo 등) 주입
+		if (paramMap.containsKey("pgParam") && paramMap.get("pgParam") != null) {
+			try {
+				String pgParamStr = paramMap.get("pgParam");
+				if (pgParamStr.trim().startsWith("{")) {
+					Gson gson = new Gson();
+					Type mapType = new TypeToken<Map<String, Object>>() {}.getType();
+					Map<String, Object> pgMap = gson.fromJson(pgParamStr, mapType);
+					if (pgMap != null) {
+						for (Map.Entry<String, Object> entry : pgMap.entrySet()) {
+							if (entry.getValue() != null && !entry.getValue().toString().isEmpty()) {
+								if (!paramMap.containsKey(entry.getKey()) || paramMap.get(entry.getKey()) == null || paramMap.get(entry.getKey()).isEmpty()) {
+									paramMap.put(entry.getKey(), entry.getValue().toString());
+								}
+							}
+						}
+					}
+				}
+			} catch (Exception e) {
+				// JSON 파싱 무시
+			}
+		}
+
 		String tempReqNo = paramMap.get("todoNo");
 		String todoDiv2CodeId = paramMap.get("todoDiv2CodeId");
 		String todoCfOpn = paramMap.get("todoCfOpn");
@@ -158,12 +181,13 @@ public class WB20SvcImpl implements WB20Svc {
 				result += qm01Mapper.updateReqStRslt(paramMap);
 			}
 			// 결과일괄 등록 자료 결재시 투입공수 업데이트
-			if ("TEAM01".equals(paramMap.get("actTeamManager"))) {
+			if ("TEAM01".equals(paramMap.get("actTeamManager")) || "평가".equals(paramMap.get("actTeamManager")) || "Y".equals(paramMap.get("actTeamManager")) || "자체승인".equals(paramMap.get("todoCfOpn"))) {
     			if ("Y".equals(paramMap.get("sameTimeResultChk"))) {
     				if ("GUN30".equals(paramMap.get("deptId")) ||
     					"GUN40".equals(paramMap.get("deptId")) ||
     					"TRN50".equals(paramMap.get("deptId")) ||
-    					"GUN60".equals(paramMap.get("deptId"))) {
+    					"GUN60".equals(paramMap.get("deptId")) ||
+    					"GUN70".equals(paramMap.get("deptId"))) {
     						result += qm01Mapper.updateReqActMnRslt(paramMap);	// 결과자료 투입시간 업데이트
     					}
     			}
@@ -172,14 +196,40 @@ public class WB20SvcImpl implements WB20Svc {
 			// TODODIV2030:발주 및 출장 요청 결과자료 상태코드 바꾸기
 		} else if ("TODODIV2030".equals(todoDiv2CodeId)) {
 			// REQ_ST: REQST02 --> REQST03 로 상태 변경처리
-			paramMap.put("reqNo", "REQ" + tempReqNo.substring(3, 10));
+			if (tempReqNo != null && tempReqNo.startsWith("RES")) {
+				paramMap.put("reqNo", "REQ" + tempReqNo.substring(3));
+			} else {
+				paramMap.put("reqNo", tempReqNo);
+			}
 			result += qm01Mapper.updateReqStRslt(paramMap);
 
-			if ("TEAM01".equals(paramMap.get("actTeamManager"))) {
-				if ("GUN30".equals(paramMap.get("deptId")) ||
-					"GUN40".equals(paramMap.get("deptId")) ||
-					"TRN50".equals(paramMap.get("deptId")) ||
-					"GUN60".equals(paramMap.get("deptId"))) {
+			// actMh 및 deptId 보강
+			if ((paramMap.get("actMh") == null || paramMap.get("actMh").isEmpty()) && paramMap.get("etcField1") != null) {
+				paramMap.put("actMh", paramMap.get("etcField1"));
+			}
+			String appDeptId = paramMap.get("deptId");
+			if (appDeptId == null || appDeptId.isEmpty()) {
+				appDeptId = paramMap.get("actDeptId");
+			}
+			if (appDeptId == null || appDeptId.isEmpty()) {
+				appDeptId = paramMap.get("resDeptCd");
+			}
+			if (appDeptId != null && appDeptId.length() >= 5) {
+				appDeptId = appDeptId.substring(0, 5);
+			}
+			paramMap.put("deptId", appDeptId);
+
+			// 문제 연동 발주/결과건(workRptNo 또는 issNo 존재)에 한해서만 결과자료 투입시간 업데이트
+			String workRptNo = paramMap.get("workRptNo");
+			if (workRptNo == null || workRptNo.isEmpty()) {
+				workRptNo = paramMap.get("issNo");
+			}
+			if (workRptNo != null && !workRptNo.isEmpty() && paramMap.get("actMh") != null && !paramMap.get("actMh").isEmpty()) {
+				if ("GUN30".equals(appDeptId) ||
+					"GUN40".equals(appDeptId) ||
+					"TRN50".equals(appDeptId) ||
+					"GUN60".equals(appDeptId) ||
+					"GUN70".equals(appDeptId)) {
 					result += qm01Mapper.updateReqActMnRslt(paramMap);	// 결과자료 투입시간 업데이트
 				}
 			}
@@ -196,17 +246,26 @@ public class WB20SvcImpl implements WB20Svc {
 					result += wb24Mapper.updateWbsIssueResultEvaluate(paramMap);
 				}
 			}
-			// 팀장 투입시간 업데이트
-			if ("TEAM01".equals(paramMap.get("actTeamManager"))) { 
-    				if ("GUN30".equals(paramMap.get("deptId")) ||
-    					"GUN40".equals(paramMap.get("deptId")) ||
-    					"TRN50".equals(paramMap.get("deptId")) ||
-    					"GUN60".equals(paramMap.get("deptId"))) {
-    						result += wb24Mapper.updateWbsIssueActMn(paramMap);	// 이슈조치 투입시간 업데이트
-    				}
+			// actMh 및 deptId 보강
+			if ((paramMap.get("actMh") == null || paramMap.get("actMh").isEmpty()) && paramMap.get("etcField1") != null) {
+				paramMap.put("actMh", paramMap.get("etcField1"));
 			}
-			if ("자체승인".equals(paramMap.get("todoCfOpn"))) {
-				result += wb24Mapper.updateWbsIssueActMn(paramMap);
+			String appDeptId = paramMap.get("deptId");
+			if (appDeptId == null || appDeptId.isEmpty()) {
+				appDeptId = paramMap.get("actDeptId");
+			}
+			if (appDeptId != null && appDeptId.length() >= 5) {
+				appDeptId = appDeptId.substring(0, 5);
+			}
+			paramMap.put("deptId", appDeptId);
+
+			// 팀장 투입시간 업데이트
+			if ("GUN30".equals(appDeptId) ||
+				"GUN40".equals(appDeptId) ||
+				"TRN50".equals(appDeptId) ||
+				"GUN60".equals(appDeptId) ||
+				"GUN70".equals(appDeptId)) {
+				result += wb24Mapper.updateWbsIssueActMn(paramMap);	// 이슈조치 투입시간 업데이트
 			}
 			// 조치 결재시 문제에 결재 미완료를 완료로 변경
 			result += wb20Mapper.updateWbsIssueApprovalSync(paramMap);
