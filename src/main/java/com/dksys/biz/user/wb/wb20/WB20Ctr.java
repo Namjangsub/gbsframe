@@ -7,6 +7,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.ui.ModelMap;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -136,6 +137,12 @@ public class WB20Ctr {
 	  }
 
 	  //공통 결재승인(등록)
+	  //주의: 클래스 레벨 @Transactional에 이 메서드를 그대로 두면, 서비스(WB20SvcImpl)가 같은 트랜잭션에
+	  //참여(join)한 상태에서 검증 예외(RuntimeException)를 던질 때 트랜잭션이 rollback-only로 표시되고,
+	  //아래 catch가 예외를 정상적으로 처리해 메서드가 정상 종료되어도 커밋 시점에 UnexpectedRollbackException이
+	  //발생해 ExceptionAdvice로 넘어가면서 catch에서 만든 resultMessage(예: 순차결재 검증 메시지)가 무시된다.
+	  //이를 막기 위해 이 메서드만 트랜잭션을 열지 않도록 하여 서비스가 트랜잭션을 온전히 소유하게 한다.
+	  @Transactional(propagation = Propagation.NOT_SUPPORTED)
 	  @PostMapping(value = "/insertApprovalLine")
 	  public String insertApprovalLine(@RequestBody Map<String, String> paramMap, ModelMap model) {
 	    	try {
@@ -146,7 +153,12 @@ public class WB20Ctr {
 		    	model.addAttribute("resultMessage", messageUtils.getMessage("update"));
 	    	}catch(Exception e) {
 		    	 model.addAttribute("resultCode", 500);
-		 		 model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+		    	 String errMsg = e.getMessage();
+		    	 if (errMsg != null && (errMsg.contains("결재") || errMsg.contains("승인"))) {
+		    		 model.addAttribute("resultMessage", errMsg);
+		    	 } else {
+		 		 	 model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+		    	 }
 	    	}
 
 	    	return "jsonView";

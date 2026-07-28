@@ -209,7 +209,7 @@
 					<!-- 출장자 타이틀 -->
 					<th rowspan="1" class="hit" style="text-align: center;">
 						출장자
-						<div class="add_btn_small" style="display: block; margin-top: 10px; text-align: center;">
+						<div class="add_btn_small" style="display: none; margin-top: 10px; text-align: center;">
 							<a onclick="addTravelerRow();" style="width: 25px; height: 25px; line-height: 23px; padding: 0; display: inline-block;" authchk>+</a>
 							<a onclick="deleteTravelerRow();" style="width: 25px; height: 25px; line-height: 23px; padding: 0; display: inline-block; margin-left: 3px;" authchk>-</a>
 						</div>
@@ -363,13 +363,13 @@
 
 					<table class="expense_detail_tablepopup" style="width: 100%; border-collapse: collapse; border: 1px solid #ddd; font-family: inherit;">
 						<colgroup>
+							<col width="8%">
+							<col width="14%">
 							<col width="10%">
-							<col width="10%">
-							<col width="10%">
-							<col width="10%">
-							<col width="18%">
-							<col width="18%">
-							<col width="24%">
+							<col width="14%">
+							<col width="14%">
+							<col width="14%">
+							<col width="16%">
 						</colgroup>
 						<thead style="background: #f5f5f5;">
 							<tr>
@@ -381,7 +381,7 @@
 								<th colspan="2" style="text-align: center; border: 1px solid #ddd; font-family: inherit; font-size: 12px;">국내(원)</th>
 								<th style="text-align: center; border: 1px solid #ddd; font-family: inherit; font-size: 12px;">해외($)</th>
 								<th style="text-align: center; border: 1px solid #ddd; font-family: inherit; font-size: 12px;">KRW(원)</th>
-								<th id="payAmtUsdHead" style="text-align: center; border: 1px solid #ddd; font-family: inherit; font-size: 12px;">USD($)</th>
+								<th id="payAmtUsdHead" style="text-align: center; border: 1px solid #ddd; font-family: inherit; font-size: 12px;">외화(달러)</th>
 								<th style="text-align: center; border: 1px solid #ddd; font-family: inherit; font-size: 12px;">비고</th>
 							</tr>
 						</thead>
@@ -1593,10 +1593,14 @@
 
 	function isTravelerGridEditBlocked() {
 		var actionType = (popParam && popParam.actionType) || $('#actionType').val();
+		var isAuthor = (jwt.userId === $('#reqId').val());
+		var isEditableByAuthor = (actionType === 'U' || actionType === 'CHG') && isAuthor && !hasCompletedApproval();
+		var isSavedGen = hasSavedGeneralApprovalLine() && !isEditableByAuthor;
+		
 		if (actionType === 'CHG') {
-			return isApprovalEntryMode() || hasSavedGeneralApprovalLine();
+			return isApprovalEntryMode() || isSavedGen;
 		}
-		return isApprovalEntryMode() || actionType === 'PAY' || actionType === 'V' || isPayDtExist || hasSavedGeneralApprovalLine();
+		return isApprovalEntryMode() || actionType === 'PAY' || actionType === 'V' || isPayDtExist || isSavedGen;
 	}
 
 	// 클립보드 데이터를 우클릭한 셀(startRow/startCol)부터 채워넣는다.
@@ -1773,7 +1777,7 @@
 			$('#nightCnt').val(master.nightCnt); //박수
 			$('#dayCnt').val(master.dayCnt); //일수
 			$('#payAmtKrw').val(master.payAmtKrw); //지급금액(원화)
-			$('#payAmtUsd').val(master.payAmtUsd); //지급금액(달러)
+			$('#payAmtUsd').val(master.payAmtUsd); //지급금액(외화)
 
 			$('#salesCnfrmYn').prop('checked', master.salesCnfrmYn === 'Y');
 			if (master.salesCnfrmYn === 'Y') {
@@ -1989,7 +1993,9 @@
 			saveTripReqSalesInfo();
 			return;
 		}
-		if (!isPaymentFlow && hasSavedGeneralApprovalLine() && !hasCompletedApproval()) {
+		var isAuthor = (jwt.userId === $('#reqId').val());
+		var actionType = $('#actionType').val();
+		if (!isPaymentFlow && hasSavedGeneralApprovalLine() && !hasCompletedApproval() && !(actionType === 'U' && isAuthor)) {
 			alert("결재가 진행중입니다.");
 			applyEditPolicy(currentTripReqMaster);
 			return;
@@ -2039,8 +2045,8 @@
 			if (!isPaymentFlow && !forceOverlap) {
 				var hasDateOverlap = false;
 				$.each(gridList, function(idx, item) {
-					if (item.userId && item.tripStDt && item.tripEdDt && checkTravelerDateOverlap(item.userId, item.tripStDt, item.tripEdDt, item.userNm, function(overlap, stDt, edDt, nm) {
-						showCalendarModal(item.userId, stDt, edDt, nm, overlap);
+					if (item.userId && item.tripStDt && item.tripEdDt && checkTravelerDateOverlap(item.userId, item.tripStDt, item.tripEdDt, item.userNm, null, function() {
+						saveTripReq(true);
 					})) {
 						hasDateOverlap = true;
 						return false;
@@ -2186,7 +2192,8 @@
 		var sanctnSnShare = 0;
 
 		if(approvalList.length > 0) {
-			$.each(approvalList, function(idx, elem) {
+			for(var i = approvalList.length - 1; i >= 0; i--) {
+				var elem = approvalList[i];
 				if (elem.usrNm.includes('gyrsult')) {
 					// 외사 또는 외주업체 항목은 제외
 				} else {
@@ -2200,9 +2207,9 @@
 						approvalListObj["sanctnSn"] = sanctnSnApproval;
 						approvalListObj["todoDiv2CodeId"] = "TODODIV2190";
 					}
-					approvalArr.push(approvalListObj);
+					approvalArr.unshift(approvalListObj);
 				}
-			});
+			}
 		}
 
 		formData.append('approvalArr', JSON.stringify(approvalArr));
@@ -2215,7 +2222,8 @@
 		var mngSanctnSnShare = 0;
 
 		if(mngApprovalList.length > 0) {
-			$.each(mngApprovalList, function(idx, elem) {
+			for(var i = mngApprovalList.length - 1; i >= 0; i--) {
+				var elem = mngApprovalList[i];
 				if (elem.usrNm.includes('gyrsult')) {
 				} else {
 					var approvalListObj = elem;
@@ -2228,9 +2236,9 @@
 						approvalListObj["sanctnSn"] = mngSanctnSnApproval;
 						approvalListObj["todoDiv2CodeId"] = "TODODIV2191";
 					}
-					mngApprovalArr.push(approvalListObj);
+					mngApprovalArr.unshift(approvalListObj);
 				}
-			});
+			}
 		}
 		formData.append('mngApprovalArr', JSON.stringify(mngApprovalArr));
 
@@ -2766,7 +2774,7 @@
 		}
 	}
 
-	// 통화단위(원화/외화)에 따른 지급금액 USD($) 입력 가능 여부를 정책 적용 마지막 단계에서 강제하기 위한 래퍼.
+	// 통화단위(원화/외화)에 따른 지급금액 외화 항목 입력 가능 여부를 정책 적용 마지막 단계에서 강제하기 위한 래퍼.
 	// applyEditPolicyInner 내부에는 조기 return이 여러 곳에 있어, 그 안에서 직접 호출하면 일부 분기를 놓칠 수 있음.
 	function applyEditPolicy(master) {
 		applyEditPolicyInner(master);
@@ -2851,6 +2859,16 @@
 
 		// 1) 기본 초기화
 		setFormDisabled(false);
+		if (!checkUserAccountingAuth()) {
+			var $payAmtFields = $('#popForm').find('.pay-amount-input, input[id^="payAmt"], input[id^="payAmtUsd"]');
+			if (typeof $payAmtEditableFields === 'function') {
+				$payAmtFields = $payAmtEditableFields();
+			}
+			$payAmtFields.prop('readonly', true).css('background', '#fafafa');
+			$payAmtFields.filter('select, input[type="checkbox"], input[type="radio"]').prop('disabled', true);
+			
+			$('#autoCalcBtn').hide();
+		}
 		if (actionType !== 'PAY') {
 			$popArea.find('#saveBtn').show();
 			$popArea.find('#payBtn').hide();
@@ -2925,7 +2943,11 @@
 		}
 
 		// 5) 일반 모드: 일반 결재선이 저장된 후에는 결재 대상 내용을 잠근다.
-		if (actionType !== 'PAY' && (hasStartedGen || hasCompletedGen)) {
+		// 단, 아무도 결재를 진행하지 않은 상태(hasCompletedGen === false)에서 기안자가 수정(U) 모드로 접근한 경우는 개방한다.
+		var isAuthor = (jwt.userId === $('#reqId').val());
+		var lockForm = hasCompletedGen || (hasStartedGen && !(actionType === 'U' && isAuthor));
+
+		if (actionType !== 'PAY' && lockForm) {
 			setFormDisabled(true);
 			$popArea.find('#deleteBtn').hide();
 
@@ -3112,10 +3134,10 @@
 				ensurePayMngApprovalUsers();
 				reapplyEditPolicyAfterApprovalLoad();
 			} else {
-				gridViewApprovalMng.setData2([]);
-				gridResize(gridViewApprovalMng, 0);
-				ensurePayMngApprovalUsers();
-				reapplyEditPolicyAfterApprovalLoad();
+				setApplicantDefaultApprovalLineMng(function() {
+					ensurePayMngApprovalUsers();
+					reapplyEditPolicyAfterApprovalLoad();
+				});
 			}
 		});
 	}
@@ -3310,7 +3332,7 @@
 		$container.find('#totalPayAmtUsd_display').text(totals.usd.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2}));
 
 		$container.find('#payAmtKrw').val(totals.krw); //지급금액(원화)
-		$container.find('#payAmtUsd').val(totals.usd); //지급금액(달러)
+		$container.find('#payAmtUsd').val(totals.usd); //지급금액(외화)
 	}
 
 	// 출장자별 경비 요약은 전체 경비를 출장자 수로 균등 배분하여 표시한다.
@@ -3404,7 +3426,7 @@
 		function addPaymentRow(expItemCd, calcBasis, krwAmt, usdAmt, remark) {
 			list.push({
 				expItemCd: expItemCd,
-				currCd: 'KRW/USD',
+				currCd: $('#currCd').val() || 'CURR02', // 사용자가 선택한 외화 코드를 기본으로 저장
 				calcBasis: calcBasis,
 				krwAmt: krwAmt,
 				usdAmt: usdAmt,
@@ -3616,13 +3638,13 @@
 
 		$container.find('.curr_unit').text('KRW');
 
-		var currCdNm = optEl.text || 'USD';
-		$('#payAmtUsdHead').text(currCdNm + '($)');
+		var currCdNm = optEl.text || '외화';
+		$('#payAmtUsdHead').text(currCdNm);
 
 		applyPayAmtUsdCurrencyLock();
 	}
 
-	// 통화단위가 원화(WON/KRW, CURR01)인 경우 지급금액(※회계팀 작성)의 USD($) 항목은 입력 금지, 원화가 아닌 경우에만 입력 가능.
+	// 통화단위가 원화(WON/KRW, CURR01)인 경우 지급금액(※회계팀 작성)의 외화 항목은 입력 금지, 원화가 아닌 경우에만 입력 가능.
 	// 회계담당자 편집 가능 여부(모드/권한별 정책)는 이미 applyEditPolicy에서 결정된 KRW쪽 필드(payAmt_traffic)의
 	// disabled 상태를 기준으로 판단하여, 기존 편집 권한 정책 위에 통화 조건만 추가로 덧씌운다.
 	function applyPayAmtUsdCurrencyLock() {
@@ -3630,7 +3652,7 @@
 		var $usdFields = $popForm.find('#payAmtUsd_traffic, #payAmtUsd_lodging, #payAmtUsd_meal, #payAmtUsd_daily, #payAmtUsd_special');
 		if ($usdFields.length === 0) return;
 
-		var basePayAmtEditable = !$popForm.find('#payAmt_traffic').prop('disabled');
+		var basePayAmtEditable = !$popForm.find('#payAmt_traffic').prop('readonly');
 		var selectEl = $popForm.find('#currCd')[0];
 		var optEl = selectEl ? selectEl.options[selectEl.selectedIndex] : null;
 		var currCdNm = optEl ? (optEl.text || '') : '';
@@ -3742,6 +3764,7 @@
 					}
 					if (reason) {
 						var existingEtc = gridInstance.getList()[dindex].etc || '';
+						existingEtc = existingEtc.replace(/(?:, )?중복사유: [^,]*/g, '').trim();
 						gridInstance.setValue(dindex, 'etc', (existingEtc ? existingEtc + ', ' : '') + '중복사유: ' + reason);
 					}
 					gridInstance.repaint();
@@ -3795,15 +3818,22 @@
 	var kakaoCnt = 0;
 	var kakaoErr = [];
 
-	// gb='결재' 행 중 아직 미완료(확인일자 없음 && sanctnSttus!=='Y')인 첫 행의 순번(배열순서 1-base)을 반환. 모두 완료/행없음이면 null.
+	// gb='결재' 행 중 아직 미완료(확인일자 없음 && sanctnSttus!=='Y')인 행 중 실제 순번(sanctnSn)이 가장 작은 값을 반환. 모두 완료/행없음이면 null.
+	// 그리드 로드 순서(ORDER BY SANCTN_SN DESC)와 배열 인덱스는 실제 순번과 일치하지 않으므로 반드시 row.sanctnSn 값을 기준으로 판단한다.
 	function getFirstPendingApprovalSn(gridView) {
 		if (!gridView || !gridView.target || !gridView.target.getList) return null;
 		var rows = $.grep(gridView.target.getList() || [], function(r) { return r.gb === '결재'; });
-		for (var i = 0; i < rows.length; i++) {
-			var isDone = $.trim(rows[i].todoCfDt || '') || rows[i].sanctnSttus === 'Y';
-			if (!isDone) return i + 1;
-		}
-		return null;
+		var minPendingSn = null;
+		$.each(rows, function(idx, row) {
+			var isDone = $.trim(row.todoCfDt || '') || row.sanctnSttus === 'Y';
+			if (!isDone) {
+				var sn = Number(row.sanctnSn);
+				if (!isNaN(sn) && (minPendingSn === null || sn < minPendingSn)) {
+					minPendingSn = sn;
+				}
+			}
+		});
+		return minPendingSn;
 	}
 
 	// gb='결재' 행이 (1개 이상 존재하며) 모두 완료되었는지 확인
@@ -4041,13 +4071,13 @@
 		return isValid;
 	}
 
-	function setApplicantDefaultApprovalLineMng() {
+	function setApplicantDefaultApprovalLineMng(callback) {
 		// 최초 등록 시 관리부서 결재선 자동 생성 (CODE_ID = 'SPECRTS14')
 		postAjax("/admin/cm/cm05/selectChildCodeList", { codeId: 'SPECRTS14' }, null, function(data) {
 			var list = data.childCodeList || data.resultList || data.result || [];
-			if (list.length === 0) return;
+			if (list.length === 0) { if (typeof callback === 'function') callback(); return; }
 			var codeEtc = list[0].codeEtc || '';
-			if (!codeEtc) return;
+			if (!codeEtc) { if (typeof callback === 'function') callback(); return; }
 
 			var userIds = codeEtc.split(',');
 			var defaultList = [];
@@ -4084,6 +4114,7 @@
 				gridViewApprovalMng.setData2(defaultList);
 				gridResize(gridViewApprovalMng, defaultList.length);
 			}
+			if (typeof callback === 'function') callback();
 		});
 	}
 

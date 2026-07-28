@@ -316,7 +316,7 @@ function Approval(htmlParam, param, popParam) {
 					}
 
 				} else {
-					customAlert("승인중 오류가 발생 되었습니다.");
+					customAlert(data.resultMessage || "승인중 오류가 발생 되었습니다.");
 				}
 			});
 

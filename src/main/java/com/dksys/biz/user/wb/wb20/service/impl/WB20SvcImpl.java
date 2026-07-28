@@ -335,7 +335,8 @@ public class WB20SvcImpl implements WB20Svc {
 				continue;
 			}
 			if (sn < currentSn && !"Y".equals(line.get("sanctnSttus"))) {
-				throw new RuntimeException("이전 순번 결재자의 승인이 완료되어야 결재를 진행할 수 있습니다.");
+				String prevName = line.get("todoNm") != null ? String.valueOf(line.get("todoNm")) : "이전결재자";
+				throw new RuntimeException("이전결재자 " + prevName + "가 승인하지 않은 상태이므로 결재 진행할 수 없습니다.");
 			}
 		}
 	}

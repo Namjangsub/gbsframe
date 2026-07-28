@@ -231,7 +231,7 @@ public class PM51SvcImpl implements PM51Svc {
 						approvalMap.put("pgParam", pgParam2);
 						qm01Mapper.insertWbsApprovalList(approvalMap);
 						iApproval++;
-						if (approvalMap.get("userId").equals(approvalMap.get("usrNm"))) {
+						if (approvalMap.get("userId").equals(approvalMap.get("usrNm")) && "1".equals(approvalMap.get("sanCtnSn"))) {
 							approvalMap.put("todoCfOpn", "자체승인");
 							approvalMap.put("todoNo", approvalMap.get("reqNo"));
 
@@ -375,7 +375,7 @@ public class PM51SvcImpl implements PM51Svc {
 						approvalMap.put("pgParam", pgParam2);
 						qm01Mapper.insertWbsApprovalList(approvalMap);
 						iApproval++;
-						if (approvalMap.get("userId").equals(approvalMap.get("usrNm"))) {
+						if (approvalMap.get("userId").equals(approvalMap.get("usrNm")) && "1".equals(approvalMap.get("sanCtnSn"))) {
 							approvalMap.put("todoCfOpn", "자체승인");
 							approvalMap.put("todoNo", approvalMap.get("reqNo"));
 
@@ -444,7 +444,7 @@ public class PM51SvcImpl implements PM51Svc {
 				approvalMap.put("pgParam", pgParam2);
 				qm01Mapper.insertWbsApprovalList(approvalMap);
 				iApproval++;
-				if (approvalMap.get("userId").equals(approvalMap.get("usrNm"))) {
+				if (approvalMap.get("userId").equals(approvalMap.get("usrNm")) && "1".equals(approvalMap.get("sanCtnSn"))) {
 					approvalMap.put("todoCfOpn", "자동승인");
 					approvalMap.put("todoNo", approvalMap.get("reqNo"));
 					// wb20Mapper.updateApprovalLine의 WHERE 절이 SANCTN_SN을 필수로 매칭한다.
@@ -1035,13 +1035,7 @@ public class PM51SvcImpl implements PM51Svc {
 
 	//영업코드 조회
 	private String approvalSalesCd(Map<String, String> paramMap) {
-		if (hasText(paramMap.get("salesCd"))) {
-			return paramMap.get("salesCd");
-		}
-		if (hasText(paramMap.get("tripRptNo"))) {
-			return paramMap.get("tripRptNo");
-		}
-		return paramMap.get("tripReqNo");
+		return paramMap.get("salesCd");
 	}
 
 	//출장비 결재확인
