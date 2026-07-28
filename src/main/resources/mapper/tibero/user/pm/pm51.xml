@@ -916,7 +916,7 @@
 		ORDER BY TRIP_ST_DTM ASC
 	</select>
 
-	<!-- 출장복명서 경비 세부내역 등록 -->
+	<!-- 출장복명서 경비 신청/정산 현황 등록 (지급완료처리 시) -->
 	<insert id="insertTripRptD03" parameterType="Map">
 		INSERT INTO TB_PM52D01 (
 			TRIP_RPT_NO, SEQ, USE_DT, USE_DESC, PERSON_CNT, AMT, CURR_CD,
@@ -1001,6 +1001,12 @@
 			<foreach collection="userIds" item="userId" open="(" separator="," close=")">
 				#{userId}
 			</foreach>
+			<!-- 미지급 자료(TRIP_RPT_NO 없음) 또는 동일 복명서에 연결된 자료만 조회 -->
+			AND (T.TRIP_RPT_NO IS NULL
+			<if test="tripRptNo != null and tripRptNo != ''">
+				OR T.TRIP_RPT_NO = #{tripRptNo, jdbcType=VARCHAR}
+			</if>
+			)
 		ORDER BY M.WORK_RPT_DT, T.WORK_RPT_NO, T.WORK_RPT_NO_SEQ
 	</select>
 
@@ -1011,6 +1017,7 @@
 			TRIP_RPT_ROUND = #{tripRptRound, jdbcType=VARCHAR},
 			TRIP_RPT_RSV_DIV = #{tripRptRsvDiv, jdbcType=VARCHAR},
 			TRIP_RPT_CARD_EXRATE = #{tripRptCardExrate, jdbcType=NUMERIC},
+			TRIP_RPT_NO = #{tripRptNo, jdbcType=VARCHAR},
 			ACCT_REG_ID = #{userId},
 			ACCT_REG_DTTM = SYSDATE,
 			UDT_ID = #{userId},
@@ -1044,6 +1051,22 @@
 		SET
 			PAY_DT = NULL,
 			PAY_ID = NULL,
+			UDT_ID = #{userId},
+			UDT_PGM = #{pgmId},
+			UDT_DTTM = SYSDATE
+		WHERE TRIP_RPT_NO = #{tripRptNo}
+	</update>
+
+	<!-- 출장복명서 지급완료 취소 - TB_PM01D01 지급 관련 필드 초기화 (복명서번호/회계등록 전체 클리어) -->
+	<update id="clearTripExpenseStatusByRptNo" parameterType="Map">
+		UPDATE TB_PM01D01
+		SET
+			TRIP_RPT_NO = NULL,
+			TRIP_RPT_ROUND = NULL,
+			TRIP_RPT_RSV_DIV = NULL,
+			TRIP_RPT_CARD_EXRATE = NULL,
+			ACCT_REG_ID = NULL,
+			ACCT_REG_DTTM = NULL,
 			UDT_ID = #{userId},
 			UDT_PGM = #{pgmId},
 			UDT_DTTM = SYSDATE
@@ -1087,6 +1110,20 @@
 		SELECT COUNT(*)
 		FROM TB_PM52M01
 		WHERE TRIP_REQ_NO = #{tripReqNo}
+	</select>
+
+	<!-- 설치시운전 WBS 일정계획 조회 -->
+	<select id="selectSalesCodeWbsSchedule" parameterType="Map" resultType="CamelMap">
+		SELECT 
+			MIN(CASE WHEN WBS_PLAN_CODE_KIND = 'WBSCODE13' THEN TO_CHAR(WBS_PLANS_DT, 'YYYYMMDD') END) AS PLAN13_SDT,
+			MAX(CASE WHEN WBS_PLAN_CODE_KIND = 'WBSCODE14' THEN TO_CHAR(WBS_PLANE_DT, 'YYYYMMDD') END) AS PLAN14_EDT
+		FROM TB_WB22M01
+		WHERE SALES_CD = #{salesCd, jdbcType=VARCHAR}
+		  AND CO_CD = #{coCd, jdbcType=VARCHAR}
+		  AND CLOSE_YN = 'Y'
+		  AND WBS_PLAN_MNG_ID IS NOT NULL
+		  AND WBS_PLANS_DT IS NOT NULL
+		  AND WBS_PLANE_DT IS NOT NULL
 	</select>
 
 </mapper>

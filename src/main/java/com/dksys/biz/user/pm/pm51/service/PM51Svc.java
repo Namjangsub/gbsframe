@@ -59,4 +59,5 @@ public interface PM51Svc {
 
 	List<Map<String, String>> selectTripScheduleByMonth(Map<String, String> paramMap);
 
+	Map<String, String> selectSalesCodeWbsSchedule(Map<String, String> paramMap);
 }

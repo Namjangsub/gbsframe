@@ -2042,6 +2042,44 @@
 				return;
 			}
 
+			// 설치시운전 출장일정 계획 검증 (저장 진행 체크)
+			if (!forceOverlap && $('#tripTypeCds option:selected').text().indexOf('설치시운전') > -1) {
+				var salesCd = $('#salesCd').val();
+				if (salesCd) {
+					var hasScheduleError = false;
+					postAjaxSync("/user/pm/pm51/selectSalesCodeWbsSchedule", {
+						coCd: jwt.coCd,
+						salesCd: salesCd
+					}, null, function(data) {
+						var wbs = data.result || {};
+						var plan13Sdt = wbs.plan13Sdt;
+						var plan14Edt = wbs.plan14Edt;
+						
+						if (!plan13Sdt || !plan14Edt) {
+							hasScheduleError = true;
+						} else {
+							$.each(gridList, function(idx, item) {
+								var tSdt = (item.tripStDt || '').replace(/-/g, '');
+								var tEdt = (item.tripEdDt || '').replace(/-/g, '');
+								if (tSdt && tEdt) {
+									if (tSdt < plan13Sdt || tEdt > plan14Edt) {
+										hasScheduleError = true;
+										return false;
+									}
+								}
+							});
+						}
+					});
+					
+					if (hasScheduleError) {
+						var pmNm = $('#pmNm').val() || '';
+						if (!confirm("일정계획을 확인하세요. 총괄PM: " + pmNm + "\n\n그래도 등록하시겠습니까?")) {
+							return; // 등록 패스 (취소)
+						}
+					}
+				}
+			}
+
 			if (!isPaymentFlow && !forceOverlap) {
 				var hasDateOverlap = false;
 				$.each(gridList, function(idx, item) {
@@ -2492,39 +2530,38 @@
 		openSecondModal("/static/html/cmn/modal/userLstSearch.html", 900, 500, "관리부서 결재 및 공유 선택", paramObj, function (approvalGrid, shareGrid){
 			var approvalList = approvalGrid.target.getList ? approvalGrid.target.getList() : (approvalGrid.target.list || []);
 			var shareList = shareGrid.target.getList ? shareGrid.target.getList() : (shareGrid.target.list || []);
-			var appArray = approvalList.map(function(item) {
-				return { gb: "결재", usrNm: item.id, name: item.text, jik: item.parent, dtNm: item.deptNm, telNo: item.telNo || '', offTelNo: item.offTelNo || '', email: item.email || '', todoId: item.id, todoKey: item.todoKey, todoDiv2CodeId: approvalCode, sanctnSn: item.sanctnSn, sanctnSttus: 'N', flag: item.flag || 'I', coCd: item.coCd || jwt.coCd };
+			var appArray = approvalList.map(function(item, idx) {
+				return { gb: "결재", usrNm: item.id, name: item.text, jik: item.parent, dtNm: item.deptNm, telNo: item.telNo || '', offTelNo: item.offTelNo || '', email: item.email || '', todoId: item.id, todoKey: item.todoKey, todoDiv2CodeId: approvalCode, sanctnSn: idx + 1, sanctnSttus: 'N', flag: item.flag || 'I', coCd: item.coCd || jwt.coCd };
 			});
-			var shaArray = shareList.map(function(item) {
-				return { gb: "공유", usrNm: item.id, name: item.text, jik: item.parent, dtNm: item.deptNm, telNo: item.telNo || '', offTelNo: item.offTelNo || '', email: item.email || '', todoId: item.id, todoKey: item.todoKey, todoDiv2CodeId: shareCode, sanctnSn: item.sanctnSn, sanctnSttus: 'N', flag: item.flag || 'I', coCd: item.coCd || jwt.coCd };
+			var shaArray = shareList.map(function(item, idx) {
+				return { gb: "공유", usrNm: item.id, name: item.text, jik: item.parent, dtNm: item.deptNm, telNo: item.telNo || '', offTelNo: item.offTelNo || '', email: item.email || '', todoId: item.id, todoKey: item.todoKey, todoDiv2CodeId: shareCode, sanctnSn: idx + 1, sanctnSttus: 'N', flag: item.flag || 'I', coCd: item.coCd || jwt.coCd };
 			});
 
 			// 중복 제거: 결재 내에서 동일 ID 중복 제거 (첫 번째만 유지)
 			var seenApprovalIds = {};
 			var deduplicatedAppArray = [];
+			var appSn = 1;
 			$.each(appArray, function(idx, item) {
 				if (!seenApprovalIds[item.usrNm]) {
 					seenApprovalIds[item.usrNm] = true;
+					item.sanctnSn = appSn++;
 					deduplicatedAppArray.push(item);
 				}
 			});
 
 			// 중복 제거: 결재와 공유 간 중복 제거 (결재에만 유지, 공유는 제외)
 			var approvalIds = deduplicatedAppArray.map(function(item) { return item.usrNm; });
-			var deduplicatedShareArray = $.grep(shaArray, function(item) {
-				return $.inArray(item.usrNm, approvalIds) === -1;
+			var deduplicatedShareArray = [];
+			var shaSn = 1;
+			$.each(shaArray, function(idx, item) {
+				if ($.inArray(item.usrNm, approvalIds) === -1) {
+					item.sanctnSn = shaSn++;
+					deduplicatedShareArray.push(item);
+				}
 			});
 
-			// 중복 제거: 기존 그리드 데이터와의 중복 제거 (새로 추가되는 것만 유지)
-			var existingIds = appshaList.map(function(item) { return item.usrNm; });
-			var deduplicatedAppArray2 = $.grep(deduplicatedAppArray, function(item) {
-				return $.inArray(item.usrNm, existingIds) === -1;
-			});
-			var deduplicatedShareArray2 = $.grep(deduplicatedShareArray, function(item) {
-				return $.inArray(item.usrNm, existingIds) === -1;
-			});
-
-			var totalList = appshaList.concat(deduplicatedAppArray2).concat(deduplicatedShareArray2);
+			// 기존 데이터를 무조건 뒤에 붙이는 방식을 버리고, 팝업에서 확정된 순서로 완전 교체
+			var totalList = deduplicatedAppArray.concat(deduplicatedShareArray);
 			targetGrid.setData2(totalList);
 			gridResize(targetGrid, totalList.length);
 			if (targetGrid.target.repaint) {

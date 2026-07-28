@@ -238,23 +238,7 @@
 				</tr>
 			</table>
 
-			<!-- 경비 세부내역 그리드 -->
-			<table style="border: 0px; width: 100%; margin-top: 20px;margin-bottom: 20px; display: none;" class="issAct">
-				<tr style="height: 30px;">
-					<td style="text-align: LEFT; border-right: 0px;; font-size: 13px; font-weight: bold; color: blue;">경비 세부내역</td>
-					<td>
-						<div class="add_btn_small pdl10">
-							<a onclick="addExpenseDetailRow();" style="height: 30px; line-height: 28px;" authchk>+</a>
-							<a onclick="deleteExpenseDetailRow();" style="height: 30px; line-height: 28px;" authchk>-</a>
-						</div>
-					</td>
-				</tr>
-				<tr>
-					<td colspan="2">
-						<div class="ax5_grid" data-ax5grid="expenseDetailGrid" data-ax5grid-config="{}" style="width: 100%;"></div>
-					</td>
-				</tr>
-			</table>
+
 
 			<!-- 판단 (①구역용: 출장자 판단) -->
 			<table style="margin-top: 10px;">
@@ -611,7 +595,6 @@
 
 	var tripReqTravelerGridView = null;
 	var rptTravelerGridView = null;
-	var expenseDetailGridView = null;
 	var tripExpenseStatusGridView = null;
 	var dailySettlementGridView = null;
 	var actualSettlementGridView = null;
@@ -621,6 +604,7 @@
 	var gridViewApprovalMng = null;
 	var currentTripRptMaster = null;
 	var currentTripReqMaster = null;
+	var currentTripRptD03 = [];
 	var currentReqExpItems = null; // 신청서 예상경비 상세(TB_PM51D02, KRW/USD 분리) - 일비정산 선지급분 산출용
 
 	$(document).ready(function () {
@@ -639,7 +623,6 @@
 
 		initTripReqTravelerGrid();
 		initRptTravelerGrid();
-		initExpenseDetailGrid();
 		initTripExpenseStatusGrid();
 		initDailySettlementGrid();
 		initActualSettlementGrid();
@@ -802,7 +785,7 @@
 					}
 				},
 				onDataChanged: function () {
-					calculateRptTravelerCounts(this.dindex);
+					calculateRptTravelerCounts(this.dindex, this.key);
 					updateRptTravelerRowTotal(this.dindex);
 					updateActualTripPeriodFromRptTravelers();
 					resizeRptTravelerGrid();
@@ -826,12 +809,7 @@
 					{ key: "nightCnt", collector: "sum", formatter: "money", align: "center" },
 					{ key: "dayCnt", collector: "sum", formatter: "money", align: "center" },
 					{ key: "eatCnt", collector: "sum", formatter: "money", align: "center" },
-					{ key: "trafficAmt", collector: "sum", formatter: "money", align: "right" },
-					{ key: "lodgingAmt", collector: "sum", formatter: "money", align: "right" },
-					{ key: "mealAmt", collector: "sum", formatter: "money", align: "right" },
-					{ key: "dailyAmt", collector: "sum", formatter: "money", align: "right" },
 					{ key: "specialAmt", collector: "sum", formatter: "money", align: "right" },
-					{ key: "totalAmt", collector: "sum", formatter: "money", align: "right" },
 					{ key: "etc", label: "" }
 				]
 			],
@@ -862,119 +840,7 @@
 		});
 	}
 
-	// 경비 세부내역 그리드 초기화
-	function initExpenseDetailGrid() {
-		expenseDetailGridView = { target: new ax5.ui.grid() };
-		expenseDetailGridView.target.setConfig({
-			target: $('[data-ax5grid="expenseDetailGrid"]'),
-			showRowSelector: true,
-			multipleSelect: true,
-			sortable: false,
-			header: {
-				align: "center",
-				selector: true
-			},
-			body: {
-				onClick: function () {
-					this.self.select(this.dindex);
-				},
-				onDataChanged: function () {
-					var self = this.self;
-					var dindex = this.dindex;
-					var key = this.key;
-					var row = this.item;
 
-					if (['lodgingAmt', 'dailyAmt', 'specialAmt', 'trafficAmt', 'carAmt'].includes(key)) {
-						var l = Number(row.lodgingAmt) || 0;
-						var d = Number(row.dailyAmt) || 0;
-						var s = Number(row.specialAmt) || 0;
-						var t = Number(row.trafficAmt) || 0;
-						var c = Number(row.carAmt) || 0;
-						var totalAmt = l + d + s + t + c;
-						setTimeout(function() {
-							self.setValue(dindex, "amt", totalAmt);
-							calcSettlementKrw();
-							calcSettlementUsd();
-						}, 50);
-					} else if (['currCd', 'payMthdCd', 'amt'].includes(key)) {
-						setTimeout(function() {
-							calcSettlementKrw();
-							calcSettlementUsd();
-						}, 50);
-					}
-					resizeExpenseDetailGrid();
-				}
-			},
-			page: { display: false },
-			contextMenu: {
-				iconWidth: 20, itemClickAndClose: false,
-				items: [{ type: 1, label: "붙여넣기" }, { divide: true }, { type: 1, label: "줄추가" }, { type: 1, label: "내용 삭제" }, { type: 2, label: "줄삭제" }],
-				popupFilter: function() { return !isTripRptLocked(); },
-				onClick: function(item, param) {
-					if (isTripRptLocked()) return;
-					if (item.label === "붙여넣기") pasteExpenseDetailGrid(param.dindex, param.colIndex);
-					else if (item.label === "줄추가") addExpenseDetailRow();
-					else if (item.label === "내용 삭제") clearExpenseDetailRow(param.dindex);
-					else if (item.label === "줄삭제") deleteExpenseDetailRowByIndex(param.dindex);
-					expenseDetailGridView.target.contextMenu.close();
-				}
-			},
-			footSum: [
-				[
-					{ label: "합계", colspan: 3, align: "center" },
-					{ key: "amt", collector: "sum", formatter: "money", align: "right" },
-					{ key: "currCd", label: "" },
-					{ key: "lodgingAmt", collector: "sum", formatter: "money", align: "right" },
-					{ key: "dailyAmt", collector: "sum", formatter: "money", align: "right" },
-					{ key: "specialAmt", collector: "sum", formatter: "money", align: "right" },
-					{ key: "trafficAmt", collector: "sum", formatter: "money", align: "right" },
-					{ key: "carAmt", collector: "sum", formatter: "money", align: "right" },
-					{ key: "payMthdCd", label: "" },
-					{ key: "remark", label: "" }
-				]
-			],
-			columns: [
-				{ key: 'useDt', label: '사용일자', width: 90, align: 'center', editor: { type: 'date', config: { content: { config: { mode: 'day', selectMode: 'day' } } }, disabled: function() { return isTripRptLocked(); } } },
-				{ key: 'useDesc', label: '사용내역', width: 240, align: 'left', editor: { type: 'text', disabled: function() { return isTripRptLocked(); } } },
-				{ key: 'personCnt', label: '인원', width: 40, align: 'right', editor: { type: 'text', disabled: function() { return isTripRptLocked(); } } },
-				{ key: 'amt', label: '금액', width: 100, align: 'right', formatter: "money" },
-				{ key: 'currCd', label: '통화', width: 60, align: 'center',
-					editor: {
-						type: 'select',
-						disabled: function() { return isTripRptLocked(); },
-						config: {
-							columnKeys: { optionValue: 'CD', optionText: 'NM' },
-							options: [...comboCurrCd]
-						}
-					},
-					formatter: function() {
-						return getComboName(comboCurrCd, this);
-					}
-				},
-				{ key: undefined, label: "경비항목", columns: [
-					{ key: 'lodgingAmt', label: '숙박비', width: 100, align: 'right', editor: { type: 'number', disabled: function() { return isTripRptLocked(); } }, formatter: "money" },
-					{ key: 'dailyAmt', label: '일비', width: 100, align: 'right', editor: { type: 'number', disabled: function() { return isTripRptLocked(); } }, formatter: "money" },
-					{ key: 'specialAmt', label: '특별비', width: 100, align: 'right', editor: { type: 'number', disabled: function() { return isTripRptLocked(); } }, formatter: "money" },
-					{ key: 'trafficAmt', label: '교통비', width: 100, align: 'right', editor: { type: 'number', disabled: function() { return isTripRptLocked(); } }, formatter: "money" },
-					{ key: 'carAmt', label: '개인차량유지비', width: 100, align: 'right', editor: { type: 'number', disabled: function() { return isTripRptLocked(); } }, formatter: "money" },
-					{ key: 'payMthdCd', label: '결재방법', width: 60, align: 'center',
-						editor: {
-							type: 'select',
-							disabled: function() { return isTripRptLocked(); },
-							config: {
-								columnKeys: { optionValue: 'CD', optionText: 'NM' },
-								options: [...comboPayMthdCd]
-							}
-						},
-						formatter: function() {
-							return getComboName(comboPayMthdCd, this);
-						}
-					}
-				]},
-				{ key: 'remark', label: '비고', width: 200, align: 'left', editor: { type: 'text', disabled: function() { return isTripRptLocked(); } } }
-			]
-		});
-	}
 
 	// 출장 경비 신청 현황 그리드 초기화 (회계담당자 편집가능)
 	function initTripExpenseStatusGrid() {
@@ -1184,7 +1050,7 @@
 				dailyRows.push({ userNm: userNm, firstSchedule: firstSchedule, actualSchedule: actualSchedule, currNm: $('#tripRptCurr').val() || 'CURR02', dailyAdvance: reqAdvUsd, dailyFinal: finalUsd, dailyDiff: reqAdvUsd - finalUsd });
 			}
 		});
-		// 실비정산 최초전도금은 출장신청서 전체 지급합계가 아니라 예비비 지급금액만 사용
+		// 실비정산 최초전도금은 출장신청서 전체 지급합계가 아니라 예비비/특별비 지급금액만 사용
 		var reservePayKrw = 0, reservePayUsd = 0;
 		$.each(currentReqExpItems || [], function(idx, item) {
 			var itemCd = String(item.expItemCd || item.expItemCdNm || item.itemNm || item.name || '').trim();
@@ -1222,14 +1088,15 @@
 		});
 		// 집계 경비가 없어도 예비비 지급금액이 있으면 통화별 최초전도금 행을 표시
 		var advanceRoundNo = expenseMonths.length === 1 ? '최종' : '1차';
+		var reqCurrCd = (currentTripReqMaster && currentTripReqMaster.currCd) ? currentTripReqMaster.currCd : ($('#tripRptCurr').val() || 'CURR02');
 		$.each([
 			{ amount: reservePayKrw, currNm: 'CURR01' },
-			{ amount: reservePayUsd, currNm: $('#tripRptCurr').val() || 'CURR02' }
+			{ amount: reservePayUsd, currNm: reqCurrCd }
 		], function(idx, advance) {
 			if (advance.amount <= 0) return;
 			var hasCashGroup = false;
 			$.each(actualGroups, function(key, group) {
-				if (String(group.payMthdNm || '').indexOf('현금') > -1 && String(group.currNm || '').toUpperCase() === advance.currNm) {
+				if (String(group.payMthdNm || '').indexOf('현금') > -1 && String(group.currNm || '').toUpperCase() === advance.currNm.toUpperCase()) {
 					hasCashGroup = true;
 					return false;
 				}
@@ -1241,8 +1108,16 @@
 		});
 		var actualRows = $.map(actualGroups, function(group) {
 			var isFirstCash = (group.roundNo === '1차' || (expenseMonths.length === 1 && group.roundNo === '최종')) && String(group.payMthdNm || '').indexOf('현금') > -1;
-			var isWon = String(group.currNm || '').toUpperCase().indexOf('WON') > -1 || String(group.currNm || '').toUpperCase().indexOf('KRW') > -1 || String(group.currNm || '').indexOf('원') > -1;
-			var firstAdvance = isFirstCash ? (isWon ? totalPayAmtKrw : totalPayAmtUsd) : 0;
+			var currNmUpper = String(group.currNm || '').toUpperCase();
+			var isWon = currNmUpper === 'CURR01' || currNmUpper.indexOf('WON') > -1 || currNmUpper.indexOf('KRW') > -1 || currNmUpper.indexOf('원') > -1;
+			var firstAdvance = 0;
+			if (isFirstCash) {
+				if (isWon) {
+					firstAdvance = totalPayAmtKrw;
+				} else if (currNmUpper === String(reqCurrCd).toUpperCase()) {
+					firstAdvance = totalPayAmtUsd;
+				}
+			}
 			return $.extend(group, { firstAdvance: firstAdvance, currentAdvance: 0, afterSettle: firstAdvance - group.usedAmt });
 		});
 		actualRows.sort(function(a, b) {
@@ -1253,7 +1128,7 @@
 			};
 			var currRank = function(value) {
 				var text = String(value || '').toUpperCase();
-				return text.indexOf('WON') > -1 || text.indexOf('KRW') > -1 || text.indexOf('원') > -1 ? 0 : 1;
+				return text === 'CURR01' || text.indexOf('WON') > -1 || text.indexOf('KRW') > -1 || text.indexOf('원') > -1 ? 0 : 1;
 			};
 			return payRank(a.payMthdNm) - payRank(b.payMthdNm)
 				|| String(a.cardNo || '').localeCompare(String(b.cardNo || ''))
@@ -1344,12 +1219,43 @@
 			return;
 		}
 
-		// 백엔드에서 데이터 로드
+		// 백엔드에서 데이터 로드 (지급완료건인 경우 TB_PM52D01 백업 데이터 복원 후 종료)
+		if (isRptPaid() && currentTripRptD03 && currentTripRptD03.length > 0) {
+			var mappedD03 = $.map(currentTripRptD03, function(row) {
+				var useDtStr = row.useDt || '';
+				if (/^\d{8}$/.test(useDtStr)) {
+					useDtStr = useDtStr.replace(/^(\d{4})(\d{2})(\d{2})$/, '$1-$2-$3');
+				}
+				var typNm = getComboName(comboTripRptTyp, { tripRptTyp: row.expItemCd });
+				var curTypNm = getComboName(comboPayMthdCd, { payMthdCd: row.payMthdCd });
+				var currNm = getComboName(comboCurrCd, { currCd: row.currCd });
+				
+				return {
+					workRptDt: useDtStr,
+					tripRptRmk: row.useDesc,
+					tripRptAmt: row.amt,
+					tripRptCurr: row.currCd,
+					tripRptCurrNm: currNm || row.currCd,
+					tripRptTyp: row.expItemCd,
+					tripRptTypNm: row.remark || typNm || row.expItemCd,
+					tripRptCurTyp: row.payMthdCd,
+					tripRptCurTypNm: curTypNm || row.payMthdCd,
+					krwAmt: isKrwCurrency(row.currCd) ? row.amt : 0
+				};
+			});
+			tripExpenseStatusGridView.target.setData({ list: mappedD03, page: { totalElements: mappedD03.length } });
+			calculateTripExpenseStatusKrw();
+			resizeTripExpenseStatusGrid(mappedD03.length);
+			refreshSettlementSummaryGrids();
+			return;
+		}
+
 		postAjax("/user/pm/pm51/selectTripExpenseStatusList", {
 			coCd: jwt.coCd,
 			userIds: userIds,
 			stDt: stDt,
-			edDt: edDt
+			edDt: edDt,
+			tripRptNo: $('#tripRptNo').val() || ''
 		}, null, function(data) {
 			var rows = data.result || [];
 			var expenseMonths = [];
@@ -1808,7 +1714,8 @@
 			list: rows,
 			page: { totalElements: rows.length }
 		});
-		$.each(rows, function(idx) { calculateRptTravelerCounts(idx); });
+		var isNew = popParam.actionType !== 'U' && popParam.actionType !== 'V';
+		$.each(rows, function(idx) { calculateRptTravelerCounts(idx, isNew ? undefined : 'INIT'); });
 		updateActualTripPeriodFromRptTravelers();
 		refreshSettlementSummaryGrids();
 		resizeRptTravelerGrid();
@@ -1853,25 +1760,42 @@
 		}
 	}
 
-	function calculateRptTravelerCounts(dindex) {
+	function calculateRptTravelerCounts(dindex, changedKey) {
 		if (dindex === undefined || dindex === null || !rptTravelerGridView || !rptTravelerGridView.target) return;
 		var row = rptTravelerGridView.target.getList()[dindex];
 		if (!row || !row.tripStDt || !row.tripEdDt) return;
-		var start = moment(normalizeDateText(row.tripStDt), 'YYYY-MM-DD', true);
-		var end = moment(normalizeDateText(row.tripEdDt), 'YYYY-MM-DD', true);
-		if (!start.isValid() || !end.isValid() || end.isBefore(start)) return;
-		var nightCnt = end.diff(start, 'days');
-		var dayCnt = nightCnt + 1;
-		var eatCnt = (dayCnt * 3) - 1;
+		
+		var isDateChanged = !changedKey || ['tripStDt', 'tripStTm', 'tripEdDt', 'tripEdTm'].indexOf(changedKey) > -1;
+		
+		var nightCnt = Number(row.nightCnt || 0);
+		var dayCnt = Number(row.dayCnt || 0);
+		var eatCnt = Number(row.eatCnt || 0);
+		
+		if (isDateChanged) {
+			var start = moment(normalizeDateText(row.tripStDt), 'YYYY-MM-DD', true);
+			var end = moment(normalizeDateText(row.tripEdDt), 'YYYY-MM-DD', true);
+			if (start.isValid() && end.isValid() && !end.isBefore(start)) {
+				nightCnt = end.diff(start, 'days');
+				dayCnt = nightCnt + 1;
+				eatCnt = (dayCnt * 3) - 1;
+			}
+		}
+
 		var dailyRate = Number(row._dailyRate || 0);
 		var mealRate = Number(row._mealRate || 0);
-		if (!dailyRate && Number(row.dayCnt || 0) > 0) dailyRate = Number(row.dailyAmt || 0) / Number(row.dayCnt);
-		if (!mealRate && Number(row.eatCnt || 0) > 0) mealRate = Number(row.mealAmt || 0) / Number(row.eatCnt);
-		if (Number(row.nightCnt || 0) !== nightCnt) rptTravelerGridView.target.setValue(dindex, 'nightCnt', nightCnt);
-		if (Number(row.dayCnt || 0) !== dayCnt) rptTravelerGridView.target.setValue(dindex, 'dayCnt', dayCnt);
-		if (Number(row.eatCnt || 0) !== eatCnt) rptTravelerGridView.target.setValue(dindex, 'eatCnt', eatCnt);
-		if (dailyRate > 0) rptTravelerGridView.target.setValue(dindex, 'dailyAmt', dailyRate * dayCnt);
-		if (mealRate > 0) rptTravelerGridView.target.setValue(dindex, 'mealAmt', mealRate * eatCnt);
+		
+		if (isDateChanged) {
+			if (Number(row.nightCnt || 0) !== nightCnt) rptTravelerGridView.target.setValue(dindex, 'nightCnt', nightCnt);
+			if (Number(row.dayCnt || 0) !== dayCnt) rptTravelerGridView.target.setValue(dindex, 'dayCnt', dayCnt);
+			if (Number(row.eatCnt || 0) !== eatCnt) rptTravelerGridView.target.setValue(dindex, 'eatCnt', eatCnt);
+			
+			if (dailyRate > 0) rptTravelerGridView.target.setValue(dindex, 'dailyAmt', dailyRate * dayCnt);
+			if (mealRate > 0) rptTravelerGridView.target.setValue(dindex, 'mealAmt', mealRate * eatCnt);
+		} else {
+			// Date hasn't changed. If they manually changed dayCnt/eatCnt, we COULD recalculate dailyAmt/mealAmt
+			// But since dailyAmt/mealAmt are editable and there is no base rate available unless pasted,
+			// just accepting the input value as requested is enough.
+		}
 	}
 
 	function updateActualTripPeriodFromRptTravelers() {
@@ -2109,22 +2033,10 @@
 			$('#deptEvalCd').val(m02.deptEvalCd);
 			$('#finalEvalCd').val(m02.finalEvalCd);
 
-			// 경비 세부내역
+			// 경비 세부내역 (TB_PM52D01 백업 데이터 저장)
 			if (d03) {
-				d03.forEach(function(row) {
-					if (row.useDt && /^\d{8}$/.test(String(row.useDt))) {
-						row.useDt = String(row.useDt).replace(/^(\d{4})(\d{2})(\d{2})$/, '$1-$2-$3');
-					}
-					var legacyMapping = { 'PM51PAY01': '카드', 'PM51PAY02': '현금', 'PM51PAY03': '쿠폰' };
-					if (legacyMapping[row.payMthdCd]) {
-						var targetNm = legacyMapping[row.payMthdCd];
-						var matched = comboPayMthdCd.filter(function(c) { return c.NM.indexOf(targetNm) > -1; })[0];
-						if (matched) row.payMthdCd = matched.CD;
-					}
-				});
-				expenseDetailGridView.target.setData({ list: d03, page: { totalElements: d03.length } });
+				currentTripRptD03 = d03;
 			}
-			resizeExpenseDetailGrid((d03 || []).length);
 
 			// 정산 금액
 			$('#advRcvAmtKrw').val(formatSettlementKrw(m02.advRcvAmtKrw));
@@ -2403,104 +2315,7 @@
 		calcSettlementUsd();
 	}
 
-	// 경비 행 삭제
-	function deleteExpenseDetailRow() {
-		if (isTripRptLocked()) return;
-		var selectedRows = expenseDetailGridView.target.getList("selected");
-		if (selectedRows.length === 0) {
-			alert("삭제할 행을 선택해주세요.");
-			return;
-		}
 
-		var rowKeys = selectedRows.map(function(row) { return row.__index; }).sort(function(a, b) { return b - a; });
-		rowKeys.forEach(rowKey => {
-			expenseDetailGridView.target.removeRow(rowKey);
-		});
-
-		resizeExpenseDetailGrid();
-		calcSettlementKrw();
-		calcSettlementUsd();
-	}
-
-	function deleteExpenseDetailRowByIndex(dindex) {
-		if (isTripRptLocked() || dindex === undefined || dindex === null) return;
-		expenseDetailGridView.target.removeRow(dindex);
-		resizeExpenseDetailGrid();
-		calcSettlementKrw();
-		calcSettlementUsd();
-	}
-
-	function clearExpenseDetailRow(dindex) {
-		if (isTripRptLocked()) return;
-		var row = expenseDetailGridView.target.list[dindex];
-		if (!row) return;
-		['useDt', 'useDesc', 'personCnt', 'currCd', 'lodgingAmt', 'dailyAmt', 'specialAmt', 'trafficAmt', 'carAmt', 'payMthdCd', 'remark'].forEach(function(key) {
-			expenseDetailGridView.target.setValue(dindex, key, '');
-		});
-		expenseDetailGridView.target.repaint();
-		calcSettlementKrw();
-		calcSettlementUsd();
-	}
-
-	// 출장 경비 신청 현황 그리드의 선택된 행들을 경비 세부내역에 반영
-	function applyExpenseStatusToDetail() {
-		if (!isAccountingUser() || isRptPaid()) {
-			alert("회계정보 등록 권한이 없거나 지급완료 상태입니다.");
-			return;
-		}
-
-		var selectedRows = tripExpenseStatusGridView.target.getList("selected");
-		if (selectedRows.length === 0) {
-			alert("반영할 행을 선택해주세요.");
-			return;
-		}
-
-		// 선택된 행들을 경비 세부내역 그리드에 추가
-		$.each(selectedRows, function(idx, statusRow) {
-			var newRow = {
-				useDt: statusRow.workRptDt || '',
-				useDesc: statusRow.tripRptRmk || '',
-				personCnt: 1,
-				amt: Number(statusRow.tripRptAmt || 0),
-				currCd: toCurrCode(statusRow.tripRptCurr),
-				lodgingAmt: 0,
-				dailyAmt: 0,
-				specialAmt: 0,
-				trafficAmt: 0,
-				carAmt: 0,
-				payMthdCd: statusRow.tripRptCurTyp || getCashPayMthdCd(),
-				remark: statusRow.tripRptTypNm || ''
-			};
-			expenseDetailGridView.target.addRow(newRow, "last");
-		});
-
-		resizeExpenseDetailGrid();
-		calcSettlementKrw();
-		calcSettlementUsd();
-		alert(selectedRows.length + "건이 경비 세부내역에 반영되었습니다.");
-	}
-
-	async function pasteExpenseDetailGrid(startRow, startCol) {
-		if (isTripRptLocked()) return;
-		var text = await navigator.clipboard.readText();
-		if (!text) return;
-		var keys = ['useDt', 'useDesc', 'personCnt', 'amt', 'currCd', 'lodgingAmt', 'dailyAmt', 'specialAmt', 'trafficAmt', 'carAmt', 'payMthdCd', 'remark'];
-		text.trim().split(/\r?\n/).forEach(function(line, rowOffset) {
-			line.split('\t').forEach(function(value, colOffset) {
-				var key = keys[(startCol || 0) + colOffset];
-				if (key && key !== 'amt' && expenseDetailGridView.target.list[startRow + rowOffset]) {
-					var setVal = value.trim();
-					if (key === 'currCd') {
-						setVal = toCurrCode(setVal); // 'WON'/'달러' 등 텍스트 붙여넣기를 공통코드로 정규화
-					}
-					expenseDetailGridView.target.setValue(startRow + rowOffset, key, setVal);
-				}
-			});
-		});
-		expenseDetailGridView.target.repaint();
-		calcSettlementKrw();
-		calcSettlementUsd();
-	}
 
 	function clearRptTravelerRow(dindex) {
 		if (isRptTravelerGridEditBlocked()) return;
@@ -2582,21 +2397,7 @@
 		}
 	}
 
-	function resizeExpenseDetailGrid(rowCount) {
-		var listLength = expenseDetailGridView && expenseDetailGridView.target ? expenseDetailGridView.target.getList().length : 0;
-		var dataRows = Math.max(Number(rowCount !== undefined ? rowCount : listLength), 1);
-		var headerHeight = 58; // 2단 헤더 높이 반영
-		var rowHeight = 26;
-		var footSumHeight = 28;
-		var paddingHeight = 8;
-		var gridHeight = headerHeight + (dataRows * rowHeight) + footSumHeight + paddingHeight;
-		var $grid = $('[data-ax5grid="expenseDetailGrid"]');
 
-		$grid.css('height', gridHeight + 'px');
-		if (expenseDetailGridView && expenseDetailGridView.target && expenseDetailGridView.target.setHeight) {
-			expenseDetailGridView.target.setHeight(gridHeight);
-		}
-	}
 
 	function initAutoResizeTextareas() {
 		$('#tripPurpose, #tripResult, #specialNote')
@@ -2669,61 +2470,7 @@
 			+ (value.indexOf('.') >= 0 ? '.' + decimalPart : '');
 	}
 
-	// KRW 정산 계산
-	function calcSettlementKrw() {
-		var list = expenseDetailGridView.target.getList();
-		var cardSubtotal = 0;
-		var cashSubtotal = 0;
 
-		list.forEach(row => {
-			if (!isKrwCurrency(row.currCd)) return;
-
-			var amt = parseInt(row.amt) || 0;
-			var payNm = getComboName(comboPayMthdCd, row.payMthdCd) || '';
-			if (payNm.indexOf('카드') > -1) {
-				cardSubtotal += amt;
-			} else if (payNm.indexOf('현금') > -1 || payNm.indexOf('쿠폰') > -1) {
-				cashSubtotal += amt;
-			}
-		});
-
-		var usedTotal = cardSubtotal + cashSubtotal;
-		var advRcvAmt = getSettlementNumber($('#advRcvAmtKrw').val());
-		var settleAmt = advRcvAmt - usedTotal;
-
-		$('#cardSubtotalKrw').val(formatSettlementKrw(cardSubtotal));
-		$('#cashSubtotalKrw').val(formatSettlementKrw(cashSubtotal));
-		$('#usedTotalKrw').val(formatSettlementKrw(usedTotal));
-		$('#settleAmtKrw').val(formatSettlementKrw(settleAmt));
-	}
-
-	// USD 정산 계산
-	function calcSettlementUsd() {
-		var list = expenseDetailGridView.target.getList();
-		var cardSubtotal = 0;
-		var cashSubtotal = 0;
-
-		list.forEach(row => {
-			if (!isUsdCurrency(row.currCd)) return;
-
-			var amt = parseFloat(row.amt) || 0;
-			var payNm = getComboName(comboPayMthdCd, row.payMthdCd) || '';
-			if (payNm.indexOf('카드') > -1) {
-				cardSubtotal += amt;
-			} else if (payNm.indexOf('현금') > -1 || payNm.indexOf('쿠폰') > -1) {
-				cashSubtotal += amt;
-			}
-		});
-
-		var usedTotal = cardSubtotal + cashSubtotal;
-		var advRcvAmt = getSettlementNumber($('#advRcvAmtUsd').val());
-		var settleAmt = advRcvAmt - usedTotal;
-
-		$('#cardSubtotalUsd').val(formatSettlementUsd(cardSubtotal));
-		$('#cashSubtotalUsd').val(formatSettlementUsd(cashSubtotal));
-		$('#usedTotalUsd').val(formatSettlementUsd(usedTotal));
-		$('#settleAmtUsd').val(formatSettlementUsd(settleAmt));
-	}
 
 	// 저장
 	function saveTripRpt() {
@@ -2776,17 +2523,7 @@
 			alert("출장자의 출발일자, 출발시간, 도착일자, 도착시간을 모두 선택하세요!");
 			return;
 		}
-		// 경비 세부내역 필수 입력 검증
-		var expenseList = expenseDetailGridView.target.getList() || [];
-		if (expenseList.length === 0) {
-			var $gridContainer = $('[data-ax5grid="expenseDetailGrid"]');
-			$gridContainer.addClass('error-outline');
-			$gridContainer.one('click', function() {
-				$gridContainer.removeClass('error-outline');
-			});
-			alert("경비 세부내역을 최소 1건 이상 등록해주세요.");
-			return;
-		}
+
 
 		// 신청인 본인이 팀장인 경우(등록 시점 포함) 또는 현재 로그인한 사용자가 신청인의 팀장(결재자)인 경우
 		// 부서장평가 및 결재자판단 필수 입력 검증
@@ -2846,13 +2583,7 @@
 			formData.append(column, $('input[name="' + column + '"]:checked').val() || '');
 		});
 
-		// 경비 세부내역 배열 (통화는 공통코드로 정규화해서 저장 - 'WON' 등 문자열 저장 방지)
-		var expenseDtlList = $.map(expenseDetailGridView.target.getList(), function(row) {
-			var cloned = $.extend({}, row);
-			cloned.currCd = toCurrCode(cloned.currCd);
-			return cloned;
-		});
-		formData.append('expenseDtlArr', JSON.stringify(expenseDtlList));
+
 
 		var rptTravelerList = $.map(rptTravelerGridView.target.getList(), function(row) {
 			var cloned = $.extend({}, row);
@@ -3042,6 +2773,7 @@
 				tripRptRound: row.tripRptRound || '',
 				tripRptRsvDiv: row.tripRptRsvDiv || '',
 				tripRptCardExrate: row.tripRptCardExrate || 0,
+				tripRptNo: tripRptNo,
 				userId: jwt.userId,
 				pgmId: $('#pgmId').val()
 			};
@@ -3062,6 +2794,28 @@
 		// 2단계: 정산 금액 저장 + 자동 승인 (서버측에서 처리)
 		// SETTLE_AMT_KRW/USD는 일비정산(dailyDiff) + 실비정산(afterSettle) 통화별 합계로 저장
 		var finalSettle = calcFinalSettleAmounts();
+		var expenseDtlList = $.map(tripExpenseStatusGridView.target.getList() || [], function(row) {
+			return {
+				useDt: (row.workRptDt || '').replace(/-/g, ''), // 날짜에서 '-' 제거 (YYYYMMDD 형식)
+				useDesc: row.tripRptRmk || '',
+				personCnt: 1,
+				amt: Number(row.tripRptAmt || 0),
+				currCd: toCurrCode(row.tripRptCurr),
+				lodgingAmt: 0,
+				dailyAmt: 0,
+				specialAmt: 0,
+				trafficAmt: 0,
+				carAmt: 0,
+				expItemCd: row.tripRptTyp || '',
+				payMthdCd: row.tripRptCurTyp || '',
+				remark: row.tripRptTypNm || '',
+				tripRptRound: row.tripRptRound || '',
+				tripRptRsvDiv: row.tripRptRsvDiv || '',
+				tripRptCardExrate: row.tripRptCardExrate || 0,
+				tripRptCardNo: row.tripRptCardNo || ''
+			};
+		});
+
 		var settleParam = {
 			tripRptNo: tripRptNo,
 			advRcvAmtKrw: getSettlementNumber($('#advRcvAmtKrw').val()),
@@ -3071,6 +2825,7 @@
 			acctNightCnt: $('#acctNightCnt').val() !== '' ? getSettlementNumber($('#acctNightCnt').val()) : null,
 			acctDayCnt: $('#acctDayCnt').val() !== '' ? getSettlementNumber($('#acctDayCnt').val()) : null,
 			acctEatCnt: $('#acctEatCnt').val() !== '' ? getSettlementNumber($('#acctEatCnt').val()) : null,
+			expenseDtlArr: JSON.stringify(expenseDtlList),
 			userId: jwt.userId,
 			pgmId: $('#pgmId').val()
 		};
@@ -3193,18 +2948,40 @@
 		openSecondModal("/static/html/cmn/modal/userLstSearch.html", 900, 500, "관리부서 결재 및 공유 선택", paramObj, function (approvalGrid, shareGrid){
 			var approvalList = approvalGrid.target.getList ? approvalGrid.target.getList() : (approvalGrid.target.list || []);
 			var shareList = shareGrid.target.getList ? shareGrid.target.getList() : (shareGrid.target.list || []);
-			var appArray = approvalList.map(function(item) {
-				return { gb: "결재", usrNm: item.id, name: item.text, jik: item.parent, dtNm: item.deptNm, telNo: item.telNo || '', offTelNo: item.offTelNo || '', email: item.email || '', todoId: item.id, todoKey: item.todoKey, todoDiv2CodeId: approvalCode, sanctnSn: item.sanctnSn, sanctnSttus: 'N', flag: item.flag || 'I', coCd: item.coCd || jwt.coCd };
+			
+			// 팝업에서 지정된 순서대로 인덱스를 결재순번으로 부여
+			var appArray = approvalList.map(function(item, idx) {
+				return { gb: "결재", usrNm: item.id, name: item.text, jik: item.parent, dtNm: item.deptNm, telNo: item.telNo || '', offTelNo: item.offTelNo || '', email: item.email || '', todoId: item.id, todoKey: item.todoKey, todoDiv2CodeId: approvalCode, sanctnSn: idx + 1, sanctnSttus: 'N', flag: item.flag || 'I', coCd: item.coCd || jwt.coCd };
 			});
-			var shaArray = shareList.map(function(item) {
-				return { gb: "공유", usrNm: item.id, name: item.text, jik: item.parent, dtNm: item.deptNm, telNo: item.telNo || '', offTelNo: item.offTelNo || '', email: item.email || '', todoId: item.id, todoKey: item.todoKey, todoDiv2CodeId: shareCode, sanctnSn: item.sanctnSn, sanctnSttus: 'N', flag: item.flag || 'I', coCd: item.coCd || jwt.coCd };
+			var shaArray = shareList.map(function(item, idx) {
+				return { gb: "공유", usrNm: item.id, name: item.text, jik: item.parent, dtNm: item.deptNm, telNo: item.telNo || '', offTelNo: item.offTelNo || '', email: item.email || '', todoId: item.id, todoKey: item.todoKey, todoDiv2CodeId: shareCode, sanctnSn: idx + 1, sanctnSttus: 'N', flag: item.flag || 'I', coCd: item.coCd || jwt.coCd };
 			});
-			var totalList = appArray.concat(shaArray);
-			if (approvalCode === 'TODODIV2200') {
-				totalList = reorderRptGeneralApprovalLine(totalList, $('#reqViewReqId').val() || jwt.userId);
-			} else if (approvalCode === 'TODODIV2201') {
-				totalList = reorderRptMngApprovalLine(totalList);
-			}
+
+			// 중복 제거: 결재 내에서 동일 ID 중복 제거 (첫 번째만 유지)
+			var seenApprovalIds = {};
+			var deduplicatedAppArray = [];
+			var appSn = 1;
+			$.each(appArray, function(idx, item) {
+				if (!seenApprovalIds[item.usrNm]) {
+					seenApprovalIds[item.usrNm] = true;
+					item.sanctnSn = appSn++;
+					deduplicatedAppArray.push(item);
+				}
+			});
+
+			// 중복 제거: 결재와 공유 간 중복 제거 (결재에만 유지, 공유는 제외)
+			var approvalIds = deduplicatedAppArray.map(function(item) { return item.usrNm; });
+			var deduplicatedShareArray = [];
+			var shaSn = 1;
+			$.each(shaArray, function(idx, item) {
+				if ($.inArray(item.usrNm, approvalIds) === -1) {
+					item.sanctnSn = shaSn++;
+					deduplicatedShareArray.push(item);
+				}
+			});
+
+			// 팝업에서 확정된 순서로 완전 교체 (강제 재정렬 로직 제외)
+			var totalList = deduplicatedAppArray.concat(deduplicatedShareArray);
 			targetGrid.setData2(totalList);
 			if (targetGrid.target.repaint) {
 				targetGrid.target.repaint();

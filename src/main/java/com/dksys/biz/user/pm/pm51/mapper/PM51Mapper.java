@@ -119,8 +119,12 @@ public interface PM51Mapper {
 
 	int updateTripRptPayCancelApproval(Map<String, String> paramMap);
 
+	// 지급완료 취소 시 TB_PM01D01 지급 관련 필드 일괄 초기화 (복명서번호 기준)
+	int clearTripExpenseStatusByRptNo(Map<String, String> paramMap);
+
 	List<Map<String, String>> selectTripDateOverlapList(Map<String, String> paramMap);
 
 	List<Map<String, String>> selectTripScheduleByMonth(Map<String, String> paramMap);
 
+	Map<String, String> selectSalesCodeWbsSchedule(Map<String, String> paramMap);
 }

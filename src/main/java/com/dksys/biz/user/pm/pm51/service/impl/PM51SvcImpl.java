@@ -627,6 +627,11 @@ public class PM51SvcImpl implements PM51Svc {
 	}
 
 	@Override
+	public Map<String, String> selectSalesCodeWbsSchedule(Map<String, String> paramMap) {
+		return pm51Mapper.selectSalesCodeWbsSchedule(paramMap);
+	}
+
+	@Override
 	public int selectTripRptListCount(Map<String, String> paramMap) {
 		return pm51Mapper.selectTripRptListCount(paramMap);
 	}
@@ -685,15 +690,7 @@ public class PM51SvcImpl implements PM51Svc {
 			}
 		}
 
-		List<Map<String, String>> expenseDtlArr = gsonDtl.fromJson(paramMap.get("expenseDtlArr"), dtlMap);
-		if (expenseDtlArr != null && !expenseDtlArr.isEmpty()) {
-			for (Map<String, String> expenseDtlMap : expenseDtlArr) {
-				expenseDtlMap.put("tripRptNo", paramMap.get("tripRptNo"));
-				expenseDtlMap.put("coCd", paramMap.get("coCd"));
-				normalizeTripRptExpenseDate(expenseDtlMap);
-				pm51Mapper.insertTripRptD03(expenseDtlMap);
-			}
-		}
+
 
 		paramMap.put("fileTrgtKey", paramMap.get("tripRptNo"));
 		paramMap.put("pgmId", "PM5102P01");
@@ -800,7 +797,6 @@ public class PM51SvcImpl implements PM51Svc {
 		}
 
 		pm51Mapper.deleteTripRptD02(delParam);
-		pm51Mapper.deleteTripRptD03(delParam);
 
 		List<Map<String, String>> rptTravelerArr = gsonDtl.fromJson(paramMap.get("rptTravelerArr"), dtlMap);
 		if (rptTravelerArr != null && !rptTravelerArr.isEmpty()) {
@@ -811,15 +807,7 @@ public class PM51SvcImpl implements PM51Svc {
 			}
 		}
 
-		List<Map<String, String>> expenseDtlArr = gsonDtl.fromJson(paramMap.get("expenseDtlArr"), dtlMap);
-		if (expenseDtlArr != null && !expenseDtlArr.isEmpty()) {
-			for (Map<String, String> expenseDtlMap : expenseDtlArr) {
-				expenseDtlMap.put("tripRptNo", paramMap.get("tripRptNo"));
-				expenseDtlMap.put("coCd", paramMap.get("coCd"));
-				normalizeTripRptExpenseDate(expenseDtlMap);
-				pm51Mapper.insertTripRptD03(expenseDtlMap);
-			}
-		}
+
 
 		paramMap.put("fileTrgtKey", paramMap.get("tripRptNo"));
 		paramMap.put("pgmId", "PM5102P01");
@@ -1277,6 +1265,27 @@ public class PM51SvcImpl implements PM51Svc {
 		// 정산 금액 저장
 		int result = pm51Mapper.updateTripRptAcctSettle(paramMap);
 
+		Gson gsonDtl = new GsonBuilder().disableHtmlEscaping().create();
+		Type dtlMap = new TypeToken<ArrayList<Map<String, String>>>() {
+		}.getType();
+		
+		Map<String, String> delParam = new HashMap<>();
+		delParam.put("tripRptNo", tripRptNo);
+		pm51Mapper.deleteTripRptD03(delParam);
+		
+		if (paramMap.containsKey("expenseDtlArr")) {
+			String expenseDtlArrStr = (String) paramMap.get("expenseDtlArr");
+			if (hasText(expenseDtlArrStr)) {
+				List<Map<String, String>> expenseDtlArr = gsonDtl.fromJson(expenseDtlArrStr, dtlMap);
+				if (expenseDtlArr != null && !expenseDtlArr.isEmpty()) {
+					for (Map<String, String> expenseDtlMap : expenseDtlArr) {
+						expenseDtlMap.put("tripRptNo", tripRptNo);
+						pm51Mapper.insertTripRptD03(expenseDtlMap);
+					}
+				}
+			}
+		}
+
 		// 호출자 본인의 미결 결재선(TODODIV2201)이 있으면 결재처리(승인완료) 진행
 
 		Map<String, String> approvalLineParam = new HashMap<>();
@@ -1341,6 +1350,18 @@ public class PM51SvcImpl implements PM51Svc {
 		approvalCancelParam.put("userId", userId);
 		approvalCancelParam.put("pgmId", paramMap.get("pgmId"));
 		pm51Mapper.updateTripRptPayCancelApproval(approvalCancelParam);
+
+		// TB_PM52D01 백업 데이터 삭제 (지급완료 취소이므로 스냅샷 제거)
+		Map<String, String> d03DeleteParam = new HashMap<>();
+		d03DeleteParam.put("tripRptNo", tripRptNo);
+		pm51Mapper.deleteTripRptD03(d03DeleteParam);
+
+		// TB_PM01D01 지급 관련 필드 초기화 (복명서번호/회계등록/지급회차/예비구분/카드환율)
+		Map<String, String> clearParam = new HashMap<>();
+		clearParam.put("tripRptNo", tripRptNo);
+		clearParam.put("userId", userId);
+		clearParam.put("pgmId", paramMap.get("pgmId"));
+		pm51Mapper.clearTripExpenseStatusByRptNo(clearParam);
 
 		Map<String, String> cancelParam = new HashMap<>();
 		cancelParam.put("tripRptNo", tripRptNo);

@@ -331,4 +331,11 @@ public class PM51Ctr {
 		return "jsonView";
 	}
 
+	@PostMapping("/selectSalesCodeWbsSchedule")
+	public String selectSalesCodeWbsSchedule(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		Map<String, String> result = pm51Svc.selectSalesCodeWbsSchedule(paramMap);
+		model.addAttribute("result", result);
+		return "jsonView";
+	}
+
 }
