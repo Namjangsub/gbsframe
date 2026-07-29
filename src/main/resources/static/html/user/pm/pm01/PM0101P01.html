@@ -1,3 +1,7 @@
+<style>
+/* 경비 첨부이미지 박스: hover 시 삭제(×) 버튼 노출 */
+.tripImgBox.hasImg:hover .tripImgDelBtn { display:block !important; }
+</style>
 <div class="popup_area of_a" style="width: 100%; height: 100%;">
 	<div class="tit_contents">
 		<h4 class="tit">작업일보 등록</h4>
@@ -538,17 +542,9 @@
 //	 		}
 //	 		$('#tripTable' + tripCnt).hide();  //마지막 테이블 숨기기
 
-			let tripCnt = $('.tripTable').length;
+			let tripCnt = getMaxTripIdx();
 			if (tripCnt == 0)  return false;
-			if (tripCnt == 1) $('#removeDayileRptTrpButton').hide();
-			
-			if ($('#tripTable' + tripCnt + ' #updCheck').val() == 'U') {
-				$('#tripTable' + tripCnt + ' #updCheck').val('D');		//DB에서 불러오면 수정임 'U', 처음 등록시 C, 제거시 'D'
-	    		tripRptRowDeleteArr.push(tripRptRow(tripCnt));	//삭제대상으로 저장함
-			} 
-			
-			$('#tripTable' + tripCnt).remove();  //마지막 테이블 지우기
-			
+			deleteTripRptRow(tripCnt);	//가장 마지막(번호가 가장 큰) 행 삭제
 		});
 
 		$('#tripRptCurTyp').on('change', function () {
@@ -565,9 +561,31 @@
 	}
 	 
 
+	//현재 등록된 tripTable중 가장 큰 인덱스 조회 (중간 행 삭제로 번호가 비어도 안전하게 다음 인덱스를 계산하기 위함)
+	function getMaxTripIdx() {
+		let max = 0;
+		$('.tripTable').each(function() {
+			let n = parseInt($(this).attr('id').replace('tripTable', ''), 10);
+			if (!isNaN(n) && n > max) max = n;
+		});
+		return max;
+	}
+
+	//신규 경비행에 부여할 workRptNoSeq 계산: 기존(DB로드) 행의 workRptNoSeq 값과 절대 겹치지 않도록
+	//DOM 위치가 아니라 현재 화면에 있는 모든 행의 실제 workRptNoSeq 값 중 최대값+1을 사용함
+	//(workRptNoSeq는 서버에서 첨부파일 매칭키로 그대로 사용되므로 중복시 파일첨부 오류 발생함)
+	function getNextTripSeq() {
+		let max = 0;
+		$('.tripTable').each(function() {
+			let n = parseInt($(this).find('#workRptNoSeq').val(), 10);
+			if (!isNaN(n) && n > max) max = n;
+		});
+		return max + 1;
+	}
+
 	//경비추가 버튼 기능  수행
 	function dailyRptTripAdd() {
-			let tripCnt = $('.tripTable').length;
+			let tripCnt = getMaxTripIdx();
 			$('#removeDayileRptTrpButton').show();
 			if ($('#tripTable' + tripCnt).css('display') === 'none') {
 //	 	        console.log('마지막 tripTable 숨김상태');
@@ -579,9 +597,12 @@
 	    		$('#tripTable' + tripCnt).show();  //마지막 테이블 숨기기
 		    } else {
 //	 	        console.log('마지막 tripTable 활성상태');
+				let nextSeq = getNextTripSeq();	//기존 행의 실제 workRptNoSeq와 절대 겹치지 않는 값(DOM 위치와는 무관)
 				tripCnt += 1;
-		
-		        let newRow = $('<table id="tripTable'+ (tripCnt) +'" class="tripTable" style="margin-top: 20px; display:break"> ' +
+
+		        let newRow = $('<div id="tripTable'+ (tripCnt) +'" class="tripTable" style="margin-top: 20px; display: flex; align-items: stretch; gap: 10px;"> ' +
+                    '<div style="flex: 1;">' +
+                    '<table style="width: 100%; margin: 0; border-collapse: collapse;">' +
 		        	'<tr class="tripArea">' +
 		            '<th class="hit">비용항목</th>' +
 		            '<td>' +
@@ -593,7 +614,7 @@
 		            '<td>' +
 		            '<input type="hidden" id="fileTrgtKey" name="fileTrgtKey" value="">' +
 		            '<input type="hidden" id="updCheck" name="updCheck" value="C">' +
-		            '<input type="hidden" id="workRptNoSeq" name="workRptNoSeq" value=' + tripCnt +'>' +
+		            '<input type="hidden" id="workRptNoSeq" name="workRptNoSeq" value=' + nextSeq +'>' +
 		            '<input type="text" id="tripRptRmk" name="tripRptRmk" data-search="tripRptRmk" class="form-control" msg="내용">' +
 		            '</td>' +
 		            '</tr>' +
@@ -632,12 +653,64 @@
 		            '<input type="hidden" id="fileKey" name="fileKey" class="form-control" msg="첨부파일명">' +
 		            '</td>' +
 		            '</tr>' +
-		            '</table>');
+		            '</table>' +
+                    '</div>' +
+                    '<div style="width: 130px; display: flex; align-items: stretch; border-left: 1px solid #ddd; padding-left: 10px;">' +
+		            '<div id="dropZone_' + tripCnt + '" class="tripImgBox" tabindex="0" style="width: 100%; height: 120px; box-sizing: border-box; position: relative; border: 1px dashed #ccc; border-radius: 4px; display: flex; align-items: center; justify-content: center; overflow: hidden; cursor: pointer; text-align: center; font-size: 11px; color: #999; background: #fafafa; padding: 5px; outline: none;" onclick="tripImgBoxClick(' + tripCnt + ');">' +
+		            '<span class="drop-text" style="line-height: 1.2;">클릭/드롭하여<br>이미지등록</span>' +
+		            '<img id="tripRptImg_' + tripCnt + '" src="" draggable="false" style="width: 100%; height: 100%; object-fit: contain; display: none; pointer-events: none;" />' +
+		            '<button type="button" class="tripImgDelBtn" title="이미지 삭제" onclick="deleteTripRptImg(event, ' + tripCnt + ');" ' +
+		            'style="display:none;position:absolute;top:1px;right:1px;width:16px;height:16px;line-height:14px;padding:0;border:none;border-radius:8px;background:rgba(0,0,0,.55);color:#fff;font-size:11px;cursor:pointer;">×</button>' +
+		            '</div>' +
+                    '</div>' +
+                    '<div style="width: 90px; display: flex; align-items: center; justify-content: center; border-left: 1px solid #ddd; padding-left: 10px;">' +
+		            '<button type="button" class="btn btn-danger btn-sm tripRowDelBtn" title="이 경비내역 삭제" onclick="deleteTripRptRow(' + tripCnt + ');" ' +
+		            'style="height: 32px; line-height: 14px; font-size: 11px; white-space: normal; padding: 2px 6px;">해당비용삭제</button>' +
+                    '</div>' +
+		            '</div>');
 		        $('#dayilyRpt').append(newRow);
 		
 				setCommonSelect($('#tripTable' + tripCnt + ' #tripRptTyp'));
 				setCommonSelect($('#tripTable' + tripCnt + ' #tripRptCurTyp'));
 				setCommonSelect($('#tripTable' + tripCnt + ' #tripRptCurr'));
+				
+				// 드래그 앤 드롭 이벤트 설정
+				let dropZone = document.getElementById('dropZone_' + tripCnt);
+				if (dropZone) {
+					dropZone.addEventListener('dragover', function(e) {
+						e.preventDefault();
+						e.stopPropagation();
+						dropZone.style.backgroundColor = '#e0e0e0';
+					});
+					dropZone.addEventListener('dragleave', function(e) {
+						e.preventDefault();
+						e.stopPropagation();
+						dropZone.style.backgroundColor = '#fafafa';
+					});
+					dropZone.addEventListener('drop', function(e) {
+						e.preventDefault();
+						e.stopPropagation();
+						dropZone.style.backgroundColor = '#fafafa';
+						if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+							lastPosition = tripCnt;
+							var fileInput = document.getElementById('tripRptFile');
+							fileInput.files = e.dataTransfer.files;
+							setTripRptFile(fileInput);
+						}
+					});
+					// 이미지 복사 붙여넣기(Ctrl+V) 지원: 박스에 포커스된 상태에서 붙여넣으면 클립보드 이미지 등록
+					dropZone.addEventListener('paste', function(e) {
+						var f = pickImageFileFromClipboard(e.clipboardData);
+						if (!f) return;
+						e.preventDefault();
+						lastPosition = tripCnt;
+						var dt = new DataTransfer();
+						dt.items.add(f);
+						var fileInput = document.getElementById('tripRptFile');
+						fileInput.files = dt.files;
+						setTripRptFile(fileInput);
+					});
+				}
 				
 		    }
 	}
@@ -783,6 +856,18 @@
    	        			$('#tripTable' + (i+1) + ' #cardTh').removeClass('hit');
    	        			$('#tripTable' + (i+1) + ' #tripRptCardNo').removeAttr('required', '');
    	        		}
+
+					// 첨부파일 이미지 미리보기 세팅
+					let fileName = tripRows[i].tripRptFileNm;
+					let fileKey = tripRows[i].fileKey;
+					if (fileKey && fileKey != '0' && fileKey != '') {
+						let ext = fileName ? fileName.split('.').pop().toLowerCase() : '';
+						if (['jpg', 'jpeg', 'png', 'gif', 'bmp', 'heic'].includes(ext)) {
+							loadTripRptImgPreview((i+1), fileKey, fileName);
+							$('#tripTable' + (i+1) + ' #dropZone_' + (i+1) + ' .drop-text').hide();
+						}
+					}
+   	        		
     	 		}
     	 	}
 
@@ -921,10 +1006,12 @@
 		//---------------------------------------------------------------
 
 		//경비 테이블의 값을 arry로 변환하여 저장하기
-		let tripCnt = $('.tripTable').length;
+		//지정 행 삭제로 번호가 중간에 비어있을 수 있으므로 실제 존재하는 .tripTable 요소를 그대로 순회함(1..N 연속 가정 금지)
 		let tripRptS = [];	//경비현황 저장,  파일정보는 별도 보관됨 rptTripFileArr에 보관되어 있음
-		for (var i = 1; i < tripCnt+1; i++) {
-	
+		let tripValidationFailed = false;
+		$('.tripTable').each(function() {
+			let i = $(this).attr('id').replace('tripTable', '');
+
 		  	let tripRptCurTyp = $('#tripTable' + i + ' #tripRptCurTyp').val();
 		  	let tripRptCardNo = $('#tripTable' + i + ' #tripRptCardNo').val();
 	   		if (tripRptCurTyp == 'CURTYP01') {
@@ -933,20 +1020,23 @@
 	    	    } else {
 	    	    	alert ("카드번호 끝 4자리를 입력하세요!");
 	    	    	$('#tripTable' + i + ' #tripRptCardNo').focus();
-	    	    	return false;
+	    	    	tripValidationFailed = true;
+	    	    	return false;	//$.each 중단
 	    	    }
 	   		}
-	   		
+
 		  	let tripRptAmt = gPasFloatChk($('#tripTable' + i + ' #tripRptAmt').val());
 	   		if (tripRptAmt == 0) {
 		    	alert ("금액을 입력하세요!");
 		    	$('#tripTable' + i + ' #tripRptAmt').focus();
-		    	return false;
+		    	tripValidationFailed = true;
+		    	return false;	//$.each 중단
 		    }
-	
+
 	    	tripRptS.push(tripRptRow(i));
-		}
-		
+		});
+		if (tripValidationFailed) return false;
+
 		//paramMap.get("tripRptS")				-->최종입력된  경비내역 정보
 		//paramMap.get("tripRptRowDeleteArr")	-->수정중 삭제된 경비내역 정보
 		//paramMap.get("rptTripFiles"+xx)		-->최종입력됨 경비내역 첨부파일 file object임
@@ -954,10 +1044,13 @@
 		formData.append("tripRptS",  JSON.stringify(tripRptS)); //수정된 경비내역 서버로 전송
 		formData.append("tripRptRowDeleteArr",  JSON.stringify(tripRptRowDeleteArr));  //삭제된 경비내역 서버로 전송
 		formData.append("tripRptRowFileDeleteArr",  JSON.stringify(tripRptRowFileDeleteArr));  //경비내역 수정시 삭제된 첨부파일정보
-		//file object만 별도 추출 
+		//file object만 별도 추출
+		//서버는 workRptNoSeq 값으로 rptTripFiles{N} 필드를 매칭하므로(PM01SvcImpl 참고),
+		//obj.rptTripNo(선택 당시 화면상 행 번호)가 아니라 해당 행의 실제 workRptNoSeq 값을 사용해야 함
 		$.each(rptTripFileArr, function(idx, obj){
 			// 신규파일만 추가
-			formData.append("rptTripFiles" + obj.rptTripNo, obj.file);
+			let seq = $('#tripTable' + obj.rptTripNo + ' #workRptNoSeq').val();
+			formData.append("rptTripFiles" + seq, obj.file);
 		});
 	
 		return formData;
@@ -1220,6 +1313,70 @@
 	}
 	
 	
+	// 클립보드 붙여넣기(paste) 이벤트에서 이미지 파일만 골라냄 (텍스트 붙여넣기는 방해하지 않음)
+	function pickImageFileFromClipboard(cd) {
+		if (!cd) return null;
+		if (cd.files && cd.files.length > 0) {
+			for (let i = 0; i < cd.files.length; i++) {
+				const f = cd.files[i];
+				if (f && f.type && f.type.indexOf('image/') === 0) return f;
+			}
+		}
+		if (cd.items && cd.items.length > 0) {
+			let fallback = null;
+			for (let i = 0; i < cd.items.length; i++) {
+				const it = cd.items[i];
+				if (!it || it.kind !== 'file') continue;
+				if (!it.type || it.type.indexOf('image/') !== 0) continue;
+				const f = it.getAsFile && it.getAsFile();
+				if (!f) continue;
+				if (it.type === 'image/png' || it.type === 'image/jpeg') return f;
+				fallback = f;
+			}
+			return fallback;
+		}
+		return null;
+	}
+
+	//경비내역 이미지 삭제(×버튼)
+	function deleteTripRptImg(e, i) {
+		e.stopPropagation(); // dropZone의 파일선택 클릭 이벤트로 전파 방지
+
+		// 신규 선택(미저장) 파일 정보 제거
+		rptTripFileArr = rptTripFileArr.filter(item => item.rptTripNo !== i);
+
+		// 기존 저장된 첨부파일이 있으면 삭제 대상으로 등록
+		let tempFileKey = $('#tripTable' + i + ' #fileKey').val();
+		let tempFileName = $('#tripTable' + i + ' #tripRptFileNm').val();
+		let tempUpdCheck = $('#tripTable' + i + ' #updCheck').val();
+		if (tempFileKey && tempFileKey != 0 && tempUpdCheck == 'U') {
+			tripRptRowFileDeleteArr.push({
+				fileKey: tempFileKey,
+				fileName: tempFileName
+			});
+		}
+
+		$('#tripTable' + i + ' #fileKey').val(0);
+		$('#tripTable' + i + ' #tripRptFileNm').val('').removeAttr('onclick');
+		$('#tripTable' + i + ' #tripRptImg_' + i).hide().attr('src', '');
+		$('#dropZone_' + i).removeClass('hasImg');
+		$('#tripTable' + i + ' #dropZone_' + i + ' .drop-text').show();
+	}
+
+	//경비내역 행 삭제(지정 행 삭제) - 마지막행이 아니어도 삭제 가능
+	function deleteTripRptRow(i) {
+		if ($('#tripTable' + i + ' #updCheck').val() == 'U') {	//DB에 저장된 기존 행이면 삭제대상으로 저장
+			$('#tripTable' + i + ' #updCheck').val('D');
+			tripRptRowDeleteArr.push(tripRptRow(i));
+		}
+		// 신규 선택(미저장) 파일 정보 제거
+		rptTripFileArr = rptTripFileArr.filter(item => item.rptTripNo !== i);
+		$('#tripTable' + i).remove();
+		if ($('.tripTable').length === 0) {
+			$('#removeDayileRptTrpButton').hide();
+		}
+	}
+
 	function setTripRptButton(index){
 		lastPosition = index;
 		tripRptFile.click();
@@ -1308,6 +1465,45 @@
 				}
 				$('#tripTable' + lastPosition + ' #tripRptFileNm').val(file.name);
 				$('#tripTable' + lastPosition + ' #tripRptFileNm').removeAttr('onclick');
+
+				// 이미지 미리보기 업데이트
+				let ext = file.name ? file.name.split('.').pop().toLowerCase() : '';
+				if (['jpg', 'jpeg', 'png', 'gif', 'bmp'].includes(ext)) {
+					let reader = new FileReader();
+					reader.onload = function(e) {
+						let imgElem = $('#tripTable' + lastPosition + ' #tripRptImg_' + lastPosition);
+						if (imgElem.length > 0) {
+							imgElem.attr('src', e.target.result).show();
+							$('#dropZone_' + lastPosition).addClass('hasImg');
+							$('#tripTable' + lastPosition + ' #dropZone_' + lastPosition + ' .drop-text').hide();
+						}
+					}
+					reader.readAsDataURL(file);
+				} else if (ext === 'heic') {
+					// HEIC는 브라우저가 직접 렌더링하지 못하므로 heic2any로 jpeg 변환 후 미리보기
+					if (typeof heic2any !== "undefined") {
+						heic2any({ blob: file, toType: "image/jpeg" }).then(function(resultBlob) {
+							let reader = new FileReader();
+							reader.onload = function(e) {
+								let imgElem = $('#tripTable' + lastPosition + ' #tripRptImg_' + lastPosition);
+								if (imgElem.length > 0) {
+									imgElem.attr('src', e.target.result).show();
+									$('#dropZone_' + lastPosition).addClass('hasImg');
+									$('#tripTable' + lastPosition + ' #dropZone_' + lastPosition + ' .drop-text').hide();
+								}
+							};
+							reader.readAsDataURL(resultBlob);
+						}).catch(function(error) {
+							console.error("HEIC 미리보기 변환 오류:", error);
+						});
+					} else {
+						console.error("heic2any 라이브러리가 로딩되지 않음");
+					}
+				} else {
+					$('#tripTable' + lastPosition + ' #tripRptImg_' + lastPosition).hide().attr('src', '');
+					$('#dropZone_' + lastPosition).removeClass('hasImg');
+					$('#tripTable' + lastPosition + ' #dropZone_' + lastPosition + ' .drop-text').show();
+				}
 // 	        }
 		});
 		$(elem).val("");
@@ -1410,6 +1606,68 @@
 		});
 	}
 
+	//경비내용 첨부파일 이미지 미리보기 (fileDownloadAuth2는 pdfjs-viewer 헤더가 있어야 응답하므로 <img src>로 직접 요청할 수 없어 XHR로 blob을 받아 표시함)
+	function loadTripRptImgPreview(i, fileKey, fileName) {
+		var xhr = new XMLHttpRequest();
+		xhr.open("GET", "/admin/cm/cm08/fileDownloadAuth2?fileKey=" + fileKey + "&userId=" + jwt.userId + "&coCd=" + $('#coCd').val(), true);
+		xhr.responseType = "blob";
+		xhr.setRequestHeader("Authorization", authorizationToken);
+		xhr.setRequestHeader("X-GBS-Source", "pdfjs-viewer");
+
+		xhr.onload = function() {
+			if (xhr.status === 200) {
+				var contentType = xhr.getResponseHeader("Content-Type");
+				if (contentType && contentType.indexOf("text/plain") !== -1) {
+					console.error("경비 첨부이미지 조회 오류: " + fileKey);
+					return;
+				}
+				var ext = fileName ? fileName.split('.').pop().toLowerCase() : '';
+				if (ext === 'heic') {
+					// HEIC는 브라우저가 직접 렌더링하지 못하므로 heic2any로 jpeg 변환 후 미리보기
+					if (typeof heic2any !== "undefined") {
+						heic2any({ blob: xhr.response, toType: "image/jpeg" }).then(function(resultBlob) {
+							var reader = new FileReader();
+							reader.onload = function(e) {
+								$('#tripTable' + i + ' #tripRptImg_' + i).attr('src', e.target.result).show();
+								$('#dropZone_' + i).addClass('hasImg');
+							};
+							reader.readAsDataURL(resultBlob);
+						}).catch(function(error) {
+							console.error("HEIC 미리보기 변환 오류:", error);
+						});
+					} else {
+						console.error("heic2any 라이브러리가 로딩되지 않음");
+					}
+					return;
+				}
+				var reader = new FileReader();
+				reader.onload = function(e) {
+					$('#tripTable' + i + ' #tripRptImg_' + i).attr('src', e.target.result).show();
+					$('#dropZone_' + i).addClass('hasImg');
+				};
+				reader.readAsDataURL(xhr.response);
+			} else {
+				console.error("경비 첨부이미지 조회 실패: " + xhr.status + " - " + xhr.statusText);
+			}
+		};
+
+		xhr.onerror = function() {
+			console.error("경비 첨부이미지 조회 중 네트워크 오류가 발생했습니다.");
+		};
+
+		xhr.send();
+	}
+
+	//경비내역 첨부이미지 클릭 시 파일선택창 대신 이미지뷰어로 연결 (첨부된 이미지가 있을때만)
+	function tripImgBoxClick(i) {
+		let fileKey = $('#tripTable' + i + ' #fileKey').val();
+		if ($('#dropZone_' + i).hasClass('hasImg') && fileKey && fileKey != '0' && fileKey != '') {
+			downloadTripRptFile(i);
+		} else {
+			setTripRptButton(i);
+		}
+	}
+
 	function downloadTripRptFile(i) {
 		let tripRptFileNm = $('#tripTable' + i + ' #tripRptFileNm').val();
 		let fileKey = $('#tripTable' + i + ' #fileKey').val();
@@ -1418,6 +1676,22 @@
 			return false;
 		}
 
+		//현재 팝업에 등록된 경비 첨부이미지 전체 목록(뷰어에서 이전/다음으로 이동하며 확인 가능하도록)
+		let fileList = [];
+		$('.tripTable').each(function() {
+			let rowIdx = $(this).attr('id').replace('tripTable', '');
+			let rowFileKey = $('#tripTable' + rowIdx + ' #fileKey').val();
+			if (rowFileKey && rowFileKey != 0 && rowFileKey != '') {
+				let rowFileNm = $('#tripTable' + rowIdx + ' #tripRptFileNm').val();
+				let rowTripTyp = $('#tripTable' + rowIdx + ' #tripRptTyp option:checked').text();
+				fileList.push({
+					"fileKey"	: rowFileKey,
+					"fileName"	: jwt.userNm + '-' + $('#workRptDt').val() + '-' + rowTripTyp + '-' + rowFileNm,
+					"coCd"		: $('#coCd').val()
+				});
+			}
+		});
+
 		//이미지뷰어 call
 		let tempFileName = jwt.userNm + '-' + $('#workRptDt').val() + '-' + tripRptTyp  + '-' + tripRptFileNm;
 		var paramObj = {
@@ -1425,10 +1699,11 @@
 				"fileName" 	: tempFileName,
 				"userId" 	: jwt.userId,
 				"coCd" 		: $('#coCd').val(),
+				"fileList"	: fileList
 			};
 		openSecondModal("/static/html/cmn/modal/attachImageView.html", $('body').width(), $('body').height()-40, tempFileName, paramObj, function(data) {
 		});
-		
+
 		return;
 	}
 	

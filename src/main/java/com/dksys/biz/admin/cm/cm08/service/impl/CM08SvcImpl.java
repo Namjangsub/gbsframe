@@ -158,6 +158,7 @@ public class CM08SvcImpl implements CM08Svc {
 
         int savedCount = 0;
         List<File> written = new ArrayList<>();
+        List<String> insertedFileKeys = new ArrayList<>();
         try {
             Files.createDirectories(dir);
 
@@ -197,7 +198,9 @@ public class CM08SvcImpl implements CM08Svc {
                 }
 
                 cm08Mapper.insertFile(param);
-                String saveFile = param.get("fileKey") + "_" + safeFileName;
+                String fileKey = param.get("fileKey");
+                insertedFileKeys.add(fileKey);
+                String saveFile = fileKey + "_" + safeFileName;
                 File target = new File(dirForDb, saveFile);
                 mf.transferTo(target);
                 written.add(target);
@@ -208,6 +211,16 @@ public class CM08SvcImpl implements CM08Svc {
                 try {
                     if (f != null && f.exists()) {
                         f.delete();
+                    }
+                } catch (Exception ignore) {
+                    // best effort
+                }
+            }
+            //파일 전송 실패시 방금 insertFile로 등록한 메타데이터도 함께 삭제(실물 파일 없는 고아 레코드 방지)
+            for (String fk : insertedFileKeys) {
+                try {
+                    if (fk != null && !fk.isEmpty()) {
+                        cm08Mapper.deleteFile(fk);
                     }
                 } catch (Exception ignore) {
                     // best effort
@@ -240,6 +253,7 @@ public class CM08SvcImpl implements CM08Svc {
 
 	        int savedCount = 0;
 	        List<File> written = new ArrayList<>();
+	        List<String> insertedFileKeys = new ArrayList<>();
 	        try {
 	            Files.createDirectories(dir);
 	            for (MultipartFile mf : fileList) {
@@ -279,18 +293,30 @@ public class CM08SvcImpl implements CM08Svc {
 	                param.put("salesCd", nz(chk,"salesCd") == null ? "" : nz(chk,"salesCd"));
 
 	                cm08Mapper.insertFile(param);
-	                String saveFile = param.get("fileKey") + "_" + safeFileName;
+	                String fileKey = param.get("fileKey");
+	                insertedFileKeys.add(fileKey);
+	                String saveFile = fileKey + "_" + safeFileName;
 	                File target = new File(dirForDb, saveFile);
 	                mf.transferTo(target);
 	                written.add(target);
 	                savedCount++;
-	                paramMap.put("fileKey", param.get("fileKey"));
+	                paramMap.put("fileKey", fileKey);
 	            }
 	        } catch (Exception e) {
 	            for (File f : written) {
 	                try {
 	                    if (f != null && f.exists()) {
 	                        f.delete();
+	                    }
+	                } catch (Exception ignore) {
+	                    // best effort
+	                }
+	            }
+	            //파일 전송 실패시 방금 insertFile로 등록한 메타데이터도 함께 삭제(실물 파일 없는 고아 레코드 방지)
+	            for (String fk : insertedFileKeys) {
+	                try {
+	                    if (fk != null && !fk.isEmpty()) {
+	                        cm08Mapper.deleteFile(fk);
 	                    }
 	                } catch (Exception ignore) {
 	                    // best effort
