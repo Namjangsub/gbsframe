@@ -850,16 +850,40 @@
 					setTimeout(function() {
 						calculateTripExpenseStatusKrw();
 						refreshSettlementSummaryGrids();
+						syncTripExpenseStatusHeaderCheckbox();
+					}, 0);
+				}
+			},
+			onStateChanged: function (info) {
+				if (info.action === "selected" || info.action === "unselected" || info.action === "selectedAll" || info.action === "unselectedAll") {
+					setTimeout(function() {
+						refreshSettlementSummaryGrids();
+						if (tripExpenseStatusGridView && tripExpenseStatusGridView.target) {
+							tripExpenseStatusGridView.target.repaint(); // footSum 재계산
+						}
+						syncTripExpenseStatusHeaderCheckbox();
 					}, 0);
 				}
 			},
 			page: { display: false },
 			footSum: [
 				[
-					{ label: "합계", colspan: 8, align: "center" },
-					{ key: "tripRptAmt", collector: "sum", formatter: "money", align: "right" },
+					{ label: "선택합계", colspan: 8, align: "center" },
+					{ key: "tripRptAmt", collector: function() {
+						var sum = 0;
+						$.each(this.list, function(idx, item) {
+							if (item.__selected__) sum += Number(item.tripRptAmt || 0);
+						});
+						return sum;
+					}, formatter: "money", align: "right" },
 					{ label: "", colspan: 3, align: "right" },
-					{ key: "krwAmt", collector: "sum", formatter: "money", align: "right" },
+					{ key: "krwAmt", collector: function() {
+						var sum = 0;
+						$.each(this.list, function(idx, item) {
+							if (item.__selected__) sum += Number(item.krwAmt || 0);
+						});
+						return sum;
+					}, formatter: "money", align: "right" },
 					{ label: "", colspan: 2, align: "right" }
 				]
 			],
@@ -912,7 +936,34 @@
 				{ key: 'acctRegDttm', label: '회계지급일시', width: 130, align: 'center',},
 			]
 		});
+		
+		// ax5grid 헤더의 전체선택 클릭 시 onStateChanged 이벤트가 누락되는 문제 해결
+		// selectAll 메서드를 오버라이드하여 합계 재계산 로직을 강제로 실행합니다.
+		var originalSelectAll = tripExpenseStatusGridView.target.selectAll;
+		tripExpenseStatusGridView.target.selectAll = function(options) {
+			var result = originalSelectAll.apply(this, arguments);
+			setTimeout(function() {
+				refreshSettlementSummaryGrids();
+				if (tripExpenseStatusGridView && tripExpenseStatusGridView.target) {
+					tripExpenseStatusGridView.target.repaint(); // footSum 재계산
+				}
+				syncTripExpenseStatusHeaderCheckbox();
+			}, 50);
+			return result;
+		};
+
 		resizeTripExpenseStatusGrid(0);
+	}
+
+	// 헤더 전체선택 체크박스의 표시 상태(data-ax5grid-selected)를 실제 선택 개수 기준으로 재계산.
+	// ax5grid는 개별 행 선택/해제 후 헤더 체크박스의 체크 표시를 자동으로 갱신하지 않아,
+	// 행 선택이 바뀔 때마다(onDataChanged/onStateChanged/selectAll 이후) 호출해 동기화한다.
+	function syncTripExpenseStatusHeaderCheckbox() {
+		if (!tripExpenseStatusGridView || !tripExpenseStatusGridView.target) return;
+		var all = tripExpenseStatusGridView.target.getList() || [];
+		var selected = tripExpenseStatusGridView.target.getList('selected') || [];
+		var allSelected = all.length > 0 && selected.length === all.length;
+		$('[data-ax5grid="tripExpenseStatusGrid"] [data-ax5grid-container="header"] table tr td[data-ax5grid-column-key="__checkbox_header__"]').attr('data-ax5grid-selected', allSelected);
 	}
 
 	// 출장 경비 신청 현황 그리드 높이 조정 (데이터 0건이어도 컬럼헤더/합계행은 항상 노출)
@@ -942,13 +993,7 @@
 			{ key: 'cardNo', label: '카드번호', width: 60, align: 'center', styleClass: finalSettlementRowStyle }, { key: 'currNm', label: '통화종류', width: 60, align: 'center', formatter: function() { return getCurrUnitLabel(this.value); }, styleClass: finalSettlementRowStyle },
 			{ key: 'firstAdvance', label: '최초전도금', width: 90, align: 'right', formatter: 'money', styleClass: finalSettlementRowStyle }, { key: 'currentAdvance', label: '현전도금', width: 90, align: 'right', formatter: 'money', styleClass: finalSettlementRowStyle },
 			{ key: 'usedAmt', label: '사용금액', width: 90, align: 'right', formatter: 'money', styleClass: finalSettlementRowStyle }, { key: 'afterSettle', label: '정산후금액', width: 90, align: 'right', formatter: 'money', styleClass: finalSettlementRowStyle }
-		], footSum: [[
-			{ label: '합계', colspan: 4, align: 'center' },
-			{ key: 'firstAdvance', collector: 'sum', formatter: 'money', align: 'right' },
-			{ key: 'currentAdvance', collector: 'sum', formatter: 'money', align: 'right' },
-			{ key: 'usedAmt', collector: 'sum', formatter: 'money', align: 'right' },
-			{ key: 'afterSettle', collector: 'sum', formatter: 'money', align: 'right' }
-		]] });
+		] });
 		resizeSettlementSummaryGrid(actualSettlementGridView, 'actualSettlementGrid', 0);
 	}
 
@@ -957,7 +1002,8 @@
 	}
 
 	function resizeSettlementSummaryGrid(gridView, gridName, rowCount) {
-		var height = 58 + (Math.max(Number(rowCount || 0), 1) * 26) + 8;
+		var footSumHeight = gridName === 'actualSettlementGrid' ? 0 : 28; // 실비정산 그리드는 합계행 제거됨
+		var height = 30 + (Math.max(Number(rowCount || 0), 1) * 26) + footSumHeight + 8;
 		$('[data-ax5grid="' + gridName + '"]').css('height', height + 'px');
 		if (gridView && gridView.target && gridView.target.setHeight) gridView.target.setHeight(height);
 	}
@@ -999,7 +1045,8 @@
 	function refreshSettlementSummaryGrids() {
 		var travelers = rptTravelerGridView && rptTravelerGridView.target ? rptTravelerGridView.target.getList() || [] : [];
 		var requestedTravelers = tripReqTravelerGridView && tripReqTravelerGridView.target ? tripReqTravelerGridView.target.getList() || [] : [];
-		var expenses = tripExpenseStatusGridView && tripExpenseStatusGridView.target ? tripExpenseStatusGridView.target.getList() || [] : [];
+		// 선택된 경비 현황만 집계
+		var expenses = tripExpenseStatusGridView && tripExpenseStatusGridView.target ? tripExpenseStatusGridView.target.getList("selected") || [] : [];
 
 		// 회계지급용 박/일/식 미입력 시: 복명서 출장자(신청인 본인)가 등록한 박/일/식을 안내용 placeholder로 표시
 		var travelerCounts = travelers[0] || {};
@@ -1125,12 +1172,13 @@
 				|| roundRank(a.roundNo) - roundRank(b.roundNo)
 				|| currRank(a.currNm) - currRank(b.currNm);
 		});
+		// 현전도금 이월/정산은 현금만 대상 (통화별 1차→...→최종 순서로 이전 정산후금액을 이월). 카드는 집계(사용금액)만 표시하고 이월·정산하지 않는다.
 		var cashBalances = {};
 		$.each(actualRows, function(idx, row) {
 			if (String(row.payMthdNm || '').indexOf('현금') < 0) {
 				row.firstAdvance = 0;
 				row.currentAdvance = 0;
-				row.afterSettle = -row.usedAmt;
+				row.afterSettle = 0;
 				return true;
 			}
 			var currencyKey = String(row.currNm || '').toUpperCase();
@@ -1244,6 +1292,7 @@
 				};
 			});
 			tripExpenseStatusGridView.target.setData({ list: mappedD03, page: { totalElements: mappedD03.length } });
+			tripExpenseStatusGridView.target.selectAll({selected: true}); // 기본적으로 전체 선택
 			calculateTripExpenseStatusKrw();
 			resizeTripExpenseStatusGrid(mappedD03.length);
 			refreshSettlementSummaryGrids();
@@ -1295,6 +1344,7 @@
 			});
 
 			tripExpenseStatusGridView.target.setData({ list: rows, page: { totalElements: rows.length } });
+			tripExpenseStatusGridView.target.selectAll({selected: true}); // 기본적으로 전체 선택
 			calculateTripExpenseStatusKrw();
 			refreshSettlementSummaryGrids();
 			resizeTripExpenseStatusGrid(rows.length);
@@ -2735,20 +2785,20 @@
 		var tripRptNo = $('#tripRptNo').val();
 		if (!tripRptNo) return;
 
-		// 경비현황 그리드의 현재 데이터 수집
-		var statusList = tripExpenseStatusGridView.target.getList() || [];
+		// 경비현황 그리드의 현재 선택된 데이터 수집
+		var statusList = tripExpenseStatusGridView.target.getList("selected") || [];
 		if (statusList.length === 0) {
-			alert("저장할 경비현황 데이터가 없습니다.");
+			alert("선택된 경비현황 데이터가 없습니다. 지급처리할 항목을 선택해주세요.");
 			return;
 		}
 
 		var errorOccurred = false;
-		var saveCount = tripExpenseStatusGridView.target.getList().length;
+		var saveCount = statusList.length;
 
 		// 정산 금액 저장 + 자동 승인 (서버측에서 처리)
 		// SETTLE_AMT_KRW/USD는 일비정산(dailyDiff) + 실비정산(afterSettle) 통화별 합계로 저장
 		var finalSettle = calcFinalSettleAmounts();
-		var expenseDtlList = $.map(tripExpenseStatusGridView.target.getList() || [], function(row) {
+		var expenseDtlList = $.map(statusList, function(row) {
 			return {
 				coCd: row.coCd,
 				workRptNo: row.roundNo,

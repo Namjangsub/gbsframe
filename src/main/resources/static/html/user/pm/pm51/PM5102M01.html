@@ -89,10 +89,12 @@
 							</select>
 						</td>
 
-						<th>결재상태</th>
+						<th>지급유무</th>
 						<td>
-							<select id="aprvStsCd_S" name="aprvStsCd_S" data-search="aprvStsCd">
+							<select id="payYn_S" name="payYn_S" data-search="payYn" class="form-control input-sm">
 								<option value="">전체</option>
+								<option value="Y">지급완료</option>
+								<option value="N">미지급</option>
 							</select>
 						</td>
 					</tr>
@@ -331,7 +333,7 @@
 	function initSearch() {
 		$(".contents.search input[type='text']").val("");
 		$("#tripDiv_S").val("");
-		$("#aprvStsCd_S").val("");
+		$("#payYn_S").val("");
 		$("#srchStDt_S").val(dateToStr(moment(new Date()).startOf("month").toDate()));
 		$("#srchEdDt_S").val(dateToStr(moment(new Date()).endOf("month").toDate()));
 		gridView.setData(0);
@@ -582,27 +584,56 @@
 
 		postAjax("/user/pm/pm51/selectTripRptList", paramObj, null, function (data) {
 			var list = data.result || [];
+			var excelHeader = gridView.target.columns;
 			var excelData = [];
 
 			list.forEach(row => {
 				excelData.push({
-					복명번호: row.tripRptNo,
-					신청번호: row.tripReqNo,
-					구분: row.tripDiv,
-					출장자: row.travelerList || '-',
-					"실제기간": (row.actStDtm || '').substring(0, 8) + ' ~ ' + (row.actEdDtm || '').substring(0, 8),
-					경비합계: row.totalAmt,
-					정산결과: row.settleAmt,
-					최종평가: row.finalEvalCd,
-					결재상태: row.aprvStsCd
+					clntNm: row.clntNm,
+					clntPjtNm: row.clntPjtNm,
+					tripDivNm: row.tripDivNm,
+					actPeriod: (function(v) {
+						if (!v) return "";
+						var parts = v.split("~");
+						var res = [];
+						parts.forEach(function(p) {
+							var val = p.replace(/[^0-9]/g, "");
+							if (val.length >= 8) res.push(val.substring(0,4) + "-" + val.substring(4,6) + "-" + val.substring(6,8));
+							else res.push(p);
+						});
+						return res.join(" ~ ");
+					})(row.actPeriod),
+					aprvStsNm: (function(tot, done, nm) {
+						if (tot === 0) return "결재자없음";
+						if (tot > 0 && done === 0) return "미결재";
+						if (tot > 0 && done > 0 && done < tot) return "결재진행중";
+						if (tot > 0 && done === tot) return "결재완료";
+						return nm || "미상신";
+					})(row.appTotCnt, row.appDoneCnt, row.aprvStsNm),
+					tripTypeCdsNm: row.tripTypeCdsNm,
+					travelerList: row.travelerList,
+					tripPlace: row.tripPlace,
+					salesCd: row.salesCd,
+					equipNm: row.equipNm,
+					currCdNm: row.currCdNm,
+					payAprvStsNm: (function(tot, done, nm) {
+						if (tot === 0) return "결재자없음";
+						if (tot > 0 && done === 0) return "미결재";
+						if (tot > 0 && done > 0 && done < tot) return "결재진행중";
+						if (tot > 0 && done === tot) return "결재완료";
+						return nm || "미상신";
+					})(row.payAppTotCnt, row.payAppDoneCnt, row.payAprvStsNm),
+					payDt: row.payDt,
+					payNm: row.payNm,
+					settleAmtKrw: row.settleAmtKrw,
+					settleAmtUsd: row.settleAmtUsd,
+					finalEvalNm: row.finalEvalNm,
+					tripRptNo: row.tripRptNo,
+					tripReqNo: row.tripReqNo
 				});
 			});
-
-			var wb = XLSX.utils.book_new();
-			var ws = XLSX.utils.json_to_sheet(excelData);
-			XLSX.utils.book_append_sheet(wb, ws, "출장복명서");
 			var todayDate = new Date().format('yyyyMMddHHmmss');
-			XLSX.writeFile(wb, "출장복명서_" + todayDate + ".xlsx");
+			exportJSONToExcel(excelData, excelHeader, "출장복명서_" + todayDate);
 		});
 	}
 

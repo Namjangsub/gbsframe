@@ -88,10 +88,12 @@
 							</select>
 						</td>
 
-						<th>결재상태</th>
+						<th>지급유무</th>
 						<td>
-							<select id="aprvStsCd_S" name="aprvStsCd_S" data-search="aprvStsCd">
+							<select id="payYn_S" name="payYn_S" data-search="payYn" class="form-control input-sm">
 								<option value="">전체</option>
+								<option value="Y">지급완료</option>
+								<option value="N">미지급</option>
 							</select>
 						</td>
 					</tr>
@@ -211,7 +213,7 @@
 					{ key: "clntNm", label: "고객사", width: 150, align: "left" },
 					{ key: "clntPjtNm", label: "프로젝트", width: 80, align: "left" },
 					{ key: "tripDivNm", label: "구분", width: 50, align: "center" },
-					{ key: "tripPeriod", label: "출장기간", width: 150, align: "center", formatter: function() {
+					{ key: "tripPeriod", label: "출장기간", width: 160, align: "center", formatter: function() {
 						if (!this.value) return "";
 						var parts = this.value.split("~");
 						var res = [];
@@ -223,7 +225,11 @@
 								res.push(p);
 							}
 						});
-						return res.join(" ~ ");
+						var formatted = res.join(" ~ ");
+						if (this.item.isOverlapped) {
+							return '<span style="color: red; font-weight: bold;" title="동일 출장자의 다른 출장일정과 중복됩니다.">' + formatted + '</span>';
+						}
+						return formatted;
 					}},
 					{
 						key: "aprvStsNm", label: "결재상태", width: 70, align: "center",
@@ -288,6 +294,42 @@
 				try {
 					var list = data.result || [];
 					if (list) {
+						// 출장기간 중첩 체크 (목록 내 동일 출장자의 다른 신청서와 일정이 겹치는지 확인)
+						$.each(list, function(i, row1) {
+							row1.isOverlapped = false;
+							if (!row1.tripPeriod || !row1.travelerList) return true;
+							
+							var t1 = String(row1.travelerList).split(',').map(function(s){return s.trim();});
+							var p1 = String(row1.tripPeriod).split('~');
+							var st1 = p1[0] ? p1[0].replace(/[^0-9]/g, "").substring(0,8) : "99999999";
+							var ed1 = p1[1] ? p1[1].replace(/[^0-9]/g, "").substring(0,8) : "00000000";
+							
+							for (var j = 0; j < list.length; j++) {
+								if (i === j) continue;
+								var row2 = list[j];
+								if (!row2.tripPeriod || !row2.travelerList) continue;
+								
+								var t2 = String(row2.travelerList).split(',').map(function(s){return s.trim();});
+								var hasSameTraveler = false;
+								for (var k = 0; k < t1.length; k++) {
+									if (t2.indexOf(t1[k]) > -1) {
+										hasSameTraveler = true;
+										break;
+									}
+								}
+								if (!hasSameTraveler) continue;
+								
+								var p2 = String(row2.tripPeriod).split('~');
+								var st2 = p2[0] ? p2[0].replace(/[^0-9]/g, "").substring(0,8) : "99999999";
+								var ed2 = p2[1] ? p2[1].replace(/[^0-9]/g, "").substring(0,8) : "00000000";
+								
+								if (st1 <= ed2 && ed1 >= st2) {
+									row1.isOverlapped = true;
+									break;
+								}
+							}
+						});
+
 						targetObj.setData({
 							list: list,
 							page: { totalElements: list.length }
@@ -336,7 +378,7 @@
 	function initSearch() {
 		$(".contents.search input[type='text']").val("");
 		$("#tripDiv_S").val("");
-		$("#aprvStsCd_S").val("");
+		$("#payYn_S").val("");
 		$("#srchStDt_S").val(dateToStr(moment(new Date()).startOf("month").toDate()));
 		$("#srchEdDt_S").val(dateToStr(moment(new Date()).endOf("month").toDate()));
 		gridView.setData(0);
@@ -578,26 +620,21 @@
 
 		postAjax("/user/pm/pm51/selectTripReqList", paramObj, null, function (data) {
 			var list = data.result || [];
+			var excelHeader = gridView.target.columns;
 			var excelData = [];
 
 			list.forEach(row => {
 				excelData.push({
-					신청번호: row.tripReqNo,
-					출장일자: (function(v) {
+					tripStDtm: (function(v) {
 						if (!v) return "";
 						var val = v.replace(/[^0-9]/g, "");
 						if (val.length >= 8) return val.substring(0, 4) + "-" + val.substring(4, 6) + "-" + val.substring(6, 8);
 						return v;
 					})(row.tripStDtm),
-					고객사: row.clntNm,
-					프로젝트: row.clntPjtNm,
-					SalesCd: row.salesCd,
-					구분: row.tripDivNm,
-					유형: row.tripTypeCdsNm,
-					출장자: row.travelerList,
-					출장지: row.tripPlace,
-					장비명: row.equipNm,
-					출장기간: (function(v) {
+					clntNm: row.clntNm,
+					clntPjtNm: row.clntPjtNm,
+					tripDivNm: row.tripDivNm,
+					tripPeriod: (function(v) {
 						if (!v) return "";
 						var parts = v.split("~");
 						var res = [];
@@ -611,17 +648,37 @@
 						});
 						return res.join(" ~ ");
 					})(row.tripPeriod),
-					통화단위: row.currCdNm,
-					결재상태: (row.appTotCnt === 0) ? "결재자없음" : row.aprvStsNm,
-					복명서여부: row.tripRptYn
+					aprvStsNm: (function(tot, done, nm) {
+						if (tot === 0) return "결재자없음";
+						if (tot > 0 && done === 0) return "미결재";
+						if (tot > 0 && done > 0 && done < tot) return "결재진행중";
+						if (tot > 0 && done === tot) return "결재완료";
+						return nm || "미상신";
+					})(row.appTotCnt, row.appDoneCnt, row.aprvStsNm),
+					tripRptYn: row.tripRptYn || 'N',
+					tripTypeCdsNm: row.tripTypeCdsNm,
+					travelerList: row.travelerList,
+					tripPlace: row.tripPlace,
+					salesCd: row.salesCd,
+					equipNm: row.equipNm,
+					currCdNm: row.currCdNm,
+					payAprvStsNm: (function(tot, done, nm) {
+						if (tot === 0) return "결재자없음";
+						if (tot > 0 && done === 0) return "미결재";
+						if (tot > 0 && done > 0 && done < tot) return "결재진행중";
+						if (tot > 0 && done === tot) return "결재완료";
+						return nm || "미상신";
+					})(row.payAppTotCnt, row.payAppDoneCnt, row.payAprvStsNm),
+					payDt: row.payDt,
+					payNm: row.payNm,
+					tripReqNo: row.tripReqNo,
+					curRevNo: row.curRevNo ? "REV" + row.curRevNo + " (완료)" : "",
+					chgReason: row.chgReason
 				});
 			});
 
-			var wb = XLSX.utils.book_new();
-			var ws = XLSX.utils.json_to_sheet(excelData);
-			XLSX.utils.book_append_sheet(wb, ws, "출장신청서");
 			var todayDate = new Date().format('yyyyMMddHHmmss');
-			XLSX.writeFile(wb, "출장신청서_" + todayDate + ".xlsx");
+			exportJSONToExcel(excelData, excelHeader, "출장신청서_" + todayDate);
 		});
 	}
 
