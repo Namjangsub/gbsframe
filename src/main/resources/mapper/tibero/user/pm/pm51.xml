@@ -745,7 +745,7 @@
 	</select>
 
 	<!-- 출장복명서 마스터 상세 -->
-	<select id="selectTripRptM02" parameterType="Map" resultType="CamelMap">
+	<select id="selectTripRptM01" parameterType="Map" resultType="CamelMap">
 		SELECT
 			TRIP_RPT_NO,
 			CO_CD,
@@ -782,7 +782,7 @@
 	</select>
 
 	<!-- 출장복명서 경비 세부내역 -->
-	<select id="selectTripRptD03" parameterType="Map" resultType="CamelMap">
+	<select id="selectTripRptD01" parameterType="Map" resultType="CamelMap">
 		SELECT
 			TRIP_RPT_NO,
 			SEQ,
@@ -798,7 +798,17 @@
 			CAR_AMT,
 			EXP_ITEM_CD,
 			PAY_MTHD_CD,
-			REMARK
+			REMARK,
+			CO_CD,
+			WORK_RPT_NO,
+			WORK_RPT_NO_SEQ,
+			TRIP_RPT_ROUND,
+			TRIP_RPT_RSV_DIV,
+			TRIP_RPT_CARD_EXRATE,
+			TRIP_RPT_CARD_NO,
+			UDT_ID AS ACCT_REG_ID,
+			FN_CM06M01_ID_TO_NM(UDT_ID) AS ACCT_REG_NM,
+			TO_CHAR(UDT_DTTM, 'YYYY-MM-DD HH24:MI:SS') AS ACCT_REG_DTTM
 		FROM TB_PM52D01
 		WHERE TRIP_RPT_NO = #{tripRptNo}
 		ORDER BY SEQ
@@ -831,7 +841,7 @@
 	</select>
 
 	<!-- 출장복명서 마스터 등록 -->
-	<insert id="insertTripRptM02" parameterType="Map">
+	<insert id="insertTripRptM01" parameterType="Map">
 		<selectKey keyProperty="tripRptNo" resultType="String" order="BEFORE">
 			SELECT 'BR' || TO_CHAR(SYSDATE, 'YYYYMMDD') || '-' || LPAD(MOD(TB_PM52M01_SQ01.NEXTVAL, 10000), 4, '0') FROM DUAL
 		</selectKey>
@@ -916,22 +926,28 @@
 		ORDER BY TRIP_ST_DTM ASC
 	</select>
 
-	<!-- 출장복명서 경비 신청/정산 현황 등록 (지급완료처리 시) -->
-	<insert id="insertTripRptD03" parameterType="Map">
+	<!-- 출장복명서 경비 신청/정산 현황 등록 (회계담당자 저장 시) -->
+	<insert id="insertTripRptD01" parameterType="Map">
 		INSERT INTO TB_PM52D01 (
 			TRIP_RPT_NO, SEQ, USE_DT, USE_DESC, PERSON_CNT, AMT, CURR_CD,
 			LODGING_AMT, DAILY_AMT, SPECIAL_AMT, TRAFFIC_AMT, CAR_AMT,
-			EXP_ITEM_CD, PAY_MTHD_CD, REMARK
+			EXP_ITEM_CD, PAY_MTHD_CD, REMARK,
+			CO_CD, WORK_RPT_NO, WORK_RPT_NO_SEQ,
+			TRIP_RPT_ROUND, TRIP_RPT_RSV_DIV, TRIP_RPT_CARD_EXRATE, TRIP_RPT_CARD_NO,
+			CREAT_ID, CREAT_PGM, CREAT_DTTM, UDT_ID, UDT_PGM, UDT_DTTM
 		) VALUES (
 			#{tripRptNo}, NVL((SELECT MAX(SEQ) FROM TB_PM52D01 WHERE TRIP_RPT_NO = #{tripRptNo}), 0) + 1,
 			#{useDt, jdbcType=VARCHAR}, #{useDesc, jdbcType=VARCHAR}, #{personCnt, jdbcType=NUMERIC}, #{amt, jdbcType=NUMERIC}, #{currCd, jdbcType=VARCHAR},
 			#{lodgingAmt, jdbcType=NUMERIC}, #{dailyAmt, jdbcType=NUMERIC}, #{specialAmt, jdbcType=NUMERIC}, #{trafficAmt, jdbcType=NUMERIC}, #{carAmt, jdbcType=NUMERIC},
-			#{expItemCd, jdbcType=VARCHAR}, #{payMthdCd, jdbcType=VARCHAR}, #{remark, jdbcType=VARCHAR}
+			#{expItemCd, jdbcType=VARCHAR}, #{payMthdCd, jdbcType=VARCHAR}, #{remark, jdbcType=VARCHAR},
+			#{coCd, jdbcType=VARCHAR}, #{workRptNo, jdbcType=VARCHAR}, #{workRptNoSeq, jdbcType=NUMERIC},
+			#{tripRptRound, jdbcType=VARCHAR}, #{tripRptRsvDiv, jdbcType=VARCHAR}, #{tripRptCardExrate, jdbcType=NUMERIC}, #{tripRptCardNo, jdbcType=VARCHAR},
+			#{userId}, #{pgmId}, SYSDATE, #{userId}, #{pgmId}, SYSDATE
 		)
 	</insert>
 
 	<!-- 출장복명서 마스터 수정 -->
-	<update id="updateTripRptM02" parameterType="Map">
+	<update id="updateTripRptM01" parameterType="Map">
 		UPDATE TB_PM52M01
 		SET
 			ACT_ST_DTM = #{actStDtm},
@@ -986,14 +1002,19 @@
 			T.TRIP_RPT_CURR,
 			FN_CM05M01_CD_TO_NM(T.TRIP_RPT_CURR) AS TRIP_RPT_CURR_NM,
 			T.TRIP_RPT_AMT,
-			T.TRIP_RPT_ROUND,
-			T.TRIP_RPT_RSV_DIV,
-			T.TRIP_RPT_CARD_EXRATE,
-			T.ACCT_REG_ID,
-			FN_CM06M01_ID_TO_NM(T.ACCT_REG_ID) AS ACCT_REG_NM,
-			TO_CHAR(T.ACCT_REG_DTTM, 'YYYY-MM-DD HH24:MI:SS') AS ACCT_REG_DTTM
+			S.TRIP_RPT_ROUND AS SAVED_TRIP_RPT_ROUND,
+			S.TRIP_RPT_RSV_DIV AS SAVED_TRIP_RPT_RSV_DIV,
+			S.TRIP_RPT_CARD_EXRATE AS TRIP_RPT_CARD_EXRATE,
+			S.UDT_ID AS ACCT_REG_ID,
+			FN_CM06M01_ID_TO_NM(S.UDT_ID) AS ACCT_REG_NM,
+			TO_CHAR(S.UDT_DTTM, 'YYYY-MM-DD HH24:MI:SS') AS ACCT_REG_DTTM
 		FROM TB_PM01D01 T
 		INNER JOIN TB_PM01M01 M ON T.WORK_RPT_NO = M.WORK_RPT_NO
+		LEFT JOIN TB_PM52D01 S
+			ON S.TRIP_RPT_NO = #{tripRptNo, jdbcType=VARCHAR}
+			AND S.CO_CD = T.CO_CD
+			AND S.WORK_RPT_NO = T.WORK_RPT_NO
+			AND S.WORK_RPT_NO_SEQ = T.WORK_RPT_NO_SEQ
 		WHERE T.CO_CD = #{coCd}
 			AND T.TRIP_RPT_AMT IS NOT NULL
 			AND M.WORK_RPT_DT BETWEEN TO_DATE(#{stDt}, 'YYYY-MM-DD') AND TO_DATE(#{edDt}, 'YYYY-MM-DD')
@@ -1017,7 +1038,6 @@
 			TRIP_RPT_ROUND = #{tripRptRound, jdbcType=VARCHAR},
 			TRIP_RPT_RSV_DIV = #{tripRptRsvDiv, jdbcType=VARCHAR},
 			TRIP_RPT_CARD_EXRATE = #{tripRptCardExrate, jdbcType=NUMERIC},
-			TRIP_RPT_NO = #{tripRptNo, jdbcType=VARCHAR},
 			ACCT_REG_ID = #{userId},
 			ACCT_REG_DTTM = SYSDATE,
 			UDT_ID = #{userId},
@@ -1057,20 +1077,63 @@
 		WHERE TRIP_RPT_NO = #{tripRptNo}
 	</update>
 
-	<!-- 출장복명서 지급완료 취소 - TB_PM01D01 지급 관련 필드 초기화 (복명서번호/회계등록 전체 클리어) -->
+	<!-- 출장복명서 지급완료 취소 - TB_PM01D01 지급정보만 초기화 (지급번호/지급담당자/지급일자)
+	     회계 입력값(회차/예비구분/카드환율)은 원본 이력으로 남긴다. 복명서별 회계값은 TB_PM52D01 삭제로 초기화된다. -->
 	<update id="clearTripExpenseStatusByRptNo" parameterType="Map">
 		UPDATE TB_PM01D01
 		SET
 			TRIP_RPT_NO = NULL,
-			TRIP_RPT_ROUND = NULL,
-			TRIP_RPT_RSV_DIV = NULL,
-			TRIP_RPT_CARD_EXRATE = NULL,
 			ACCT_REG_ID = NULL,
 			ACCT_REG_DTTM = NULL,
 			UDT_ID = #{userId},
 			UDT_PGM = #{pgmId},
 			UDT_DTTM = SYSDATE
 		WHERE TRIP_RPT_NO = #{tripRptNo}
+	</update>
+
+	<!-- 지급확정 전 점유 충돌 검사: 다른 복명서가 이미 점유한 출장경비 조회 -->
+	<select id="selectTripExpenseOccupiedByOther" parameterType="Map" resultType="CamelMap">
+		SELECT
+			T.CO_CD,
+			T.WORK_RPT_NO,
+			T.WORK_RPT_NO_SEQ,
+			T.TRIP_RPT_NO,
+			TO_CHAR(M.WORK_RPT_DT, 'YYYY-MM-DD') AS WORK_RPT_DT,
+			T.TRIP_RPT_AMT
+		FROM TB_PM01D01 T
+		INNER JOIN TB_PM01M01 M ON T.WORK_RPT_NO = M.WORK_RPT_NO
+		WHERE T.TRIP_RPT_NO IS NOT NULL
+			AND T.TRIP_RPT_NO != #{tripRptNo}
+			AND (
+			<foreach collection="rows" item="row" separator=" OR ">
+				(T.CO_CD = #{row.coCd} AND T.WORK_RPT_NO = #{row.workRptNo} AND T.WORK_RPT_NO_SEQ = #{row.workRptNoSeq})
+			</foreach>
+			)
+		ORDER BY M.WORK_RPT_DT, T.WORK_RPT_NO, T.WORK_RPT_NO_SEQ
+	</select>
+
+	<!-- 지급완료 처리 시: 해당 복명서의 기존 출장경비 연결 초기화 -->
+	<update id="updateTripExpenseStatusClearForPay" parameterType="Map">
+		UPDATE TB_PM01D01
+		SET
+			TRIP_RPT_NO = NULL,
+			UDT_ID = #{userId},
+			UDT_PGM = #{pgmId},
+			UDT_DTTM = SYSDATE
+		WHERE TRIP_RPT_NO = #{tripRptNo}
+	</update>
+
+	<!-- 지급완료 처리 시: 정산 대상 출장경비를 해당 복명서로 점유 -->
+	<update id="updateTripExpenseStatusLinkForPay" parameterType="Map">
+		UPDATE TB_PM01D01
+		SET
+			TRIP_RPT_NO = #{tripRptNo},
+			UDT_ID = #{userId},
+			UDT_PGM = #{pgmId},
+			UDT_DTTM = SYSDATE
+		WHERE CO_CD = #{coCd}
+			AND WORK_RPT_NO = #{workRptNo}
+			AND WORK_RPT_NO_SEQ = #{workRptNoSeq}
 	</update>
 
 	<!-- 출장복명서 지급완료 취소 시 지불담당자 본인의 관리결재행만 결재전 상태로 환원 -->
@@ -1094,13 +1157,13 @@
 	</delete>
 
 	<!-- 출장복명서 경비 세부내역 삭제 -->
-	<delete id="deleteTripRptD03" parameterType="Map">
+	<delete id="deleteTripRptD01" parameterType="Map">
 		DELETE FROM TB_PM52D01
 		WHERE TRIP_RPT_NO = #{tripRptNo}
 	</delete>
 
 	<!-- 출장복명서 마스터 삭제 -->
-	<delete id="deleteTripRptM02" parameterType="Map">
+	<delete id="deleteTripRptM01" parameterType="Map">
 		DELETE FROM TB_PM52M01
 		WHERE TRIP_RPT_NO = #{tripRptNo}
 	</delete>

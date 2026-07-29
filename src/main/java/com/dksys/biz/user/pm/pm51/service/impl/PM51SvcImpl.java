@@ -649,8 +649,8 @@ public class PM51SvcImpl implements PM51Svc {
 	@Override
 	public Map<String, Object> selectTripRptDtl(Map<String, String> paramMap) {
 		Map<String, Object> result = new HashMap<>();
-		Map<String, String> m02 = pm51Mapper.selectTripRptM02(paramMap);
-		List<Map<String, String>> d03 = pm51Mapper.selectTripRptD03(paramMap);
+		Map<String, String> m02 = pm51Mapper.selectTripRptM01(paramMap);
+		List<Map<String, String>> d03 = pm51Mapper.selectTripRptD01(paramMap);
 		List<Map<String, String>> d02 = pm51Mapper.selectTripRptD02(paramMap);
 		if (m02 != null) {
 			paramMap.put("tripReqNo", m02.get("tripReqNo"));
@@ -679,7 +679,7 @@ public class PM51SvcImpl implements PM51Svc {
 			throw new RuntimeException("이미 복명서가 존재합니다");
 		}
 
-		int result = pm51Mapper.insertTripRptM02(paramMap);
+		int result = pm51Mapper.insertTripRptM01(paramMap);
 
 		List<Map<String, String>> rptTravelerArr = gsonDtl.fromJson(paramMap.get("rptTravelerArr"), dtlMap);
 		if (rptTravelerArr != null && !rptTravelerArr.isEmpty()) {
@@ -689,8 +689,6 @@ public class PM51SvcImpl implements PM51Svc {
 				pm51Mapper.insertTripRptD02(travelerMap);
 			}
 		}
-
-
 
 		paramMap.put("fileTrgtKey", paramMap.get("tripRptNo"));
 		paramMap.put("pgmId", "PM5102P01");
@@ -778,7 +776,7 @@ public class PM51SvcImpl implements PM51Svc {
 			}
 		}
 
-		int result = pm51Mapper.updateTripRptM02(paramMap);
+		int result = pm51Mapper.updateTripRptM01(paramMap);
 
 		Map<String, String> delParam = new HashMap<>();
 		delParam.put("tripRptNo", paramMap.get("tripRptNo"));
@@ -806,8 +804,6 @@ public class PM51SvcImpl implements PM51Svc {
 				pm51Mapper.insertTripRptD02(travelerMap);
 			}
 		}
-
-
 
 		paramMap.put("fileTrgtKey", paramMap.get("tripRptNo"));
 		paramMap.put("pgmId", "PM5102P01");
@@ -873,7 +869,7 @@ public class PM51SvcImpl implements PM51Svc {
 
 	@Override
 	public int updateTripRptMngEval(Map<String, String> paramMap) throws Exception {
-		Map<String, String> m02 = pm51Mapper.selectTripRptM02(paramMap);
+		Map<String, String> m02 = pm51Mapper.selectTripRptM01(paramMap);
 		if (m02 == null) {
 			throw new RuntimeException("출장복명서 정보를 찾을 수 없습니다.");
 		}
@@ -997,8 +993,8 @@ public class PM51SvcImpl implements PM51Svc {
 		pm51Mapper.deleteTripReqApprovalLines(delParam);
 
 		pm51Mapper.deleteTripRptD02(delParam);
-		pm51Mapper.deleteTripRptD03(delParam);
-		int result = pm51Mapper.deleteTripRptM02(delParam);
+		pm51Mapper.deleteTripRptD01(delParam);
+		int result = pm51Mapper.deleteTripRptM01(delParam);
 		return result;
 	}
 
@@ -1234,7 +1230,7 @@ public class PM51SvcImpl implements PM51Svc {
 
 		Map<String, String> m02Param = new HashMap<>();
 		m02Param.put("tripRptNo", tripRptNo);
-		Map<String, String> m02 = pm51Mapper.selectTripRptM02(m02Param);
+		Map<String, String> m02 = pm51Mapper.selectTripRptM01(m02Param);
 		if (m02 == null) {
 			throw new RuntimeException("출장복명서 정보를 찾을 수 없습니다.");
 		}
@@ -1271,8 +1267,8 @@ public class PM51SvcImpl implements PM51Svc {
 		
 		Map<String, String> delParam = new HashMap<>();
 		delParam.put("tripRptNo", tripRptNo);
-		pm51Mapper.deleteTripRptD03(delParam);
-		
+		pm51Mapper.deleteTripRptD01(delParam);
+
 		if (paramMap.containsKey("expenseDtlArr")) {
 			String expenseDtlArrStr = (String) paramMap.get("expenseDtlArr");
 			if (hasText(expenseDtlArrStr)) {
@@ -1280,7 +1276,12 @@ public class PM51SvcImpl implements PM51Svc {
 				if (expenseDtlArr != null && !expenseDtlArr.isEmpty()) {
 					for (Map<String, String> expenseDtlMap : expenseDtlArr) {
 						expenseDtlMap.put("tripRptNo", tripRptNo);
-						pm51Mapper.insertTripRptD03(expenseDtlMap);
+						expenseDtlMap.put("userId", userId);
+						expenseDtlMap.put("pgmId", (String) paramMap.get("pgmId"));
+						pm51Mapper.insertTripRptD01(expenseDtlMap);
+
+						// 회계담당자 입력값을 원본 출장경비(TB_PM01D01)에도 동기화 (점유(TRIP_RPT_NO)는 지급완료 시점에만 처리)
+						pm51Mapper.updateTripExpenseStatus(new HashMap<String, Object>(expenseDtlMap));
 					}
 				}
 			}
@@ -1301,12 +1302,59 @@ public class PM51SvcImpl implements PM51Svc {
 					approveParam.put("pgmId", (String) paramMap.get("pgmId"));
 					wb20Svc.insertApprovalLine(approveParam);
 
+					// 지급확정 전 점유 충돌 검사: 다른 복명서가 이미 점유한 경비가 있으면 전체 중단
+					List<Map<String, String>> payTargetRows = new ArrayList<>();
+					String payTargetArrStr = (String) paramMap.get("expenseDtlArr");
+					if (hasText(payTargetArrStr)) {
+						List<Map<String, String>> parsedRows = gsonDtl.fromJson(payTargetArrStr, dtlMap);
+						if (parsedRows != null) {
+							payTargetRows.addAll(parsedRows);
+						}
+					}
+					if (!payTargetRows.isEmpty()) {
+						Map<String, Object> occupiedParam = new HashMap<>();
+						occupiedParam.put("tripRptNo", tripRptNo);
+						occupiedParam.put("rows", payTargetRows);
+						List<Map<String, Object>> occupiedList = pm51Mapper.selectTripExpenseOccupiedByOther(occupiedParam);
+						if (occupiedList != null && !occupiedList.isEmpty()) {
+							StringBuilder sb = new StringBuilder();
+							sb.append("다른 복명서가 이미 점유한 출장경비가 ").append(occupiedList.size()).append("건 있어 지급확정을 중단했습니다.\n");
+							int printed = 0;
+							for (Map<String, Object> occupied : occupiedList) {
+								if (printed >= 5) {
+									sb.append("\n... 외 ").append(occupiedList.size() - printed).append("건");
+									break;
+								}
+								sb.append("\n- ").append(occupied.get("workRptDt"))
+									.append(" / 금액 ").append(occupied.get("tripRptAmt"))
+									.append(" / 복명서 ").append(occupied.get("tripRptNo"));
+								printed++;
+							}
+							sb.append("\n\n경비내역을 재조회한 뒤 다시 확인해 주세요.");
+							throw new RuntimeException(sb.toString());
+						}
+					}
+
 					// 자금담당자(SPECRTS15) 본인 결재처리 시점에만 복명서 지급완료 처리
 					Map<String, String> payDoneParam = new HashMap<>();
 					payDoneParam.put("tripRptNo", tripRptNo);
 					payDoneParam.put("userId", userId);
 					payDoneParam.put("pgmId", (String) paramMap.get("pgmId"));
 					pm51Mapper.updateTripRptPayDone(payDoneParam);
+
+					// 지급완료 시점에만 출장경비(TB_PM01D01) 점유
+					Map<String, String> payClearParam = new HashMap<>();
+					payClearParam.put("tripRptNo", tripRptNo);
+					payClearParam.put("userId", userId);
+					payClearParam.put("pgmId", (String) paramMap.get("pgmId"));
+					pm51Mapper.updateTripExpenseStatusClearForPay(payClearParam);
+
+					for (Map<String, String> payRow : payTargetRows) {
+						payRow.put("tripRptNo", tripRptNo);
+						payRow.put("userId", userId);
+						payRow.put("pgmId", (String) paramMap.get("pgmId"));
+						pm51Mapper.updateTripExpenseStatusLinkForPay(payRow);
+					}
 					break;
 				}
 			}
@@ -1322,7 +1370,7 @@ public class PM51SvcImpl implements PM51Svc {
 
 		Map<String, String> m02Param = new HashMap<>();
 		m02Param.put("tripRptNo", tripRptNo);
-		Map<String, String> m02 = pm51Mapper.selectTripRptM02(m02Param);
+		Map<String, String> m02 = pm51Mapper.selectTripRptM01(m02Param);
 		if (m02 == null) {
 			throw new RuntimeException("출장복명서 정보를 찾을 수 없습니다.");
 		}
@@ -1354,7 +1402,7 @@ public class PM51SvcImpl implements PM51Svc {
 		// TB_PM52D01 백업 데이터 삭제 (지급완료 취소이므로 스냅샷 제거)
 		Map<String, String> d03DeleteParam = new HashMap<>();
 		d03DeleteParam.put("tripRptNo", tripRptNo);
-		pm51Mapper.deleteTripRptD03(d03DeleteParam);
+		pm51Mapper.deleteTripRptD01(d03DeleteParam);
 
 		// TB_PM01D01 지급 관련 필드 초기화 (복명서번호/회계등록/지급회차/예비구분/카드환율)
 		Map<String, String> clearParam = new HashMap<>();

@@ -83,31 +83,36 @@ public interface PM51Mapper {
 
 	List<Map<String, String>> selectTripReqForRpt(Map<String, String> paramMap);
 
-	Map<String, String> selectTripRptM02(Map<String, String> paramMap);
+	Map<String, String> selectTripRptM01(Map<String, String> paramMap);
 
-	List<Map<String, String>> selectTripRptD03(Map<String, String> paramMap);
+	List<Map<String, String>> selectTripRptD01(Map<String, String> paramMap);
 
 	List<Map<String, String>> selectTripRptD02(Map<String, String> paramMap);
 
-	int insertTripRptM02(Map<String, String> paramMap);
+	int insertTripRptM01(Map<String, String> paramMap);
 
 	int insertTripRptD02(Map<String, String> paramMap);
 
-	int insertTripRptD03(Map<String, String> paramMap);
+	int insertTripRptD01(Map<String, String> paramMap);
 
-	int updateTripRptM02(Map<String, String> paramMap);
+	int updateTripRptM01(Map<String, String> paramMap);
 
 	int updateTripRptMngEval(Map<String, String> paramMap);
 
 	int deleteTripRptD02(Map<String, String> paramMap);
 
-	int deleteTripRptD03(Map<String, String> paramMap);
+	int deleteTripRptD01(Map<String, String> paramMap);
 
-	int deleteTripRptM02(Map<String, String> paramMap);
+	int deleteTripRptM01(Map<String, String> paramMap);
 
 	int selectTripRptExists(Map<String, String> paramMap);
 
 	List<Map<String, Object>> selectTripExpenseStatusList(Map<String, Object> paramMap);
+
+	List<Map<String, Object>> selectTripExpenseOccupiedByOther(Map<String, Object> paramMap);
+
+	int updateTripExpenseStatusClearForPay(Map<String, String> paramMap);
+	int updateTripExpenseStatusLinkForPay(Map<String, String> paramMap);
 
 	int updateTripExpenseStatus(Map<String, Object> paramMap);
 
