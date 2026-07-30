@@ -42,6 +42,61 @@
     font-size: 1rem;
   }
   #topUserNm { margin-right: .25rem; }  /* 이름·시간 사이 여백 */
+
+  /* Todo 알림 뱃지 스타일 (알약형) */
+  .todo-pill-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    height: 22px;
+    line-height: 1;
+    padding: 0 10px;
+    border-radius: 11px;
+    font-size: 11px;
+    font-weight: bold;
+    white-space: nowrap;
+    cursor: pointer;
+    text-decoration: none !important;
+    transition: all 0.2s ease;
+    box-sizing: border-box;
+  }
+
+  .todo-pill-badge.red {
+    background-color: #fff0f0;
+    color: #d9534f;
+    border: 1px solid #ffcccc;
+  }
+
+  .todo-pill-badge.red:hover {
+    background-color: #ffe6e6;
+    color: #c9302c;
+  }
+
+  .todo-pill-badge.blue {
+    background-color: #f0f7ff;
+    color: #337ab7;
+    border: 1px solid #cce5ff;
+  }
+
+  /* 상단 우측 버튼/메뉴 수직 중앙 정렬 */
+  .btn_area {
+    margin-top: 7px;
+  }
+  .btn_area > * {
+    display: inline-flex !important;
+    align-items: center !important;
+  }
+  .btn_area .topUserName {
+    display: inline-flex;
+    align-items: center;
+    line-height: normal;
+    margin-right: 8px;
+  }
+  .btn_area .navbar-nav > li > a {
+    padding-top: 0 !important;
+    padding-bottom: 0 !important;
+    line-height: 30px !important;
+  }
 </style>
 
 <!-- 페이지 타이틀 -->
@@ -50,7 +105,12 @@
 </h3>
 
 <!-- 로그아웃버튼 -->
-<div class="btn_area"  style="height:30px; display: flex;">
+<div class="btn_area"  style="height:30px; display: flex; align-items: center;">
+
+	<div id="myTodoStatus" style="display: flex; align-items: center; gap: 2px; margin-right: 4px; height: 100%;">
+		<a onclick="goToApprovalScreen();" class="todo-pill-badge red">결재 <span id="myApprovalCount" style="margin-left: 2px;">0</span>건</a>
+		<a onclick="goToApprovalScreen();" class="todo-pill-badge blue">공유 <span id="myShareCount" style="margin-left: 2px;">0</span>건</a>
+	</div>
 
 	<ul class="nav navbar-nav" id="topShortLinkMenu">
 		<li class="dropdown">
@@ -87,17 +147,24 @@
 	    <span id="lastLoginTime">22:00:00</span>
 	</div> 
 	<span>
-	<div id="personalStatus" style="display: flex; justify-content: center; align-items: center; border: 1px solid gray; border-radius: 25px;">
-		<div>　</div>
-		<a onclick="allEmployee();" style="height: 26px; line-height: 28px; width: 90px;"><i class="fas fa-users"></i> 직원현황</a>
-		<div>일정</div>
-		<div id="scdLoad" class="status_red"></div>　
-		<div>품질</div>
-		<div id="qcLoad" class="status_red"></div>　
-		<div>역량.부하</div>
-		<div id="jobLoad" class="status_red"></div>　
-		<div>소통.협력</div>
-		<div id="commLoad" class="status_blue"></div>　
+	<div id="personalStatus" style="display: flex; justify-content: center; align-items: center; border: 1px solid gray; border-radius: 25px; padding: 2px 10px; gap: 8px;">
+		<a onclick="allEmployee();" style="height: 26px; line-height: 26px; width: 85px; text-decoration: none;"><i class="fas fa-users"></i> 직원현황</a>
+		<div style="display: flex; flex-direction: column; align-items: center; line-height: 1.1; font-size: 11px;">
+			<div>일정</div>
+			<div id="scdLoad" class="status_red" style="margin-top: 2px;"></div>
+		</div>
+		<div style="display: flex; flex-direction: column; align-items: center; line-height: 1.1; font-size: 11px;">
+			<div>품질</div>
+			<div id="qcLoad" class="status_red" style="margin-top: 2px;"></div>
+		</div>
+		<div style="display: flex; flex-direction: column; align-items: center; line-height: 1.1; font-size: 11px;">
+			<div>역량.부하</div>
+			<div id="jobLoad" class="status_red" style="margin-top: 2px;"></div>
+		</div>
+		<div style="display: flex; flex-direction: column; align-items: center; line-height: 1.1; font-size: 11px;">
+			<div>소통.협력</div>
+			<div id="commLoad" class="status_blue" style="margin-top: 2px;"></div>
+		</div>
 	</div>
 	</span>
 	<div>
@@ -126,11 +193,45 @@
 		
 		//개인별 상태현황 정보 처리
 		userStatusRtv();
-		
+
 		$("#topUserNm").click(function() {topinsertDailyWorkModal("C");});
 		$("#personalStatus").click(function() {callPersonalStatus();});
-		
+
+		//결재미완료 / 공유미확인 건수 처리 (최초 조회 + 3분 간격 갱신)
+		myTodoStatusRtv();
+		setInterval(myTodoStatusRtv, 180000);
+
 	});
+
+	//결재미완료 / 공유미확인 건수 조회
+	function myTodoStatusRtv() {
+		var formData = {
+			"coCd" 			: jwt.coCd,
+			"salesMngId" 	: jwt.userId,
+			"boardParam" 	: "BOARD",
+			"sanctnSttus" 	: "N",
+			"pageNo" 		: 1,
+			"recordCnt" 	: 999999999
+		};
+		postAjax("/user/wb/wb20/selectToDoList", formData, null, function(data) {
+			var list = data.resultList;
+			var approvalCnt = 0;
+			var shareCnt = 0;
+			if (Array.isArray(list)) {
+				list.forEach(function(item) {
+					if (item.todoDiv1CodeNm == "결재") approvalCnt++;
+					else if (item.todoDiv1CodeNm == "공유") shareCnt++;
+				});
+			}
+			$("#myApprovalCount").text(approvalCnt);
+			$("#myShareCount").text(shareCnt);
+		});
+	}
+
+	//결재화면(TO-DO LIST)으로 이동
+	function goToApprovalScreen() {
+		window.open("/static/html/user/wb/wb20/WB2001M01.html", "_blank");
+	}
 	
 	function userStatusRtv() {
 		var formData = {
