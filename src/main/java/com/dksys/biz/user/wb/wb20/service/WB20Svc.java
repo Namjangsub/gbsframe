@@ -8,6 +8,8 @@ public interface WB20Svc {
 
 	int selectToDoCount(Map<String, String> paramMap);
 
+	Map<String, Integer> selectToDoCountGrouped(Map<String, String> paramMap);
+
 	List<Map<String, String>> selectToDoList(Map<String, String> paramMap);
 
 	int toDoCfDtUpdate(Map<String, String> paramMap);

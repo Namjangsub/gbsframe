@@ -54,6 +54,32 @@ public class WB20SvcImpl implements WB20Svc {
 	}
 
 	@Override
+	public Map<String, Integer> selectToDoCountGrouped(Map<String, String> paramMap) {
+		List<Map<String, String>> list = wb20Mapper.selectToDoCountGrouped(paramMap);
+		Map<String, Integer> resultMap = new HashMap<>();
+		int approvalCnt = 0;
+		int shareCnt = 0;
+		if (list != null) {
+			for (Map<String, String> item : list) {
+				String div1 = String.valueOf(item.get("todoDiv1CodeId"));
+				Object cntObj = item.get("cnt");
+				int cnt = 0;
+				if (cntObj != null) {
+					cnt = Integer.parseInt(String.valueOf(cntObj));
+				}
+				if ("TODODIV10".equals(div1)) {
+					approvalCnt += cnt;
+				} else if ("TODODIV20".equals(div1)) {
+					shareCnt += cnt;
+				}
+			}
+		}
+		resultMap.put("approvalCnt", approvalCnt);
+		resultMap.put("shareCnt", shareCnt);
+		return resultMap;
+	}
+
+	@Override
 	public List<Map<String, String>> selectToDoList(Map<String, String> paramMap) {
 //		return wb20Mapper.selectToDoList(paramMap);
 		return wb20Mapper.selectToDoListNewSql(paramMap);

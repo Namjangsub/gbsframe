@@ -49,6 +49,13 @@ public class WB20Ctr {
 
 	  }
 
+	  @PostMapping(value = "/selectToDoCountGrouped")
+	  public String selectToDoCountGrouped(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		  Map<String, Integer> countMap = wb20Svc.selectToDoCountGrouped(paramMap);
+		  model.addAttribute("result", countMap);
+		  return "jsonView";
+	  }
+
 	  @PostMapping(value = "/M08selectToDoList")
 	  public String M08selectToDoList(@RequestBody Map<String, String> paramMap, ModelMap model) {
 

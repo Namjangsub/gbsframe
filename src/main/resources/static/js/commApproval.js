@@ -310,11 +310,14 @@ function Approval(htmlParam, param, popParam) {
 						// PFU 공유 등록 결과는 insertApprovalLine 응답으로 함께 처리
 						if (data.result.pfuShareTargetYn == "Y" && data.result.pfuShareResultCode == "200") {
 							sendTodoPfuShare(paramMap);
-							
+
 						}
 						sendTodoFinal(paramMap);
 					}
-
+					//결재처리 완료 - 상단 결재미완료/공유미확인 건수 갱신
+					if (typeof myTodoStatusRtv === 'function') {
+						myTodoStatusRtv();
+					}
 				} else {
 					customAlert(data.resultMessage || "승인중 오류가 발생 되었습니다.");
 				}
