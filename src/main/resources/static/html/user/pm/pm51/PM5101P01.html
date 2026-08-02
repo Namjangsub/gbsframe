@@ -558,24 +558,6 @@
 	// - pm51TeamMgrId: 신청인이 팀장이 아닌 경우, 신청인의 담당자팀장 ID (selectTeamManagerInfo 결과)
 	var pm51ApplicantIsTeamMgr = false;
 	var pm51TeamMgrId = '';
-	var vpUserIdsCache = null;
-
-	// 부사장 고정 ID 목록 (공통코드 CODE_ID='SPECRTS08'의 CODE_ETC, 콤마 구분) - SPECRTS14/15와 동일 패턴
-	function getVpUserIds() {
-		if (vpUserIdsCache !== null) return vpUserIdsCache;
-		var ids = [];
-		postAjaxSync("/admin/cm/cm05/selectChildCodeList", { codeId: 'SPECRTS08' }, null, function(data) {
-			var list = data.childCodeList || data.resultList || data.result || [];
-			$.each(list, function(idx, item) {
-				var codeEtc = item.codeEtc || '';
-				if (codeEtc) {
-					ids = ids.concat(codeEtc.replace(/\s/g, '').split(',').filter(function(v) { return !!v; }));
-				}
-			});
-		});
-		vpUserIdsCache = ids;
-		return ids;
-	}
 
 	// 관리(자금)결재선 고정 순서 ID 목록 (공통코드 CODE_ID='SPECRTS14'의 CODE_ETC, 콤마 구분 순서가 곧 결재 순번)
 	var mngFixedOrderUserIdsCache = null;
@@ -595,13 +577,13 @@
 		return ids;
 	}
 
-	// 신청부서(TODODIV2190) 일반결재선을 "신청인(담당자/팀장) → 영업PM → (신청인이 담당자인 경우만)담당자팀장 → 부사장" 순서로
+	// 신청부서(TODODIV2190) 일반결재선을 "신청인(담당자/팀장) → 영업PM → (신청인이 담당자인 경우만)담당자팀장" 순서로
 	// 재구성하고 순번(sanctnSn)을 1부터 다시 부여한다. ID 매칭 기반으로 동작하므로 DB에서 재로드된 행에도 안전하게 적용된다.
 	// 결재(gb='결재') 행만 순서를 재구성하며, 공유(gb='공유') 행은 기존 상대 순서를 그대로 유지한다.
+	// 부사장 결재는 관리부서(회계) 결재선(SPECRTS14) 쪽에서 최종 1회만 처리하므로 여기서는 다루지 않는다.
 	function reorderGeneralApprovalLine(rows) {
 		var reqId = String($('#reqId').val() || '').trim();
 		var pmId = String($('#pmId').val() || '').trim();
-		var vpIds = getVpUserIds();
 
 		var approvalRows = $.grep(rows, function(r) { return r.gb === '결재'; });
 		var shareRows = $.grep(rows, function(r) { return r.gb !== '결재'; });
@@ -621,19 +603,13 @@
 		var applicantRow = extractById(remaining, reqId);
 		var pmRow = extractById(remaining, pmId);
 		var teamMgrRow = pm51ApplicantIsTeamMgr ? null : extractById(remaining, pm51TeamMgrId);
-		var vpRows = [];
-		$.each(vpIds, function(idx, vid) {
-			var row = extractById(remaining, vid);
-			if (row) vpRows.push(row);
-		});
 
-		// 결재 순서: 담당자(신청인) → 담당팀장 → 영업PM → 부사장
+		// 결재 순서: 담당자(신청인) → 담당팀장 → 영업PM
 		var ordered = [];
 		if (applicantRow) ordered.push(applicantRow);
 		if (teamMgrRow) ordered.push(teamMgrRow);
 		if (pmRow) ordered.push(pmRow);
-		ordered = ordered.concat(vpRows);
-		// 위 4가지 역할(신청인/팀장/PM/부사장)에 매칭되지 않은 나머지 결재 행(수동 추가분 등)은 뒤에 그대로 유지
+		// 위 3가지 역할(신청인/팀장/PM)에 매칭되지 않은 나머지 결재 행(수동 추가분 등)은 뒤에 그대로 유지
 		ordered = ordered.concat(remaining);
 
 		var sn = 1;
@@ -1255,23 +1231,6 @@
 			});
 		}
 
-		// 부사장(SPECRTS08) 자동 추가
-		$.each(getVpUserIds(), function(idx, vpId) {
-			if (!vpId) return;
-			var vpJik = '', vpDeptNm = '', vpNm = vpId;
-			postAjaxSync("/admin/cm/cm06/selectUserInfo", { userId: vpId }, null, function(data) {
-				if (data && data.userInfo) {
-					vpJik = data.userInfo.levelNm || '';
-					vpDeptNm = data.userInfo.deptNm || '';
-					vpNm = data.userInfo.name || vpId;
-				}
-			});
-			autoList.push({
-				gb: '결재', usrNm: vpId, todoId: vpId, name: vpNm, jik: vpJik, dtNm: vpDeptNm,
-				todoDiv2CodeId: 'TODODIV2190', flag: 'I', autoVpApproval: 'Y', coCd: jwt.coCd
-			});
-		});
-
 		// 기존 그리드의 수동 추가된 결재/공유자는 유지 (자동 추가분만 갱신)
 		// DB에서 재로드된 행에는 auto* 플래그가 없으므로, 자동 행과 같은 ID의 기존 행도 제거 (중복 누적 방지)
 		var autoIds = $.map(autoList, function(r) { return String(r.usrNm || '').toLowerCase(); });
@@ -1282,7 +1241,7 @@
 			var oldApplicantId = String(previousReqId || '').toLowerCase();
 			var isPreviousApplicant = oldApplicantId && rowUserId === oldApplicantId;
 			var isAutoTarget = $.inArray(rowUserId, autoIds) > -1;
-			if (row.autoApplicantApproval !== 'Y' && row.autoVpApproval !== 'Y' && row.autoPmApproval !== 'Y' && !isPreviousApplicant && !isAutoTarget) {
+			if (row.autoApplicantApproval !== 'Y' && row.autoPmApproval !== 'Y' && !isPreviousApplicant && !isAutoTarget) {
 				preservedList.push(row);
 			}
 		});
@@ -4232,7 +4191,7 @@
 			}
 		}
 
-		// 신청인(담당자/팀장) → 영업PM → (담당자인 경우만) 담당자팀장 → 부사장 순서로 재구성 + 순번 재부여
+		// 신청인(담당자/팀장) → 영업PM → (담당자인 경우만) 담당자팀장 순서로 재구성 + 순번 재부여
 		var orderedList = reorderGeneralApprovalLine(filteredList);
 		gridViewApproval.target.setData({ list: orderedList, page: { totalElements: orderedList.length } });
 		gridResize(gridViewApproval, orderedList.length);

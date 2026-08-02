@@ -1519,25 +1519,7 @@
 	// PM52 전용 결재선 순서 재구성 관련 전역변수
 	var pm52ApplicantIsTeamMgr = false;
 	var pm52TeamMgrId = '';
-	var rptVpUserIdsCache = null;
 	var rptTeamMgrCacheKey = null;
-
-	// 부사장 고정 ID 목록 (공통코드 CODE_ID='SPECRTS08'의 CODE_ETC, 콤마 구분)
-	function getRptVpUserIds() {
-		if (rptVpUserIdsCache !== null) return rptVpUserIdsCache;
-		var ids = [];
-		postAjaxSync("/admin/cm/cm05/selectChildCodeList", { codeId: 'SPECRTS08' }, null, function(data) {
-			var list = data.childCodeList || data.resultList || data.result || [];
-			$.each(list, function(idx, item) {
-				var codeEtc = item.codeEtc || '';
-				if (codeEtc) {
-					ids = ids.concat(codeEtc.replace(/\s/g, '').split(',').filter(function(v) { return !!v; }));
-				}
-			});
-		});
-		rptVpUserIdsCache = ids;
-		return ids;
-	}
 
 	// 복명서 관리(자금)결재선 고정 순서 ID 목록 (공통코드 CODE_ID='SPECRTS14'의 CODE_ETC, 콤마 구분 순서가 곧 결재 순번)
 	var rptMngFixedOrderUserIdsCache = null;
@@ -1557,8 +1539,9 @@
 		return ids;
 	}
 
-	// 복명서 일반결재선을 "신청인 → 담당팀장 → 부사장" 순서로 재구성 (영업PM 제외)
+	// 복명서 일반결재선을 "신청인 → 담당팀장" 순서로 재구성 (영업PM 제외)
 	// 순번(sanctnSn)을 1부터 다시 부여한다. 결재 행만 순서를 재구성하며, 공유 행은 기존 순서를 유지한다.
+	// 부사장 결재는 관리부서(회계) 결재선(SPECRTS14) 쪽에서 최종 1회만 처리하므로 여기서는 다루지 않는다.
 	function reorderRptGeneralApprovalLine(rows, applicantId) {
 		if (!applicantId) return rows;
 
@@ -1574,8 +1557,6 @@
 				}
 			});
 		}
-
-		var vpIds = getRptVpUserIds();
 
 		var approvalRows = $.grep(rows, function(r) { return r.gb === '결재'; });
 		var shareRows = $.grep(rows, function(r) { return r.gb !== '결재'; });
@@ -1594,18 +1575,12 @@
 		var remaining = approvalRows.slice();
 		var applicantRow = extractById(remaining, applicantId);
 		var teamMgrRow = pm52ApplicantIsTeamMgr ? null : extractById(remaining, pm52TeamMgrId);
-		var vpRows = [];
-		$.each(vpIds, function(idx, vid) {
-			var row = extractById(remaining, vid);
-			if (row) vpRows.push(row);
-		});
 
-		// 결재 순서: 신청인 → 담당팀장 → 부사장
+		// 결재 순서: 신청인 → 담당팀장
 		var ordered = [];
 		if (applicantRow) ordered.push(applicantRow);
 		if (teamMgrRow) ordered.push(teamMgrRow);
-		ordered = ordered.concat(vpRows);
-		// 위 3가지 역할에 매칭되지 않은 나머지 결재 행은 뒤에 그대로 유지
+		// 위 2가지 역할에 매칭되지 않은 나머지 결재 행은 뒤에 그대로 유지
 		ordered = ordered.concat(remaining);
 
 		var sn = 1;
@@ -1668,23 +1643,6 @@
 					todoDiv2CodeId: 'TODODIV2200', flag: 'I', autoApplicantApproval: 'Y', coCd: jwt.coCd
 				});
 			}
-		});
-
-		// 부사장(SPECRTS08) 자동 추가 (PM51의 setApplicantDefaultApprovalLine과 동일 패턴)
-		$.each(getRptVpUserIds(), function(idx, vpId) {
-			if (!vpId) return;
-			var vpJik = '', vpDeptNm = '', vpNm = vpId;
-			postAjaxSync("/admin/cm/cm06/selectUserInfo", { userId: vpId }, null, function(data) {
-				if (data && data.userInfo) {
-					vpJik = data.userInfo.levelNm || '';
-					vpDeptNm = data.userInfo.deptNm || '';
-					vpNm = data.userInfo.name || vpId;
-				}
-			});
-			autoList.push({
-				gb: '결재', usrNm: vpId, todoId: vpId, name: vpNm, jik: vpJik, dtNm: vpDeptNm,
-				todoDiv2CodeId: 'TODODIV2200', flag: 'I', autoApplicantApproval: 'Y', coCd: jwt.coCd
-			});
 		});
 
 		// DB에서 재로드된 행에는 autoApplicantApproval 표시가 없으므로, 자동 행과 같은 ID의 기존 행도 제거 (중복 누적 방지)
