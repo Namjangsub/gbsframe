@@ -1,0 +1,2453 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+	<meta charset="utf-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1"/>
+	<link rel="icon" href="/static/favicon.ico" type="image/x-icon">
+	<title>생산팀 출장 예약 - 팀 캘린더</title>
+
+	<!-- Bootstrap & Common CSS -->
+	<link rel="stylesheet" href="/static/bootstrap/css/bootstrap.min.css">
+	<link rel="stylesheet" href="/static/bootstrap/css/bootstrap-theme.min.css">
+	<link rel="stylesheet" href="/static/bootstrap/css/dashboard.css">
+	<link rel="stylesheet" href="/static/bootstrap/css/bootstrap-datepicker.css">
+	<link rel="stylesheet" href="/static/fontawesome/css/all.css">
+
+	<!-- AX5 (legacy, for date picker) -->
+	<link rel="stylesheet" href="/static/css/ax5/ax5calendar.css">
+	<link rel="stylesheet" href="/static/css/ax5/ax5picker.css">
+	<link rel="stylesheet" href="/static/css/ax5/ax5mask.css">
+	<link rel="stylesheet" href="/static/css/ax5/ax5modal.css">
+	<link rel="stylesheet" href="/static/css/ax5/ax5toast.css">
+
+	<!-- TUI Grid -->
+	<link rel="stylesheet" href="/static/css/tui-grid/4.21.22/tui-grid.css" />
+
+	<!-- Common -->
+	<link rel="stylesheet" href="/static/css/gnb.css">
+	<link rel="stylesheet" href="/static/css/main.css">
+	<link rel="stylesheet" href="/static/css/sub.css">
+	<link rel="stylesheet" href="/static/css/common.css">
+
+	<!-- jQuery & Libraries -->
+	<script type="text/javascript" src="/static/js/jquery-latest.min.js"></script>
+	<link rel="stylesheet" href="/static/css/jquery-ui.css">
+	<script src="/static/js/jquery-ui.min.js"></script>
+	<script type="text/javascript" src="/static/js/jquery.serializeObject.js"></script>
+	<script type="text/javascript" src="/static/bootstrap/js/bootstrap.min.js"></script>
+	<script type="text/javascript" src="/static/bootstrap/js/bootstrap-datepicker.min.js"></script>
+	<script type="text/javascript" src="/static/bootstrap/js/bootstrap-datepicker.ko.min.js"></script>
+
+	<!-- moment & AX5 -->
+	<script type="text/javascript" src="/static/js/moment/moment-with-locales.js"></script>
+	<script src="/static/js/ax5/ax5core.min.js"></script>
+	<script src="/static/js/ax5/ax5calendar.min.js"></script>
+	<script src="/static/js/ax5/ax5picker.min.js"></script>
+	<script src="/static/js/ax5/ax5mask.min.js"></script>
+	<script src="/static/js/ax5/ax5modal.min.js"></script>
+	<script src="/static/js/ax5/ax5toast.min.js"></script>
+
+	<!-- TUI Grid & Adapter -->
+	<script src="/static/js/tui-grid/4.21.22/tui-grid.min.js"></script>
+	<script src="/static/js/common/GridAdapter.js"></script>
+
+	<!-- Global & Common -->
+	<script type="text/javascript" src="/static/js/global.js"></script>
+	<script type="text/javascript" src="/static/js/workingDayCalc.js"></script>
+
+	<style>
+		:root {
+			--day-col-width: 24px; /* 줌 슬라이더로 조정되는 일자 컬럼 너비 (기본값 24px) */
+		}
+		/* ─ 캘린더 테이블 공통 스타일 (정직원/외주/KPI 3종 테이블 공유) ─ */
+		.calendar-table {
+			/* width:100%을 쓰면 table-layout:fixed가 지정한 컬럼 너비를 컨테이너 폭에 맞춰
+			   비율로 늘려버려서 줌 슬라이더가 무력화된다. width:auto로 두고 실제 폭은
+			   <colgroup>의 합으로 결정되게 하며, 넘치는 부분은 부모의 overflow-x:auto가 처리한다. */
+			width: auto;
+			border-collapse: collapse;
+			table-layout: fixed; /* <colgroup>의 컬럼 너비가 그대로 적용되게 함 (줌 기능용) */
+			font-size: 11px;
+			user-select: none; /* 드래그 중 텍스트 선택 방지 */
+			-webkit-user-select: none;
+			-moz-user-select: none;
+			-ms-user-select: none;
+		}
+		.calendar-table th, .calendar-table td {
+			border: 1px solid #dce1e6;
+			padding: 3px 2px;
+			text-align: center;
+			overflow: hidden;
+		}
+		.calendar-table th {
+			background-color: #f2f4f7;
+			font-weight: 600;
+			color: #333;
+		}
+		.calendar-table th.month-col {
+			font-size: 11px;
+			font-weight: 700;
+			background-color: #e8ecf1;
+		}
+		.calendar-table th.day-col {
+			width: var(--day-col-width);
+			min-width: var(--day-col-width);
+			max-width: var(--day-col-width);
+			font-size: 10px;
+			font-weight: 500;
+			padding: 2px 1px;
+		}
+		.calendar-table col.first-col {
+			width: 150px;
+			min-width: 150px;
+			max-width: 150px;
+		}
+		/* table-layout:fixed 상태에서 실제 컬럼 너비를 결정하는 것은 <col>이다(헤더 행의 width는
+		   colspan이 섞이면 무시될 수 있음) - 줌 슬라이더는 이 <col> 너비만 바꾸면 충분하다. */
+		.calendar-table col.day-col-el {
+			width: var(--day-col-width);
+			min-width: var(--day-col-width);
+			max-width: var(--day-col-width);
+		}
+		.calendar-table th.weekend-sat {
+			background-color: #eaf2ff;
+			color: #2b6cb0;
+		}
+		.calendar-table th.weekend-sun {
+			background-color: #ffeef0;
+			color: #c53030;
+		}
+		.calendar-table .row-label {
+			text-align: left;
+			background-color: #f8f9fa;
+			font-weight: bold;
+			padding-left: 8px;
+			white-space: nowrap;
+			overflow: hidden;
+			text-overflow: ellipsis;
+		}
+		.calendar-table .gantt-cell {
+			cursor: pointer;
+			position: relative;
+			height: 17px;
+			padding: 0px 2px;
+			vertical-align: middle;
+			transition: background-color 0.1s ease;
+		}
+		.calendar-table .gantt-cell:hover {
+			background-color: #e8f4ff !important;
+		}
+		.calendar-table .gantt-cell.empty {
+			background-color: #ffffff;
+			height: 17px;
+			padding: 0px 2px;
+		}
+		.calendar-table .gantt-cell.sat {
+			background-color: #f7faef;
+		}
+		.calendar-table .gantt-cell.sun {
+			background-color: #fff5f5;
+		}
+		.calendar-table .gantt-cell.drag-selecting {
+			background-color: #bee3f8 !important;
+			outline: 2px dashed #3182ce;
+			outline-offset: -2px;
+		}
+		/* KPI 요약 테이블 전용 */
+		#kpiTable .metric-cell {
+			text-align: right;
+			padding-right: 6px;
+			font-variant-numeric: tabular-nums;
+		}
+		#kpiTable tr.metric-diff .metric-cell.pos { color: #c53030; font-weight: 600; }
+		#kpiTable tr.metric-diff .metric-cell.neg { color: #2b6cb0; font-weight: 600; }
+		#kpiTable tr.metric-highlight td.row-label { background-color: #eaf2ff; }
+		/* 외주 근무시간 테이블 전용 */
+		#vndrTable .gantt-cell.has-value {
+			background-color: #fffbea;
+			font-weight: 700;
+			color: #8a6d00;
+		}
+		#vndrTable .gantt-cell.has-value:hover {
+			background-color: #fff3c4 !important;
+		}
+		#ganttTable .gantt-bar {
+			display: block;
+			position: relative;
+			box-sizing: border-box;
+			width: 100%;
+			max-width: 100%;
+			padding: 0px 6px;
+			border-radius: 4px;
+			color: #1a202c;
+			font-size: 11px;
+			font-weight: 600;
+			white-space: nowrap;
+			overflow: hidden;
+			text-overflow: ellipsis;
+			cursor: move; /* 전체 드래그 이동 커서 */
+			box-shadow: 0 1px 3px rgba(0,0,0,0.12);
+			transition: transform 0.1s ease, box-shadow 0.1s ease;
+		}
+		#ganttTable .gantt-bar:hover {
+			opacity: 0.9;
+			box-shadow: 0 3px 6px rgba(0,0,0,0.18);
+		}
+		/* 리사이즈 핸들 */
+		#ganttTable .gantt-bar .resize-handle {
+			position: absolute;
+			top: 0;
+			bottom: 0;
+			width: 6px;
+			cursor: col-resize;
+			z-index: 5;
+			background: rgba(0,0,0,0.05);
+			transition: background 0.15s ease;
+		}
+		#ganttTable .gantt-bar .resize-handle:hover,
+		#ganttTable .gantt-bar .resize-handle.active {
+			background: rgba(0, 0, 0, 0.25);
+		}
+		#ganttTable .gantt-bar .handle-left {
+			left: 0;
+			border-top-left-radius: 4px;
+			border-bottom-left-radius: 4px;
+		}
+		#ganttTable .gantt-bar .handle-right {
+			right: 0;
+			border-top-right-radius: 4px;
+			border-bottom-right-radius: 4px;
+		}
+		/* 바 이동/리사이즈 드래그 선택 하이라이트 */
+		#ganttTable td.gantt-cell.bar-drag-preview {
+			background-color: #90cdf4 !important;
+			outline: 2px dashed #2b6cb0;
+			outline-offset: -2px;
+		}
+
+		/* ─ 실적 행 및 막대 스타일 ─ */
+		#ganttTable .actual-row {
+			background-color: #fafafa;
+			height: 17px;
+		}
+		#ganttTable .actual-cell {
+			cursor: default;
+			position: relative;
+			height: 17px;
+			padding: 0px 2px;
+			vertical-align: middle;
+		}
+		#ganttTable .actual-cell.empty {
+			background-color: #fafafa;
+			height: 17px;
+			padding: 0px 2px;
+		}
+		#ganttTable .actual-cell.sat {
+			background-color: #f7faef;
+		}
+		#ganttTable .actual-cell.sun {
+			background-color: #fff5f5;
+		}
+		#ganttTable .actual-bar {
+			display: block;
+			position: relative;
+			box-sizing: border-box;
+			width: 100%;
+			max-width: 100%;
+			padding: 0px 4px;
+			border-radius: 3px;
+			color: #333;
+			font-size: 10px;
+			font-weight: 600;
+			white-space: nowrap;
+			overflow: hidden;
+			text-overflow: ellipsis;
+			background: repeating-linear-gradient(45deg, #d0d5db, #d0d5db 4px, #e8eaed 4px, #e8eaed 8px);
+			border: 1px solid #999;
+			box-shadow: 0 1px 2px rgba(0,0,0,0.08);
+		}
+		#ganttTable .actual-bar.status-rest {
+			background: #FF0000 !important;
+			color: #ffffff !important;
+			border: 1px solid #cc0000;
+			text-align: center;
+			padding: 0px !important;
+			font-size: 9px;
+			line-height: 15px;
+			letter-spacing: -0.5px;
+		}
+		/* 같은 팀원의 계획행-실적행 사이 경계선 제거 (아래위로 붙여서 한 블록처럼 표시) */
+		#ganttTable tr:not(.actual-row) td {
+			border-bottom: none;
+		}
+		#ganttTable tr.actual-row td {
+			border-top: none;
+		}
+
+		/* 상태별 색상 */
+		.status-normal { background-color: #7DEB75; } /* 정상일정/연장확정 */
+		.status-extend { background-color: #00FFFF; } /* 연장예정 */
+		.status-pending { background-color: #FF00FF; } /* 미확정 */
+		.status-rest { background-color: #FF0000; color: #fff !important; } /* 휴무 */
+		.status-office { background-color: #00B0F0; color: #fff !important; } /* 사내근무 */
+
+		/* 범례 */
+		.legend {
+			margin: 0px 0;
+			padding: 0px 8px;
+			background-color: #f5f5f5;
+			border-radius: 4px;
+		}
+		.legend-item {
+			display: inline-block;
+			margin-right: 20px;
+			padding: 0px;
+			font-size: 12px;
+		}
+		.legend-box {
+			display: inline-block;
+			width: 20px;
+			height: 14px;
+			border: 1px solid #999;
+			margin-right: 5px;
+			vertical-align: middle;
+		}
+
+		/* 모달 스타일 */
+		.modal-backdrop {
+			background-color: rgba(0, 0, 0, 0.5);
+		}
+		#rsvModal {
+			display: none;
+			position: fixed;
+			z-index: 9999;
+			left: 0;
+			top: 0;
+			width: 100%;
+			height: 100%;
+			background-color: rgba(0, 0, 0, 0.4);
+		}
+		.modal-content-box {
+			background-color: #fefefe;
+			margin: 5% auto;
+			padding: 0;
+			border: 1px solid #888;
+			border-radius: 6px;
+			width: 80%;
+			max-width: 700px;
+			max-height: 80vh;
+			overflow-y: auto;
+		}
+		.modal-header-box {
+			padding: 15px;
+			border-bottom: 1px solid #ddd;
+			background-color: #f9f9f9;
+			display: flex;
+			justify-content: space-between;
+			align-items: center;
+		}
+		.modal-header-box h4 {
+			margin: 0;
+			font-size: 16px;
+			font-weight: bold;
+		}
+		.modal-close-btn {
+			background: none;
+			border: none;
+			font-size: 24px;
+			cursor: pointer;
+			color: #999;
+		}
+		.modal-close-btn:hover {
+			color: #000;
+		}
+		.modal-body-box {
+			padding: 20px;
+		}
+		.modal-footer-box {
+			padding: 15px;
+			border-top: 1px solid #ddd;
+			background-color: #f9f9f9;
+			text-align: right;
+		}
+		.form-group-modal {
+			margin-bottom: 15px;
+		}
+		.form-group-modal label {
+			display: block;
+			font-weight: bold;
+			margin-bottom: 5px;
+			font-size: 12px;
+		}
+		.form-group-modal input,
+		.form-group-modal select,
+		.form-group-modal textarea {
+			width: 100%;
+			padding: 6px;
+			font-size: 12px;
+			border: 1px solid #ccc;
+			border-radius: 3px;
+		}
+		.form-group-modal textarea {
+			resize: vertical;
+			min-height: 60px;
+		}
+
+		/* 컨테이너 */
+		.section-title {
+			margin-top: 20px;
+			margin-bottom: 10px;
+			font-size: 14px;
+			font-weight: bold;
+			padding: 0px 8px;
+			background-color: #e8f4f8;
+			border-left: 4px solid #0099cc;
+			border-radius: 2px;
+		}
+		#ganttContainer, #vndrContainer, #kpiContainer {
+			margin: 10px 0;
+			overflow-x: visible;
+		}
+
+		/* 월간 요약 카드 */
+		.monthly-summary {
+			display: flex;
+			flex-wrap: wrap;
+			gap: 10px;
+			margin: 10px 0 14px;
+		}
+		.summary-card {
+			flex: 1 1 120px;
+			min-width: 110px;
+			background-color: #fff;
+			border: 1px solid #e2e6ea;
+			border-left: 4px solid #0099cc;
+			border-radius: 4px;
+			padding: 10px 12px;
+		}
+		.summary-card .summary-label {
+			font-size: 11px;
+			color: #667085;
+			margin-bottom: 4px;
+			white-space: nowrap;
+		}
+		.summary-card .summary-value {
+			font-size: 20px;
+			font-weight: 700;
+			color: #1a202c;
+		}
+		.summary-card .summary-unit {
+			font-size: 11px;
+			font-weight: 400;
+			color: #667085;
+			margin-left: 2px;
+		}
+		.summary-card.diff-positive .summary-value { color: #c53030; }
+		.summary-card.diff-negative .summary-value { color: #2b6cb0; }
+
+		/* 상단 대시보드 카드 (엑셀 "25년 출장현황(월)" 시트 재현) */
+		.top-dashboard {
+			display: flex;
+			align-items: stretch;
+			border: 1px solid #dce1e6;
+			border-radius: 6px;
+			overflow: hidden;
+			margin: 10px 0;
+			font-size: 12px;
+		}
+		.top-dashboard .td-month {
+			flex: 1.5 1.5 0;
+			background-color: #22303f;
+			color: #fff;
+			display: flex;
+			flex-direction: column;
+			align-items: center;
+			justify-content: center;
+			padding: 8px;
+		}
+		.top-dashboard .td-month .td-month-title {
+			font-size: 20px;
+			font-weight: 800;
+			margin-bottom: 6px;
+		}
+		.top-dashboard .td-month .td-office-trip {
+			display: flex;
+			gap: 6px;
+			font-size: 11px;
+		}
+		.top-dashboard .td-month .td-office-trip span.tag {
+			padding: 1px 6px;
+			border-radius: 3px;
+			background: rgba(255,255,255,0.15);
+		}
+		.top-dashboard .td-office-trip .office-pct { color: #7DEB75; font-weight: 700; }
+		.top-dashboard .td-office-trip .trip-pct { color: #ffd166; font-weight: 700; }
+		.top-dashboard .td-metric {
+			flex: 1 1 0;
+			display: flex;
+			flex-direction: column;
+			border-left: 1px solid #e2e6ea;
+		}
+		.top-dashboard .td-metric-head {
+			font-size: 11px;
+			font-weight: 700;
+			text-align: center;
+			padding: 6px 4px;
+			background-color: #f2f4f7;
+			color: #333;
+		}
+		.top-dashboard .td-metric-body {
+			flex: 1;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			font-size: 18px;
+			font-weight: 700;
+			padding: 6px;
+			color: #1a202c;
+		}
+		.top-dashboard .td-metric-sub {
+			font-size: 10px;
+			font-weight: 400;
+			color: #667085;
+			margin-left: 3px;
+		}
+		.top-dashboard .td-metric.head-plan .td-metric-head { color: #c53030; }
+		.top-dashboard .td-metric.head-actual .td-metric-head { color: #2b6cb0; }
+		.top-dashboard .td-metric.head-install .td-metric-head { background-color: #eaf2ff; color: #2b6cb0; }
+		.top-dashboard .td-metric.head-paid .td-metric-head { background-color: #eaf2ff; color: #2b6cb0; }
+		.top-dashboard .td-metric.head-free .td-metric-head { background-color: #eaf2ff; color: #2b6cb0; }
+		.top-dashboard .td-metric.head-quarantine .td-metric-head { background-color: #f2f4f7; color: #888; }
+		.top-dashboard .td-metric.head-diff .td-metric-head { background-color: #f5e6e6; color: #c53030; }
+		.top-dashboard .td-metric.head-diff .td-metric-body.pos { color: #c53030; }
+		.top-dashboard .td-metric.head-diff .td-metric-body.neg { color: #2b6cb0; }
+		.top-dashboard .td-metric.head-people .td-metric-head { color: #333; }
+		/* ─ MonthRangePicker 스타일 ─ */
+		#mrpPicker { display:none;position:fixed;z-index:99999;background:#fff;border:1px solid #d0d0d0;border-radius:6px;box-shadow:0 6px 20px rgba(0,0,0,.18);padding:12px 16px 14px;user-select:none;font-size:13px; }
+		#mrpPicker .drp-top { display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;border-bottom:1px solid #eee;padding-bottom:8px; }
+		#mrpPicker .drp-top .drp-title { font-weight:bold;font-size:13px;color:#333; }
+		#mrpPicker .drp-close { border:none;background:none;cursor:pointer;font-size:18px;color:#888;padding:0 2px;line-height:1; }
+		#mrpPicker .drp-close:hover { color:#333; }
+		#mrpPicker .drp-body { display:flex;flex-direction:row;gap:16px;justify-content:center; }
+		#mrpPicker .drp-col { flex:1;min-width:200px; }
+		#mrpPicker .drp-col-label { text-align:center;font-weight:bold;font-size:12px;color:#555;margin-bottom:4px;padding:3px 0;background:#f5f5f5;border-radius:3px; }
+		#mrpPicker .drp-sel-val { text-align:center;font-size:12px;color:#2a7cdf;margin-top:4px;font-weight:bold;min-height:18px; }
+		#mrpPicker .drp-footer { text-align:center;margin-top:12px;padding-top:10px;border-top:1px solid #eee; }
+		#mrpPicker .drp-footer button { padding:5px 20px;border-radius:4px;cursor:pointer;font-size:13px;margin:0 4px; }
+		#mrpPicker .drp-btn-apply { background:#2a7cdf;color:#fff;border:1px solid #1a6cce; }
+		#mrpPicker .drp-btn-apply:hover { background:#1a6cce; }
+		#mrpPicker .drp-btn-cancel { background:#fff;color:#555;border:1px solid #ccc; }
+		#mrpPicker .drp-btn-cancel:hover { background:#f5f5f5; }
+	</style>
+</head>
+
+<body>
+	<div id="head_area"></div>
+	<div id="top_area"></div>
+	<div id="main_area">
+
+		<input type="hidden" id="pgmId" name="pgmId" value="PM6001M01">
+
+		<!-- ─ 상단 버튼영역 ─ -->
+		<div class="contents no_bg">
+			<ul class="btn_ul">
+				<li class="btn_r">
+					<button type="button" class="bg_gray" onclick="initSearch();">초기화</button>
+					<button type="button" id="btnSearch" class="bg_gray">검 색</button>
+				</li>
+			</ul>
+		</div>
+
+		<!-- ─ 상단 검색영역 (1줄 4개 공간 구조) ─ -->
+		<div class="contents search">
+			<div class="">
+				<table class="table_input type04">
+					<tr>
+						<th class="hit">조회월</th>
+						<td>
+							<div class="date_input" style="display: flex; align-items: center; gap: 4px;">
+								<input type="text" id="monthStS" name="monthStS" class="input_calendar" placeholder="YYYY-MM" style="width: 110px;">
+								<span>~</span>
+								<input type="text" id="monthEdS" name="monthEdS" class="input_calendar" placeholder="YYYY-MM" style="width: 110px;">
+							</div>
+						</td>
+
+						<th class="hit">Zoom</th>
+						<td>
+							<div style="display: flex; align-items: center; gap: 8px; width: 100%; max-width: 220px;">
+								<input type="range" id="zoomSlider" min="16" max="32" step="1" value="24" style="flex: 1;">
+								<span id="zoomValueDisp" style="font-size: 12px; color: #667085; width: 28px;">24</span>
+							</div>
+						</td>
+
+						<th></th>
+						<td></td>
+
+						<th></th>
+						<td></td>
+					</tr>
+				</table>
+			</div>
+		</div>
+
+		<!-- ─ 상단 대시보드 카드 (엑셀 "25년 출장현황(월)" 시트 재현) ─ -->
+		<div id="topDashboardCard" class="top-dashboard"></div>
+
+		<!-- ─ 범례 ─ -->
+		<div class="legend">
+			<div class="legend-item">
+				<span class="legend-box status-normal"></span>
+				<span>정상일정</span>
+			</div>
+			<div class="legend-item">
+				<span class="legend-box" style="background-color: #7DEB75;"></span>
+				<span>연장확정</span>
+			</div>
+			<div class="legend-item">
+				<span class="legend-box status-extend"></span>
+				<span>연장예정</span>
+			</div>
+			<div class="legend-item">
+				<span class="legend-box status-pending"></span>
+				<span>미확정</span>
+			</div>
+			<div class="legend-item">
+				<span class="legend-box status-rest"></span>
+				<span>휴무</span>
+			</div>
+			<div class="legend-item">
+				<span class="legend-box status-office"></span>
+				<span>사내근무</span>
+			</div>
+			<div class="legend-item">
+				<span class="legend-box" style="background: repeating-linear-gradient(45deg, #d0d5db, #d0d5db 4px, #e8eaed 4px, #e8eaed 8px); border: 1px solid #999;"></span>
+				<span>실적(출장신청서)</span>
+			</div>
+		</div>
+
+		<!-- ─ 전체 캘린더 통합 가로 스크롤 래퍼 (부분 스크롤 방지 및 단일 스크롤바 통합) ─ -->
+		<div id="masterCalendarWrapper" style="width: 100%; overflow-x: auto; margin: 10px 0;">
+			<!-- ─ 정직원 간트 캘린더 ─ -->
+			<div class="section-title">정직원 출장 예약 현황</div>
+			<div id="ganttContainer" style="margin-bottom: 15px;">
+				<table id="ganttTable" class="calendar-table">
+					<thead>
+						<tr>
+							<th style="width: 150px;">팀원</th>
+							<th id="dateHeaderContainer" style="width: auto;"></th>
+						</tr>
+					</thead>
+					<tbody id="ganttTableBody">
+					</tbody>
+				</table>
+			</div>
+
+			<!-- ─ 외주 인력 섹션 ─ -->
+			<div class="section-title">
+				외주 인력 근무시간
+				<button type="button" class="bg_gray" style="float: right; height: 26px; line-height: 24px;" onclick="openNewVndrModal('', '');"><i class="fas fa-plus"></i> 신규 등록</button>
+			</div>
+			<div id="vndrContainer" style="margin-bottom: 15px;">
+				<table id="vndrTable" class="calendar-table">
+					<thead>
+						<tr>
+							<th style="width: 150px;">업체명</th>
+							<th id="vndrDateHeaderContainer" style="width: auto;"></th>
+						</tr>
+					</thead>
+					<tbody id="vndrTableBody">
+					</tbody>
+				</table>
+				<div id="vndrEmptyMsg" style="display: none; text-align: center; color: #999; padding: 20px;">등록된 외주 투입 내역이 없습니다. "신규 등록" 버튼으로 추가하세요.</div>
+			</div>
+
+			<!-- ─ KPI 요약 ─ -->
+			<div class="section-title">일자별 인력 현황 요약</div>
+			<div id="monthlySummaryContainer" class="monthly-summary"></div>
+			<div id="kpiContainer" style="margin-bottom: 10px;">
+				<table id="kpiTable" class="calendar-table">
+					<thead>
+						<tr>
+							<th style="width: 150px;">구분</th>
+							<th id="kpiDateHeaderContainer" style="width: auto;"></th>
+						</tr>
+					</thead>
+					<tbody id="kpiTableBody">
+					</tbody>
+				</table>
+			</div>
+		</div>
+
+	</div>
+
+	<!-- ─ 예약 등록/수정 모달 ─ -->
+	<div id="rsvModal" class="modal">
+		<div class="modal-content-box">
+			<div class="modal-header-box">
+				<h4 id="modalTitle">출장 예약</h4>
+				<button type="button" class="modal-close-btn" onclick="closeRsvModal()">&times;</button>
+			</div>
+			<form id="rsvForm" onsubmit="return false;">
+				<div class="modal-body-box">
+					<input type="hidden" id="rsvNo" name="rsvNo">
+
+					<div class="form-group-modal" style="display: flex; gap: 10px;">
+						<div style="flex: 1;">
+							<label for="rsvUserId">대상자 <span style="color: red;">*</span></label>
+							<select id="rsvUserId" name="userId">
+								<option value="">-- 선택 --</option>
+							</select>
+						</div>
+						<div style="flex: 1;">
+							<label for="rsvTripDiv">국내/해외 <span style="color: red;">*</span></label>
+							<select id="rsvTripDiv" name="tripDiv" data-kind="PM51DIV"></select>
+						</div>
+					</div>
+				</div>
+
+				<div class="modal-body-box" style="display: flex; gap: 10px; padding-top: 0;">
+					<div class="form-group-modal" style="flex: 1;">
+						<label for="rsvTripTypeCds">출장유형 <span style="color: red;">*</span></label>
+						<select id="rsvTripTypeCds" name="tripTypeCds" data-kind="PM51TYPE"></select>
+					</div>
+
+					<div class="form-group-modal" style="flex: 1;">
+						<label for="rsvTripCondCd">유상/무상 <span style="color: red;">*</span></label>
+						<select id="rsvTripCondCd" name="tripCondCd" data-kind="PM51COND"></select>
+					</div>
+				</div>
+
+				<div class="modal-body-box" style="display: flex; gap: 10px; padding-top: 0;">
+					<div class="form-group-modal" style="flex: 1;">
+						<label for="rsvRsvStsCd">예약상태 <span style="color: red;">*</span></label>
+						<select id="rsvRsvStsCd" name="rsvStsCd" data-kind="PM60STS"></select>
+					</div>
+
+					<div class="form-group-modal" style="flex: 1;">
+						<label for="rsvTripPlace">현장명</label>
+						<input type="text" id="rsvTripPlace" name="tripPlace" placeholder="예: 서울 강남">
+					</div>
+				</div>
+
+				<div class="modal-body-box" style="display: flex; gap: 10px; padding-top: 0;">
+					<div class="form-group-modal" style="flex: 1;">
+						<label for="rsvTripStDtm">출장 시작일 <span style="color: red;">*</span></label>
+						<input type="date" id="rsvTripStDtm" name="tripStDtm">
+					</div>
+
+					<div class="form-group-modal" style="flex: 1;">
+						<label for="rsvTripEdDtm">출장 종료일 <span style="color: red;">*</span></label>
+						<input type="date" id="rsvTripEdDtm" name="tripEdDtm">
+					</div>
+				</div>
+
+				<div class="modal-body-box" style="padding-top: 0;">
+					<div class="form-group-modal" style="display: flex; gap: 10px;">
+						<div style="flex: 1;">
+							<label for="rsvNightCnt">야간 숙박일수</label>
+							<input type="number" id="rsvNightCnt" name="nightCnt" readonly style="background-color: #f0f0f0;">
+						</div>
+						<div style="flex: 1;">
+							<label for="rsvDayCnt">출장 일수</label>
+							<input type="number" id="rsvDayCnt" name="dayCnt" readonly style="background-color: #f0f0f0;">
+						</div>
+					</div>
+
+					<div class="form-group-modal">
+						<label for="rsvEtc">비고</label>
+						<textarea id="rsvEtc" name="etc" placeholder="기타 사항 입력"></textarea>
+					</div>
+				</div>
+
+				<div class="modal-footer-box">
+					<button type="button" class="btn btn-default" onclick="closeRsvModal()">취 소</button>
+					<button type="button" class="btn btn-primary" id="btnSaveRsv" onclick="saveRsv()">저 장</button>
+					<button type="button" class="btn btn-danger" id="btnDeleteRsv" style="display: none;" onclick="deleteRsv()">삭 제</button>
+				</div>
+			</form>
+		</div>
+	</div>
+
+	<!-- ─ 외주 투입 등록/수정 모달 ─ -->
+	<div id="vndrModal" class="modal">
+		<div class="modal-content-box">
+			<div class="modal-header-box">
+				<h4 id="vndrModalTitle">외주 투입 등록</h4>
+				<button type="button" class="modal-close-btn" onclick="closeVndrModal()">&times;</button>
+			</div>
+			<form id="vndrForm" onsubmit="return false;">
+				<div class="modal-body-box">
+					<input type="hidden" id="vndrRsvNo" name="rsvNo">
+
+					<div class="form-group-modal">
+						<label for="vndrNm">업체명 <span style="color: red;">*</span></label>
+						<input type="text" id="vndrNm" name="vndrNm" placeholder="업체명 입력">
+					</div>
+
+					<div class="form-group-modal" style="display: flex; gap: 10px;">
+						<div style="flex: 1;">
+							<label for="vndrWorkStDt">근무 시작일 <span style="color: red;">*</span></label>
+							<input type="date" id="vndrWorkStDt" name="workStDt">
+						</div>
+						<div style="flex: 1;">
+							<label for="vndrWorkEdDt">근무 종료일 <span style="color: red;">*</span></label>
+							<input type="date" id="vndrWorkEdDt" name="workEdDt">
+						</div>
+					</div>
+					<div id="vndrRangeHint" style="display: none; font-size: 11px; color: #667085; margin: -8px 0 12px;">기간을 선택하면 종료일까지 매일 동일한 근무시간으로 등록됩니다.</div>
+
+					<div class="form-group-modal">
+						<label for="vndrWorkHour">근무시간 <span style="color: red;">*</span></label>
+						<input type="number" id="vndrWorkHour" name="workHour" placeholder="근무시간 (숫자)" step="0.5" min="0">
+					</div>
+
+					<div class="form-group-modal">
+						<label for="vndrEtc">비고</label>
+						<textarea id="vndrEtc" name="etc" placeholder="기타 사항 입력"></textarea>
+					</div>
+				</div>
+
+				<div class="modal-footer-box">
+					<button type="button" class="btn btn-default" onclick="closeVndrModal()">취 소</button>
+					<button type="button" class="btn btn-primary" id="btnSaveVndr" onclick="saveVndr()">저 장</button>
+					<button type="button" class="btn btn-danger" id="btnDeleteVndr" style="display: none;" onclick="deleteVndr()">삭 제</button>
+				</div>
+			</form>
+		</div>
+	</div>
+
+	<script type="text/javascript">
+		// ─ 전역 변수 ─
+		var currentMonth = null;
+		var teamMemberList = [];
+		var rsvList = [];
+		var actualList = [];
+		var vacationList = [];
+		var vndrList = [];
+		var kpiStatList = [];
+		var dayColWidth = 24; // 일자 컬럼 너비(px) - 줌 슬라이더 기본값 24px
+		var ROW_LABEL_WIDTH = 150; // 3개 캘린더 테이블(정직원/외주/KPI)의 첫 컬럼(라벨) 공통 너비 - 이 값이 달라지면 테이블마다 날짜 컬럼 시작 위치가 어긋나 서로 정렬이 안 맞는다
+
+		// ─ 상태별 색상 맵 (백엔드에서 받은 rsvStsCdNm 기준) ─
+		var statusColorMap = {
+			'정상일정': '#7DEB75',
+			'연장확정': '#7DEB75',    // 정상일정과 동일 색상, 텍스트 라벨로만 구분
+			'연장예정': '#00FFFF',
+			'미확정': '#FF00FF',
+			'휴무': '#FF0000',
+			'사내근무': '#00B0F0'
+		};
+
+		// ─ 페이지 초기화 ─
+		$(document).ready(function() {
+			moment.locale('ko'); // 요일 한글 표시(월/화/수...)
+			mainDefaultLoad("생산관리", "출장예약");
+			initPage();
+		});
+
+		// ===== 월 범위 피커 (PM4001M01.html과 동일한 MonthRangePicker 모듈) =====
+		var MonthRangePicker = (function(){
+		    var s = { startYm:null, endYm:null, onApply:null, justOpened:false };
+		    var MN = ['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'];
+		    var _sy = new Date().getFullYear();  // 시작 컬럼 연도
+		    var _ey = new Date().getFullYear();  // 종료 컬럼 연도
+		    var _built = false;
+
+		    var HTML =
+		        '<div id="mrpPicker" style="display:none;position:fixed;z-index:99999;background:#fff;' +
+		        'border:1px solid #d0d0d0;border-radius:6px;box-shadow:0 6px 20px rgba(0,0,0,.18);' +
+		        'padding:12px 16px 14px;user-select:none;font-size:13px;">' +
+		        '<div class="drp-top"><span class="drp-title">월 선택</span>' +
+		        '<button class="drp-close" id="mrpClose">&#x2715;</button></div>' +
+		        '<div class="drp-body">' +
+		        '<div class="drp-col">' +
+		        '  <div class="drp-col-label">시작월</div>' +
+		        '  <div style="display:flex;align-items:center;justify-content:space-between;margin:6px 0 6px;">' +
+		        '    <button id="mrpSPrev" type="button" style="background:none;border:none;font-size:18px;cursor:pointer;padding:0 6px;line-height:1;">&#8249;</button>' +
+		        '    <span id="mrpSYear" style="font-weight:bold;font-size:13px;"></span>' +
+		        '    <button id="mrpSNext" type="button" style="background:none;border:none;font-size:18px;cursor:pointer;padding:0 6px;line-height:1;">&#8250;</button>' +
+		        '  </div>' +
+		        '  <div id="mrpSGrid" style="display:grid;grid-template-columns:repeat(4,1fr);gap:5px;"></div>' +
+		        '  <div class="drp-sel-val" id="mrpSVal"></div>' +
+		        '</div>' +
+		        '<div class="drp-col">' +
+		        '  <div class="drp-col-label">종료월</div>' +
+		        '  <div style="display:flex;align-items:center;justify-content:space-between;margin:6px 0 6px;">' +
+		        '    <button id="mrpEPrev" type="button" style="background:none;border:none;font-size:18px;cursor:pointer;padding:0 6px;line-height:1;">&#8249;</button>' +
+		        '    <span id="mrpEYear" style="font-weight:bold;font-size:13px;"></span>' +
+		        '    <button id="mrpENext" type="button" style="background:none;border:none;font-size:18px;cursor:pointer;padding:0 6px;line-height:1;">&#8250;</button>' +
+		        '  </div>' +
+		        '  <div id="mrpEGrid" style="display:grid;grid-template-columns:repeat(4,1fr);gap:5px;"></div>' +
+		        '  <div class="drp-sel-val" id="mrpEVal"></div>' +
+		        '</div>' +
+		        '</div>' +
+		        '<div class="drp-footer">' +
+		        '<button class="drp-btn-apply" id="mrpApply">선택완료</button>' +
+		        '<button class="drp-btn-cancel" id="mrpCancel">취소</button>' +
+		        '</div></div>';
+
+		    function pad(m){ return (m<10?'0':'')+m; }
+		    function ym(y,m){ return y+'-'+pad(m); }
+		    function fmtYm(v){ return v ? v.substr(0,4)+'년 '+parseInt(v.substr(5))+'월' : ''; }
+
+		    function cellStyle(v, mode){
+		        var sel = (mode === 'start') ? s.startYm : s.endYm;
+		        var isSelected = sel && v === sel;
+		        var bg  = isSelected ? '#2a7cdf' : '#f7f7f7';
+		        var clr = isSelected ? '#fff' : '#333';
+		        var bdr = isSelected ? '#1a6cce' : '#ddd';
+		        return 'padding:8px 2px;border:1px solid '+bdr+';border-radius:4px;background:'+bg+
+		               ';color:'+clr+';cursor:pointer;font-size:12px;width:100%;margin:0;text-align:center;box-sizing:border-box;';
+		    }
+
+		    function renderGrid(gridId, year, mode){
+		        var html='';
+		        for(var i=1;i<=12;i++){
+		            var v=ym(year,i);
+		            html+='<button type="button" data-ym="'+v+'" style="'+cellStyle(v,mode)+'">'+MN[i-1]+'</button>';
+		        }
+		        $('#'+gridId).html(html);
+		    }
+
+		    function render(){
+		        renderGrid('mrpSGrid', _sy, 'start');
+		        renderGrid('mrpEGrid', _ey, 'end');
+		        $('#mrpSYear').text(_sy+'년');
+		        $('#mrpEYear').text(_ey+'년');
+		        $('#mrpSVal').text(fmtYm(s.startYm));
+		        $('#mrpEVal').text(fmtYm(s.endYm));
+		    }
+
+		    function build(){
+		        if(_built) return;
+		        _built = true;
+		        $('body').append(HTML);
+
+		        $('#mrpSPrev').on('click',function(e){e.stopPropagation();_sy--;render();});
+		        $('#mrpSNext').on('click',function(e){e.stopPropagation();_sy++;render();});
+		        $('#mrpEPrev').on('click',function(e){e.stopPropagation();_ey--;render();});
+		        $('#mrpENext').on('click',function(e){e.stopPropagation();_ey++;render();});
+
+		        $(document).on('click','#mrpSGrid button[data-ym]',function(e){
+		            e.stopPropagation();
+		            s.startYm=$(this).attr('data-ym');
+		            if(s.endYm && s.endYm<s.startYm) s.endYm=s.startYm;
+		            render();
+		        });
+		        $(document).on('click','#mrpEGrid button[data-ym]',function(e){
+		            e.stopPropagation();
+		            s.endYm=$(this).attr('data-ym');
+		            if(s.startYm && s.startYm>s.endYm) s.startYm=s.endYm;
+		            render();
+		        });
+
+		        $('#mrpApply').on('click',function(e){
+		            e.stopPropagation();
+		            if(!s.startYm){alert('시작월을 선택하세요.');return;}
+		            if(!s.endYm){alert('종료월을 선택하세요.');return;}
+		            var cb=s.onApply, sy=s.startYm, ey=s.endYm;
+		            hide();
+		            if(typeof cb==='function') cb(sy,ey);
+		        });
+
+		        $('#mrpCancel,#mrpClose').on('click',function(e){e.stopPropagation();hide();});
+
+		        $(document).on('click.mrpOutside',function(e){
+		            if(s.justOpened) return;
+		            if($('#mrpPicker').is(':hidden')) return;
+		            if($(e.target).closest('#mrpPicker').length) return;
+		            if($(e.target).is('#monthStS,#monthEdS')) return;
+		            hide();
+		        });
+		    }
+
+		    function open(opts){
+		        opts=opts||{};
+		        s.startYm=opts.startYm||null;
+		        s.endYm=opts.endYm||null;
+		        s.onApply=opts.onApply||null;
+
+		        build();
+
+		        _sy = s.startYm ? parseInt(s.startYm) : new Date().getFullYear();
+		        _ey = s.endYm   ? parseInt(s.endYm)   : new Date().getFullYear();
+		        render();
+
+		        var $p=$('#mrpPicker');
+		        if($p.parent()[0]!==document.body) $('body').append($p);
+		        $p.css({visibility:'hidden',display:'block'});
+		        var pw=$p.outerWidth()||480, ph=$p.outerHeight()||300;
+		        $p.css({visibility:'',display:'none'});
+
+		        var ww=$(window).width(), wh=$(window).height();
+		        var left=(ww-pw)/2, top=(wh-ph)/2;
+		        var $t=opts.$trigger;
+		        if($t&&$t.length){
+		            var off=$t.offset();
+		            left=Math.min(off.left, ww-pw-10);
+		            top=off.top+$t.outerHeight()+4;
+		            if(top+ph>wh) top=off.top-ph-4;
+		        }
+		        $p.css({left:Math.max(left,4), top:Math.max(top,4), display:'block'});
+
+		        s.justOpened=true;
+		        setTimeout(function(){s.justOpened=false;},200);
+		    }
+
+		    function hide(){ $('#mrpPicker').hide(); }
+
+		    return { open:open, hide:hide };
+		})();
+
+		function initSearch() {
+			var today = moment();
+			var nextMonth = today.clone().add(1, 'months');
+			$('#monthStS').val(today.format('YYYY-MM'));
+			$('#monthEdS').val(nextMonth.format('YYYY-MM'));
+			$('#zoomSlider').val(24);
+			setDayColWidth(24);
+			searchData();
+		}
+
+		function initPage() {
+			// 현재 월 설정 (format: YYYY-MM) - 기본값은 2개월 기준 (이번 달 ~ 다음 달)
+			var today = moment();
+			var nextMonth = today.clone().add(1, 'months');
+			currentMonth = today.format('YYYY-MM');
+			$('#monthStS').val(today.format('YYYY-MM'));
+			$('#monthEdS').val(nextMonth.format('YYYY-MM'));
+
+			// data-kind select 초기화 (모달은 main_area 바깥 형제 요소이므로 body 전체에서 탐색)
+			var selectArr = $('body select[data-kind]');
+			if (selectArr.length > 0) {
+				setComboOptions(selectArr);
+			}
+
+			// 팀원 목록 조회
+			loadTeamMemberList();
+
+			// 이벤트 바인딩
+			$('#btnSearch').on('click', function() {
+				searchData();
+			});
+			$('#monthStS, #monthEdS').on('keyup', function(e) {
+				if (e.keyCode === 13) {
+					searchData();
+				}
+			});
+			$('#monthStS, #monthEdS').css('cursor', 'pointer').on('click', function() {
+				MonthRangePicker.open({
+					startYm: $('#monthStS').val() || null,
+					endYm: $('#monthEdS').val() || null,
+					$trigger: $(this),
+					onApply: function(sy, ey) {
+						$('#monthStS').val(sy);
+						$('#monthEdS').val(ey);
+						searchData();
+					}
+				});
+			});
+			$('#zoomSlider').on('input', function() {
+				setDayColWidth(parseInt($(this).val(), 10));
+			});
+		}
+
+		// 줌 슬라이더로 일자 컬럼 너비 조정 (CSS 변수 갱신만으로 3개 테이블 전체에 즉시 반영, 재조회 불필요)
+		function setDayColWidth(px) {
+			dayColWidth = px;
+			document.documentElement.style.setProperty('--day-col-width', px + 'px');
+			$('#zoomValueDisp').text(px);
+			autoFitVndrCells();
+			autoFitKpiCells();
+			autoFitGanttRestBars();
+		}
+
+		// 정직원 캘린더의 1일 휴무 바(.gantt-bar.status-rest, .actual-bar.status-rest) 폰트 크기를 셀 폭에 맞춰 동적 조율
+		function autoFitGanttRestBars() {
+			var minFontPx = 6;
+			var maxFontPx = 9;
+			var startFontPx = Math.min(maxFontPx, Math.max(minFontPx, Math.floor(dayColWidth * 0.35)));
+			$('#ganttTable .status-rest').each(function() {
+				var $bar = $(this);
+				var fontSize = startFontPx;
+				$bar.css({
+					'font-size': fontSize + 'px',
+					'line-height': '15px',
+					'padding': '0px',
+					'letter-spacing': '-0.5px'
+				});
+				while ($bar[0].scrollWidth > $bar[0].clientWidth && fontSize > minFontPx) {
+					fontSize -= 1;
+					$bar.css('font-size', fontSize + 'px');
+				}
+			});
+		}
+
+		// 외주 인력 근무시간 셀(gantt-cell has-value) 텍스트 폰트 크기를 셀 너비에 맞추어 유동적 가변 조율
+		function autoFitVndrCells() {
+			var minFontPx = 8;
+			var maxFontPx = 11;
+			var startFontPx = Math.min(maxFontPx, Math.max(minFontPx, Math.floor(dayColWidth * 0.4)));
+			$('#vndrTable td.gantt-cell.has-value').each(function() {
+				var $cell = $(this);
+				var fontSize = startFontPx;
+				$cell.css({
+					'font-size': fontSize + 'px',
+					'line-height': '17px',
+					'padding': '0px 1px'
+				});
+				while ($cell[0].scrollWidth > $cell[0].clientWidth && fontSize > minFontPx) {
+					fontSize -= 1;
+					$cell.css('font-size', fontSize + 'px');
+				}
+			});
+		}
+
+		// 일자별 인력 현황 요약 셀(metric-cell) 텍스트 폰트 크기를 셀 너비에 맞추어 유동적 가변 조율
+		function autoFitKpiCells() {
+			var minFontPx = 8;
+			var maxFontPx = 11;
+			var startFontPx = Math.min(maxFontPx, Math.max(minFontPx, Math.floor(dayColWidth * 0.42)));
+			$('#kpiTable td.metric-cell').each(function() {
+				var $cell = $(this);
+				var fontSize = startFontPx;
+				$cell.css({
+					'font-size': fontSize + 'px',
+					'padding-left': '1px',
+					'padding-right': '1px',
+					'text-align': 'center'
+				});
+				while ($cell[0].scrollWidth > $cell[0].clientWidth && fontSize > minFontPx) {
+					fontSize -= 1;
+					$cell.css('font-size', fontSize + 'px');
+				}
+			});
+		}
+
+		// 조회월(시작~종료) 입력값을 검증하고 YYYYMMDD 범위로 변환
+		function getSearchMonthRange() {
+			var stStr = $.trim($('#monthStS').val());
+			var edStr = $.trim($('#monthEdS').val()) || stStr;
+			if (!stStr) {
+				alert('조회월을 선택하세요.');
+				return null;
+			}
+
+			var stMonthMoment = moment(stStr, 'YYYY-MM');
+			var edMonthMoment = moment(edStr, 'YYYY-MM');
+			if (!stMonthMoment.isValid() || !edMonthMoment.isValid()) {
+				alert('조회월 형식이 올바르지 않습니다. (YYYY-MM)');
+				return null;
+			}
+			if (edMonthMoment.isBefore(stMonthMoment)) {
+				alert('종료월이 시작월보다 빠를 수 없습니다.');
+				return null;
+			}
+
+			return {
+				stMonthMoment: moment(stStr, 'YYYY-MM'),
+				edMonthMoment: moment(edStr, 'YYYY-MM'),
+				monthStDt: moment(stStr, 'YYYY-MM').format('YYYYMM01'),
+				monthEdDt: moment(edStr, 'YYYY-MM').endOf('month').format('YYYYMMDD')
+			};
+		}
+
+		function loadTeamMemberList() {
+			postAjax("/user/pm/pm60/selectTeamMemberList", {}, null, function(data) {
+				if (data && data.result) {
+					teamMemberList = data.result;
+					populateUserSelect();
+				}
+				// 팀원 목록 로드 완료 후 당월 현황을 바로 조회 (화면 진입 시 클릭 없이 표시)
+				searchData();
+			});
+		}
+
+		function populateUserSelect() {
+			var $select = $('#rsvUserId');
+			$select.empty();
+			$select.append('<option value="">-- 선택 --</option>');
+			$.each(teamMemberList, function(idx, member) {
+				$select.append('<option value="' + member.userId + '">' + (member.userNm || member.userId) + ' (' + (member.positionNm || '') + ')</option>');
+			});
+		}
+
+		function searchData() {
+			var range = getSearchMonthRange();
+			if (!range) {
+				return;
+			}
+			var monthStDt = range.monthStDt;
+			var monthEdDt = range.monthEdDt;
+			var monthMoment = range.stMonthMoment;
+
+			// 예약 정보 조회
+			postAjax("/user/pm/pm60/selectRsvCalendar", {
+				monthStDt: monthStDt,
+				monthEdDt: monthEdDt
+			}, null, function(data) {
+				if (data && data.result) {
+					rsvList = data.result;
+				}
+
+				// 실적(출장신청서) 데이터 조회 (순차 호출)
+				postAjax("/user/pm/pm60/selectRsvActualCalendar", {
+					monthStDt: monthStDt,
+					monthEdDt: monthEdDt
+				}, null, function(actualData) {
+					if (actualData && actualData.result) {
+						actualList = actualData.result;
+					} else {
+						actualList = [];
+					}
+
+					// 휴가(TB_PM01M01) 데이터 조회 (순차 호출)
+					postAjax("/user/pm/pm60/selectVacationCalendar", {
+						monthStDt: monthStDt,
+						monthEdDt: monthEdDt
+					}, null, function(vacationData) {
+						if (vacationData && vacationData.result) {
+							vacationList = vacationData.result;
+						} else {
+							vacationList = [];
+						}
+						// 계획, 실적, 휴가 데이터 모두 로드 완료 후 렌더링
+						renderGanttCalendar(monthStDt, monthEdDt);
+					});
+				});
+			});
+
+			// 외주 인력 정보 조회
+			postAjax("/user/pm/pm60/selectVndrList", {
+				monthStDt: monthStDt,
+				monthEdDt: monthEdDt
+			}, null, function(data) {
+				vndrList = (data && data.result) ? data.result : [];
+				renderVndrCalendar(monthStDt, monthEdDt);
+			});
+
+			// KPI 요약 조회
+			postAjax("/user/pm/pm60/selectRsvStatDaily", {
+				monthStDt: monthStDt,
+				monthEdDt: monthEdDt
+			}, null, function(data) {
+				if (data && data.result) {
+					kpiStatList = data.result;
+					computeKpiDerivedFields(kpiStatList);
+					renderKpiCalendar(monthStDt, monthEdDt);
+					renderTopDashboardCard(moment(monthStDt, 'YYYYMMDD'), moment(monthEdDt, 'YYYYMMDD'), kpiStatList);
+					renderMonthlySummary(kpiStatList);
+				}
+			});
+		}
+
+		// 마우스 드래그 상태 관리 변수
+		var isCalendarDragging = false;
+		var dragUserId = null;
+		var dragStartDay = null;
+		var dragCurrentDay = null;
+
+		// table-layout:fixed 상태에서 컬럼 너비는 <colgroup>이 우선 적용되므로(줌 슬라이더가
+		// 어느 헤더 행 너비와도 무관하게 항상 먹히도록) 헤더 행과 별도로 colgroup을 생성한다.
+		function buildColGroup(dayCount, firstColWidth) {
+			var html = '<colgroup><col class="first-col" style="width: ' + firstColWidth + 'px;">';
+			for (var i = 0; i < dayCount; i++) {
+				html += '<col class="day-col-el">';
+			}
+			html += '</colgroup>';
+			return html;
+		}
+
+		// 3개 캘린더 테이블(정직원/외주/KPI)이 공유하는 일자 헤더(월 구분행 + 일자행) 생성 헬퍼
+		function buildDateHeaderRow(stMoment, dayCount, firstColLabel, firstColWidth) {
+			// 1행: 월 구분 (연속된 같은 달을 colspan으로 병합)
+			var monthRow = '<tr><th rowspan="2" style="min-width: ' + firstColWidth + 'px; width: ' + firstColWidth + 'px;">' + firstColLabel + '</th>';
+			var i = 0;
+			while (i < dayCount) {
+				var mDay = stMoment.clone().add(i, 'days');
+				var ym = mDay.format('YYYY-MM');
+				var span = 1;
+				while (i + span < dayCount) {
+					var nextMDay = stMoment.clone().add(i + span, 'days');
+					if (nextMDay.format('YYYY-MM') !== ym) break;
+					span++;
+				}
+				monthRow += '<th class="month-col" colspan="' + span + '">' + mDay.format('YYYY년 MM월') + '</th>';
+				i += span;
+			}
+			monthRow += '</tr>';
+
+			// 2행: 일자(숫자만, 요일은 주말 배경색으로만 구분)
+			var dayRow = '<tr>';
+			for (var d = 0; d < dayCount; d++) {
+				var day = stMoment.clone().add(d, 'days');
+				var dayNum = day.day(); // 0: 일요일, 6: 토요일
+				var thClass = 'day-col';
+				if (dayNum === 6) thClass += ' weekend-sat';
+				else if (dayNum === 0) thClass += ' weekend-sun';
+
+				dayRow += '<th class="' + thClass + '" title="' + day.format('YYYY-MM-DD') + '(' + day.format('ddd') + ')">' + day.format('DD') + '</th>';
+			}
+			dayRow += '</tr>';
+
+			return monthRow + dayRow;
+		}
+
+		function renderGanttCalendar(monthStDt, monthEdDt) {
+			var stMoment = moment(monthStDt, 'YYYYMMDD');
+			var edMoment = moment(monthEdDt, 'YYYYMMDD');
+			var dayCount = edMoment.diff(stMoment, 'days') + 1;
+
+			$('#ganttTable').find('colgroup').remove();
+			$(buildColGroup(dayCount, ROW_LABEL_WIDTH)).prependTo('#ganttTable');
+			$('#ganttTable thead').html(buildDateHeaderRow(stMoment, dayCount, '팀원', ROW_LABEL_WIDTH));
+
+			// 팀원별 행 생성 (계획 행 + 실적 행)
+			var tbody = '';
+			$.each(teamMemberList, function(idx, member) {
+				var userNm = (member.userNm || member.userId) + ' (' + (member.positionNm || '') + ')';
+
+				// ─ 첫 번째 행: 계획(기존 로직) ─
+				tbody += '<tr data-user-id="' + member.userId + '">';
+				tbody += '<td class="row-label" rowspan="2" title="' + userNm + '">' + userNm + '</td>';
+
+				var i = 0;
+				while (i < dayCount) {
+					var day = stMoment.clone().add(i, 'days');
+					var dayStr = day.format('YYYYMMDD');
+					var dayNum = day.day();
+					var cellContent = getCellContent(member.userId, dayStr);
+
+					var dayClass = '';
+					if (dayNum === 6) dayClass = ' sat';
+					else if (dayNum === 0) dayClass = ' sun';
+
+					if (cellContent.type === 'empty') {
+						tbody += '<td class="gantt-cell empty' + dayClass + '" data-user-id="' + member.userId + '" data-day-str="' + dayStr + '"></td>';
+						i++;
+					} else {
+						// 동일 예약 건이 연속된 날짜 수(colspan) 계산
+						var span = 1;
+						while (i + span < dayCount) {
+							var nextDay = stMoment.clone().add(i + span, 'days');
+							var nextDayStr = nextDay.format('YYYYMMDD');
+							var nextContent = getCellContent(member.userId, nextDayStr);
+							if (nextContent.type === 'bar' && nextContent.rsvNo === cellContent.rsvNo) {
+								span++;
+							} else {
+								break;
+							}
+						}
+
+						var bgColor = statusColorMap[cellContent.statusName] || '#cccccc';
+						var stDate = cellContent.tripStDtm.substring(0, 8);
+						var edDate = cellContent.tripEdDtm.substring(0, 8);
+
+						var barExtraCls = cellContent.isVacation || cellContent.statusName === '휴무' ? ' status-rest' : '';
+						var cellHtml = '<div class="gantt-bar' + barExtraCls + '" style="background-color: ' + bgColor + ';" data-rsv-no="' + cellContent.rsvNo + '" data-user-id="' + member.userId + '" data-st-date="' + stDate + '" data-ed-date="' + edDate + '" data-is-vacation="' + (cellContent.isVacation ? 'Y' : 'N') + '" onclick="onGanttBarClick(\'' + cellContent.rsvNo + '\', event)" title="' + cellContent.tripPlace + ' / ' + cellContent.tripTypeName + ' (' + cellContent.statusName + ')">';
+						if (!cellContent.isVacation) {
+							cellHtml += '<div class="resize-handle handle-left" title="시작일 변경"></div>';
+						}
+						cellHtml += '<span class="bar-title">' + cellContent.tripPlace + ' (' + cellContent.tripTypeName + ')</span>';
+						if (!cellContent.isVacation) {
+							cellHtml += '<div class="resize-handle handle-right" title="종료일 변경"></div>';
+						}
+						cellHtml += '</div>';
+
+						var colspanAttr = span > 1 ? ' colspan="' + span + '"' : '';
+						tbody += '<td class="gantt-cell' + dayClass + '"' + colspanAttr + ' data-user-id="' + member.userId + '" data-day-str="' + dayStr + '">' + cellHtml + '</td>';
+
+						i += span;
+					}
+				}
+				tbody += '</tr>';
+
+				// ─ 두 번째 행: 실적(새로 추가) ─
+				tbody += '<tr data-user-id="' + member.userId + '" class="actual-row">';
+				var j = 0;
+				while (j < dayCount) {
+					var day = stMoment.clone().add(j, 'days');
+					var dayStr = day.format('YYYYMMDD');
+					var dayNum = day.day();
+					var actualContent = getActualCellContent(member.userId, dayStr);
+
+					var dayClass = '';
+					if (dayNum === 6) dayClass = ' sat';
+					else if (dayNum === 0) dayClass = ' sun';
+
+					if (actualContent.type === 'empty') {
+						tbody += '<td class="actual-cell empty' + dayClass + '" data-user-id="' + member.userId + '" data-day-str="' + dayStr + '"></td>';
+						j++;
+					} else {
+						// 동일 실적 건이 연속된 날짜 수(colspan) 계산
+						var actualSpan = 1;
+						while (j + actualSpan < dayCount) {
+							var nextDay = stMoment.clone().add(j + actualSpan, 'days');
+							var nextDayStr = nextDay.format('YYYYMMDD');
+							var nextActualContent = getActualCellContent(member.userId, nextDayStr);
+							if (nextActualContent.type === 'bar' && nextActualContent.tripReqNo === actualContent.tripReqNo) {
+								actualSpan++;
+							} else {
+								break;
+							}
+						}
+
+						var stDate = actualContent.tripStDtm.substring(0, 8);
+						var edDate = actualContent.tripEdDtm.substring(0, 8);
+
+						var barClass = 'actual-bar' + (actualContent.isVacation || actualContent.statusName === '휴무' ? ' status-rest' : '');
+						var cellHtml = '<div class="' + barClass + '" data-trip-req-no="' + actualContent.tripReqNo + '" data-user-id="' + member.userId + '" title="' + actualContent.tripPlace + ' / ' + actualContent.tripTypeName + '">';
+						cellHtml += '<span class="bar-title">' + actualContent.tripPlace + '</span>';
+						cellHtml += '</div>';
+
+						var colspanAttr = actualSpan > 1 ? ' colspan="' + actualSpan + '"' : '';
+						tbody += '<td class="actual-cell' + dayClass + '"' + colspanAttr + ' data-user-id="' + member.userId + '" data-day-str="' + dayStr + '">' + cellHtml + '</td>';
+
+						j += actualSpan;
+					}
+				}
+				tbody += '</tr>';
+			});
+			$('#ganttTableBody').html(tbody);
+			autoFitRowLabels('ganttTable');
+			autoFitGanttRestBars();
+
+			// 드래그 이벤트 바인딩 (계획 행만 대상 - actual-cell/actual-bar는 건드리지 않음)
+			bindCalendarDragEvents();
+		}
+
+		// 3개 캘린더 테이블의 첫 컬럼(라벨)이 공통 너비(ROW_LABEL_WIDTH)를 쓰다 보니 긴 이름/업체명이
+		// 넘칠 수 있어, 넘치는 셀만 폰트를 조금씩 줄여서 한 줄에 들어가게 한다.
+		function autoFitRowLabels(tableId) {
+			var minFontPx = 9;
+			var startFontPx = 12;
+			$('#' + tableId + ' td.row-label').each(function() {
+				var $cell = $(this);
+				var fontSize = startFontPx;
+				$cell.css('font-size', fontSize + 'px');
+				while ($cell[0].scrollWidth > $cell[0].clientWidth && fontSize > minFontPx) {
+					fontSize -= 1;
+					$cell.css('font-size', fontSize + 'px');
+				}
+			});
+		}
+
+		// 바 드래그 조절 상태 변수
+		var isBarDragging = false;
+		var barDragMode = null; // 'move', 'resize-left', 'resize-right'
+		var barDragRsvNo = null;
+		var barDragUserId = null;
+		var barDragOrigSt = null;
+		var barDragOrigEd = null;
+		var barDragTargetSt = null;
+		var barDragTargetEd = null;
+		var barDragHasMoved = false;
+
+		var barDragStartX = 0;
+		var barDragCellWidth = 32;
+
+		function onGanttBarClick(rsvNo, event) {
+			// 바 이동/리사이즈 드래그 후 단순 클릭 이벤트 호출 방지
+			if (barDragHasMoved) {
+				barDragHasMoved = false;
+				return;
+			}
+			if (String(rsvNo).indexOf('VAC_') === 0) {
+				return; // 휴가 일지는 일일업무일지(TB_PM01M01)에서 작성되는 내역이므로 출장 예약 수정 모달을 띄우지 않음
+			}
+			openEditRsvModal(rsvNo, event);
+		}
+
+		function bindCalendarDragEvents() {
+			var $table = $('#ganttTable');
+
+			// 1. 간트 바 및 좌우 리사이즈 핸들 마우스 다운
+			$table.find('.gantt-bar').off('mousedown').on('mousedown', function(e) {
+				var $bar = $(this);
+				if ($bar.attr('data-is-vacation') === 'Y') {
+					return; // 휴가 바는 드래그 이동 대상에서 제외
+				}
+				e.stopPropagation();
+				e.preventDefault(); // 드래그 중 텍스트 드래그 및 이벤트 튀는 현상 방지
+				isBarDragging = true;
+				barDragHasMoved = false;
+				barDragStartX = e.clientX;
+
+				// 테이블 헤더(일자 행)의 첫 날짜 셀 너비 측정 (1일 셀당 width, 월구분 행 제외)
+				var $firstHeaderCell = $table.find('thead tr').last().find('th.day-col').eq(0);
+				if ($firstHeaderCell.length > 0) {
+					barDragCellWidth = $firstHeaderCell.outerWidth() || dayColWidth;
+				}
+
+				var $bar = $(this);
+				barDragRsvNo = $bar.attr('data-rsv-no');
+				barDragUserId = $bar.attr('data-user-id');
+				barDragOrigSt = $bar.attr('data-st-date');
+				barDragOrigEd = $bar.attr('data-ed-date');
+				barDragTargetSt = barDragOrigSt;
+				barDragTargetEd = barDragOrigEd;
+
+				var $target = $(e.target);
+				if ($target.hasClass('handle-left')) {
+					barDragMode = 'resize-left';
+				} else if ($target.hasClass('handle-right')) {
+					barDragMode = 'resize-right';
+				} else {
+					barDragMode = 'move';
+				}
+
+				updateBarDragPreview();
+			});
+
+			// 2. 마우스 이동 (마우스 오프셋 기반 1일 단위 정밀 이동/리사이즈)
+			$(document).off('mousemove.ganttDrag').on('mousemove.ganttDrag', function(e) {
+				if (isBarDragging) {
+					var diffX = e.clientX - barDragStartX;
+					var deltaDays = Math.round(diffX / barDragCellWidth);
+
+					var newSt = barDragOrigSt;
+					var newEd = barDragOrigEd;
+
+					if (barDragMode === 'move') {
+						if (deltaDays !== 0) {
+							newSt = moment(barDragOrigSt, 'YYYYMMDD').add(deltaDays, 'days').format('YYYYMMDD');
+							newEd = moment(barDragOrigEd, 'YYYYMMDD').add(deltaDays, 'days').format('YYYYMMDD');
+						}
+					} else if (barDragMode === 'resize-left') {
+						if (deltaDays !== 0) {
+							var candSt = moment(barDragOrigSt, 'YYYYMMDD').add(deltaDays, 'days').format('YYYYMMDD');
+							if (candSt <= barDragOrigEd) {
+								newSt = candSt;
+								newEd = barDragOrigEd;
+							}
+						}
+					} else if (barDragMode === 'resize-right') {
+						if (deltaDays !== 0) {
+							var candEd = moment(barDragOrigEd, 'YYYYMMDD').add(deltaDays, 'days').format('YYYYMMDD');
+							if (candEd >= barDragOrigSt) {
+								newSt = barDragOrigSt;
+								newEd = candEd;
+							}
+						}
+					}
+
+					if (newSt !== barDragTargetSt || newEd !== barDragTargetEd) {
+						barDragTargetSt = newSt;
+						barDragTargetEd = newEd;
+						barDragHasMoved = true;
+						updateBarDragPreview();
+					}
+					return;
+				}
+
+				if (isCalendarDragging) {
+					var elem = document.elementFromPoint(e.clientX, e.clientY);
+					if (elem) {
+						var $cell = $(elem).closest('td.gantt-cell');
+						if ($cell.length > 0) {
+							var cellUserId = $cell.attr('data-user-id');
+							var hoverDayStr = $cell.attr('data-day-str');
+							if (cellUserId === dragUserId && hoverDayStr && dragCurrentDay !== hoverDayStr) {
+								dragCurrentDay = hoverDayStr;
+								updateDragSelectionHighlight();
+							}
+						}
+					}
+				}
+			});
+
+			// 3. 빈 셀 드래그 시작 (신규 예약)
+			$table.find('td.gantt-cell').off('mousedown').on('mousedown', function(e) {
+				if ($(e.target).hasClass('gantt-bar') || $(e.target).closest('.gantt-bar').length > 0) {
+					return;
+				}
+
+				isCalendarDragging = true;
+				dragUserId = $(this).attr('data-user-id');
+				dragStartDay = $(this).attr('data-day-str');
+				dragCurrentDay = dragStartDay;
+
+				updateDragSelectionHighlight();
+			});
+
+			// 4. 전역 마우스 업
+			$(document).off('mouseup.ganttDrag').on('mouseup.ganttDrag', function() {
+				// A. 간트 바 이동/리사이즈 완료 처리
+				if (isBarDragging) {
+					isBarDragging = false;
+					$('#ganttTable td.gantt-cell').removeClass('bar-drag-preview');
+
+					if (barDragHasMoved && barDragRsvNo && (barDragTargetSt !== barDragOrigSt || barDragTargetEd !== barDragOrigEd)) {
+						updateRsvDates(barDragRsvNo, barDragTargetSt, barDragTargetEd);
+					} else {
+						barDragHasMoved = false;
+					}
+					return;
+				}
+
+				// B. 신규 영역 선택 완료 처리
+				if (isCalendarDragging) {
+					isCalendarDragging = false;
+
+					if (dragUserId && dragStartDay && dragCurrentDay) {
+						var stDay = dragStartDay < dragCurrentDay ? dragStartDay : dragCurrentDay;
+						var edDay = dragStartDay < dragCurrentDay ? dragCurrentDay : dragStartDay;
+
+						openNewRsvModal(dragUserId, stDay, edDay);
+					}
+
+					$('#ganttTable td.gantt-cell').removeClass('drag-selecting');
+					dragUserId = null;
+					dragStartDay = null;
+					dragCurrentDay = null;
+				}
+			});
+		}
+
+		function updateBarDragPreview() {
+			$('#ganttTable td.gantt-cell').removeClass('bar-drag-preview');
+
+			if (!barDragUserId || !barDragTargetSt || !barDragTargetEd) return;
+
+			$('#ganttTable tr[data-user-id="' + barDragUserId + '"] td.gantt-cell').each(function() {
+				var dayStr = $(this).attr('data-day-str');
+				if (dayStr && dayStr >= barDragTargetSt && dayStr <= barDragTargetEd) {
+					$(this).addClass('bar-drag-preview');
+				}
+			});
+		}
+
+		function updateRsvDates(rsvNo, stDayStr, edDayStr) {
+			// 기존 상세 정보 조회를 거쳐 시작일/종료일만 업데이트
+			postAjax("/user/pm/pm60/selectRsvDtl", { rsvNo: rsvNo }, null, function(data) {
+				if (data && data.result) {
+					var rsv = data.result;
+					rsv.tripStDtm = stDayStr + '000000';
+					rsv.tripEdDtm = edDayStr + '235959';
+
+					var stMoment = moment(stDayStr, 'YYYYMMDD');
+					var edMoment = moment(edDayStr, 'YYYYMMDD');
+					var nightCnt = Math.max(0, edMoment.diff(stMoment, 'days'));
+					var dayCnt = nightCnt + 1;
+					rsv.nightCnt = nightCnt;
+					rsv.dayCnt = dayCnt;
+
+					postAjax("/user/pm/pm60/updateRsv", rsv, null, function(res) {
+						if (res && (res.resultCode === '200' || res.resultCode === 200)) {
+							searchData();
+						} else {
+							alert(res ? res.resultMessage : '일정 변경에 실패했습니다.');
+							searchData();
+						}
+					});
+				}
+			});
+		}
+
+		function updateDragSelectionHighlight() {
+			$('#ganttTable td.gantt-cell').removeClass('drag-selecting');
+
+			if (!dragUserId || !dragStartDay || !dragCurrentDay) return;
+
+			var stDay = dragStartDay < dragCurrentDay ? dragStartDay : dragCurrentDay;
+			var edDay = dragStartDay < dragCurrentDay ? dragCurrentDay : dragStartDay;
+
+			$('#ganttTable tr[data-user-id="' + dragUserId + '"] td.gantt-cell').each(function() {
+				var dayStr = $(this).attr('data-day-str');
+				if (dayStr && dayStr >= stDay && dayStr <= edDay) {
+					$(this).addClass('drag-selecting');
+				}
+			});
+		}
+
+		function getCellContent(userId, dayStr) {
+			// 해당 일자에 사용자의 출장 예약(계획)이 있는지 확인
+			for (var i = 0; i < rsvList.length; i++) {
+				var rsv = rsvList[i];
+				if (rsv.userId === userId) {
+					var stDtm = rsv.tripStDtm;
+					var edDtm = rsv.tripEdDtm;
+					var stDate = stDtm.substring(0, 8);
+					var edDate = edDtm.substring(0, 8);
+
+					// dayStr이 stDate <= dayStr <= edDate인지 확인
+					if (dayStr >= stDate && dayStr <= edDate) {
+						return {
+							type: 'bar',
+							rsvNo: rsv.rsvNo,
+							tripStDtm: rsv.tripStDtm,
+							tripEdDtm: rsv.tripEdDtm,
+							tripPlace: rsv.tripPlace || '(미지정)',
+							tripTypeName: rsv.tripTypeCdsNm || '(미지정)',
+							statusName: rsv.rsvStsCdNm || '미확정'
+						};
+					}
+				}
+			}
+			return { type: 'empty' };
+		}
+
+		function getVacationLabel(vac) {
+			var remarkText = $.trim(vac.remark || vac.REMARK || '');
+			var codeNmText = $.trim(vac.workRptSNm || vac.WORK_RPT_S_NM || vac.workRptSNm || '');
+			var combinedText = (remarkText + ' ' + codeNmText).toLowerCase();
+
+			// 1. 비고(REMARK)나 코드명에 특정 키워드가 포함되어 있는지 먼저 체크
+			if (combinedText.indexOf('년차') !== -1 || combinedText.indexOf('연차') !== -1 || combinedText.indexOf('월차') !== -1) {
+				return '년차';
+			} else if (combinedText.indexOf('포상') !== -1) {
+				return '포상';
+			} else if (combinedText.indexOf('반차') !== -1 || combinedText.indexOf('오전') !== -1 || combinedText.indexOf('오후') !== -1) {
+				return '반차';
+			} else if (combinedText.indexOf('공가') !== -1) {
+				return '공가';
+			} else if (combinedText.indexOf('병가') !== -1) {
+				return '병가';
+			} else if (combinedText.indexOf('경조') !== -1) {
+				return '경조';
+			}
+
+			// 2. '01.휴가'나 '1.휴가' 등 숫자가 붙은 코드명 정리
+			if (codeNmText) {
+				var cleaned = codeNmText.replace(/^[0-9]+\.\s*/, '');
+				if (cleaned) {
+					return cleaned;
+				}
+			}
+
+			return '휴가';
+		}
+
+		function getActualCellContent(userId, dayStr) {
+			// 1. 해당 일자에 사용자의 출장신청서(실적)가 있는지 우선 확인
+			for (var i = 0; i < actualList.length; i++) {
+				var actual = actualList[i];
+				if (actual.userId === userId) {
+					var stDtm = actual.tripStDtm;
+					var edDtm = actual.tripEdDtm;
+					var stDate = stDtm.substring(0, 8);
+					var edDate = edDtm.substring(0, 8);
+
+					// dayStr이 stDate <= dayStr <= edDate인지 확인
+					if (dayStr >= stDate && dayStr <= edDate) {
+						return {
+							type: 'bar',
+							isVacation: false,
+							tripReqNo: actual.tripReqNo,
+							tripStDtm: actual.tripStDtm,
+							tripEdDtm: actual.tripEdDtm,
+							tripPlace: actual.tripPlace || '(미지정)',
+							tripTypeName: actual.tripTypeCdsNm || '(미지정)'
+						};
+					}
+				}
+			}
+
+			// 2. 해당 일자에 일일업무일지(TB_PM01M01) 휴가(WORK_RPT_S LIKE '%9901') 데이터가 있는지 확인
+			for (var j = 0; j < vacationList.length; j++) {
+				var vac = vacationList[j];
+				var vUserId = vac.userId || vac.workRptId || vac.USER_ID || vac.WORK_RPT_ID;
+				var vWorkDt = vac.workRptDt || vac.WORK_RPT_DT;
+
+				if (String(vUserId) === String(userId) && String(vWorkDt) === String(dayStr)) {
+					var label = getVacationLabel(vac);
+					return {
+						type: 'bar',
+						isVacation: true,
+						tripReqNo: 'VAC_' + vUserId + '_' + vWorkDt,
+						tripStDtm: vWorkDt + '000000',
+						tripEdDtm: vWorkDt + '235959',
+						tripPlace: label,
+						tripTypeName: '휴무',
+						statusName: '휴무'
+					};
+				}
+			}
+
+			return { type: 'empty' };
+		}
+
+		function openNewRsvModal(userId, stDayStr, edDayStr) {
+			// 단일 날짜 클릭 호환성 보장
+			if (!edDayStr) {
+				edDayStr = stDayStr;
+			}
+
+			// 새 예약 등록 모달 오픈
+			$('#rsvNo').val('');
+			$('#rsvUserId').val(userId);
+			$('#rsvTripStDtm').val(stDayStr.substring(0, 4) + '-' + stDayStr.substring(4, 6) + '-' + stDayStr.substring(6, 8));
+			$('#rsvTripEdDtm').val(edDayStr.substring(0, 4) + '-' + edDayStr.substring(4, 6) + '-' + edDayStr.substring(6, 8));
+			$('#rsvTripPlace').val('');
+			$('#rsvTripDiv').val('');
+			$('#rsvTripTypeCds').val('');
+			$('#rsvTripCondCd').val('');
+			$('#rsvRsvStsCd').val('');
+			$('#rsvEtc').val('');
+
+			$('#modalTitle').text('출장 예약 등록');
+			$('#btnDeleteRsv').hide();
+			$('#rsvModal').show();
+
+			// 자동으로 일수 및 박수 계산 실행 및 바인딩
+			calculateDays();
+			$('#rsvTripStDtm, #rsvTripEdDtm').off('change').on('change', calculateDays);
+		}
+
+		function openEditRsvModal(rsvNo, event) {
+			event.stopPropagation();
+
+			// 예약 상세 조회
+			postAjax("/user/pm/pm60/selectRsvDtl", {
+				rsvNo: rsvNo
+			}, null, function(data) {
+				if (data && data.result) {
+					var rsv = data.result;
+					$('#rsvNo').val(rsv.rsvNo);
+					$('#rsvUserId').val(rsv.userId);
+
+					var stDate = rsv.tripStDtm.substring(0, 8);
+					var edDate = rsv.tripEdDtm.substring(0, 8);
+					$('#rsvTripStDtm').val(stDate.substring(0, 4) + '-' + stDate.substring(4, 6) + '-' + stDate.substring(6, 8));
+					$('#rsvTripEdDtm').val(edDate.substring(0, 4) + '-' + edDate.substring(4, 6) + '-' + edDate.substring(6, 8));
+					$('#rsvTripPlace').val(rsv.tripPlace || '');
+					$('#rsvTripDiv').val(rsv.tripDiv || '');
+					$('#rsvTripTypeCds').val(rsv.tripTypeCds || '');
+					$('#rsvTripCondCd').val(rsv.tripCondCd || '');
+					$('#rsvRsvStsCd').val(rsv.rsvStsCd || '');
+					$('#rsvNightCnt').val(rsv.nightCnt || 0);
+					$('#rsvDayCnt').val(rsv.dayCnt || 1);
+					$('#rsvEtc').val(rsv.etc || '');
+
+					$('#modalTitle').text('출장 예약 수정');
+					$('#btnDeleteRsv').show();
+
+					$('#rsvModal').show();
+
+					// 자동으로 일수 계산 바인딩
+					$('#rsvTripStDtm, #rsvTripEdDtm').off('change').on('change', calculateDays);
+				}
+			});
+		}
+
+		function closeRsvModal() {
+			$('#rsvModal').hide();
+		}
+
+		function calculateDays() {
+			var stDt = $('#rsvTripStDtm').val();
+			var edDt = $('#rsvTripEdDtm').val();
+			if (stDt && edDt) {
+				var stMoment = moment(stDt, 'YYYY-MM-DD');
+				var edMoment = moment(edDt, 'YYYY-MM-DD');
+				if (stMoment.isValid() && edMoment.isValid()) {
+					var nightCnt = Math.max(0, edMoment.diff(stMoment, 'days'));
+					var dayCnt = nightCnt + 1;
+					$('#rsvNightCnt').val(nightCnt);
+					$('#rsvDayCnt').val(dayCnt);
+				}
+			}
+		}
+
+		function saveRsv() {
+			// 유효성 검사
+			var userId = $.trim($('#rsvUserId').val());
+			var tripStDtm = $.trim($('#rsvTripStDtm').val());
+			var tripEdDtm = $.trim($('#rsvTripEdDtm').val());
+			var tripDiv = $.trim($('#rsvTripDiv').val());
+			var tripTypeCds = $.trim($('#rsvTripTypeCds').val());
+			var tripCondCd = $.trim($('#rsvTripCondCd').val());
+			var rsvStsCd = $.trim($('#rsvRsvStsCd').val());
+
+			if (!userId || !tripStDtm || !tripEdDtm || !tripDiv || !tripTypeCds || !tripCondCd || !rsvStsCd) {
+				alert('필수 필드를 모두 입력하세요.');
+				return;
+			}
+
+			// 날짜 포맷 변환 (YYYY-MM-DD → YYYYMMDD)
+			var tripStDtmFmt = tripStDtm.replace(/-/g, '');
+			var tripEdDtmFmt = tripEdDtm.replace(/-/g, '');
+
+			// 날짜 중복 체크 (사전 검사)
+			var rsvNo = $.trim($('#rsvNo').val());
+			checkTripDateOverlap(userId, tripStDtmFmt, tripEdDtmFmt, rsvNo, function(hasOverlap) {
+				if (hasOverlap) {
+					if (!confirm('중복된 출장 일정이 있습니다. 그래도 저장하시겠습니까?')) {
+						return;
+					}
+				}
+
+				// 저장 또는 수정
+				var isNew = !rsvNo;
+				var endpoint = isNew ? '/user/pm/pm60/insertRsv' : '/user/pm/pm60/updateRsv';
+				var paramObj = {
+					rsvNo: rsvNo || undefined,
+					userId: userId,
+					tripStDtm: tripStDtmFmt,
+					tripEdDtm: tripEdDtmFmt,
+					tripDiv: tripDiv,
+					tripTypeCds: tripTypeCds,
+					tripCondCd: tripCondCd,
+					rsvStsCd: rsvStsCd,
+					tripPlace: $.trim($('#rsvTripPlace').val()),
+					etc: $.trim($('#rsvEtc').val()),
+					coCd: jwt.coCd,
+					creatId: jwt.userId,
+					nightCnt: parseInt($('#rsvNightCnt').val()) || 0,
+					dayCnt: parseInt($('#rsvDayCnt').val()) || 1
+				};
+
+				// 중복 확인 후 사용자가 저장을 진행한 경우 forceOverlap 플래그 추가
+				if (hasOverlap) {
+					paramObj.forceOverlap = 'Y';
+				}
+
+				// JSON post (전역 postAjax 사용)
+				postAjax(endpoint, paramObj, null, function(data) {
+					if (data && (data.resultCode === '200' || data.resultCode === 200)) {
+						alert('저장되었습니다.');
+						closeRsvModal();
+						searchData();
+					} else {
+						alert('저장에 실패했습니다: ' + (data.resultMessage || ''));
+					}
+				});
+			});
+		}
+
+		function checkTripDateOverlap(userId, tripStDate, tripEdDate, rsvNo, callback) {
+			postAjax("/user/pm/pm60/selectRsvDateOverlapList", {
+				userId: userId,
+				tripStDate: tripStDate,
+				tripEdDate: tripEdDate,
+				rsvNo: rsvNo || null
+			}, null, function(data) {
+				if (data && data.result && data.result.length > 0) {
+					callback(true);
+				} else {
+					callback(false);
+				}
+			});
+		}
+
+		function deleteRsv() {
+			if (!confirm('정말 삭제하시겠습니까?')) {
+				return;
+			}
+
+			var rsvNo = $.trim($('#rsvNo').val());
+			if (!rsvNo) {
+				alert('삭제할 데이터가 없습니다.');
+				return;
+			}
+
+			putAjax("/user/pm/pm60/deleteRsv", {
+				rsvNo: rsvNo
+			}, null, function(data) {
+				if (data && (data.resultCode === '200' || data.resultCode === 200)) {
+					alert('삭제되었습니다.');
+					closeRsvModal();
+					searchData();
+				} else {
+					alert('삭제에 실패했습니다: ' + (data.resultMessage || ''));
+				}
+			});
+		}
+
+		// ─ 외주 인력 근무시간 캘린더 테이블 ─
+		function renderVndrCalendar(monthStDt, monthEdDt) {
+			var stMoment = moment(monthStDt, 'YYYYMMDD');
+			var edMoment = moment(monthEdDt, 'YYYYMMDD');
+			var dayCount = edMoment.diff(stMoment, 'days') + 1;
+
+			$('#vndrTable').find('colgroup').remove();
+			$(buildColGroup(dayCount, ROW_LABEL_WIDTH)).prependTo('#vndrTable');
+			$('#vndrTable thead').html(buildDateHeaderRow(stMoment, dayCount, '업체명', ROW_LABEL_WIDTH));
+
+			// 데이터에 등장하는 업체명을 행으로 사용 (없으면 빈 상태 표시)
+			var vndrNames = [];
+			$.each(vndrList, function(idx, v) {
+				if (vndrNames.indexOf(v.vndrNm) === -1) {
+					vndrNames.push(v.vndrNm);
+				}
+			});
+
+			if (vndrNames.length === 0) {
+				$('#vndrTableBody').html('');
+				$('#vndrTable').hide();
+				$('#vndrEmptyMsg').show();
+				return;
+			}
+			$('#vndrTable').show();
+			$('#vndrEmptyMsg').hide();
+
+			var tbody = '';
+			$.each(vndrNames, function(idx, vndrNm) {
+				tbody += '<tr>';
+				tbody += '<td class="row-label" title="' + vndrNm + '">' + vndrNm + '</td>';
+
+				for (var i = 0; i < dayCount; i++) {
+					var day = stMoment.clone().add(i, 'days');
+					var dayStr = day.format('YYYYMMDD');
+					var dayNum = day.day();
+					var dayClass = '';
+					if (dayNum === 6) dayClass = ' sat';
+					else if (dayNum === 0) dayClass = ' sun';
+
+					var rec = findVndrRecord(vndrNm, dayStr);
+					if (rec) {
+						tbody += '<td class="gantt-cell has-value' + dayClass + '" onclick="onVndrCellClick(\'' + rec.rsvNo + '\')" title="' + (rec.etc || '') + '">' + rec.workHour + 'h</td>';
+					} else {
+						tbody += '<td class="gantt-cell empty' + dayClass + '" data-vndr-nm="' + vndrNm.replace(/"/g, '&quot;') + '" data-day-str="' + dayStr + '"></td>';
+					}
+				}
+				tbody += '</tr>';
+			});
+			$('#vndrTableBody').html(tbody);
+			autoFitRowLabels('vndrTable');
+			autoFitVndrCells();
+
+			// 드래그로 시작~종료일 범위 선택 이벤트 바인딩
+			bindVndrDragEvents();
+		}
+
+		// 외주 캘린더 드래그(기간 선택) 상태 변수
+		var isVndrDragging = false;
+		var vndrDragRowNm = null;
+		var vndrDragStartDay = null;
+		var vndrDragCurrentDay = null;
+
+		function bindVndrDragEvents() {
+			$('#vndrTable td.gantt-cell.empty').off('mousedown').on('mousedown', function(e) {
+				isVndrDragging = true;
+				vndrDragRowNm = $(this).attr('data-vndr-nm');
+				vndrDragStartDay = $(this).attr('data-day-str');
+				vndrDragCurrentDay = vndrDragStartDay;
+				updateVndrDragHighlight();
+			});
+
+			$(document).off('mousemove.vndrDrag').on('mousemove.vndrDrag', function(e) {
+				if (!isVndrDragging) return;
+				var elem = document.elementFromPoint(e.clientX, e.clientY);
+				if (elem) {
+					var $cell = $(elem).closest('td.gantt-cell');
+					if ($cell.length > 0 && $cell.closest('#vndrTable').length > 0) {
+						var cellVndrNm = $cell.attr('data-vndr-nm');
+						var hoverDayStr = $cell.attr('data-day-str');
+						if (cellVndrNm === vndrDragRowNm && hoverDayStr && vndrDragCurrentDay !== hoverDayStr) {
+							vndrDragCurrentDay = hoverDayStr;
+							updateVndrDragHighlight();
+						}
+					}
+				}
+			});
+
+			$(document).off('mouseup.vndrDrag').on('mouseup.vndrDrag', function() {
+				if (!isVndrDragging) return;
+				isVndrDragging = false;
+
+				if (vndrDragRowNm && vndrDragStartDay && vndrDragCurrentDay) {
+					var stDay = vndrDragStartDay < vndrDragCurrentDay ? vndrDragStartDay : vndrDragCurrentDay;
+					var edDay = vndrDragStartDay < vndrDragCurrentDay ? vndrDragCurrentDay : vndrDragStartDay;
+					var stFmt = stDay.substring(0, 4) + '-' + stDay.substring(4, 6) + '-' + stDay.substring(6, 8);
+					var edFmt = edDay.substring(0, 4) + '-' + edDay.substring(4, 6) + '-' + edDay.substring(6, 8);
+					openNewVndrModal(vndrDragRowNm, stFmt, edFmt);
+				}
+
+				$('#vndrTable td.gantt-cell').removeClass('drag-selecting');
+				vndrDragRowNm = null;
+				vndrDragStartDay = null;
+				vndrDragCurrentDay = null;
+			});
+		}
+
+		function updateVndrDragHighlight() {
+			$('#vndrTable td.gantt-cell').removeClass('drag-selecting');
+			if (!vndrDragRowNm || !vndrDragStartDay || !vndrDragCurrentDay) return;
+
+			var stDay = vndrDragStartDay < vndrDragCurrentDay ? vndrDragStartDay : vndrDragCurrentDay;
+			var edDay = vndrDragStartDay < vndrDragCurrentDay ? vndrDragCurrentDay : vndrDragStartDay;
+
+			$('#vndrTable td.gantt-cell[data-vndr-nm="' + vndrDragRowNm + '"]').each(function() {
+				var d = $(this).attr('data-day-str');
+				if (d && d >= stDay && d <= edDay) {
+					$(this).addClass('drag-selecting');
+				}
+			});
+		}
+
+		function findVndrRecord(vndrNm, dayStr) {
+			for (var i = 0; i < vndrList.length; i++) {
+				if (vndrList[i].vndrNm === vndrNm && vndrList[i].workDt === dayStr) {
+					return vndrList[i];
+				}
+			}
+			return null;
+		}
+
+		function onVndrCellClick(rsvNo) {
+			for (var i = 0; i < vndrList.length; i++) {
+				if (String(vndrList[i].rsvNo) === String(rsvNo)) {
+					openEditVndrModal(vndrList[i]);
+					return;
+				}
+			}
+		}
+
+		// ─ 일자별 인력 현황 요약 캘린더 테이블 ─
+		var kpiMetricRows = [
+			{ key: 'totalCnt', label: '전체 인원' },
+			{ key: 'planCnt', label: 'A계획 인원' },
+			{ key: 'actualCnt', label: 'B실적 인원' },
+			{ key: 'installCnt', label: ' └ 설치(a)' },
+			{ key: 'paidCnt', label: ' └ 유상(b)' },
+			{ key: 'freeCnt', label: ' └ 무상(c)' },
+			{ key: 'diffCnt', label: 'C(실적-계획)', highlight: true },
+			{ key: 'availCnt', label: '가용 인원' },
+		];
+
+		function computeKpiDerivedFields(dataList) {
+			$.each(dataList, function(idx, item) {
+				var actual = Number(item.actualCnt) || 0;
+				var plan = Number(item.planCnt) || 0;
+				item.diffCnt = actual - plan;
+			});
+		}
+
+		function renderKpiCalendar(monthStDt, monthEdDt) {
+			var stMoment = moment(monthStDt, 'YYYYMMDD');
+			var edMoment = moment(monthEdDt, 'YYYYMMDD');
+			var dayCount = edMoment.diff(stMoment, 'days') + 1;
+
+			$('#kpiTable').find('colgroup').remove();
+			$(buildColGroup(dayCount, ROW_LABEL_WIDTH)).prependTo('#kpiTable');
+			$('#kpiTable thead').html(buildDateHeaderRow(stMoment, dayCount, '구분', ROW_LABEL_WIDTH));
+
+			var tbody = '';
+			$.each(kpiMetricRows, function(rowIdx, metric) {
+				tbody += '<tr' + (metric.highlight ? ' class="metric-diff metric-highlight"' : '') + '>';
+				tbody += '<td class="row-label">' + metric.label + '</td>';
+
+				for (var i = 0; i < dayCount; i++) {
+					var day = stMoment.clone().add(i, 'days');
+					var dayStr = day.format('YYYYMMDD');
+					var dayNum = day.day();
+					var dayClass = '';
+					if (dayNum === 6) dayClass = ' weekend-sat';
+					else if (dayNum === 0) dayClass = ' weekend-sun';
+
+					var item = kpiStatList.filter(function(x) { return x.workDt === dayStr; })[0];
+					var cellText = '-';
+					var cellCls = '';
+					if (item) {
+						var raw = item[metric.key];
+						if (metric.isRate) {
+							cellText = raw ? (raw * 100).toFixed(1) + '%' : '-';
+						} else if (metric.highlight) {
+							var num = Number(raw) || 0;
+							cellText = num === 0 ? '-' : ((num > 0 ? '+' : '') + num);
+							cellCls = num > 0 ? ' pos' : (num < 0 ? ' neg' : '');
+						} else if (metric.key === 'totalCnt') {
+							// 전체 인원은 0이어도 그대로 표시 (이상 상태를 숨기지 않음)
+							cellText = (raw === null || raw === undefined || raw === '') ? '-' : raw;
+						} else {
+							var numVal = Number(raw) || 0;
+							cellText = (raw === null || raw === undefined || raw === '' || numVal === 0) ? '-' : raw;
+						}
+					}
+					tbody += '<td class="metric-cell' + dayClass + cellCls + '">' + cellText + '</td>';
+				}
+				tbody += '</tr>';
+			});
+			$('#kpiTableBody').html(tbody);
+			autoFitRowLabels('kpiTable');
+			autoFitKpiCells();
+		}
+
+		// ─ 상단 대시보드 카드 (엑셀 "25년 출장현황(월)" 시트 재현) ─
+		function renderTopDashboardCard(stMonthMoment, edMonthMoment, dataList) {
+			var $container = $('#topDashboardCard');
+			if (!dataList || dataList.length === 0) {
+				$container.html('');
+				return;
+			}
+
+			// 시작월=종료월이면 "YYYY년 MM월", 다르면 "YYYY년 MM월~MM월"(연도 다르면 양쪽 다 표기)
+			var titleText;
+			if (stMonthMoment.format('YYYY-MM') === edMonthMoment.format('YYYY-MM')) {
+				titleText = stMonthMoment.format('YYYY년 MM월');
+			} else if (stMonthMoment.format('YYYY') === edMonthMoment.format('YYYY')) {
+				titleText = stMonthMoment.format('YYYY년 MM월') + '~' + edMonthMoment.format('MM월');
+			} else {
+				titleText = stMonthMoment.format('YYYY년 MM월') + '~' + edMonthMoment.format('YYYY년 MM월');
+			}
+
+			var sum = summarizeKpiList(dataList);
+			var dayCount = dataList.length;
+			var teamCnt = teamMemberList.length;
+			var capacity = teamCnt * dayCount; // 이번달 보유 M/D = 인원수 x 일수
+			var tripPct = capacity > 0 ? (sum.actualCnt / capacity) * 100 : 0;
+			var officePct = 100 - tripPct;
+			var diffSum = sum.actualCnt - sum.planCnt;
+			var diffCls = diffSum > 0 ? 'pos' : (diffSum < 0 ? 'neg' : '');
+			var diffArrow = diffSum > 0 ? '▲' : (diffSum < 0 ? '▼' : '');
+
+			function pctOfB(v) {
+				return sum.actualCnt > 0 ? '(' + Math.round((v / sum.actualCnt) * 100) + '%)' : '';
+			}
+
+			var html = '';
+			html += '<div class="td-month">';
+			html += '<div class="td-month-title">' + titleText + '</div>';
+			html += '<div class="td-office-trip"><span class="tag office-pct">사내 ' + officePct.toFixed(0) + '%</span><span class="tag trip-pct">출장 ' + tripPct.toFixed(0) + '%</span></div>';
+			html += '</div>';
+
+			html += '<div class="td-metric head-plan"><div class="td-metric-head">A 계획</div><div class="td-metric-body">' + sum.planCnt + '</div></div>';
+			html += '<div class="td-metric head-actual"><div class="td-metric-head">B 실적</div><div class="td-metric-body">' + sum.actualCnt + '</div></div>';
+			html += '<div class="td-metric head-install"><div class="td-metric-head">a 설치</div><div class="td-metric-body">' + sum.installCnt + '<span class="td-metric-sub">' + pctOfB(sum.installCnt) + '</span></div></div>';
+			html += '<div class="td-metric head-paid"><div class="td-metric-head">b 유상</div><div class="td-metric-body">' + sum.paidCnt + '<span class="td-metric-sub">' + pctOfB(sum.paidCnt) + '</span></div></div>';
+			html += '<div class="td-metric head-free"><div class="td-metric-head">c 무상</div><div class="td-metric-body">' + sum.freeCnt + '<span class="td-metric-sub">' + pctOfB(sum.freeCnt) + '</span></div></div>';
+			html += '<div class="td-metric head-quarantine"><div class="td-metric-head">d 자가격리</div><div class="td-metric-body" title="현재 공통코드 미배정 - 항상 0">-</div></div>';
+			html += '<div class="td-metric head-diff"><div class="td-metric-head">C 실적-계획</div><div class="td-metric-body ' + diffCls + '">' + diffArrow + Math.abs(diffSum) + '</div></div>';
+			html += '<div class="td-metric head-people"><div class="td-metric-head">생산 인원</div><div class="td-metric-body">' + teamCnt + '</div></div>';
+
+			$container.html(html);
+		}
+
+		function summarizeKpiList(dataList) {
+			var sum = { planCnt: 0, actualCnt: 0, installCnt: 0, paidCnt: 0, freeCnt: 0, availCnt: 0, totalCnt: 0 };
+			$.each(dataList, function(idx, item) {
+				sum.planCnt += Number(item.planCnt) || 0;
+				sum.actualCnt += Number(item.actualCnt) || 0;
+				sum.installCnt += Number(item.installCnt) || 0;
+				sum.paidCnt += Number(item.paidCnt) || 0;
+				sum.freeCnt += Number(item.freeCnt) || 0;
+				sum.availCnt += Number(item.availCnt) || 0;
+				sum.totalCnt += Number(item.totalCnt) || 0;
+			});
+			return sum;
+		}
+
+		// ─ 월간 집계/통계 합계 요약 카드 (KPI 테이블 하단) ─
+		function renderMonthlySummary(dataList) {
+			var $container = $('#monthlySummaryContainer');
+			if (!dataList || dataList.length === 0) {
+				$container.html('');
+				return;
+			}
+
+			var sum = summarizeKpiList(dataList);
+
+			var dayCount = dataList.length;
+			var avgAvail = dayCount > 0 ? (sum.availCnt / dayCount) : 0;
+			var avgTotal = dayCount > 0 ? (sum.totalCnt / dayCount) : 0;
+			var avgAbsenceRate = avgTotal > 0 ? (1 - (avgAvail / avgTotal)) * 100 : 0;
+			var diffSum = sum.actualCnt - sum.planCnt;
+			var diffClass = diffSum > 0 ? 'diff-positive' : (diffSum < 0 ? 'diff-negative' : '');
+
+			var cards = [
+				{ label: '출장계획 합계(연인원)', value: sum.planCnt, unit: '명·일' },
+				{ label: '출장실적 합계(연인원)', value: sum.actualCnt, unit: '명·일' },
+				{ label: '설치(a) 합계', value: sum.installCnt, unit: '명·일' },
+				{ label: '유상(b) 합계', value: sum.paidCnt, unit: '명·일' },
+				{ label: '무상(c) 합계', value: sum.freeCnt, unit: '명·일' },
+				{ label: 'C(실적-계획) 합계', value: (diffSum > 0 ? '+' : '') + diffSum, unit: '명·일', cls: diffClass },
+				{ label: '일평균 가용인원', value: avgAvail.toFixed(1), unit: '명' },
+				{ label: '일평균 결근률', value: avgAbsenceRate.toFixed(1), unit: '%' }
+			];
+
+			var html = '';
+			$.each(cards, function(idx, c) {
+				html += '<div class="summary-card ' + (c.cls || '') + '">';
+				html += '<div class="summary-label">' + c.label + '</div>';
+				html += '<div class="summary-value">' + c.value + '<span class="summary-unit">' + c.unit + '</span></div>';
+				html += '</div>';
+			});
+
+			$container.html(html);
+		}
+
+		// ─ 외주 투입 모달 함수 ─
+		function closeVndrModal() {
+			$('#vndrModal').hide();
+		}
+
+		function openEditVndrModal(rowData) {
+			// 수정 모달 오픈 (기존 레코드는 항상 단일 일자 - 종료일 입력 잠금)
+			$('#vndrRsvNo').val(rowData.rsvNo || '');
+			$('#vndrNm').val(rowData.vndrNm || '');
+
+			// 날짜 포맷 변환 (YYYYMMDD → YYYY-MM-DD)
+			var workDt = rowData.workDt;
+			if (workDt && workDt.length === 8) {
+				workDt = workDt.substring(0, 4) + '-' + workDt.substring(4, 6) + '-' + workDt.substring(6, 8);
+			}
+			$('#vndrWorkStDt').val(workDt || '');
+			$('#vndrWorkEdDt').val(workDt || '');
+			$('#vndrWorkEdDt').prop('readonly', true).css('background-color', '#f0f0f0');
+			$('#vndrRangeHint').hide();
+			$('#vndrWorkHour').val(rowData.workHour || '');
+			$('#vndrEtc').val(rowData.etc || '');
+
+			$('#vndrModalTitle').text('외주 투입 수정');
+			$('#btnDeleteVndr').show();
+			$('#vndrModal').show();
+		}
+
+		function openNewVndrModal(vndrNm, stDt, edDt) {
+			// 신규 등록 모달 오픈 (기간 드래그 시 시작~종료일 범위 입력 가능)
+			if (!edDt) {
+				edDt = stDt;
+			}
+			$('#vndrRsvNo').val('');
+			$('#vndrNm').val(vndrNm || '');
+			$('#vndrWorkStDt').val(stDt || '');
+			$('#vndrWorkEdDt').val(edDt || '');
+			$('#vndrWorkEdDt').prop('readonly', false).css('background-color', '');
+			$('#vndrRangeHint').toggle(!!(stDt && edDt && stDt !== edDt));
+			$('#vndrWorkHour').val('');
+			$('#vndrEtc').val('');
+
+			$('#vndrModalTitle').text('외주 투입 등록');
+			$('#btnDeleteVndr').hide();
+			$('#vndrModal').show();
+
+			$('#vndrWorkStDt, #vndrWorkEdDt').off('change').on('change', function() {
+				var s = $('#vndrWorkStDt').val();
+				var e = $('#vndrWorkEdDt').val();
+				$('#vndrRangeHint').toggle(!!(s && e && s !== e));
+			});
+		}
+
+		function saveVndr() {
+			// 유효성 검사
+			var vndrNm = $.trim($('#vndrNm').val());
+			var workStDt = $.trim($('#vndrWorkStDt').val());
+			var workEdDt = $.trim($('#vndrWorkEdDt').val()) || workStDt;
+			var workHour = $.trim($('#vndrWorkHour').val());
+
+			if (!vndrNm || !workStDt || !workEdDt || !workHour) {
+				alert('필수 필드를 모두 입력하세요.');
+				return;
+			}
+			if (workEdDt < workStDt) {
+				alert('종료일이 시작일보다 빠를 수 없습니다.');
+				return;
+			}
+
+			var rsvNo = $.trim($('#vndrRsvNo').val());
+			var etc = $.trim($('#vndrEtc').val());
+			var hourVal = parseFloat(workHour) || 0;
+
+			// 수정 모드(단일 일자, rsvNo 존재)는 기존과 동일하게 단건 저장
+			if (rsvNo) {
+				postAjax('/user/pm/pm60/updateVndr', {
+					rsvNo: rsvNo,
+					vndrNm: vndrNm,
+					workDt: workStDt.replace(/-/g, ''),
+					workHour: hourVal,
+					etc: etc,
+					coCd: jwt.coCd,
+					creatId: jwt.userId
+				}, null, function(data) {
+					if (data && (data.resultCode === '200' || data.resultCode === 200)) {
+						alert('저장되었습니다.');
+						closeVndrModal();
+						loadVndrList();
+					} else {
+						alert('저장에 실패했습니다: ' + (data.resultMessage || ''));
+					}
+				});
+				return;
+			}
+
+			// 신규 등록: 시작~종료일 범위의 매일에 대해 순차 저장(기존 값이 있으면 수정, 없으면 등록)
+			var days = [];
+			var cur = moment(workStDt, 'YYYY-MM-DD');
+			var end = moment(workEdDt, 'YYYY-MM-DD');
+			while (cur.isSameOrBefore(end)) {
+				days.push(cur.format('YYYYMMDD'));
+				cur.add(1, 'days');
+			}
+
+			var okCnt = 0, failCnt = 0;
+			function saveNextDay(idx) {
+				if (idx >= days.length) {
+					alert('저장되었습니다. (등록/수정 ' + okCnt + '건' + (failCnt > 0 ? ', 실패 ' + failCnt + '건' : '') + ')');
+					closeVndrModal();
+					loadVndrList();
+					return;
+				}
+
+				var dayStr = days[idx];
+				var existing = findVndrRecord(vndrNm, dayStr);
+				var endpoint = existing ? '/user/pm/pm60/updateVndr' : '/user/pm/pm60/insertVndr';
+				var paramObj = {
+					rsvNo: existing ? existing.rsvNo : undefined,
+					vndrNm: vndrNm,
+					workDt: dayStr,
+					workHour: hourVal,
+					etc: etc,
+					coCd: jwt.coCd,
+					creatId: jwt.userId
+				};
+
+				postAjax(endpoint, paramObj, null, function(data) {
+					if (data && (data.resultCode === '200' || data.resultCode === 200)) {
+						okCnt++;
+					} else {
+						failCnt++;
+					}
+					saveNextDay(idx + 1);
+				});
+			}
+
+			saveNextDay(0);
+		}
+
+		function deleteVndr() {
+			if (!confirm('정말 삭제하시겠습니까?')) {
+				return;
+			}
+
+			var rsvNo = $.trim($('#vndrRsvNo').val());
+			if (!rsvNo) {
+				alert('삭제할 데이터가 없습니다.');
+				return;
+			}
+
+			putAjax("/user/pm/pm60/deleteVndr", {
+				rsvNo: rsvNo
+			}, null, function(data) {
+				if (data && (data.resultCode === '200' || data.resultCode === 200)) {
+					alert('삭제되었습니다.');
+					closeVndrModal();
+					loadVndrList();
+				} else {
+					alert('삭제에 실패했습니다: ' + (data.resultMessage || ''));
+				}
+			});
+		}
+
+		function loadVndrList() {
+			// 현재 조회월(시작~종료) 범위를 기반으로 외주 인력 목록 재조회
+			var range = getSearchMonthRange();
+			if (!range) {
+				return;
+			}
+			var monthStDt = range.monthStDt;
+			var monthEdDt = range.monthEdDt;
+
+			postAjax("/user/pm/pm60/selectVndrList", {
+				monthStDt: monthStDt,
+				monthEdDt: monthEdDt
+			}, null, function(data) {
+				vndrList = (data && data.result) ? data.result : [];
+				renderVndrCalendar(monthStDt, monthEdDt);
+			});
+		}
+
+	</script>
+
+</body>
+</html>

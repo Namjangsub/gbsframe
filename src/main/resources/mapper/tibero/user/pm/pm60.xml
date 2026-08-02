@@ -1,0 +1,383 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.dksys.biz.user.pm.pm60.mapper.PM60Mapper">
+
+	<!-- 팀원 목록 조회 (생산팀 GUN6010 소속, 활성 사용자만) -->
+	<select id="selectTeamMemberList" parameterType="Map" resultType="CamelMap">
+		SELECT
+			ID AS USER_ID,
+			NAME AS USER_NM,
+			LEVEL_NM AS POSITION_NM,
+			EMP_NO AS EMP_NO,
+			DEPT_ID AS DEPT_ID,
+			DEPT_NM AS DEPT_NM
+		FROM (
+			SELECT
+				C.ID,
+				C.NAME,
+				L.LEVEL_NM,
+				C.EMP_NO,
+				D.DEPT_ID,
+				D.DEPT_NM
+			FROM TB_CM06M01 C
+			LEFT JOIN TB_CM04M01 D ON C.DEPT_ID = D.DEPT_ID
+			LEFT JOIN TB_CM07M01 L ON C.LEVEL_CD = L.LEVEL_CD
+			WHERE C.DEPT_ID = 'GUN6010'
+			AND C.USE_YN = 'Y'
+			ORDER BY C.NAME ASC
+		)
+		WHERE 1 = 1
+	</select>
+
+	<!-- 정직원 예약 월간 리스트 조회 -->
+	<select id="selectRsvCalendar" parameterType="Map" resultType="CamelMap">
+		SELECT
+			RSV_NO AS RSV_NO,
+			CO_CD AS CO_CD,
+			USER_ID AS USER_ID,
+			(SELECT NAME FROM TB_CM06M01 WHERE ID = TB_PM60M01.USER_ID) AS USER_NM,
+			TRIP_DIV AS TRIP_DIV,
+			FN_CM05M01_CD_TO_NM(TRIP_DIV) AS TRIP_DIV_NM,
+			TRIP_TYPE_CDS AS TRIP_TYPE_CDS,
+			FN_CM05M01_CD_TO_NM(TRIP_TYPE_CDS) AS TRIP_TYPE_CDS_NM,
+			TRIP_COND_CD AS TRIP_COND_CD,
+			FN_CM05M01_CD_TO_NM(TRIP_COND_CD) AS TRIP_COND_CD_NM,
+			RSV_STS_CD AS RSV_STS_CD,
+			FN_CM05M01_CD_TO_NM(RSV_STS_CD) AS RSV_STS_CD_NM,
+			TRIP_PLACE AS TRIP_PLACE,
+			TRIP_ST_DTM AS TRIP_ST_DTM,
+			TRIP_ED_DTM AS TRIP_ED_DTM,
+			SUBSTR(TRIP_ST_DTM, 1, 10) AS TRIP_ST_DTM_DISP,
+			SUBSTR(TRIP_ED_DTM, 1, 10) AS TRIP_ED_DTM_DISP,
+			NIGHT_CNT AS NIGHT_CNT,
+			DAY_CNT AS DAY_CNT,
+			ETC AS ETC,
+			TRIP_REQ_NO AS TRIP_REQ_NO,
+			CREAT_ID AS CREAT_ID,
+			CREAT_DTTM AS CREAT_DTTM,
+			UDT_ID AS UDT_ID,
+			UDT_DTTM AS UDT_DTTM
+		FROM TB_PM60M01
+		WHERE CO_CD = 'GUN'
+		<if test="monthStDt != null and monthStDt != '' and monthEdDt != null and monthEdDt != ''">
+			AND SUBSTR(TRIP_ST_DTM, 1, 8) &lt;= #{monthEdDt}
+			AND SUBSTR(TRIP_ED_DTM, 1, 8) &gt;= #{monthStDt}
+		</if>
+		ORDER BY USER_ID ASC, TRIP_ST_DTM ASC
+	</select>
+
+	<!--
+		정직원 실적 월간 리스트 조회 - 간트에 실적 바로 함께 표시.
+		실적 산출 우선순위: 해당 (출장신청서,출장자)에 출장복명서(TB_PM52D02, TB_PM52M01 경유)가
+		존재하면 복명서의 실제 기간(TRIP_ST_DTM/TRIP_ED_DTM)을 사용하고, 복명서가 없으면
+		출장신청서(TB_PM51D01)의 신청 기간을 사용한다(NVL 우선순위 처리).
+	-->
+	<select id="selectRsvActualCalendar" parameterType="Map" resultType="CamelMap">
+		SELECT
+			M.TRIP_REQ_NO AS TRIP_REQ_NO,
+			D.USER_ID AS USER_ID,
+			NVL((
+				SELECT D2.TRIP_ST_DTM
+				FROM TB_PM52D02 D2
+				INNER JOIN TB_PM52M01 R ON R.TRIP_RPT_NO = D2.TRIP_RPT_NO
+				WHERE R.TRIP_REQ_NO = M.TRIP_REQ_NO
+				AND D2.USER_ID = D.USER_ID
+				AND ROWNUM = 1
+			), D.TRIP_ST_DTM) AS TRIP_ST_DTM,
+			NVL((
+				SELECT D2.TRIP_ED_DTM
+				FROM TB_PM52D02 D2
+				INNER JOIN TB_PM52M01 R ON R.TRIP_RPT_NO = D2.TRIP_RPT_NO
+				WHERE R.TRIP_REQ_NO = M.TRIP_REQ_NO
+				AND D2.USER_ID = D.USER_ID
+				AND ROWNUM = 1
+			), D.TRIP_ED_DTM) AS TRIP_ED_DTM,
+			M.TRIP_PLACE AS TRIP_PLACE,
+			M.TRIP_TYPE_CDS AS TRIP_TYPE_CDS,
+			FN_CM05M01_CD_TO_NM(M.TRIP_TYPE_CDS) AS TRIP_TYPE_CDS_NM
+		FROM TB_PM51D01 D
+		INNER JOIN TB_PM51M01 M ON M.TRIP_REQ_NO = D.TRIP_REQ_NO
+		WHERE D.USER_ID IN (SELECT ID FROM TB_CM06M01 WHERE DEPT_ID = 'GUN6010' AND USE_YN = 'Y')
+		<if test="monthStDt != null and monthStDt != '' and monthEdDt != null and monthEdDt != ''">
+			AND SUBSTR(
+				NVL((
+					SELECT D2.TRIP_ST_DTM FROM TB_PM52D02 D2
+					INNER JOIN TB_PM52M01 R ON R.TRIP_RPT_NO = D2.TRIP_RPT_NO
+					WHERE R.TRIP_REQ_NO = M.TRIP_REQ_NO AND D2.USER_ID = D.USER_ID AND ROWNUM = 1
+				), D.TRIP_ST_DTM), 1, 8) &lt;= #{monthEdDt}
+			AND SUBSTR(
+				NVL((
+					SELECT D2.TRIP_ED_DTM FROM TB_PM52D02 D2
+					INNER JOIN TB_PM52M01 R ON R.TRIP_RPT_NO = D2.TRIP_RPT_NO
+					WHERE R.TRIP_REQ_NO = M.TRIP_REQ_NO AND D2.USER_ID = D.USER_ID AND ROWNUM = 1
+				), D.TRIP_ED_DTM), 1, 8) &gt;= #{monthStDt}
+		</if>
+		ORDER BY D.USER_ID ASC, D.TRIP_ST_DTM ASC
+	</select>
+
+	<!--
+		휴가 월간 리스트 조회 - 일일업무일지(TB_PM01M01)에서 WORK_RPT_S가 '9901'로 끝나면 휴가로
+		판정(부서별 공통코드 그룹 XX9901='1.휴가' 패턴, DB 확인 완료). 간트에 실적 바로 함께 표시.
+	-->
+	<select id="selectVacationCalendar" parameterType="Map" resultType="CamelMap">
+		SELECT
+			WORK_RPT_ID AS USER_ID,
+			TO_CHAR(WORK_RPT_DT, 'YYYYMMDD') AS WORK_RPT_DT,
+			WORK_RPT_S AS WORK_RPT_S,
+			FN_CM05M01_CD_TO_NM(WORK_RPT_S) AS WORK_RPT_S_NM,
+			WORK_RPT_RMK AS REMARK
+		FROM TB_PM01M01
+		WHERE WORK_RPT_S LIKE '%9901'
+		AND WORK_RPT_ID IN (SELECT ID FROM TB_CM06M01 WHERE DEPT_ID = 'GUN6010' AND USE_YN = 'Y')
+		<if test="monthStDt != null and monthStDt != '' and monthEdDt != null and monthEdDt != ''">
+			AND TO_CHAR(WORK_RPT_DT, 'YYYYMMDD') BETWEEN #{monthStDt} AND #{monthEdDt}
+		</if>
+		ORDER BY WORK_RPT_ID ASC, WORK_RPT_DT ASC
+	</select>
+
+	<!-- 예약 단건 상세 조회 -->
+	<select id="selectRsvDtl" parameterType="Map" resultType="CamelMap">
+		SELECT
+			RSV_NO AS RSV_NO,
+			CO_CD AS CO_CD,
+			USER_ID AS USER_ID,
+			(SELECT NAME FROM TB_CM06M01 WHERE ID = TB_PM60M01.USER_ID) AS USER_NM,
+			TRIP_DIV AS TRIP_DIV,
+			FN_CM05M01_CD_TO_NM(TRIP_DIV) AS TRIP_DIV_NM,
+			TRIP_TYPE_CDS AS TRIP_TYPE_CDS,
+			FN_CM05M01_CD_TO_NM(TRIP_TYPE_CDS) AS TRIP_TYPE_CDS_NM,
+			TRIP_COND_CD AS TRIP_COND_CD,
+			FN_CM05M01_CD_TO_NM(TRIP_COND_CD) AS TRIP_COND_CD_NM,
+			RSV_STS_CD AS RSV_STS_CD,
+			FN_CM05M01_CD_TO_NM(RSV_STS_CD) AS RSV_STS_CD_NM,
+			TRIP_PLACE AS TRIP_PLACE,
+			TRIP_ST_DTM AS TRIP_ST_DTM,
+			TRIP_ED_DTM AS TRIP_ED_DTM,
+			NIGHT_CNT AS NIGHT_CNT,
+			DAY_CNT AS DAY_CNT,
+			ETC AS ETC,
+			TRIP_REQ_NO AS TRIP_REQ_NO,
+			CREAT_ID AS CREAT_ID,
+			CREAT_DTTM AS CREAT_DTTM,
+			UDT_ID AS UDT_ID,
+			UDT_DTTM AS UDT_DTTM
+		FROM TB_PM60M01
+		WHERE RSV_NO = #{rsvNo}
+	</select>
+
+	<!-- 정직원 예약 등록 -->
+	<insert id="insertRsv" parameterType="Map">
+		<selectKey keyProperty="rsvNo" resultType="String" order="BEFORE">
+			SELECT 'RV' || TO_CHAR(SYSDATE, 'YYYYMMDD') || '-' || LPAD(MOD(TB_PM60M01_SQ01.NEXTVAL, 10000), 4, '0') FROM DUAL
+		</selectKey>
+		INSERT INTO TB_PM60M01 (
+			RSV_NO, CO_CD, USER_ID, TRIP_DIV, TRIP_TYPE_CDS, TRIP_COND_CD, RSV_STS_CD,
+			TRIP_PLACE, TRIP_ST_DTM, TRIP_ED_DTM, NIGHT_CNT, DAY_CNT, ETC, TRIP_REQ_NO,
+			CREAT_ID, CREAT_PGM, CREAT_DTTM
+		) VALUES (
+			#{rsvNo}, #{coCd, jdbcType=VARCHAR}, #{userId, jdbcType=VARCHAR}, #{tripDiv, jdbcType=VARCHAR},
+			#{tripTypeCds, jdbcType=VARCHAR}, #{tripCondCd, jdbcType=VARCHAR}, #{rsvStsCd, jdbcType=VARCHAR},
+			#{tripPlace, jdbcType=VARCHAR}, #{tripStDtm, jdbcType=VARCHAR}, #{tripEdDtm, jdbcType=VARCHAR},
+			#{nightCnt, jdbcType=NUMERIC}, #{dayCnt, jdbcType=NUMERIC}, #{etc, jdbcType=VARCHAR}, #{tripReqNo, jdbcType=VARCHAR},
+			#{creatId, jdbcType=VARCHAR}, 'PM6001P01', SYSDATE
+		)
+	</insert>
+
+	<!-- 정직원 예약 수정 -->
+	<update id="updateRsv" parameterType="Map">
+		UPDATE TB_PM60M01
+		SET
+			TRIP_DIV = #{tripDiv, jdbcType=VARCHAR},
+			TRIP_TYPE_CDS = #{tripTypeCds, jdbcType=VARCHAR},
+			TRIP_COND_CD = #{tripCondCd, jdbcType=VARCHAR},
+			RSV_STS_CD = #{rsvStsCd, jdbcType=VARCHAR},
+			TRIP_PLACE = #{tripPlace, jdbcType=VARCHAR},
+			TRIP_ST_DTM = #{tripStDtm, jdbcType=VARCHAR},
+			TRIP_ED_DTM = #{tripEdDtm, jdbcType=VARCHAR},
+			NIGHT_CNT = #{nightCnt, jdbcType=NUMERIC},
+			DAY_CNT = #{dayCnt, jdbcType=NUMERIC},
+			ETC = #{etc, jdbcType=VARCHAR},
+			TRIP_REQ_NO = #{tripReqNo, jdbcType=VARCHAR},
+			UDT_ID = #{creatId, jdbcType=VARCHAR},
+			UDT_PGM = 'PM6001P01',
+			UDT_DTTM = SYSDATE
+		WHERE RSV_NO = #{rsvNo}
+	</update>
+
+	<!-- 정직원 예약 취소/삭제 -->
+	<delete id="deleteRsv" parameterType="Map">
+		DELETE FROM TB_PM60M01
+		WHERE RSV_NO = #{rsvNo}
+	</delete>
+
+	<!-- 기간 중복 체크용 예약 리스트 조회 -->
+	<select id="selectRsvDateOverlapList" parameterType="Map" resultType="CamelMap">
+		SELECT
+			'예약' AS DOC_TYPE,
+			RSV_NO AS DOC_NO,
+			TRIP_ST_DTM AS TRIP_ST_DTM,
+			TRIP_ED_DTM AS TRIP_ED_DTM,
+			TRIP_PLACE AS TRIP_PLACE,
+			FN_CM05M01_CD_TO_NM(TRIP_TYPE_CDS) AS TRIP_TYPE_NM
+		FROM TB_PM60M01
+		WHERE USER_ID = #{userId}
+		<if test="rsvNo != null and rsvNo != ''">
+			AND RSV_NO != #{rsvNo}
+		</if>
+		AND SUBSTR(TRIP_ST_DTM, 1, 8) &lt;= #{tripEdDate}
+		AND SUBSTR(TRIP_ED_DTM, 1, 8) &gt;= #{tripStDate}
+	</select>
+
+	<!-- 외주 투입 목록 조회 -->
+	<select id="selectVndrList" parameterType="Map" resultType="CamelMap">
+		SELECT
+			RSV_NO AS RSV_NO,
+			CO_CD AS CO_CD,
+			VNDR_NM AS VNDR_NM,
+			WORK_DT AS WORK_DT,
+			WORK_HOUR AS WORK_HOUR,
+			ETC AS ETC,
+			CREAT_ID AS CREAT_ID,
+			CREAT_DTTM AS CREAT_DTTM,
+			UDT_ID AS UDT_ID,
+			UDT_DTTM AS UDT_DTTM
+		FROM TB_PM60M02
+		WHERE CO_CD = 'GUN'
+		<if test="monthStDt != null and monthStDt != '' and monthEdDt != null and monthEdDt != ''">
+			AND WORK_DT &gt;= #{monthStDt}
+			AND WORK_DT &lt;= #{monthEdDt}
+		</if>
+		ORDER BY WORK_DT ASC, VNDR_NM ASC
+	</select>
+
+	<!-- 외주 투입 등록 -->
+	<insert id="insertVndr" parameterType="Map">
+		<selectKey keyProperty="rsvNo" resultType="String" order="BEFORE">
+			SELECT 'RV2' || TO_CHAR(SYSDATE, 'YYYYMMDD') || '-' || LPAD(MOD(TB_PM60M02_SQ01.NEXTVAL, 10000), 4, '0') FROM DUAL
+		</selectKey>
+		INSERT INTO TB_PM60M02 (
+			RSV_NO, CO_CD, VNDR_NM, WORK_DT, WORK_HOUR, ETC,
+			CREAT_ID, CREAT_PGM, CREAT_DTTM
+		) VALUES (
+			#{rsvNo}, #{coCd, jdbcType=VARCHAR}, #{vndrNm, jdbcType=VARCHAR}, #{workDt, jdbcType=VARCHAR},
+			#{workHour, jdbcType=NUMERIC}, #{etc, jdbcType=VARCHAR},
+			#{creatId, jdbcType=VARCHAR}, 'PM6001P01', SYSDATE
+		)
+	</insert>
+
+	<!-- 외주 투입 수정 -->
+	<update id="updateVndr" parameterType="Map">
+		UPDATE TB_PM60M02
+		SET
+			VNDR_NM = #{vndrNm, jdbcType=VARCHAR},
+			WORK_DT = #{workDt, jdbcType=VARCHAR},
+			WORK_HOUR = #{workHour, jdbcType=NUMERIC},
+			ETC = #{etc, jdbcType=VARCHAR},
+			UDT_ID = #{creatId, jdbcType=VARCHAR},
+			UDT_PGM = 'PM6001P01',
+			UDT_DTTM = SYSDATE
+		WHERE RSV_NO = #{rsvNo}
+	</update>
+
+	<!-- 외주 투입 삭제 -->
+	<delete id="deleteVndr" parameterType="Map">
+		DELETE FROM TB_PM60M02
+		WHERE RSV_NO = #{rsvNo}
+	</delete>
+
+	<!--
+		일자별 KPI 현황 조회 (계획/실적/가용인원).
+		B실적(설치/유상/무상) 산출 우선순위: 출장복명서(TB_PM52D02)가 있으면 복명서의 실제
+		기간을 쓰고, 없으면 출장신청서(TB_PM51D01)의 신청 기간을 쓴다.
+		EFFECTIVE_ACTUAL CTE에서 (출장자,출장신청서)별 유효 실적 기간을 한 번만 계산해서 재사용.
+	-->
+	<select id="selectRsvStatDaily" parameterType="Map" resultType="CamelMap">
+		WITH CALENDAR_TBL AS (
+			SELECT TO_CHAR(TO_DATE(#{monthStDt},'YYYYMMDD') + LEVEL - 1, 'YYYYMMDD') AS WORK_DT
+			FROM DUAL
+			CONNECT BY LEVEL &lt;= (TO_DATE(#{monthEdDt},'YYYYMMDD') - TO_DATE(#{monthStDt},'YYYYMMDD') + 1)
+		),
+		EFFECTIVE_ACTUAL AS (
+			SELECT
+				D.USER_ID AS USER_ID,
+				M.TRIP_REQ_NO AS TRIP_REQ_NO,
+				M.TRIP_TYPE_CDS AS TRIP_TYPE_CDS,
+				NVL((
+					SELECT D2.TRIP_ST_DTM
+					FROM TB_PM52D02 D2
+					INNER JOIN TB_PM52M01 R ON R.TRIP_RPT_NO = D2.TRIP_RPT_NO
+					WHERE R.TRIP_REQ_NO = M.TRIP_REQ_NO
+					AND D2.USER_ID = D.USER_ID
+					AND ROWNUM = 1
+				), D.TRIP_ST_DTM) AS EFF_ST_DTM,
+				NVL((
+					SELECT D2.TRIP_ED_DTM
+					FROM TB_PM52D02 D2
+					INNER JOIN TB_PM52M01 R ON R.TRIP_RPT_NO = D2.TRIP_RPT_NO
+					WHERE R.TRIP_REQ_NO = M.TRIP_REQ_NO
+					AND D2.USER_ID = D.USER_ID
+					AND ROWNUM = 1
+				), D.TRIP_ED_DTM) AS EFF_ED_DTM
+			FROM TB_PM51D01 D
+			INNER JOIN TB_PM51M01 M ON M.TRIP_REQ_NO = D.TRIP_REQ_NO
+			WHERE D.USER_ID IN (SELECT ID FROM TB_CM06M01 WHERE DEPT_ID = 'GUN6010' AND USE_YN = 'Y')
+		)
+		SELECT
+			C.WORK_DT AS WORK_DT,
+			SUBSTR(C.WORK_DT, 1, 4) || '-' || SUBSTR(C.WORK_DT, 5, 2) || '-' || SUBSTR(C.WORK_DT, 7, 2) AS WORK_DT_DISP,
+			(SELECT COUNT(*) FROM TB_CM06M01 WHERE DEPT_ID='GUN6010' AND USE_YN='Y') AS TOTAL_CNT,
+			COALESCE((
+				SELECT COUNT(DISTINCT USER_ID)
+				FROM TB_PM60M01
+				WHERE CO_CD = 'GUN'
+				AND SUBSTR(TRIP_ST_DTM, 1, 8) &lt;= C.WORK_DT
+				AND SUBSTR(TRIP_ED_DTM, 1, 8) &gt;= C.WORK_DT
+			), 0) AS PLAN_CNT,
+			COALESCE((
+				SELECT COUNT(*) FROM TB_CM06M01 WHERE DEPT_ID='GUN6010' AND USE_YN='Y'
+			), 0) - COALESCE((
+				SELECT COUNT(DISTINCT USER_ID)
+				FROM TB_PM60M01
+				WHERE CO_CD = 'GUN'
+				AND SUBSTR(TRIP_ST_DTM, 1, 8) &lt;= C.WORK_DT
+				AND SUBSTR(TRIP_ED_DTM, 1, 8) &gt;= C.WORK_DT
+			), 0) - COALESCE((
+				SELECT COUNT(DISTINCT WORK_RPT_ID)
+				FROM TB_PM01M01
+				WHERE WORK_RPT_S LIKE '%9901'
+				AND TO_CHAR(WORK_RPT_DT, 'YYYYMMDD') = C.WORK_DT
+				AND WORK_RPT_ID IN (SELECT ID FROM TB_CM06M01 WHERE DEPT_ID='GUN6010' AND USE_YN='Y')
+			), 0) AS AVAIL_CNT,
+			COALESCE((
+				SELECT COUNT(DISTINCT USER_ID)
+				FROM EFFECTIVE_ACTUAL
+				WHERE SUBSTR(EFF_ST_DTM, 1, 8) &lt;= C.WORK_DT
+				AND SUBSTR(EFF_ED_DTM, 1, 8) &gt;= C.WORK_DT
+			), 0) AS ACTUAL_CNT,
+			COALESCE((
+				SELECT COUNT(DISTINCT USER_ID)
+				FROM EFFECTIVE_ACTUAL
+				WHERE SUBSTR(EFF_ST_DTM, 1, 8) &lt;= C.WORK_DT
+				AND SUBSTR(EFF_ED_DTM, 1, 8) &gt;= C.WORK_DT
+				AND TRIP_TYPE_CDS IN ('PM51TYPE30', 'PM51TYPE50')
+			), 0) AS INSTALL_CNT,
+			COALESCE((
+				SELECT COUNT(DISTINCT USER_ID)
+				FROM EFFECTIVE_ACTUAL
+				WHERE SUBSTR(EFF_ST_DTM, 1, 8) &lt;= C.WORK_DT
+				AND SUBSTR(EFF_ED_DTM, 1, 8) &gt;= C.WORK_DT
+				AND TRIP_TYPE_CDS = 'PM51TYPE60'
+			), 0) AS PAID_CNT,
+			COALESCE((
+				SELECT COUNT(DISTINCT USER_ID)
+				FROM EFFECTIVE_ACTUAL
+				WHERE SUBSTR(EFF_ST_DTM, 1, 8) &lt;= C.WORK_DT
+				AND SUBSTR(EFF_ED_DTM, 1, 8) &gt;= C.WORK_DT
+				AND TRIP_TYPE_CDS = 'PM51TYPE40'
+			), 0) AS FREE_CNT
+		FROM CALENDAR_TBL C
+		ORDER BY C.WORK_DT ASC
+	</select>
+
+</mapper>
