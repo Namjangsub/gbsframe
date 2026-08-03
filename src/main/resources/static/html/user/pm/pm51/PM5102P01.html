@@ -555,7 +555,9 @@
 	}
 
 	var comboCurrCd = setComboOptionCode("CURR"); //화폐단위
-	var comboPayMthdCd = setComboOptionCode("PM51PAY"); //경비지급방식
+	// 결제방법(현금/카드) 코드킨드는 실제 입력화면(PM0101P01.html #tripRptCurTyp)에서 data-kind="CURTYP"로 확인됨.
+	// "PM51PAY"는 존재하지 않는 코드킨드라서 getCashPayMthdCd()/getComboName() 매칭이 항상 실패하고 있었다.
+	var comboPayMthdCd = setComboOptionCode("CURTYP"); //결제방법(현금/카드)
 	var comboTripRptRound = setComboOptionCode("PM51ROUND"); //결정회차
 	var comboTripRptRsvDiv = setComboOptionCode("PM51RSV"); //예산구분
 
@@ -832,6 +834,12 @@
 
 
 
+	// 출장 경비 신청 현황: 식비/식대/숙박비 항목 여부 판정 (선택 원천 차단 + 자동선택 제외 + 안내 alert에서 공용으로 사용)
+	function isExcludedTripRptType(item) {
+		var expTypNm = String((item && (item.tripRptTypNm || item.tripRptTyp)) || '').trim();
+		return expTypNm.indexOf('식비') > -1 || expTypNm.indexOf('식대') > -1 || expTypNm.indexOf('숙박비') > -1;
+	}
+
 	// 출장 경비 신청 현황 그리드 초기화 (회계담당자 편집가능)
 	function initTripExpenseStatusGrid() {
 		tripExpenseStatusGridView = { target: new ax5.ui.grid() };
@@ -845,7 +853,17 @@
 				selector: true
 			},
 			body: {
-				onClick: function () { this.self.select(this.dindex); },
+				onClick: function () {
+					var gridTarget = this.self;
+					var dindex = this.dindex;
+					setTimeout(function() {
+						var item = gridTarget.list[dindex];
+						if (!item) return;
+						if (isExcludedTripRptType(item)) {
+							alert('식비 및 숙박비 항목은 선택에서 제외됩니다.');
+						}
+					}, 0);
+				},
 				onDataChanged: function () {
 					setTimeout(function() {
 						calculateTripExpenseStatusKrw();
@@ -856,6 +874,9 @@
 			},
 			onStateChanged: function (info) {
 				if (info.action === "selected" || info.action === "unselected" || info.action === "selectedAll" || info.action === "unselectedAll") {
+					// 식비/식대/숙박비 항목은 __disable_selection__ 플래그로 선택 자체가 원천 차단되므로
+					// (data.select/data.selectAll이 각 행의 __disable_selection__을 확인해 토글을 건너뜀)
+					// 여기서는 선택된 항목을 다시 스캔해 강제 해제할 필요가 없다.
 					setTimeout(function() {
 						refreshSettlementSummaryGrids();
 						if (tripExpenseStatusGridView && tripExpenseStatusGridView.target) {
@@ -939,9 +960,20 @@
 		
 		// ax5grid 헤더의 전체선택 클릭 시 onStateChanged 이벤트가 누락되는 문제 해결
 		// selectAll 메서드를 오버라이드하여 합계 재계산 로직을 강제로 실행합니다.
+		// 식비/식대/숙박비 항목은 __disable_selection__ 플래그로 선택에서 원천 제외되므로(data.selectAll이 확인),
+		// 전체선택을 눌러도 그 항목만 자동으로 빠진다 - 사용자가 오해하지 않도록 안내 alert만 추가한다.
 		var originalSelectAll = tripExpenseStatusGridView.target.selectAll;
 		tripExpenseStatusGridView.target.selectAll = function(options) {
 			var result = originalSelectAll.apply(this, arguments);
+			var hasExcluded = false;
+			if (!(options && options.selected === false)) {
+				$.each(this.list || [], function(idx, rowItem) {
+					if (isExcludedTripRptType(rowItem)) { hasExcluded = true; return false; }
+				});
+			}
+			if (hasExcluded) {
+				alert('식비 및 숙박비 항목은 전체 선택에서 제외됩니다.');
+			}
 			setTimeout(function() {
 				refreshSettlementSummaryGrids();
 				if (tripExpenseStatusGridView && tripExpenseStatusGridView.target) {
@@ -951,6 +983,21 @@
 			}, 50);
 			return result;
 		};
+
+		// 맨 앞 행 선택(체크박스, rowSelector) 클릭 시에는 ax5grid가 body.onClick을 호출하지 않는다.
+		// 선택 자체는 __disable_selection__ 플래그로 이미 차단되므로, 여기서는 안내 alert만 띄운다.
+		$('[data-ax5grid="tripExpenseStatusGrid"]').on('click', '[data-ax5grid-column-attr="rowSelector"]', function() {
+			var dindex = Number(this.getAttribute('data-ax5grid-data-index'));
+			setTimeout(function() {
+				var gridTarget = tripExpenseStatusGridView && tripExpenseStatusGridView.target;
+				if (!gridTarget || !gridTarget.list) return;
+				var item = gridTarget.list[dindex];
+				if (!item) return;
+				if (isExcludedTripRptType(item)) {
+					alert('식비 및 숙박비 항목은 선택에서 제외됩니다.');
+				}
+			}, 0);
+		});
 
 		resizeTripExpenseStatusGrid(0);
 	}
@@ -1227,6 +1274,49 @@
 		}
 	}
 
+	// TB_PM52D01 백업 행(마지막 저장 스냅샷)을 그리드 표시용 형태로 변환한다.
+	// (지급완료건 표시, 조회/수정 시 작업일보에서 사라진 항목 복원 양쪽에서 공용으로 사용)
+	function mapTripRptD03ToGridRow(row) {
+		var useDtStr = row.useDt || '';
+		if (/^\d{8}$/.test(useDtStr)) {
+			useDtStr = useDtStr.replace(/^(\d{4})(\d{2})(\d{2})$/, '$1-$2-$3');
+		}
+		// getComboName(comboArray, key)는 key가 객체면 key.value만 확인한다 - {payMthdCd: ...} 같은 임의 키 객체를 넘기면
+		// 항상 매칭 실패로 빈 문자열을 반환하므로 반드시 원시 코드값을 그대로 넘긴다.
+		var curTypNm = getComboName(comboPayMthdCd, row.payMthdCd);
+		var currNm = getComboName(comboCurrCd, row.currCd);
+		// REMARK는 저장 시 항상 tripRptTypNm(항목명)으로 채워진다 (saveTripExpenseStatusOnly()의 remark: row.tripRptTypNm 참고).
+		// expItemCd는 최후 폴백일 뿐이며, 코드값 자체를 이름 대신 보여주는 것도 코드값이 없는 것보다는 낫다.
+		var typNm = row.remark || row.expItemCd;
+
+		return {
+			coCd: row.coCd,
+			roundNo: row.workRptNo,
+			workRptNoSeq: row.workRptNoSeq,
+			workRptId: row.workRptId,
+			workRptIdNm: row.workRptIdNm,
+			workRptDt: useDtStr,
+			tripRptRmk: row.useDesc,
+			tripRptAmt: row.amt,
+			tripRptCurr: row.currCd,
+			tripRptCurrNm: currNm || row.currCd,
+			tripRptTyp: row.expItemCd,
+			tripRptTypNm: typNm,
+			tripRptCurTyp: row.payMthdCd,
+			tripRptCurTypNm: curTypNm || row.payMthdCd,
+			tripRptCardNo: row.tripRptCardNo,
+			tripRptRound: row.tripRptRound,
+			tripRptRsvDiv: row.tripRptRsvDiv,
+			// money 포맷터는 값이 undefined일 때만 공백을 반환하므로, 환율이 없으면(null/0) "0" 대신 공백이 보이도록 undefined로 넘긴다.
+			tripRptCardExrate: row.tripRptCardExrate || undefined,
+			acctRegId: row.acctRegId,
+			acctRegNm: row.acctRegNm,
+			acctRegDttm: row.acctRegDttm,
+			krwAmt: isKrwCurrency(row.currCd) ? row.amt : 0,
+			__disable_selection__: isExcludedTripRptType({ tripRptTypNm: typNm })
+		};
+	}
+
 	// 출장 경비 신청 현황 데이터 로드
 	function loadTripExpenseStatusGrid() {
 		if (!tripExpenseStatusGridView || !tripExpenseStatusGridView.target) return;
@@ -1259,43 +1349,17 @@
 
 		// 백엔드에서 데이터 로드 (지급완료건인 경우 TB_PM52D01 백업 데이터 복원 후 종료)
 		if (isRptPaid() && currentTripRptD03 && currentTripRptD03.length > 0) {
-			var mappedD03 = $.map(currentTripRptD03, function(row) {
-				var useDtStr = row.useDt || '';
-				if (/^\d{8}$/.test(useDtStr)) {
-					useDtStr = useDtStr.replace(/^(\d{4})(\d{2})(\d{2})$/, '$1-$2-$3');
-				}
-				var typNm = getComboName(comboTripRptTyp, { tripRptTyp: row.expItemCd });
-				var curTypNm = getComboName(comboPayMthdCd, { payMthdCd: row.payMthdCd });
-				var currNm = getComboName(comboCurrCd, { currCd: row.currCd });
-				
-				return {
-					coCd: row.coCd,
-					roundNo: row.workRptNo,
-					workRptNoSeq: row.workRptNoSeq,
-					workRptDt: useDtStr,
-					tripRptRmk: row.useDesc,
-					tripRptAmt: row.amt,
-					tripRptCurr: row.currCd,
-					tripRptCurrNm: currNm || row.currCd,
-					tripRptTyp: row.expItemCd,
-					tripRptTypNm: row.remark || typNm || row.expItemCd,
-					tripRptCurTyp: row.payMthdCd,
-					tripRptCurTypNm: curTypNm || row.payMthdCd,
-					tripRptCardNo: row.tripRptCardNo,
-					tripRptRound: row.tripRptRound,
-					tripRptRsvDiv: row.tripRptRsvDiv,
-					tripRptCardExrate: row.tripRptCardExrate,
-					acctRegId: row.acctRegId,
-					acctRegNm: row.acctRegNm,
-					acctRegDttm: row.acctRegDttm,
-					krwAmt: isKrwCurrency(row.currCd) ? row.amt : 0
-				};
-			});
+			var mappedD03 = $.map(currentTripRptD03, function(row) { return mapTripRptD03ToGridRow(row); });
 			tripExpenseStatusGridView.target.setData({ list: mappedD03, page: { totalElements: mappedD03.length } });
-			tripExpenseStatusGridView.target.selectAll({selected: true}); // 기본적으로 전체 선택
+			$.each(mappedD03, function(didx, rowItem) {
+				if (!isExcludedTripRptType(rowItem)) {
+					tripExpenseStatusGridView.target.select(didx, { selected: true });
+				}
+			});
 			calculateTripExpenseStatusKrw();
 			resizeTripExpenseStatusGrid(mappedD03.length);
 			refreshSettlementSummaryGrids();
+			syncTripExpenseStatusHeaderCheckbox();
 			return;
 		}
 
@@ -1341,13 +1405,40 @@
 					row.krwAmt = 0;
 				}
 				row.remark = '';
+				row.__disable_selection__ = isExcludedTripRptType(row);
 			});
 
+			var curTripRptNo = $('#tripRptNo').val() || '';
+			var isExistingDoc = !!curTripRptNo;
+
+			// 조회/수정 화면: 작업일보에서 삭제·변경되어 최신 목록(rows)에서 빠졌지만
+			// 마지막 저장(TB_PM52D01, currentTripRptD03)에는 있던 항목을 복원해 병합한다.
+			// (지급내역 계산현황이 항상 마지막 저장 자료와 일치하도록)
+			if (isExistingDoc && currentTripRptD03 && currentTripRptD03.length > 0) {
+				var liveKeySet = {};
+				$.each(rows, function(idx, r) {
+					liveKeySet[String(r.coCd) + '_' + String(r.roundNo) + '_' + String(r.workRptNoSeq)] = true;
+				});
+				$.each(currentTripRptD03, function(idx, d03Row) {
+					var key = String(d03Row.coCd) + '_' + String(d03Row.workRptNo) + '_' + String(d03Row.workRptNoSeq);
+					if (!liveKeySet[key]) {
+						rows.push(mapTripRptD03ToGridRow(d03Row));
+					}
+				});
+			}
+
 			tripExpenseStatusGridView.target.setData({ list: rows, page: { totalElements: rows.length } });
-			tripExpenseStatusGridView.target.selectAll({selected: true}); // 기본적으로 전체 선택
+			// 자동 선택: 신규 작성은 식비/숙박비 제외 전체 선택, 조회/수정은 마지막 저장 시 확정된 항목(acctRegId 존재 = TB_PM52D01에 있었음)만 선택
+			$.each(rows, function(didx, rowItem) {
+				if (isExcludedTripRptType(rowItem)) return;
+				if (isExistingDoc ? !!rowItem.acctRegId : true) {
+					tripExpenseStatusGridView.target.select(didx, { selected: true });
+				}
+			});
 			calculateTripExpenseStatusKrw();
 			refreshSettlementSummaryGrids();
 			resizeTripExpenseStatusGrid(rows.length);
+			syncTripExpenseStatusHeaderCheckbox();
 		});
 	}
 
@@ -1616,6 +1707,26 @@
 		$.each(ordered, function(idx, row) { row.sanctnSn = sn++; });
 
 		return ordered.concat(shareRows);
+	}
+
+	// 관리부서 결재선(SPECRTS14) 중 그리드에 누락된 담당자를 자동 추가한다 (PM5101 saveTripReq의 ensurePayMngApprovalUsers()와 동일 패턴).
+	// 저장 시점에 호출해, SPECRTS14 공통코드에 등록된 담당자가 결재선에 빠져 있어도 자동으로 채워서 함께 저장되게 한다.
+	function ensureRptMngApprovalUsers() {
+		if (!gridViewApprovalMng || !gridViewApprovalMng.target) return;
+		var list = gridViewApprovalMng.target.getList() || [];
+		var registeredIds = {};
+		$.each(list, function(_, row) { registeredIds[row.usrNm || row.todoId] = true; });
+		$.each(getMngFixedOrderUserIds(), function(_, userId) {
+			if (!registeredIds[userId]) {
+				list.push({
+					gb: '결재', usrNm: userId, todoId: userId, name: userId,
+					todoDiv2CodeId: 'TODODIV2201', flag: 'I', autoRptMngApproval: 'Y', coCd: jwt.coCd
+				});
+			}
+		});
+		list = reorderRptMngApprovalLine(list);
+		gridViewApprovalMng.setData2(list);
+		gridResize(gridViewApprovalMng, list.length);
 	}
 
 	// 결재선 초기화
@@ -2006,6 +2117,13 @@
 			var d01 = data.result.d01 || [];
 			currentReqExpItems = data.result.reqExpItems || [];
 
+			// 경비 세부내역 (TB_PM52D01 백업 데이터 저장) - 아래 updateActualTripPeriodFromRptTravelers()가
+			// loadTripExpenseStatusGrid()를 곧바로 호출하므로, 그 전에 먼저 채워둬야 마지막 저장 스냅샷을 기준으로
+			// 선택 상태를 복원할 수 있다.
+			if (d03) {
+				currentTripRptD03 = d03;
+			}
+
 			// 신청서 인용 정보
 			$('#tripReqNo').val(m02.tripReqNo);
 			bindTripReqView(m01, d01);
@@ -2042,11 +2160,6 @@
 			$('#selfEvalCd').val(m02.selfEvalCd);
 			$('#deptEvalCd').val(m02.deptEvalCd);
 			$('#finalEvalCd').val(m02.finalEvalCd);
-
-			// 경비 세부내역 (TB_PM52D01 백업 데이터 저장)
-			if (d03) {
-				currentTripRptD03 = d03;
-			}
 
 			// 정산 금액
 			$('#advRcvAmtKrw').val(formatSettlementKrw(m02.advRcvAmtKrw));
