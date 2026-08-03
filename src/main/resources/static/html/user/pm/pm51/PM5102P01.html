@@ -259,7 +259,7 @@
 					</td>
 				</tr>
 				<tr>
-					<th class="hit">출장자 판단</th>
+					<th class="hit">출장자 경비 판단</th>
 					<td colspan="1">
 						<div style="display: flex; gap: 10px; flex-wrap: wrap; height: 22px;">
 							<label><input type="radio" name="sprtEvalCd" value="SAVE"> 절약</label>
@@ -348,7 +348,7 @@
 					<th colspan="2"></th>
 				</tr>
 				<tr>
-					<th>결재자 판단</th>
+					<th>결재자 경비 판단</th>
 					<td colspan="5">
 						<div style="display: flex; gap: 10px; flex-wrap: wrap; height: 22px;">
 							<label><input type="radio" name="aprvEvalCd" value="SAVE"> 절약</label>
@@ -1154,8 +1154,8 @@
 		var getExpenseRoundName = function(row) {
 			var month = getExpenseMonth(row.workRptDt);
 			var monthIndex = $.inArray(month, expenseMonths);
-			if (monthIndex < 0) return getComboName(comboTripRptRound, row.tripRptRound || row.roundNo) || row.tripRptRound || row.roundNo || '';
-			if (expenseMonths.length === 1) return '최종';
+			if (monthIndex < 0) return getComboName(comboTripRptRound, row.tripRptRound || row.roundNo) || row.tripRptRound || row.roundNo || '최종';
+			if (expenseMonths.length <= 1) return '최종';
 			if (monthIndex === expenseMonths.length - 1) return '최종';
 			return (monthIndex + 1) + '차';
 		};
@@ -1170,8 +1170,8 @@
 			if (!actualGroups[groupKey]) actualGroups[groupKey] = { roundNo: roundNo, payMthdNm: payMthdNm, cardNo: cardNo, currNm: currCd, usedAmt: 0 };
 			actualGroups[groupKey].usedAmt += getSettlementNumber(row.tripRptAmt || 0);
 		});
-		// 집계 경비가 없어도 예비비 지급금액이 있으면 통화별 최초전도금 행을 표시
-		var advanceRoundNo = expenseMonths.length === 1 ? '최종' : '1차';
+		// 집계 경비가 없거나 1개 월만 존재하는 경우 회차는 '최종'으로 정리
+		var advanceRoundNo = expenseMonths.length <= 1 ? '최종' : '1차';
 		var reqCurrCd = (currentTripReqMaster && currentTripReqMaster.currCd) ? currentTripReqMaster.currCd : ($('#tripRptCurr').val() || 'CURR02');
 		$.each([
 			{ amount: reservePayKrw, currNm: 'CURR01' },
@@ -1191,7 +1191,7 @@
 			}
 		});
 		var actualRows = $.map(actualGroups, function(group) {
-			var isFirstCash = (group.roundNo === '1차' || (expenseMonths.length === 1 && group.roundNo === '최종')) && String(group.payMthdNm || '').indexOf('현금') > -1;
+			var isFirstCash = (group.roundNo === '1차' || (expenseMonths.length <= 1 && group.roundNo === '최종')) && String(group.payMthdNm || '').indexOf('현금') > -1;
 			var currNmUpper = String(group.currNm || '').toUpperCase();
 			var isWon = currNmUpper === 'CURR01' || currNmUpper.indexOf('WON') > -1 || currNmUpper.indexOf('KRW') > -1 || currNmUpper.indexOf('원') > -1;
 			var firstAdvance = 0;
@@ -1204,6 +1204,19 @@
 			}
 			return $.extend(group, { firstAdvance: firstAdvance, currentAdvance: 0, afterSettle: firstAdvance - group.usedAmt });
 		});
+		// 정산내역 및 전도금이 1건도 없는 경우에도 실비정산 그리드에 회차 '최종' 기본 행 배치
+		if (actualRows.length === 0) {
+			actualRows.push({
+				roundNo: '최종',
+				payMthdNm: '현금',
+				cardNo: '',
+				currNm: 'CURR01',
+				firstAdvance: 0,
+				currentAdvance: 0,
+				usedAmt: 0,
+				afterSettle: 0
+			});
+		}
 		actualRows.sort(function(a, b) {
 			var payRank = function(value) { return String(value || '').indexOf('현금') > -1 ? 0 : 1; };
 			var roundRank = function(value) {

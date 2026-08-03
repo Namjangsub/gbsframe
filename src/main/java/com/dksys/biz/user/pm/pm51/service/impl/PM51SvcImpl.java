@@ -224,12 +224,12 @@ public class PM51SvcImpl implements PM51Svc {
 					if ("공유".equals(approvalMap.get("gb"))) {
 						approvalMap.put("sanCtnSn", Integer.toString(iSharng));
 						approvalMap.put("pgParam", pgParam1);
-						qm01Mapper.insertWbsSharngList(approvalMap);
+						insertWbsSharngListSync(approvalMap);
 						iSharng++;
 					} else {
 						approvalMap.put("sanCtnSn", Integer.toString(iApproval));
 						approvalMap.put("pgParam", pgParam2);
-						qm01Mapper.insertWbsApprovalList(approvalMap);
+						insertWbsApprovalListSync(approvalMap);
 						iApproval++;
 						if (approvalMap.get("userId").equals(approvalMap.get("usrNm")) && "1".equals(approvalMap.get("sanCtnSn"))) {
 							approvalMap.put("todoCfOpn", "자체승인");
@@ -368,12 +368,12 @@ public class PM51SvcImpl implements PM51Svc {
 					if ("공유".equals(approvalMap.get("gb"))) {
 						approvalMap.put("sanCtnSn", Integer.toString(iSharng));
 						approvalMap.put("pgParam", pgParam1);
-						qm01Mapper.insertWbsSharngList(approvalMap);
+						insertWbsSharngListSync(approvalMap);
 						iSharng++;
 					} else {
 						approvalMap.put("sanCtnSn", Integer.toString(iApproval));
 						approvalMap.put("pgParam", pgParam2);
-						qm01Mapper.insertWbsApprovalList(approvalMap);
+						insertWbsApprovalListSync(approvalMap);
 						iApproval++;
 						if (approvalMap.get("userId").equals(approvalMap.get("usrNm")) && "1".equals(approvalMap.get("sanCtnSn"))) {
 							approvalMap.put("todoCfOpn", "자체승인");
@@ -437,12 +437,12 @@ public class PM51SvcImpl implements PM51Svc {
 			if (isShareApproval(approvalMap)) {
 				approvalMap.put("sanCtnSn", Integer.toString(iSharng));
 				approvalMap.put("pgParam", pgParam1);
-				qm01Mapper.insertWbsSharngList(approvalMap);
+				insertWbsSharngListSync(approvalMap);
 				iSharng++;
 			} else {
 				approvalMap.put("sanCtnSn", Integer.toString(iApproval));
 				approvalMap.put("pgParam", pgParam2);
-				qm01Mapper.insertWbsApprovalList(approvalMap);
+				insertWbsApprovalListSync(approvalMap);
 				iApproval++;
 				if (approvalMap.get("userId").equals(approvalMap.get("usrNm")) && "1".equals(approvalMap.get("sanCtnSn"))) {
 					approvalMap.put("todoCfOpn", "자동승인");
@@ -496,8 +496,24 @@ public class PM51SvcImpl implements PM51Svc {
 		Map<String, String> m01 = pm51Mapper.selectTripReqM01(paramMap);
 		String salesCd = paramMap.get("tripReqNo");
 		if (m01 != null) {
-			if ("Y".equals(m01.get("tripRptYn"))) {
+			// 복명서가 작성된 경우 삭제 불가
+			if ("Y".equals(m01.get("tripRptYn")) || hasText(m01.get("tripRptNo"))) {
 				throw new RuntimeException("이미 복명서가 작성된 출장신청서는 삭제할 수 없습니다.");
+			}
+
+			// 결재 진행중이거나 완료된 경우 삭제 불가 (APRVSTS01=신청/대기 이외 차단)
+			String aprvStsCd = m01.get("aprvStsCd");
+			if (hasText(aprvStsCd) && !"APRVSTS01".equals(aprvStsCd) && !"APRVSTS00".equals(aprvStsCd)) {
+				throw new RuntimeException("결재처리가 이미 진행중이거나 완료된 출장신청서는 삭제할 수 없습니다.");
+			}
+
+			String currentUserId = paramMap.get("userId");
+			String creatId = m01.get("creatId");
+			String reqId = m01.get("reqId");
+			if (hasText(currentUserId)) {
+				if (!currentUserId.equals(creatId) && !currentUserId.equals(reqId)) {
+					throw new RuntimeException("본인이 작성하거나 신청한 출장신청서만 삭제할 수 있습니다.");
+				}
 			}
 
 			String m01SalesCd = m01.get("salesCd");
@@ -729,12 +745,12 @@ public class PM51SvcImpl implements PM51Svc {
 					if ("공유".equals(approvalMap.get("gb"))) {
 						approvalMap.put("sanCtnSn", Integer.toString(iSharng));
 						approvalMap.put("pgParam", pgParam1);
-						qm01Mapper.insertWbsSharngList(approvalMap);
+						insertWbsSharngListSync(approvalMap);
 						iSharng++;
 					} else {
 						approvalMap.put("sanCtnSn", Integer.toString(iApproval));
 						approvalMap.put("pgParam", pgParam2);
-						qm01Mapper.insertWbsApprovalList(approvalMap);
+						insertWbsApprovalListSync(approvalMap);
 						iApproval++;
 						if (approvalMap.get("userId").equals(approvalMap.get("usrNm"))) {
 							approvalMap.put("todoCfOpn", "자체승인");
@@ -839,12 +855,12 @@ public class PM51SvcImpl implements PM51Svc {
 					if ("공유".equals(approvalMap.get("gb"))) {
 						approvalMap.put("sanCtnSn", Integer.toString(iSharng));
 						approvalMap.put("pgParam", pgParam1);
-						qm01Mapper.insertWbsSharngList(approvalMap);
+						insertWbsSharngListSync(approvalMap);
 						iSharng++;
 					} else {
 						approvalMap.put("sanCtnSn", Integer.toString(iApproval));
 						approvalMap.put("pgParam", pgParam2);
-						qm01Mapper.insertWbsApprovalList(approvalMap);
+						insertWbsApprovalListSync(approvalMap);
 						iApproval++;
 						if (approvalMap.get("userId").equals(approvalMap.get("usrNm"))) {
 							approvalMap.put("todoCfOpn", "자체승인");
@@ -1160,21 +1176,43 @@ public class PM51SvcImpl implements PM51Svc {
 		return codeEtc.split(",");
 	}
 
+	private static final Object APPROVAL_LOCK = new Object();
+
+	private void insertWbsApprovalListSync(Map<String, String> approvalMap) {
+		synchronized (APPROVAL_LOCK) {
+			fillApprovalBaseParam(approvalMap, null);
+			qm01Mapper.insertWbsApprovalList(approvalMap);
+		}
+	}
+
+	private void insertWbsSharngListSync(Map<String, String> approvalMap) {
+		synchronized (APPROVAL_LOCK) {
+			fillApprovalBaseParam(approvalMap, null);
+			qm01Mapper.insertWbsSharngList(approvalMap);
+		}
+	}
+
 	private void fillApprovalBaseParam(Map<String, String> approvalMap, Map<String, String> paramMap) {
-		String pgmId = paramMap.get("pgmId");
-		approvalMap.put("pgmId", pgmId);
-		approvalMap.put("pgPath", approvalPgPath(pgmId));
-		approvalMap.put("userId", paramMap.get("userId"));
-		approvalMap.put("todoDiv1CodeId", isShareApproval(approvalMap) ? "TODODIV10" : "TODODIV20");
-		approvalMap.put("todoCoCd", paramMap.get("coCd"));
-		approvalMap.put("histNo", "");
-		approvalMap.put("sanctnSttus", "N");
-		if (!hasText(approvalMap.get("todoTitle"))) {
-			approvalMap.put("todoTitle", approvalTitle(paramMap));
+		if (paramMap != null) {
+			String pgmId = paramMap.get("pgmId");
+			approvalMap.put("pgmId", pgmId);
+			approvalMap.put("pgPath", approvalPgPath(pgmId));
+			approvalMap.put("userId", paramMap.get("userId"));
+			approvalMap.put("todoDiv1CodeId", isShareApproval(approvalMap) ? "TODODIV10" : "TODODIV20");
+			approvalMap.put("todoCoCd", paramMap.get("coCd"));
+			approvalMap.put("histNo", "");
+			approvalMap.put("sanctnSttus", "N");
+			if (!hasText(approvalMap.get("todoTitle"))) {
+				approvalMap.put("todoTitle", approvalTitle(paramMap));
+			}
+			if (!hasText(approvalMap.get("todoTitl"))) {
+				approvalMap.put("todoTitl", approvalMap.get("todoTitle"));
+			}
 		}
-		if (!hasText(approvalMap.get("todoTitl"))) {
-			approvalMap.put("todoTitl", approvalMap.get("todoTitle"));
-		}
+		// 신규 결재선 INSERT 시 기존 todoKey/toDoKey/TODO_KEY 속성을 제거하여 MyBatis selectKey가 유니크한 TODO_KEY를 항상 새로 생성하도록 함
+		approvalMap.remove("todoKey");
+		approvalMap.remove("toDoKey");
+		approvalMap.remove("TODO_KEY");
 	}
 
 	private String approvalPgPath(String pgmId) {
