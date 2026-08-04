@@ -2675,6 +2675,7 @@
 		formData.append('tripRptNo', $('#tripRptNo').val());
 		formData.append('tripReqNo', $('#tripReqNo').val());
 		formData.append('actionType', $('#actionType').val());
+		formData.append('approvalTitle', buildTripRptGanttStyleTitle()); //결재정보 제목(간트바 표시 형식과 동일)
 
 		// 날짜 변환: datetime-local (2026-03-15T09:00) → YYYYMMDDHH24MI
 		var actStDtm = formatToYYYYMMDDHHMM($('#actStDtm').val());
@@ -2783,6 +2784,9 @@
 		openProgress(true);
 		filePostAjax(url, formData, function (data) {
 			if (data.resultCode === 200) {
+				// 자체승인(1번 결재자=제출자)이 서버에서 처리됐을 수 있으므로, kakaoTodo()가 다음 결재자를 정확히 찾도록 로컬 갱신 후 호출
+				markSelfApprovedRowLocally(gridViewApproval);
+				markSelfApprovedRowLocally(gridViewApprovalMng);
 				kakaoTodo(data.tripRptNo || $('#tripRptNo').val());
 				if (typeof myTodoStatusRtv === 'function') { myTodoStatusRtv(); }
 				alert(data.resultMessage);
@@ -2889,8 +2893,8 @@
 		// 경비현황 그리드의 현재 선택된 데이터 수집
 		var statusList = tripExpenseStatusGridView.target.getList("selected") || [];
 		if (statusList.length === 0) {
-			alert("선택된 경비현황 데이터가 없습니다. 지급처리할 항목을 선택해주세요.");
-			return;
+			// 그리드에 데이터가 있든 없든, 선택된 항목이 없으면 경비 처리 없이 진행할지 확인
+			if (!confirm("경비 처리 없이 지급완료 처리 하시겠습니까?")) return;
 		}
 
 		var errorOccurred = false;
@@ -2955,7 +2959,7 @@
 		// (결재처리(자동 승인)와 1 set: 남은 결재자에게 결재요청 알림톡 재발송)
 		kakaoTodo(tripRptNo);
 		if (typeof myTodoStatusRtv === 'function') { myTodoStatusRtv(); }
-		alert(saveCount + "건의 경비정보와 정산정보가 저장되었습니다.");
+		alert(saveCount === 0 ? "경비 처리 없이 지급완료 처리되었습니다." : (saveCount + "건의 경비정보와 정산정보가 저장되었습니다."));
 		if (modalStack.last() && typeof modalStack.last().callback === 'function') {
 			modalStack.last().callback({ tripRptNo: tripRptNo });
 		}
@@ -3504,6 +3508,7 @@
 						telNo: item.telNo || '',
 						offTelNo: item.offTelNo || '',
 						email: item.email || '',
+						reqDate: item.reqDate || item.reqDt || '',
 						todoId: item.todoId,
 						todoKey: item.todoKey,
 						todoDiv2CodeId: item.todoDiv2CodeId,
@@ -3530,6 +3535,19 @@
 	*/
 	var kakaoCnt = 0;
 	var kakaoErr = [];
+
+	// 저장(insertTripRpt/updateTripRpt) 시 서버가 1번 결재자=제출자 본인이면 자동으로 자체승인 처리하는데,
+	// 화면에 남아있는 결재선 데이터는 이 처리 결과를 아직 반영하지 못한다. kakaoTodo()가 다음 결재자를 정확히 찾을 수 있도록
+	// 서버의 자체승인 조건(1번 && 본인)과 동일한 기준으로 로컬 행을 완료 처리해둔다.
+	function markSelfApprovedRowLocally(gridView) {
+		if (!gridView || !gridView.target || !gridView.target.getList) return;
+		$.each(gridView.target.getList() || [], function(idx, row) {
+			if (row.gb === '결재' && String(row.sanctnSn) === '1' && String(row.usrNm || row.todoId || '') === String(jwt.userId)) {
+				row.sanctnSttus = 'Y';
+				row.todoCfDt = row.todoCfDt || moment().format('YYYY-MM-DD');
+			}
+		});
+	}
 
 	// gb='결재' 행 중 아직 미완료(확인일자 없음 && sanctnSttus!=='Y')인 행 중 실제 순번(sanctnSn)이 가장 작은 값을 반환. 모두 완료/행없음이면 null.
 	// 그리드 로드 순서(ORDER BY SANCTN_SN DESC)와 배열 인덱스는 실제 순번과 일치하지 않으므로 반드시 row.sanctnSn 값을 기준으로 판단한다.
@@ -3613,6 +3631,15 @@
 		}
 	}
 
+	// 간트바 표시 문구와 동일한 형식으로 결재/알림톡 제목 구성: 출장지_프로젝트명(출장유형) 출장복명
+	function buildTripRptGanttStyleTitle() {
+		var titleTripPlace = $('#reqViewTripPlace').val() || '';
+		var titleClntPjtNm = $('#reqViewClntPjtNm').val() || '';
+		var titleTripTypeNm = $('#reqViewTripTypeCds option:selected').text() || '';
+		if (titleTripTypeNm === '선택') titleTripTypeNm = '';
+		return titleTripPlace + (titleClntPjtNm ? '_' + titleClntPjtNm : '') + (titleTripTypeNm ? '(' + titleTripTypeNm + ')' : '') + ' 출장복명';
+	}
+
 	function kakaoSendBody(docNo, todoDiv1CodeId, todoDiv2CodeId, sanctnDiv2, clntNm, teleNo, sanctnSn) {
 		var param = {
 			"tmplatDiv": "TMPLATDIV02"
@@ -3620,7 +3647,7 @@
 			, "todoDiv1CodeId": todoDiv1CodeId
 			, "todoDiv2CodeId": todoDiv2CodeId
 			, "todoDiv1CodeNm": sanctnDiv2
-			, "title": "출장복명서"
+			, "title": buildTripRptGanttStyleTitle()
 			, "sanctnDiv2": sanctnDiv2				//템플릿 결재구분2 #{sanctnDiv2}
 			, "todoNo": docNo
 			, "clntCd": "1"

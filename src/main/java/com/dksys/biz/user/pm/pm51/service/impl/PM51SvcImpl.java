@@ -1255,6 +1255,9 @@ public class PM51SvcImpl implements PM51Svc {
 	}
 
 	private String approvalTitle(Map<String, String> paramMap) {
+		if (hasText(paramMap.get("approvalTitle"))) {
+			return paramMap.get("approvalTitle");
+		}
 		if (hasText(paramMap.get("tripRptNo"))) {
 			return paramMap.get("tripRptNo") + " 출장보고서";
 		}

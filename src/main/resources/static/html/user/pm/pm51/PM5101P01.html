@@ -2056,6 +2056,7 @@
 					if (hasScheduleError) {
 						var pmNm = $('#pmNm').val() || '';
 						if (!confirm("일정계획을 확인하세요. 총괄PM: " + pmNm + "\n\n그래도 등록하시겠습니까?")) {
+							resetSaveFlag();
 							return; // 등록 패스 (취소)
 						}
 					}
@@ -2066,17 +2067,19 @@
 				var hasDateOverlap = false;
 				$.each(gridList, function(idx, item) {
 					if (item.userId && item.tripStDt && item.tripEdDt && checkTravelerDateOverlap(item.userId, item.tripStDt, item.tripEdDt, item.userNm, null, function() {
+						// 중복 확인 후 재시도: 재귀 호출 전에 플래그를 먼저 풀어야 saveTripReq(true)가 최상단 가드에서 즉시 반환되지 않는다.
+						resetSaveFlag();
 						saveTripReq(true);
 					})) {
 						hasDateOverlap = true;
 						return false;
 					}
 				});
-				if (hasDateOverlap) return;
+				if (hasDateOverlap) { resetSaveFlag(); return; }
 			}
 		}
 
-		if (!isPaymentFlow && checkUserAccountingAuth() && !validateTripAreaDivRequired()) return;
+		if (!isPaymentFlow && checkUserAccountingAuth() && !validateTripAreaDivRequired()) { resetSaveFlag(); return; }
 
 		var formData = new FormData();
 		var $popForm = $('#popForm');
@@ -2088,11 +2091,13 @@
 			if (!changeReason) {
 				alert('변경사유를 입력해주세요.');
 				$('#chgReason').focus();
+				resetSaveFlag();
 				return;
 			}
 			// 저장 직전 변경내용 비교 업데이트 - 실제로 달라진 내용이 없으면 저장 차단
 			if (!renderTripReqChgDiff()) {
 				alert('변경된 내용이 없습니다.');
+				resetSaveFlag();
 				return;
 			}
 		}
@@ -2131,6 +2136,7 @@
 
 			formData.append('reqId', $popForm.find('#reqId').val()); //신청인
 			formData.append('reqNm', $popForm.find('#reqNm').val()); //신청인명
+			formData.append('approvalTitle', buildTripReqGanttStyleTitle()); //결재정보 제목(간트바 표시 형식과 동일)
 		formData.append('tripDiv', $popForm.find('#tripDiv').val()); //출장구분
 			formData.append('tripTypeCds', $popForm.find('#tripTypeCds').val()); //출장유형
 			formData.append('tripPlace', $popForm.find('#tripPlace').val()); //출장지
@@ -2286,6 +2292,7 @@
 		formData.append('forceOverlap', forceOverlap ? 'Y' : 'N');
 		formData.append('todoDiv2CodeId', 'TODODIV2190');
 		if (appendFileUploadData(formData) === false) {
+			resetSaveFlag();
 			return;
 		}
 
@@ -2303,6 +2310,9 @@
 		filePostAjax(url, formData, function (data) {
 			window.isSavingTripReq = false;
 			if (data.resultCode === 200) {
+				// 자체승인(1번 결재자=제출자)이 서버에서 처리됐을 수 있으므로, kakaoTodo()가 다음 결재자를 정확히 찾도록 로컬 갱신 후 호출
+				markSelfApprovedRowLocally(gridViewApproval);
+				markSelfApprovedRowLocally(gridViewApprovalMng);
 				kakaoTodo(data.tripReqNo || $('#tripReqNo').val());
 				if (typeof myTodoStatusRtv === 'function') { myTodoStatusRtv(); }
 				if (window.isPayingNow) {
@@ -3893,6 +3903,19 @@
 	var kakaoCnt = 0;
 	var kakaoErr = [];
 
+	// 저장(insertTripReq/insertTripReqChg/updateTripReq) 시 서버가 1번 결재자=제출자 본인이면 자동으로 자체승인 처리하는데,
+	// 화면에 남아있는 결재선 데이터는 이 처리 결과를 아직 반영하지 못한다. kakaoTodo()가 다음 결재자를 정확히 찾을 수 있도록
+	// 서버의 자체승인 조건(1번 && 본인)과 동일한 기준으로 로컬 행을 완료 처리해둔다.
+	function markSelfApprovedRowLocally(gridView) {
+		if (!gridView || !gridView.target || !gridView.target.getList) return;
+		$.each(gridView.target.getList() || [], function(idx, row) {
+			if (row.gb === '결재' && String(row.sanctnSn) === '1' && String(row.usrNm || row.todoId || '') === String(jwt.userId)) {
+				row.sanctnSttus = 'Y';
+				row.todoCfDt = row.todoCfDt || moment().format('YYYY-MM-DD');
+			}
+		});
+	}
+
 	// gb='결재' 행 중 아직 미완료(확인일자 없음 && sanctnSttus!=='Y')인 행 중 실제 순번(sanctnSn)이 가장 작은 값을 반환. 모두 완료/행없음이면 null.
 	// 그리드 로드 순서(ORDER BY SANCTN_SN DESC)와 배열 인덱스는 실제 순번과 일치하지 않으므로 반드시 row.sanctnSn 값을 기준으로 판단한다.
 	function getFirstPendingApprovalSn(gridView) {
@@ -3975,6 +3998,15 @@
 		}
 	}
 
+	// 간트바 표시 문구와 동일한 형식으로 결재/알림톡 제목 구성: 출장지_프로젝트명(출장유형) 출장신청
+	function buildTripReqGanttStyleTitle() {
+		var titleTripPlace = $('#tripPlace').val() || '';
+		var titleClntPjtNm = $('#clntPjtNm').val() || '';
+		var titleTripTypeNm = $('#tripTypeCds option:selected').text() || '';
+		if (titleTripTypeNm === '선택') titleTripTypeNm = '';
+		return titleTripPlace + (titleClntPjtNm ? '_' + titleClntPjtNm : '') + (titleTripTypeNm ? '(' + titleTripTypeNm + ')' : '') + ' 출장신청';
+	}
+
 	function kakaoSendBody(docNo, todoDiv1CodeId, todoDiv2CodeId, sanctnDiv2, clntNm, teleNo, sanctnSn) {
 		var param = {
 			"tmplatDiv": "TMPLATDIV02"
@@ -3982,7 +4014,7 @@
 			, "todoDiv1CodeId": todoDiv1CodeId
 			, "todoDiv2CodeId": todoDiv2CodeId
 			, "todoDiv1CodeNm": sanctnDiv2
-			, "title": "출장신청서"
+			, "title": buildTripReqGanttStyleTitle()
 			, "sanctnDiv2": sanctnDiv2				//템플릿 결재구분2 #{sanctnDiv2}
 			, "todoNo": docNo
 			, "clntCd": "1"
