@@ -4266,6 +4266,11 @@ window.DateRangePicker = (function(){
         s.onCancel = opts.onCancel || null;
         s.excludeSelectors = opts.excludeSelectors || [];
 
+        // 라벨 및 타이틀 커스텀 설정
+        $('#globalDRP .drp-title').text(opts.title || '날짜 선택');
+        $('#globalDRP .drp-col-label').eq(0).text(opts.startLabel || '시작일자');
+        $('#globalDRP .drp-col-label').eq(1).text(opts.endLabel || '종료일자');
+
         // min/max date constraints on pickers
         $('#gDrpStartCal').datepicker('setStartDate', s.minDt || -Infinity);
         $('#gDrpStartCal').datepicker('setEndDate',   s.maxDt || Infinity);
