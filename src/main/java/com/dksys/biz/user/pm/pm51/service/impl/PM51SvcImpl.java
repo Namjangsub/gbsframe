@@ -1075,9 +1075,28 @@ public class PM51SvcImpl implements PM51Svc {
 			return mergedApprovalArr;
 		}
 
+		// [예외] sms가 GUN60(생산팀) 소속 팀원을 대신해 입력하는 경우, 출장자 본인결재는 자동추가하지 않음
+		String callerId = paramMap.get("userId");
+		String skipSelfApprovalUserId = null;
+		if ("sms".equals(callerId)) {
+			Map<String, String> reqParam = new HashMap<>();
+			reqParam.put("tripReqNo", paramMap.get("tripReqNo"));
+			Map<String, String> reqM01 = pm51Mapper.selectTripReqM01(reqParam);
+			String applicantId = reqM01 != null ? reqM01.get("userId") : null;
+			if (hasText(applicantId) && !applicantId.equals(callerId)) {
+				Map<String, String> reqUserInfoParam = new HashMap<>();
+				reqUserInfoParam.put("userId", applicantId);
+				Map<String, String> reqUserInfo = cm06Mapper.selectUserInfo(reqUserInfoParam);
+				String reqDeptId = reqUserInfo != null ? reqUserInfo.get("deptId") : null;
+				if (hasText(reqDeptId) && reqDeptId.startsWith("GUN60")) {
+					skipSelfApprovalUserId = applicantId;
+				}
+			}
+		}
+
 		for (Map<String, String> leaderRow : leaderArr) {
 			String userId = leaderRow.get("usrNm");
-			if (!hasText(userId) || !registeredUserIds.add(userId)) {
+			if (!hasText(userId) || userId.equals(skipSelfApprovalUserId) || !registeredUserIds.add(userId)) {
 				continue;
 			}
 			// 조회 결과(CamelMap)는 put 시 키가 변형되므로 일반 HashMap으로 복사해서 사용
@@ -1106,6 +1125,19 @@ public class PM51SvcImpl implements PM51Svc {
 		if (!hasText(reqId)) {
 			return mergedApprovalArr;
 		}
+
+		// [예외] sms가 GUN60(생산팀) 소속 팀원을 대신해 입력하는 경우, 출장자 본인결재는 자동추가하지 않음
+		String callerId = paramMap.get("userId");
+		if ("sms".equals(callerId) && !reqId.equals(callerId)) {
+			Map<String, String> reqUserInfoParam = new HashMap<>();
+			reqUserInfoParam.put("userId", reqId);
+			Map<String, String> reqUserInfo = cm06Mapper.selectUserInfo(reqUserInfoParam);
+			String reqDeptId = reqUserInfo != null ? reqUserInfo.get("deptId") : null;
+			if (hasText(reqDeptId) && reqDeptId.startsWith("GUN60")) {
+				return mergedApprovalArr;
+			}
+		}
+
 		if (registeredUserIds.add(reqId)) {
 			Map<String, String> applicantMap = new HashMap<>();
 			applicantMap.put("gb", "결재");
