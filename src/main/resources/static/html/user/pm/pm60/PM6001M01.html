@@ -488,6 +488,30 @@
 			overflow-x: visible;
 		}
 
+		/* masterCalendarWrapper의 네이티브 가로 스크롤바는 숨기고(콘텐츠가 길어 페이지 최하단까지
+		   스크롤해야만 보이던 문제), masterScrollbarSticky 미러 바를 대신 노출한다. */
+		#masterCalendarWrapper {
+			scrollbar-width: none; /* Firefox */
+			-ms-overflow-style: none; /* IE/구 Edge */
+		}
+		#masterCalendarWrapper::-webkit-scrollbar {
+			display: none; /* Chrome/Safari/Edge Chromium */
+		}
+		.master-scrollbar-sticky {
+			display: none; /* 가로 스크롤이 필요할 때만 JS로 표시 */
+			position: sticky;
+			bottom: 0;
+			height: 14px;
+			overflow-x: scroll;
+			overflow-y: hidden;
+			background: #f0f2f5;
+			border-top: 1px solid #d0d5db;
+			z-index: 30;
+		}
+		.master-scrollbar-sticky #masterScrollbarStickyInner {
+			height: 1px;
+		}
+
 		/* 상단 대시보드 카드 (엑셀 "25년 출장현황(월)" 시트 재현) */
 		.top-dashboard {
 			display: flex;
@@ -625,8 +649,14 @@
 							</div>
 						</td>
 
-						<th></th>
-						<td></td>
+						<th class="hit">근태포함</th>
+						<td>
+							<select id="attYn_S" name="attYn_S" data-search="attYn" style="width: 100%;">
+								<option value="">전체</option>
+								<option value="Y">근태제외</option>
+								<option value="N">출장신청제외</option>
+							</select>
+						</td>
 
 						<th></th>
 						<td></td>
@@ -725,6 +755,12 @@
 					</tbody>
 				</table>
 			</div>
+		</div>
+
+		<!-- ─ 캘린더 가로 스크롤바 미러: masterCalendarWrapper의 네이티브 스크롤바는 숨기고(내용이 길어
+			 페이지 최하단까지 내려가야만 보이는 문제), 뷰포트 하단에 항상 붙어있는 이 바로 대체 표시 ─ -->
+		<div id="masterScrollbarSticky" class="master-scrollbar-sticky">
+			<div id="masterScrollbarStickyInner"></div>
 		</div>
 
 	</div>
@@ -1098,10 +1134,16 @@
 			$('#btnSearch').on('click', function() {
 				searchData();
 			});
+			// 검색조건 셀렉트박스 변경 시 자동 재조회
+			$('#attYn_S').on('change', function() {
+				searchData();
+			});
 			$('#monthStS, #monthEdS').on('keyup', function(e) {
 				if (e.keyCode === 13) {
 					searchData();
 				}
+			}).on('change', function() {
+				searchData();
 			});
 			$('#monthStS, #monthEdS').css('cursor', 'pointer').on('click', function() {
 				MonthRangePicker.open({
@@ -1119,6 +1161,52 @@
 			$('#zoomSlider').on('input', function() {
 				setDayColWidth(parseInt($(this).val(), 10));
 			});
+
+			setupMasterScrollbarSync();
+		}
+
+		// masterCalendarWrapper(가로 스크롤 컨테이너)의 네이티브 스크롤바는 숨겨두고, 뷰포트 하단에
+		// 항상 붙어있는 masterScrollbarSticky 미러 바로 좌우 스크롤을 대신 제공한다(양방향 동기화).
+		// 3개 테이블 중 하나라도 렌더링/줌으로 폭이 바뀌면 ResizeObserver가 감지해 자동으로 폭을 재동기화한다.
+		function setupMasterScrollbarSync() {
+			var $wrapper = $('#masterCalendarWrapper');
+			var $sticky = $('#masterScrollbarSticky');
+			var $stickyInner = $('#masterScrollbarStickyInner');
+			var syncing = false;
+
+			function syncStickyScrollbar() {
+				var wrapperEl = $wrapper[0];
+				var contentWidth = wrapperEl.scrollWidth;
+				$stickyInner.css('width', contentWidth + 'px');
+				$sticky.css('display', contentWidth > wrapperEl.clientWidth ? 'block' : 'none');
+			}
+
+			$wrapper.on('scroll', function() {
+				if (syncing) return;
+				syncing = true;
+				$sticky.scrollLeft($wrapper.scrollLeft());
+				syncing = false;
+			});
+			$sticky.on('scroll', function() {
+				if (syncing) return;
+				syncing = true;
+				$wrapper.scrollLeft($sticky.scrollLeft());
+				syncing = false;
+			});
+
+			$(window).on('resize', syncStickyScrollbar);
+
+			if (window.ResizeObserver) {
+				var ro = new ResizeObserver(function() {
+					syncStickyScrollbar();
+				});
+				$.each(['ganttTable', 'vndrTable', 'kpiTable'], function(idx, id) {
+					var el = document.getElementById(id);
+					if (el) ro.observe(el);
+				});
+			}
+
+			syncStickyScrollbar();
 		}
 
 		// 줌 슬라이더로 일자 컬럼 너비 조정 (CSS 변수 갱신만으로 3개 테이블 전체에 즉시 반영, 재조회 불필요)
@@ -1263,11 +1351,13 @@
 			var monthStDt = range.monthStDt;
 			var monthEdDt = range.monthEdDt;
 			var monthMoment = range.stMonthMoment;
+			var attYn = $.trim($('#attYn_S').val());
 
 			// 예약 정보 조회
 			postAjax("/user/pm/pm60/selectRsvCalendar", {
 				monthStDt: monthStDt,
-				monthEdDt: monthEdDt
+				monthEdDt: monthEdDt,
+				attYn: attYn
 			}, null, function(data) {
 				if (data && data.result) {
 					rsvList = data.result;
@@ -1276,7 +1366,8 @@
 				// 실적(출장신청서) 데이터 조회 (순차 호출)
 				postAjax("/user/pm/pm60/selectRsvActualCalendar", {
 					monthStDt: monthStDt,
-					monthEdDt: monthEdDt
+					monthEdDt: monthEdDt,
+					attYn: attYn
 				}, null, function(actualData) {
 					if (actualData && actualData.result) {
 						actualList = actualData.result;
@@ -1287,7 +1378,8 @@
 					// 휴가(TB_PM01M01) 데이터 조회 (순차 호출)
 					postAjax("/user/pm/pm60/selectVacationCalendar", {
 						monthStDt: monthStDt,
-						monthEdDt: monthEdDt
+						monthEdDt: monthEdDt,
+						attYn: attYn
 					}, null, function(vacationData) {
 						if (vacationData && vacationData.result) {
 							vacationList = vacationData.result;
@@ -1312,7 +1404,8 @@
 			// KPI 요약 조회
 			postAjax("/user/pm/pm60/selectRsvStatDaily", {
 				monthStDt: monthStDt,
-				monthEdDt: monthEdDt
+				monthEdDt: monthEdDt,
+				attYn: attYn
 			}, null, function(data) {
 				if (data && data.result) {
 					kpiStatList = data.result;
