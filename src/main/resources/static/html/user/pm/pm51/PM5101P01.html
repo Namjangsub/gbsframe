@@ -530,7 +530,6 @@
 		domestic: {
 			lodgingWeekday: 60000,
 			lodgingWeekend: 70000,
-			daily: 36000,
 			mealUnit: 12000,
 			special: 10000
 		},
@@ -540,6 +539,13 @@
 			special: 15
 		}
 	};
+
+	// 국내는 1일 3식, 해외는 1일 2식 기준으로 총 식수 계산 (첫날/마지막날 이동으로 1식 차감)
+	function calcTravelerEatCnt(dayCnt) {
+		var isDomestic = ($('#tripDiv').val() || 'PM51DIV10') === 'PM51DIV10';
+		var mealsPerDay = isDomestic ? 3 : 2;
+		return Math.max(0, dayCnt * mealsPerDay - 1);
+	}
 
 	var travelerDeleteArr = [];
 	var expenseDeleteArr = [];
@@ -1346,7 +1352,7 @@
 
 	// 지급금액(※회계팀 작성) 입력 필드 전체 선택자 (applyEditPolicyInner 내 여러 분기에서 공용으로 사용)
 	function $payAmtEditableFields() {
-		return $('#popForm').find('#payAmt_traffic, #payAmt_lodging, #payAmt_meal, #payAmt_daily, #payAmt_special, #payAmtUsd_traffic, #payAmtUsd_lodging, #payAmtUsd_meal, #payAmtUsd_daily, #payAmtUsd_special, #payAmtTrafficTxt, #payAmtLodgingTxt, #payAmtMealTxt, #payAmtDailyTxt, #payAmtSpecialTxt, #payAmtTotalTxt, #meal_days, #meal_meals, #meal_peeps, #daily_days, #daily_peeps');
+		return $('#popForm').find('#payAmt_traffic, #payAmt_lodging, #payAmt_meal, #payAmt_daily, #payAmt_special, #payAmtUsd_traffic, #payAmtUsd_lodging, #payAmtUsd_meal, #payAmtUsd_daily, #payAmtUsd_special, #payAmtTrafficTxt, #payAmtLodgingTxt, #payAmtMealTxt, #payAmtDailyTxt, #payAmtSpecialTxt, #payAmtTotalTxt');
 	}
 
 	// 해외 출장 시 출장지역구분 필수 입력 검증 (saveTripReq/payTripReq 공용)
@@ -1410,8 +1416,6 @@
 		updateTripNationNmField();
 
 		// 재계산
-		calcTableMeal();
-		calcTableDaily();
 		calcTableTotal();
 	}
 
@@ -1615,7 +1619,7 @@
 				if (stDate.isValid() && edDate.isValid()) {
 					var nightCnt = edDate.diff(stDate, 'days');
 					var dayCnt = nightCnt + 1;
-					var eatCnt = dayCnt * 3 - 1;
+					var eatCnt = calcTravelerEatCnt(dayCnt);
 					gridInstance.setValue(targetRowIdx, "nightCnt", Math.max(0, nightCnt));
 					gridInstance.setValue(targetRowIdx, "dayCnt", Math.max(0, dayCnt));
 					gridInstance.setValue(targetRowIdx, "eatCnt", Math.max(0, eatCnt));
@@ -3334,7 +3338,7 @@
 				specialKrw += dayCnt * 10000;
 			} else {
 				lodgingUsd += nightCnt * PM51_RATE.overseas.lodging[areaDiv];
-				mealUsd += eatCnt * (PM51_RATE.overseas.daily[{ A: 0, B: 1, C: 2 }[areaDiv]] / 2);
+				mealUsd += eatCnt * PM51_RATE.overseas.daily[{ A: 0, B: 1, C: 2 }[areaDiv]];
 				specialKrw += dayCnt * 15000;
 			}
 		});
@@ -3348,58 +3352,6 @@
 		// 잡비는 화면의 잡비 입력칸(payAmt_daily)에 반영하고 예비비(payAmt_special)는 유지
 		$expensePayInput('daily').val(specialKrw.toLocaleString());
 		$expensePayUsdInput('daily').val('0.00');
-		calcTableTotal();
-	}
-
-	// 식대 테이블 자동 계산
-	function calcTableMeal() {
-		var $container = $('.popup_area');
-		var $popForm = $('#popForm');
-		var tripDiv = $popForm.find('#tripDiv').val() || 'PM51DIV10';
-		var isDomestic = (tripDiv === 'PM51DIV10');
-		var total = 0;
-		var exrate = normalizeExchangeNumber($container.find('#exrate').val()) || 1;
-
-		var days = parseInt($container.find('#meal_days').val()) || 0;
-		var meals = parseInt($container.find('#meal_meals').val()) || 0;
-		var peeps = parseInt($container.find('#meal_peeps').val()) || 0;
-
-		if (isDomestic) {
-			total = days * meals * peeps * 12000;
-		} else {
-			var mealRate = PM51_RATE.overseas.daily[1] / 2;
-			total = days * meals * peeps * mealRate * exrate;
-		}
-
-		// 일수/식수/인원이 없는 상세조회 상태에서는 DB에 저장된 식대 금액을 0으로 덮어쓰지 않는다.
-		if (days > 0 && meals > 0 && peeps > 0) {
-			$expensePayInput('meal').val(Math.round(total).toLocaleString());
-		}
-		calcTableTotal();
-	}
-
-	// 일비 테이블 자동 계산
-	function calcTableDaily() {
-		var $container = $('.popup_area');
-		var $popForm = $('#popForm');
-		var tripDiv = $popForm.find('#tripDiv').val() || 'PM51DIV10'; //출장구분
-		var isDomestic = (tripDiv === 'PM51DIV10'); //국내/해외
-		var total = 0;
-		var exrate = normalizeExchangeNumber($container.find('#exrate').val()) || 1;
-
-		var days = parseInt($container.find('#daily_days').val()) || 0; //일수
-		var peeps = parseInt($container.find('#daily_peeps').val()) || 0; //인원
-
-		if (isDomestic) { //국내
-			total = days * peeps * PM51_RATE.domestic.daily;
-		} else { //해외
-			total = days * peeps * PM51_RATE.overseas.daily[1] * exrate;
-		}
-
-		// 일수/인원이 없는 상세조회 상태에서는 DB에 저장된 일비 금액을 0으로 덮어쓰지 않는다.
-		if (days > 0 && peeps > 0) {
-			$expensePayInput('daily').val(Math.round(total).toLocaleString());
-		}
 		calcTableTotal();
 	}
 
@@ -3574,7 +3526,6 @@
 
 		$.each(expenseList, function(idx, row) {
 			var item = String(row.expItemCd || '').trim();
-			var basis = row.calcBasis || '';
 			var remark = row.remark || '';
 
 			if (item === '교통비') {
@@ -3586,20 +3537,9 @@
 			} else if (item === '출장일비(식대/일비)' || item === '식대' || item === '식비') {
 				bindPaymentValue('meal', row);
 				$('#payAmtMealTxt').val(remark);
-				var m = basis.match(/(\d+)일\s*=\s*(\d+)식\s*x\s*(\d+)명/);
-				if (m) {
-					$('#meal_days').val(m[1]);
-					$('#meal_meals').val(m[2]);
-					$('#meal_peeps').val(m[3]);
-				}
 			} else if (item === '일비') {
 				bindPaymentValue('daily', row);
 				$('#payAmtDailyTxt').val(remark);
-				var d = basis.match(/(\d+)박\s*x\s*(\d+)명/);
-				if (d) {
-					$('#daily_days').val(d[1]);
-					$('#daily_peeps').val(d[2]);
-				}
 			} else if (item === '특별비' || item === '잡비') {
 				bindPaymentValue('special', row);
 				$('#payAmtSpecialTxt').val(remark);
@@ -3753,8 +3693,6 @@
 
 	function onExchangeRateChanged(el) {
 		if (el) onlyNumber(el);
-		calcTableMeal();
-		calcTableDaily();
 		calcTableTotal();
 	}
 
@@ -3845,7 +3783,7 @@
 						var dayCnt = nightCnt + 1;
 						gridInstance.setValue(dindex, 'nightCnt', Math.max(0, nightCnt));
 						gridInstance.setValue(dindex, 'dayCnt', Math.max(0, dayCnt));
-						gridInstance.setValue(dindex, 'eatCnt', Math.max(0, dayCnt * 3 - 1));
+						gridInstance.setValue(dindex, 'eatCnt', calcTravelerEatCnt(dayCnt));
 					}
 					if (reason) {
 						var existingEtc = gridInstance.getList()[dindex].etc || '';
