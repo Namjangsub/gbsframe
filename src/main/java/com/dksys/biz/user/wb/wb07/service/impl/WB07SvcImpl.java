@@ -216,6 +216,28 @@ public class WB07SvcImpl implements WB07Svc {
 	}
 
 	@Override
+	public List<Map<String, String>> selectWb22d02ExtraInfoHist(Map<String, String> paramMap) {
+		String coCd = String.valueOf(paramMap.getOrDefault("coCd", ""));
+		String salesCd = String.valueOf(paramMap.getOrDefault("salesCd", ""));
+		String columnName = String.valueOf(paramMap.getOrDefault("columnName", ""));
+
+		if (coCd.isEmpty() || salesCd.isEmpty()) {
+			throw new IllegalArgumentException("회사코드와 SALES CODE는 필수입니다.");
+		}
+
+		boolean allowedColumn = "mmMemo".equals(columnName)
+				|| "dwgMemo".equals(columnName)
+				|| "prdMemo".equals(columnName)
+				|| "salesMemo".equals(columnName)
+				|| "pmMemo".equals(columnName);
+		if (!allowedColumn) {
+			throw new IllegalArgumentException("조회할 수 없는 메모 컬럼입니다.");
+		}
+
+		return wb07Mapper.selectWb22d02ExtraInfoHist(paramMap);
+	}
+
+	@Override
 	public Map<String, Object> updateWb22d02ExtraInfo(Map<String, String> paramMap) throws Exception {
 		Map<String, Object> out = new HashMap<>();
 
@@ -231,6 +253,9 @@ public class WB07SvcImpl implements WB07Svc {
 
 		int updated = wb07Mapper.updateWb22d02ExtraInfo(paramMap);
 		if (updated == 1) {
+			paramMap.put("histDiv", "UPDATE");
+			wb07Mapper.insertWb22d02ExtraInfoHist(paramMap);
+
 			Map<String, String> latest = wb07Mapper.selectWb22d02ExtraInfo(paramMap);
 			out.put("resultCode", 200);
 			out.put("result", latest);
@@ -245,6 +270,9 @@ public class WB07SvcImpl implements WB07Svc {
 				paramMap.put("udtDttm", currentUdt);
 				int retried = wb07Mapper.updateWb22d02ExtraInfo(paramMap);
 				if (retried == 1) {
+					paramMap.put("histDiv", "UPDATE");
+					wb07Mapper.insertWb22d02ExtraInfoHist(paramMap);
+
 					Map<String, String> latest = wb07Mapper.selectWb22d02ExtraInfo(paramMap);
 					out.put("resultCode", 200);
 					out.put("result", latest);
@@ -254,14 +282,9 @@ public class WB07SvcImpl implements WB07Svc {
 		}
 
 		if (current == null || current.isEmpty()) {
+			int inserted;
 			try {
-				int inserted = wb07Mapper.insertWb22d02ExtraInfo(paramMap);
-				if (inserted == 1) {
-					Map<String, String> latest = wb07Mapper.selectWb22d02ExtraInfo(paramMap);
-					out.put("resultCode", 200);
-					out.put("result", latest);
-					return out;
-				}
+				inserted = wb07Mapper.insertWb22d02ExtraInfo(paramMap);
 			} catch (Exception e) {
 				Map<String, String> after = wb07Mapper.selectWb22d02ExtraInfo(paramMap);
 				if (after != null && !after.isEmpty()) {
@@ -271,6 +294,16 @@ public class WB07SvcImpl implements WB07Svc {
 					return out;
 				}
 				throw e;
+			}
+
+			if (inserted == 1) {
+				paramMap.put("histDiv", "INSERT");
+				wb07Mapper.insertWb22d02ExtraInfoHist(paramMap);
+
+				Map<String, String> latest = wb07Mapper.selectWb22d02ExtraInfo(paramMap);
+				out.put("resultCode", 200);
+				out.put("result", latest);
+				return out;
 			}
 
 			out.put("resultCode", 500);

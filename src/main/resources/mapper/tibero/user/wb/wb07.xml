@@ -107,6 +107,16 @@
 						AND D.SALES_CD LIKE  '%' || #{salesCd} || '%'
 					</when>
 				</choose>
+				<!-- 미출고: 물류진행요청 상세에 등록되지 않은 SALES CODE -->
+				<if test='shipYn != null and shipYn == "N"'>
+					AND NOT EXISTS (
+						SELECT 1
+						FROM TB_CR11D01 LD
+						JOIN TB_CR11M01 LM ON LM.LGIST_NO = LD.LGIST_NO
+						WHERE LM.CO_CD = C.CO_CD
+						  AND LD.SALES_CD = D.SALES_CD
+					)
+				</if>
 			)
 			,totPlan AS (
 			<choose>
@@ -525,6 +535,15 @@
 				AND W.WBS_PLAN_CODE_KIND = 'WBSCODE'
 				AND W.WBS_PLANS_DT IS NOT NULL
 				AND W.WBS_PLANE_DT IS NOT NULL
+				<if test='shipYn != null and shipYn == "N"'>
+					AND NOT EXISTS (
+						SELECT 1
+						FROM TB_CR11D01 LD
+						JOIN TB_CR11M01 LM ON LM.LGIST_NO = LD.LGIST_NO
+						WHERE LM.CO_CD = W.CO_CD
+						  AND LD.SALES_CD = W.SALES_CD
+					)
+				</if>
 				GROUP BY W.CO_CD, W.SALES_CD, T.D
 			<choose>
 			  <!-- 0) 간트에서 전달된 salesCds 목록이 있으면 해당 목록 기준으로만 필터 -->
@@ -1026,6 +1045,112 @@
 		  AND W.SALES_CD = #{salesCd}
 		  AND W.WBS_PLAN_CODE_KIND = #{wbsPlanCodeKind}
 		ORDER BY W.SEQ, W.WBS_PLANS_DT
+	</select>
+
+	<insert id="insertWb22d02ExtraInfoHist" parameterType="Map">
+		INSERT INTO TB_WB22D02_HIST
+		(
+			HIST_SEQ
+			, CO_CD
+			, SALES_CD
+			, DESIGN_MNG
+			, DELIVER_DAY
+			, MODEL_CLNT_NM
+			, MODEL_COMP_DT
+			, OUT_CLNT_NM
+			, OUT_COMP_DT
+			, CAM_CLNT_NM
+			, CAM_COMP_DT
+			, MACHIN_MNG_NM
+			, MM_MEMO
+			, DWG_MEMO
+			, PRD_MEMO
+			, SALES_MEMO
+			, PM_MEMO
+			, REMARK
+			, CREAT_ID
+			, CREAT_PGM
+			, CREAT_DTTM
+			, UDT_ID
+			, UDT_PGM
+			, UDT_DTTM
+			, HIST_DIV
+			, HIST_ID
+			, HIST_DTTM
+		)
+		SELECT
+			SEQ_WB22D02_HIST.NEXTVAL
+			, D.CO_CD
+			, D.SALES_CD
+			, D.DESIGN_MNG
+			, D.DELIVER_DAY
+			, D.MODEL_CLNT_NM
+			, D.MODEL_COMP_DT
+			, D.OUT_CLNT_NM
+			, D.OUT_COMP_DT
+			, D.CAM_CLNT_NM
+			, D.CAM_COMP_DT
+			, D.MACHIN_MNG_NM
+			, D.MM_MEMO
+			, D.DWG_MEMO
+			, D.PRD_MEMO
+			, D.SALES_MEMO
+			, D.PM_MEMO
+			, D.REMARK
+			, D.CREAT_ID
+			, D.CREAT_PGM
+			, D.CREAT_DTTM
+			, D.UDT_ID
+			, D.UDT_PGM
+			, D.UDT_DTTM
+			, #{histDiv}
+			, #{userId}
+			, CURRENT_TIMESTAMP
+		FROM TB_WB22D02 D
+		WHERE D.CO_CD = #{coCd}
+		AND D.SALES_CD = #{salesCd}
+	</insert>
+
+	<select id="selectWb22d02ExtraInfoHist" parameterType="Map" resultType="camelMap">
+		WITH HIST_BASE AS (
+			SELECT
+				  H.HIST_SEQ
+				, H.HIST_DIV
+				, H.HIST_ID
+				, H.HIST_DTTM
+				, ROW_NUMBER() OVER (ORDER BY H.HIST_SEQ) AS HIST_ORDER
+				, <choose>
+					<when test="columnName == 'mmMemo'">H.MM_MEMO</when>
+					<when test="columnName == 'dwgMemo'">H.DWG_MEMO</when>
+					<when test="columnName == 'prdMemo'">H.PRD_MEMO</when>
+					<when test="columnName == 'salesMemo'">H.SALES_MEMO</when>
+					<otherwise>H.PM_MEMO</otherwise>
+				  </choose> AS CHANGE_CONTENT
+				, LAG(
+					<choose>
+						<when test="columnName == 'mmMemo'">H.MM_MEMO</when>
+						<when test="columnName == 'dwgMemo'">H.DWG_MEMO</when>
+						<when test="columnName == 'prdMemo'">H.PRD_MEMO</when>
+						<when test="columnName == 'salesMemo'">H.SALES_MEMO</when>
+						<otherwise>H.PM_MEMO</otherwise>
+					</choose>
+				  ) OVER (ORDER BY H.HIST_SEQ) AS PREV_CONTENT
+			FROM TB_WB22D02_HIST H
+			WHERE H.CO_CD = #{coCd}
+			  AND H.SALES_CD = #{salesCd}
+		)
+		SELECT
+			  H.HIST_SEQ
+			, H.HIST_DIV
+			, H.HIST_ID
+			, NVL(U.NAME, H.HIST_ID) AS HIST_USER_NM
+			, TO_CHAR(H.HIST_DTTM, 'YYYY-MM-DD HH24:MI:SS') AS HIST_DTTM
+			, H.CHANGE_CONTENT
+		FROM HIST_BASE H
+		LEFT JOIN TB_CM06M01 U ON U.ID = H.HIST_ID
+		WHERE (H.HIST_ORDER = 1 AND H.CHANGE_CONTENT IS NOT NULL)
+		   OR DECODE(H.CHANGE_CONTENT, H.PREV_CONTENT, 0, 1) = 1
+		ORDER BY H.HIST_SEQ DESC
 	</select>
 
 </mapper>

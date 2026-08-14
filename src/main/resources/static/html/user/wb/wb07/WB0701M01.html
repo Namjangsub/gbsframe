@@ -104,7 +104,7 @@
     <!-- 검색조건 -->
     <div class="contents search">
       <div class="">
-        <table class="table_input type04">
+        <table class="table_input type05">
           <tr>
             <th class="hit">회사</th>
             <td>
@@ -125,6 +125,13 @@
 					<span>~</span>
 					<input type="text" id="endDt_S" name="endDt_S" class="input_calendar" onkeyup="dateMask(this);" autocomplete="off" required data-search="endDt">
 				</div>
+			</td>
+			<th>출고여부</th>
+			<td>
+				<select id="shipYn_S" name="shipYn_S" data-search="shipYn">
+					<option value="" selected>전체</option>
+					<option value="N">미출고</option>
+				</select>
 			</td>
             <th>간트조회기준</th>
             <td>
@@ -169,6 +176,8 @@ onkeyup="(event.keyCode == 8 || event.keyCode == 46) ? wbsPlanMngId_S.value = ''
 					<a onclick="openUserSearch();"><i class="i_search_w"></i></a>
 				</div>
 			</td>
+			<th></th>
+			<td></td>
             
 <!--             <th>PM계획상태</th> -->
 <!--             <td> -->
@@ -224,6 +233,20 @@ onkeyup="(event.keyCode == 8 || event.keyCode == 46) ? wbsPlanMngId_S.value = ''
           </div>
           <div class="extra-grid-wrap">
             <div id="extraTuiGrid" style="height:100%;"></div>
+          </div>
+          <div id="memoHistoryPopover" class="memo-history-popover" role="dialog" aria-modal="false" aria-hidden="true">
+            <div class="memo-history-popover-head">
+              <div id="memoHistoryTitle" class="memo-history-popover-title">메모 변경 이력</div>
+              <button type="button" id="memoHistoryClose" class="memo-history-close" aria-label="메모 변경 이력 닫기">&times;</button>
+            </div>
+            <div id="memoHistoryList" class="memo-history-list">
+              <div class="memo-history-table-head" role="row">
+                <span role="columnheader">변경일시</span>
+                <span role="columnheader">변경자</span>
+                <span role="columnheader">변경내용</span>
+              </div>
+              <div id="memoHistoryRows" class="memo-history-rows"></div>
+            </div>
           </div>
         </div>
         <div class="wbs-scroll" id="wbsScroll">
@@ -2182,6 +2205,177 @@ onkeyup="(event.keyCode == 8 || event.keyCode == 46) ? wbsPlanMngId_S.value = ''
       };
     }
 
+    const MEMO_HISTORY_COLUMNS = {
+      mmMemo: "구매메모",
+      dwgMemo: "설계메모",
+      prdMemo: "생산메모",
+      salesMemo: "영업메모",
+      pmMemo: "PM메모"
+    };
+    let MEMO_HISTORY_REQUEST_TOKEN = 0;
+
+    class MemoHistoryRenderer {
+      constructor(props) {
+        this.el = document.createElement("div");
+        this.el.className = "memo-history-cell";
+
+        this.valueEl = document.createElement("span");
+        this.valueEl.className = "memo-history-cell-value";
+
+        this.buttonEl = document.createElement("button");
+        this.buttonEl.type = "button";
+        this.buttonEl.className = "memo-history-trigger";
+        this.buttonEl.title = "메모 변경 이력";
+        this.buttonEl.setAttribute("aria-label", "메모 변경 이력 조회");
+        this.buttonEl.textContent = "!";
+
+        this.el.appendChild(this.valueEl);
+        this.el.appendChild(this.buttonEl);
+
+        ["mousedown", "pointerdown"].forEach(eventName => {
+          this.buttonEl.addEventListener(eventName, event => {
+            event.preventDefault();
+            event.stopPropagation();
+          });
+        });
+        this.buttonEl.addEventListener("click", event => {
+          event.preventDefault();
+          event.stopPropagation();
+          const currentProps = this.props;
+          if(!currentProps) return;
+          const row = currentProps.grid.getRow(currentProps.rowKey);
+          openMemoHistoryPopover(row, currentProps.columnInfo.name, this.buttonEl);
+        });
+
+        this.render(props);
+      }
+
+      getElement() {
+        return this.el;
+      }
+
+      render(props) {
+        this.props = props;
+        this.valueEl.textContent = String(props.value == null ? "" : props.value);
+        const columnLabel = MEMO_HISTORY_COLUMNS[props.columnInfo.name] || "메모";
+        this.buttonEl.setAttribute("aria-label", columnLabel + " 변경 이력 조회");
+      }
+    }
+
+    function closeMemoHistoryPopover(){
+      MEMO_HISTORY_REQUEST_TOKEN++;
+      const popover = document.getElementById("memoHistoryPopover");
+      if(!popover) return;
+      popover.classList.remove("is-open");
+      popover.setAttribute("aria-hidden", "true");
+    }
+
+    function positionMemoHistoryPopover(triggerEl){
+      const overlay = document.getElementById("extraGridOverlay");
+      const popover = document.getElementById("memoHistoryPopover");
+      if(!overlay || !popover || !triggerEl) return;
+
+      const overlayRect = overlay.getBoundingClientRect();
+      const triggerRect = triggerEl.getBoundingClientRect();
+      const gap = 6;
+      const edge = 8;
+
+      popover.style.left = "0px";
+      popover.style.top = "0px";
+      const popoverWidth = popover.offsetWidth;
+      const popoverHeight = popover.offsetHeight;
+
+      let left = triggerRect.right - overlayRect.left - popoverWidth;
+      left = Math.max(edge, Math.min(left, overlay.clientWidth - popoverWidth - edge));
+
+      let top = triggerRect.bottom - overlayRect.top + gap;
+      if(top + popoverHeight > overlay.clientHeight - edge){
+        top = triggerRect.top - overlayRect.top - popoverHeight - gap;
+      }
+      top = Math.max(edge, Math.min(top, overlay.clientHeight - popoverHeight - edge));
+
+      popover.style.left = left + "px";
+      popover.style.top = top + "px";
+    }
+
+    function renderMemoHistoryList(list){
+      const $list = $("#memoHistoryRows").empty();
+      if(!Array.isArray(list) || !list.length){
+        $("<div>").addClass("memo-history-state").text("변경 이력이 없습니다.").appendTo($list);
+        return;
+      }
+
+      list.forEach(item => {
+        const histId = String(item.histId || "");
+        const userNm = String(item.histUserNm || histId || "-");
+        const userText = userNm;
+        const content = item.changeContent == null || String(item.changeContent) === ""
+          ? "(내용 삭제)"
+          : String(item.changeContent);
+
+        const $item = $("<div>").addClass("memo-history-item");
+        $("<span>").addClass("memo-history-date").text(item.histDttm || "-").appendTo($item);
+        $("<span>").addClass("memo-history-user").text(userText).attr("title", userText).appendTo($item);
+        $("<div>").addClass("memo-history-content").text(content).attr("title", content).appendTo($item);
+        $item.appendTo($list);
+      });
+    }
+
+    function openMemoHistoryPopover(row, columnName, triggerEl){
+      if(!row || !row.salesCd || !MEMO_HISTORY_COLUMNS[columnName]) return;
+
+      const popover = document.getElementById("memoHistoryPopover");
+      if(!popover) return;
+
+      const requestToken = ++MEMO_HISTORY_REQUEST_TOKEN;
+      $("#memoHistoryTitle").text(MEMO_HISTORY_COLUMNS[columnName] + " 변경 이력 · " + row.salesCd);
+      $("#memoHistoryRows").empty().append(
+        $("<div>").addClass("memo-history-state").text("이력을 조회 중입니다.")
+      );
+      popover.classList.add("is-open");
+      popover.setAttribute("aria-hidden", "false");
+      positionMemoHistoryPopover(triggerEl);
+
+      const param = {
+        coCd: row.coCd || $("#coCd_S").val() || (jwt && jwt.coCd ? jwt.coCd : ""),
+        salesCd: row.salesCd,
+        columnName: columnName
+      };
+
+      postAjax("/user/wb/wb07/selectWb22d02ExtraInfoHist", param, null, function(resp){
+        if(requestToken !== MEMO_HISTORY_REQUEST_TOKEN) return;
+        if(isAjaxXhr(resp)){
+          $("#memoHistoryRows").empty().append(
+            $("<div>").addClass("memo-history-state is-error").text("이력 조회 중 오류가 발생했습니다.")
+          );
+          positionMemoHistoryPopover(triggerEl);
+          return;
+        }
+        renderMemoHistoryList(resp && Array.isArray(resp.result) ? resp.result : []);
+        positionMemoHistoryPopover(triggerEl);
+      }, false);
+    }
+
+    function bindMemoHistoryPopoverEvents(){
+      $("#memoHistoryClose").off("click.memoHistory").on("click.memoHistory", function(event){
+        event.preventDefault();
+        event.stopPropagation();
+        closeMemoHistoryPopover();
+      });
+
+      $(document).off("mousedown.memoHistory").on("mousedown.memoHistory", function(event){
+        if($(event.target).closest("#memoHistoryPopover, .memo-history-trigger").length) return;
+        closeMemoHistoryPopover();
+      });
+
+      $(window).off("resize.memoHistory").on("resize.memoHistory", closeMemoHistoryPopover);
+      document.addEventListener("scroll", function(event){
+        const popover = document.getElementById("memoHistoryPopover");
+        if(popover && popover.contains(event.target)) return;
+        closeMemoHistoryPopover();
+      }, true);
+    }
+
     let EXTRA_TUI_GRID = null;
 
     function initExtraTuiGrid(){
@@ -2212,11 +2406,11 @@ onkeyup="(event.keyCode == 8 || event.keyCode == 46) ? wbsPlanMngId_S.value = ''
         { name: "camClntNm", header: "CAM업체", width: 60, editor: "text" , align: "center"},
         { name: "camCompDt", header: "CAM완료일", width: 70, editor: { type: DatePickerEditor }, align: "center" },
         { name: "machinMngNm", header: "기계담당", width: 60, editor: "text", align: "center" },
-        { name: "mmMemo", header: "구매메모", width: 180, editor: "text" },
-        { name: "dwgMemo", header: "설계메모", width: 180, editor: "text" },
-        { name: "prdMemo", header: "생산메모", width: 180, editor: "text" },
-        { name: "salesMemo", header: "영업메모", width: 180, editor: "text" },
-        { name: "pmMemo", header: "PM메모", width: 180, editor: "text" },
+        { name: "mmMemo", header: "구매메모", width: 180, editor: "text", renderer: { type: MemoHistoryRenderer } },
+        { name: "dwgMemo", header: "설계메모", width: 180, editor: "text", renderer: { type: MemoHistoryRenderer } },
+        { name: "prdMemo", header: "생산메모", width: 180, editor: "text", renderer: { type: MemoHistoryRenderer } },
+        { name: "salesMemo", header: "영업메모", width: 180, editor: "text", renderer: { type: MemoHistoryRenderer } },
+        { name: "pmMemo", header: "PM메모", width: 180, editor: "text", renderer: { type: MemoHistoryRenderer } },
         { name: "remark", header: "비고", width: 200, editor: "text", hidden: true  },
         { name: "udtId", header: "수정자", width: 120, align: "center", hidden: true },
         { name: "udtDttm", header: "수정일시", width: 160, align: "center" , hidden: true},
@@ -2580,18 +2774,31 @@ onkeyup="(event.keyCode == 8 || event.keyCode == 46) ? wbsPlanMngId_S.value = ''
         remark: row.remark
       };
 
+      // 현재 더티 상태는 이번 요청에 포함됐다. 요청 중 새 변경이 생기면
+      // afterChange에서 다시 더티로 표시되어 완료 후 이어서 저장된다.
+      EXTRA_GRID_DIRTY.delete(salesCd);
+
       postAjax("/user/wb/wb07/updateWb22d02ExtraInfo", payload, null, function(resp){
         GRID_ROW_SAVE_INFLIGHT.delete(salesCd);
 
         if(isAjaxXhr(resp)){
+          EXTRA_GRID_DIRTY.set(salesCd, true);
+          EXTRA_TUI_GRID.grid.addRowClassName(rowKey, "row-dirty");
           console.error(resp);
           toast("저장 요청에 실패했습니다.");
           return;
         }
 
-        const code = resp ? Number(resp.resultCode) : 0;
-        const msg = resp ? String(resp.resultMessage || "") : "";
-        const raw = resp ? resp.result : null;
+        // Controller가 { result: { resultCode, result } } 형태로 반환하므로
+        // 안쪽 응답을 꺼낸다. 기존의 평면 응답 형태도 함께 지원한다.
+        const responseBody = resp && resp.result
+          && typeof resp.result === "object"
+          && Object.prototype.hasOwnProperty.call(resp.result, "resultCode")
+            ? resp.result
+            : resp;
+        const code = responseBody ? Number(responseBody.resultCode) : 0;
+        const msg = responseBody ? String(responseBody.resultMessage || "") : "";
+        const raw = responseBody ? responseBody.result : null;
 
         if((code === 200 || code === 409) && raw){
           const latest = normalizeGridRow(raw);
@@ -2599,6 +2806,24 @@ onkeyup="(event.keyCode == 8 || event.keyCode == 46) ? wbsPlanMngId_S.value = ''
             latest.problemUncomplete = Number(row.problemUncomplete || 0) || 0;
           }
           latest.expectedUdtDttm = latest.udtDttm;
+
+          // 첫 저장 요청 중 사용자가 같은 행을 다시 수정한 경우에는
+          // 최신 수정시간만 반영하고 로컬 입력값은 덮어쓰지 않은 채 재저장한다.
+          const hasPendingChange = code === 200 && EXTRA_GRID_DIRTY.has(salesCd);
+          if(hasPendingChange){
+            EXTRA_GRID_APPLYING_SERVER_DATA = true;
+            try{
+              EXTRA_TUI_GRID.grid.setValue(rowKey, "udtDttm", latest.udtDttm, false);
+              EXTRA_TUI_GRID.grid.setValue(rowKey, "expectedUdtDttm", latest.expectedUdtDttm, false);
+            }finally{
+              EXTRA_GRID_APPLYING_SERVER_DATA = false;
+            }
+            setTimeout(function(){
+              saveExtraGridRowByRowKey(rowKey);
+            }, 0);
+            return;
+          }
+
           EXTRA_GRID_DIRTY.delete(String(latest.salesCd));
           EXTRA_TUI_GRID.grid.removeRowClassName(rowKey, "row-dirty");
 
@@ -2648,6 +2873,8 @@ onkeyup="(event.keyCode == 8 || event.keyCode == 46) ? wbsPlanMngId_S.value = ''
           return;
         }
 
+        EXTRA_GRID_DIRTY.set(salesCd, true);
+        EXTRA_TUI_GRID.grid.addRowClassName(rowKey, "row-dirty");
         toast(msg || "저장에 실패했습니다.");
       });
     }
@@ -2723,6 +2950,8 @@ onkeyup="(event.keyCode == 8 || event.keyCode == 46) ? wbsPlanMngId_S.value = ''
 
     function closeExtraGridOverlay(){
       const topSalesCd = getTopSalesCdFromGrid();
+
+      closeMemoHistoryPopover();
 
       const $card = $(".wbs-card");
       $card.removeClass("overlay-grid-mode").addClass("max-gantt-mode");
@@ -4636,6 +4865,7 @@ onkeyup="(event.keyCode == 8 || event.keyCode == 46) ? wbsPlanMngId_S.value = ''
       $(".wbs-card").addClass("max-gantt-mode");
       bindHeaderModeEvents();
       bindExtraGridEvents();
+      bindMemoHistoryPopoverEvents();
       setOverlayToggleButtonText(false);
 
       $('#head_area').toggleClass('off');
