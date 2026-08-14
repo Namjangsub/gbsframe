@@ -20,6 +20,11 @@ public interface PM51Mapper {
 
 	List<Map<String, String>> selectTripReqD02(Map<String, String> paramMap);
 
+	List<Map<String, String>> selectTripReqD03(Map<String, String> paramMap);
+
+	int insertTripReqD03(Map<String, String> paramMap);
+
+	int deleteTripReqD03(Map<String, String> paramMap);
 
 	int insertTripReqHistM01(Map<String, String> paramMap);
 
@@ -89,11 +94,23 @@ public interface PM51Mapper {
 
 	List<Map<String, String>> selectTripRptD02(Map<String, String> paramMap);
 
+	List<Map<String, String>> selectTripRptD03(Map<String, String> paramMap);
+
+	List<Map<String, String>> selectTripRptD04(Map<String, String> paramMap);
+
 	int insertTripRptM01(Map<String, String> paramMap);
 
 	int insertTripRptD02(Map<String, String> paramMap);
 
 	int insertTripRptD01(Map<String, String> paramMap);
+
+	int insertTripRptD03(Map<String, String> paramMap);
+
+	int insertTripRptD04(Map<String, String> paramMap);
+
+	int deleteTripRptD03(Map<String, String> paramMap);
+
+	int deleteTripRptD04(Map<String, String> paramMap);
 
 	int updateTripRptM01(Map<String, String> paramMap);
 
