@@ -10,12 +10,10 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.dksys.biz.admin.cm.cm05.service.CM05Svc;
 import com.dksys.biz.admin.cm.cm16.mapper.CM16Mapper;
 import com.dksys.biz.user.im.im01.mapper.IM01Mapper;
 import com.dksys.biz.user.pm.pm51.mapper.PM51Mapper;
 import com.dksys.biz.user.qm.qm01.mapper.QM01Mapper;
-import com.dksys.biz.user.sm.sm10.mapper.SM10Mapper;
 import com.dksys.biz.user.wb.wb20.mapper.WB20Mapper;
 import com.dksys.biz.user.wb.wb20.service.WB20Svc;
 import com.dksys.biz.user.wb.wb24.mapper.WB24Mapper;
@@ -40,17 +38,11 @@ public class WB20SvcImpl implements WB20Svc {
 	@Autowired
 	CM16Mapper cm16Mapper;
 
-	@Autowired
-	CM05Svc cm05Svc;
-
     @Autowired
     IM01Mapper im01Mapper;
 
 	@Autowired
 	PM51Mapper pm51Mapper;
-
-	@Autowired
-	SM10Mapper sm10Mapper;
 
 	@Autowired
 	ExceptionThrower thrower;
@@ -182,17 +174,6 @@ public class WB20SvcImpl implements WB20Svc {
 		validatePm51SalesApproval(paramMap);
 		validatePm51SequentialApproval(paramMap);
 		result += wb20Mapper.updateApprovalLine(paramMap);
-		
-		// 구매비용 관리부서 결재(TODODIV2204) 승인 시 MNG_DEPT_PROC_DT 업데이트
-		if ("TODODIV2204".equals(todoDiv2CodeId)) {
-			java.util.Map<String, String> mngParam = new java.util.HashMap<>(paramMap);
-			mngParam.put("fileTrgtKey", paramMap.get("todoFileTrgtKey"));
-			mngParam.put("costNo", tempReqNo);
-			String cfDt = paramMap.get("todoCfDt");
-			if (cfDt != null) cfDt = cfDt.replaceAll("-", "");
-			mngParam.put("mngDeptProcDt", cfDt);
-			sm10Mapper.updateMngDeptProcDt(mngParam);
-		}
 		
 		// 출장신청 관리부서 회계 승인(TODODIV2191) 시 신청서 자동 지급완료 처리 연동
 		if ("TODODIV2191".equals(todoDiv2CodeId) && "Y".equals(paramMap.get("sanctnSttus"))) {
@@ -331,11 +312,6 @@ public class WB20SvcImpl implements WB20Svc {
 
 		// 최종결재 완료시 알림톡 발송 대상인지 확인
 		Map<String, String> resultMap = wb20Mapper.selectTodoFinalYn(paramMap);
-		if ("TODODIV2202".equals(todoDiv2CodeId)
-				&& "Y".equals(resultMap.get("todoYn"))) {
-			int mngApprovalCount = insertSm10MngApproval(paramMap);
-			resultMap.put("SM10_MNG_APPROVAL_COUNT", Integer.toString(mngApprovalCount));
-		}
 		if ("TODODIV2190".equals(todoDiv2CodeId)) {
 			updatePm51AprvSts(paramMap, "Y".equals(resultMap.get("todoYn")) ? "APRVSTS03" : "APRVSTS02");
 		}
@@ -358,56 +334,6 @@ public class WB20SvcImpl implements WB20Svc {
 		}
 
 		return resultMap;
-	}
-
-	private int insertSm10MngApproval(Map<String, String> paramMap) {
-		String fileTrgtKey = paramMap.get("todoFileTrgtKey");
-		if (fileTrgtKey == null || fileTrgtKey.trim().isEmpty()) {
-			fileTrgtKey = paramMap.get("todoNo");
-		}
-		Map<String, String> keyParam = new HashMap<>();
-		keyParam.put("fileTrgtKey", fileTrgtKey);
-		keyParam.put("reqNo", paramMap.get("todoNo"));
-		if (sm10Mapper.selectMngApprovalCount(keyParam) > 0) {
-			return 0;
-		}
-
-		Map<String, String> codeParam = new HashMap<>();
-		codeParam.put("codeId", "SPECRTS14");
-		Map<String, String> codeInfo = cm05Svc.selectCodeInfo(codeParam);
-		if (codeInfo == null || codeInfo.get("codeEtc") == null) {
-			return 0;
-		}
-		String reqNo = paramMap.get("todoNo");
-		String coCd = paramMap.get("coCd");
-		String pgParam = "{\"actionType\":\"U\",\"fileTrgtKey\":\"" + fileTrgtKey
-				+ "\",\"coCd\":\"" + coCd + "\"}";
-		int result = 0;
-		int sanctnSn = 1;
-		for (String rawUserId : codeInfo.get("codeEtc").split(",")) {
-			String userId = rawUserId == null ? "" : rawUserId.trim();
-			if (userId.isEmpty()) continue;
-
-			Map<String, String> approvalMap = new HashMap<>();
-			approvalMap.put("coCd", coCd);
-			approvalMap.put("usrNm", userId);
-			approvalMap.put("todoId", userId);
-			approvalMap.put("reqNo", reqNo);
-			approvalMap.put("fileTrgtKey", fileTrgtKey);
-			approvalMap.put("pgmId", "SM1001P01");
-			approvalMap.put("pgPath", "/user/sm/sm10/SM1001P01.html");
-			approvalMap.put("userId", paramMap.get("userId") != null ? paramMap.get("userId") : paramMap.get("todoId"));
-			approvalMap.put("sanCtnSn", Integer.toString(sanctnSn++));
-			approvalMap.put("pgParam", pgParam);
-			approvalMap.put("todoDiv1CodeId", "TODODIV20");
-			approvalMap.put("todoDiv2CodeId", "TODODIV2204");
-			approvalMap.put("todoCoCd", coCd);
-			approvalMap.put("todoTitle", "지출결의 관리부서 결재");
-			approvalMap.put("todoTitl", "지출결의 관리부서 결재");
-			approvalMap.put("histNo", "");
-			result += qm01Mapper.insertWbsApprovalList(approvalMap);
-		}
-		return result;
 	}
 
 	/* 공통결재 보완요청 insert */
