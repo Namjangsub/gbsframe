@@ -168,6 +168,13 @@ public class WB07Ctr {
 		return "jsonView";
 	}
 
+	@PostMapping(value = "/selectWb22d02ExtraInfoHist")
+	public String selectWb22d02ExtraInfoHist(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		List<Map<String, String>> result = wb07svc.selectWb22d02ExtraInfoHist(paramMap);
+		model.addAttribute("result", result);
+		return "jsonView";
+	}
+
 	@PostMapping(value = "/updateWb22d02ExtraInfoBatch")
 	public String updateWb22d02ExtraInfoBatch(@RequestBody Map<String, Object> paramMap, ModelMap model) throws Exception {
 		Map<String, Object> result = wb07svc.updateWb22d02ExtraInfoBatch(paramMap);

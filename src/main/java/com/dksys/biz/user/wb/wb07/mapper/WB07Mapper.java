@@ -13,6 +13,7 @@ public interface WB07Mapper {
 
 	Map<String, String> selectWb22d02ExtraInfo(Map<String, String> param);
 	List<Map<String, String>> selectWb22d02ExtraInfoGrid(Map<String, Object> param);
+	List<Map<String, String>> selectWb22d02ExtraInfoHist(Map<String, String> param);
 	int updateWb22d02ExtraInfo(Map<String, String> param);
 	int insertWb22d02ExtraInfo(Map<String, String> param);
 	
@@ -48,5 +49,7 @@ public interface WB07Mapper {
 	int wbsLevel2ActChange(Map<String, String> paramMap);
 	
 	List<Map<String, Object>> selectWbsLevel2ListForPop(Map<String, Object> paramMap);
+
+	int insertWb22d02ExtraInfoHist(Map<String, String> param);
 	
 }

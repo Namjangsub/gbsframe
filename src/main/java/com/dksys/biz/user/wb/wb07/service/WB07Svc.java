@@ -17,6 +17,7 @@ public interface WB07Svc {
 
 	List<Map<String, String>> selectWb22d02ExtraInfoGrid(Map<String, Object> paramMap);
 	Map<String, String> selectWb22d02ExtraInfo(Map<String, String> paramMap);
+	List<Map<String, String>> selectWb22d02ExtraInfoHist(Map<String, String> paramMap);
 	Map<String, Object> updateWb22d02ExtraInfo(Map<String, String> paramMap) throws Exception;
 	Map<String, Object> updateWb22d02ExtraInfoBatch(Map<String, Object> paramMap) throws Exception;
 
