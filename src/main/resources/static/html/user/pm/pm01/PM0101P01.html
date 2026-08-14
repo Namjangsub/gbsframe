@@ -370,11 +370,55 @@
 		}
 	}
 
+	//중첩 모달로 열리면(PM5102P01 → openThirdModal) 문서에 id="popForm"이 2개 존재하게 되고,
+	//getElementById 고속경로 때문에 이 화면의 $('#popForm ...') 셀렉터가 호출한 화면의 폼을 가리킨다.
+	//이 모달이 살아있는 동안만 다른 폼의 id를 떼어두고, 모달이 사라질 때 원복한다.
+	var myPopFormEl = null;
+
+	function getMyPopupArea() {
+		return $('#dayilyRpt').closest('.popup_area');
+	}
+
+	function stashOtherPopFormIds() {
+		if (myPopFormEl) return;
+		//이 화면은 문제현황 그리드에서 자기자신(actionType "I")을 다시 열 수 있어 스크립트가 같은 전역에서 재평가된다.
+		//바깥 인스턴스가 이미 처리했으면 그대로 두고(소유권 유지) 아무것도 하지 않는다.
+		if (document.querySelector('[data-popform-stashed]')) return;
+		var $myForm = $('#dayilyRpt').closest('form');	//#popForm으로 자기를 찾으면 안됨(그 셀렉터가 깨져있음)
+		if ($myForm.length === 0) return;
+		myPopFormEl = $myForm[0];
+		var formEl = myPopFormEl;						//전역 var는 재평가 시 초기화되므로 아래 클로저는 지역변수만 참조
+		var stashedCnt = 0;
+		$('[id="popForm"]').each(function() {			//id 셀렉터가 아닌 속성 셀렉터라야 전부 반환됨
+			if (this === formEl) return;
+			$(this).removeAttr('id').attr('data-popform-stashed', 'popForm');
+			stashedCnt++;
+		});
+		if (stashedCnt === 0) return;					//단독 실행(#popForm 1개)이면 아무것도 하지 않음
+		formEl.id = 'popForm';
+		//닫기버튼/헤더X/저장후close 등 모든 닫힘 경로는 결국 ax5 modal이 body 직속 자식을 remove() 하므로 여기서 일괄 원복
+		var obs = new MutationObserver(function() {
+			if (!document.body.contains(formEl)) {
+				obs.disconnect();
+				restoreOtherPopFormIds();
+			}
+		});
+		obs.observe(document.body, {childList: true});
+	}
+
+	//DOM의 마커만 보고 원복하므로 스크립트가 재평가되어 전역이 초기화돼도 안전하고, 여러번 호출해도 무해하다.
+	function restoreOtherPopFormIds() {
+		$('[data-popform-stashed="popForm"]').attr('id', 'popForm').removeAttr('data-popform-stashed');
+	}
+
+	stashOtherPopFormIds();
+
 	$(document).ready(function() {
+		stashOtherPopFormIds();		//스크립트가 DOM 주입보다 먼저 평가된 경우의 예비 호출(멱등)
 		// fileGridView.initView();
 		$("#popForm #coCd").val(modalStack.last().paramObj.coCd);
 
-		setCommonSelect($(".popup_area select[data-kind]"));
+		setCommonSelect(getMyPopupArea().find('select[data-kind]'));
 		setWorkPtDept(jwt.deptId);//자동분류 자동선택
 
 		//작성일자//
@@ -464,7 +508,7 @@
 			}
 		} else if (actionType == "TE") {
 			// 출장복명서(PM5102P01)에서 더블클릭 진입: 작업일보는 읽기전용, 비용부분만 편집 가능
-			$('.tit').text('작업일보 - 경비 수정');
+			getMyPopupArea().find('.tit').text('작업일보 - 경비 수정');
 			selectDailyWorkInfo();
 
 			$('#actionBtn').text("경비 저장");
@@ -477,6 +521,8 @@
 			var $mainFields = $('#popForm').find('select, input, textarea, button, a').filter(function() {
 				return $(this).closest('.tripTable').length === 0;
 			});
+			// 경비(일일 출장비) 조작용 버튼과 모달 자체 버튼은 살려두고, 작업일보 영역 버튼(첨부파일 등)만 잠근다.
+			var keepBtnIds = ['addDayileRptTrpButton', 'removeDayileRptTrpButton', 'actionBtn'];
 			$mainFields.each(function() {
 				var $el = $(this);
 				var tag = $el.prop('tagName');
@@ -484,11 +530,26 @@
 				if (tag === 'TEXTAREA') { $el.attr('readonly', true).css('background', '#fafafa'); }
 				if (tag === 'SELECT')   { $el.css({'background-color': '#f4f4f4', 'pointer-events': 'none'}); }
 				if (tag === 'A')        { $el.css('pointer-events', 'none').off('click'); }
+				if (tag === 'BUTTON') {
+					var btnId = $el.attr('id') || '';
+					if ($.inArray(btnId, keepBtnIds) < 0 && !$el.hasClass('close_btn')) {
+						$el.prop('disabled', true).css({'opacity': '0.5', 'pointer-events': 'none'});
+					}
+				}
 			});
 			// 작업일보 날짜 datepicker 비활성화
 			$('#workRptDt').datepicker('destroy').attr('readonly', true);
 			// 돋보기(사용자검색) 제거
-			$('.i_search_w').remove();
+			getMyPopupArea().find('.i_search_w').remove();
+
+			// 경비내용을 실제로 수정한 경우에만 "경비 저장" 버튼 활성화
+			setTripSaveBtnEnabled(false);
+			$('#dayilyRpt').on('input change', 'input, select, textarea', function() {
+				if ($(this).closest('.tripTable').length > 0) setTripSaveBtnEnabled(true);
+			});
+			$('#addDayileRptTrpButton').on('click', function() {
+				setTripSaveBtnEnabled(true);
+			});
 		}
 
 		if ($('#popForm #salesCd').val() != '' || $('#popForm #ordrsNo').val() != '') {
@@ -587,7 +648,19 @@
 		});
 
 	}
-	 
+
+	//경비내용(.tripTable)이 실제로 변경된 경우에만 저장버튼을 활성화한다. TE(경비수정) 모드 전용이며
+	//다른 actionType에서는 호출되어도 아무 동작도 하지 않는다.
+	function setTripSaveBtnEnabled(enabled) {
+		if (actionType !== 'TE') return;
+		var $btn = getMyPopupArea().find('#actionBtn');
+		if (enabled) {
+			$btn.prop('disabled', false).css({'opacity': '', 'pointer-events': ''});
+		} else {
+			$btn.prop('disabled', true).css({'opacity': '0.5', 'pointer-events': 'none'});
+		}
+	}
+
 
 	//현재 등록된 tripTable중 가장 큰 인덱스 조회 (중간 행 삭제로 번호가 비어도 안전하게 다음 인덱스를 계산하기 위함)
 	function getMaxTripIdx() {
@@ -910,7 +983,7 @@
 	
 	// 등록
 	function insertDailyWork() {
-		if (inputValidation($('.popup_area [required]'))) {						// 필수 필드의 유효성 검사
+		if (inputValidation(getMyPopupArea().find('[required]'))) {						// 필수 필드의 유효성 검사
 	    	//문제여부가 이면 제목 입력은 필수처리하기 위함
 	        if ($('#issueYn').val() === 'Y') {
 	          if ($.trim($('#issueTitle').val()) === '') {
@@ -940,7 +1013,7 @@
 	// 수정
 	function updateDailyWork() {
 
-		if (inputValidation($('.popup_area [required]'))) {						// 필수 필드의 유효성 검사
+		if (inputValidation(getMyPopupArea().find('[required]'))) {						// 필수 필드의 유효성 검사
 	    	//문제여부가 이면 제목 입력은 필수처리하기 위함
 	        if ($('#issueYn').val() === 'Y') {
 	          if ($.trim($('#issueTitle').val()) === '') {
@@ -954,11 +1027,14 @@
 	      	filePostAjax("/user/pm/pm01/updateDailyWork", formData,function(data) {
 // 						alert(data.resultMessage);
 						if (data.resultCode == 200) {
-							if ($("#issueYn").val() == 'Y') { 
+							if ($("#issueYn").val() == 'Y') {
                                 kakaoTodo();
                             }
+							restoreOtherPopFormIds();	//호출한 화면의 콜백이 자기 #popForm을 찾을 수 있도록 먼저 원복
 							modalStack.last().callback(data);
-							gridView.setData(0);
+							if (actionType !== 'TE') {	//중첩 진입 시 gridView는 호출한 화면의 전역이므로 건드리지 않음
+								gridView.setData(0);
+							}
 							modalStack.close();
 						}
 					});
@@ -969,11 +1045,11 @@
 
 	function makeFormData() {
 		// 금액 콤마 제거
-		$.each($('.popup_area input[comma]'), function(idx, elem) {
+		$.each(getMyPopupArea().find('input[comma]'), function(idx, elem) {
 			deleteComma(elem);
 		});
 		// 날짜 하이픈 제거
-		$.each($('.popup_area input[date]'), function(idx, elem) {
+		$.each(getMyPopupArea().find('input[date]'), function(idx, elem) {
 			deleteHyphen(elem);
 		});
 	    
@@ -1390,6 +1466,7 @@
 		$('#tripTable' + i + ' #tripRptImg_' + i).hide().attr('src', '');
 		$('#dropZone_' + i).removeClass('hasImg');
 		$('#tripTable' + i + ' #dropZone_' + i + ' .drop-text').show();
+		setTripSaveBtnEnabled(true);
 	}
 
 	//경비내역 행 삭제(지정 행 삭제) - 마지막행이 아니어도 삭제 가능
@@ -1409,6 +1486,7 @@
 		if ($('.tripTable').length === 0) {
 			$('#removeDayileRptTrpButton').hide();
 		}
+		setTripSaveBtnEnabled(true);
 	}
 
 	function setTripRptButton(index){
@@ -1541,8 +1619,9 @@
 // 	        }
 		});
 		$(elem).val("");
+		setTripSaveBtnEnabled(true);	//첨부이미지 등록도 경비내용 변경으로 간주 (파일input이 #dayilyRpt 밖에 있어 위임 이벤트가 잡지 못함)
 	}
-	
+
 	function deleteFile(rowIndex) {
         if (notiFileArr[rowIndex].fileDelete != 'Y') {
         	alert('파일 삭제 권한이 없습니다.')

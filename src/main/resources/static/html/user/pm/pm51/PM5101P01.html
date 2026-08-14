@@ -2585,11 +2585,16 @@
 		openProgress(true);
 		filePostAjax(url, formData, function (data) {
 			window.isSavingTripReq = false;
+			openProgress(false);
 			if (data.resultCode === 200) {
 				// 자체승인(1번 결재자=제출자)이 서버에서 처리됐을 수 있으므로, kakaoTodo()가 다음 결재자를 정확히 찾도록 로컬 갱신 후 호출
 				markSelfApprovedRowLocally(gridViewApproval);
 				markSelfApprovedRowLocally(gridViewApprovalMng);
-				kakaoTodo(data.tripReqNo || $('#tripReqNo').val());
+				try {
+					kakaoTodo(data.tripReqNo || $('#tripReqNo').val());
+				} catch (e) {
+					console.error("kakaoTodo error:", e);
+				}
 				if (typeof myTodoStatusRtv === 'function') { myTodoStatusRtv(); }
 				if (window.isPayingNow) {
 					putAjax("/user/pm/pm51/updateTripReqPayDone", {
@@ -2622,7 +2627,11 @@
 				alert("저장 중 오류 발생: " + data.resultMessage);
 				window.isPayingNow = false;
 			}
+		}, function (err) {
+			window.isSavingTripReq = false;
+			window.isPayingNow = false;
 			openProgress(false);
+			alert("서버 저장 처리 중 오류가 발생하였습니다.");
 		});
 	}
 
@@ -4038,7 +4047,6 @@
 
 	function checkTravelerDateOverlap(userId, tripStDt, tripEdDt, userNm, onOverlapDetected, onProceedCallback, onCancelCallback) {
 		if (!userId || !tripStDt || !tripEdDt) {
-			if (typeof onProceedCallback === 'function') onProceedCallback();
 			return false;
 		}
 		var isOverlap = false;
@@ -4074,7 +4082,7 @@
 					}
 				}
 			} else {
-				if (typeof onProceedCallback === 'function') onProceedCallback();
+				isOverlap = false;
 			}
 		});
 		return isOverlap;

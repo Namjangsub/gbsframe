@@ -531,8 +531,9 @@ public class PM51SvcImpl implements PM51Svc {
 			String currentUserId = paramMap.get("userId");
 			String creatId = m01.get("creatId");
 			String reqId = m01.get("reqId");
+			String userId = m01.get("userId");
 			if (hasText(currentUserId)) {
-				if (!currentUserId.equals(creatId) && !currentUserId.equals(reqId)) {
+				if (!currentUserId.equals(creatId) && !currentUserId.equals(reqId) && !currentUserId.equals(userId)) {
 					throw new RuntimeException("본인이 작성하거나 신청한 출장신청서만 삭제할 수 있습니다.");
 				}
 			}

@@ -1059,7 +1059,12 @@
 						pgmId: 'PM5102P01',
 						userId: jwt.userId
 					};
-					openThirdModal('/static/html/user/pm/pm01/PM0101P01.html', 1100, 750, '', paramObj, function() {});
+					// 작업일보 모달에서 경비를 수정·저장하면 경비현황을 다시 조회한다.
+					// loadTripExpenseStatusGrid() 내부에서 카드사 명세 대사(refreshCardReconciliation)도 함께 재실행되므로
+					// 대사 결과와 요약 바가 수정된 금액 기준으로 자동 갱신된다.
+					openThirdModal('/static/html/user/pm/pm01/PM0101P01.html', 1100, 750, '', paramObj, function() {
+						loadTripExpenseStatusGrid();
+					});
 				},
 				onDataChanged: function () {
 					setTimeout(function() {
@@ -3145,7 +3150,6 @@
 	// 기존 출장 일정 중복 검증 공용 함수 (출장신청서/복명서 공용)
 	function checkTravelerDateOverlap(userId, tripStDt, tripEdDt, userNm, onOverlapDetected, onProceedCallback, onCancelCallback) {
 		if (!userId || !tripStDt || !tripEdDt) {
-			if (typeof onProceedCallback === 'function') onProceedCallback();
 			return false;
 		}
 		var isOverlap = false;
@@ -3181,7 +3185,7 @@
 					}
 				}
 			} else {
-				if (typeof onProceedCallback === 'function') onProceedCallback();
+				isOverlap = false;
 			}
 		});
 		return isOverlap;
@@ -3677,11 +3681,16 @@
 
 		openProgress(true);
 		filePostAjax(url, formData, function (data) {
+			openProgress(false);
 			if (data.resultCode === 200) {
 				// 자체승인(1번 결재자=제출자)이 서버에서 처리됐을 수 있으므로, kakaoTodo()가 다음 결재자를 정확히 찾도록 로컬 갱신 후 호출
 				markSelfApprovedRowLocally(gridViewApproval);
 				markSelfApprovedRowLocally(gridViewApprovalMng);
-				kakaoTodo(data.tripRptNo || $('#tripRptNo').val());
+				try {
+					kakaoTodo(data.tripRptNo || $('#tripRptNo').val());
+				} catch (e) {
+					console.error("kakaoTodo error:", e);
+				}
 				if (typeof myTodoStatusRtv === 'function') { myTodoStatusRtv(); }
 				alert(data.resultMessage);
 				if (modalStack.last() && typeof modalStack.last().callback === 'function') {
@@ -3693,7 +3702,9 @@
 			} else {
 				alert("저장 중 오류 발생: " + data.resultMessage);
 			}
+		}, function (err) {
 			openProgress(false);
+			alert("서버 저장 처리 중 오류가 발생하였습니다.");
 		});
 	}
 
