@@ -251,6 +251,11 @@
 			outline: 2px dashed #2b6cb0;
 			outline-offset: -2px;
 		}
+		/* 계획 바를 세로로 드래그해 다른 팀원 행으로 옮기는 중임을 나타내는 대상 행 강조 */
+		#ganttTable tr.row-drop-target td.row-label {
+			background-color: #ebf4fd !important;
+			box-shadow: inset 0 0 0 2px #2b6cb0;
+		}
 
 		/* ─ 실적 행 및 막대 스타일 ─ */
 		#ganttTable .actual-row {
@@ -658,8 +663,14 @@
 							</select>
 						</td>
 
-						<th></th>
-						<td></td>
+						<th>부서</th>
+						<td>
+							<div class="search_form">
+								<input type="hidden" id="deptId_S" name="deptId_S" data-search="deptId">
+								<input type="text" id="deptNm_S" name="deptNm_S" data-search="deptNm" onkeyup="(event.keyCode == 8 || event.keyCode == 46) ? $('#deptId_S').val('') : event.keyCode == 13 ? loadTeamMemberList() : '';">
+								<a onclick="openDeptTree();"><i class="i_search_w"></i></a>
+							</div>
+						</td>
 					</tr>
 				</table>
 			</div>
@@ -1105,7 +1116,16 @@
 			$('#monthEdS').val(nextMonth.format('YYYY-MM'));
 			$('#zoomSlider').val(24);
 			setDayColWidth(24);
-			searchData();
+			$('#attYn_S').val('');
+			if (jwt && jwt.deptId) {
+				$('#deptId_S').val(jwt.deptId);
+				postAjax("/admin/cm/cm04/selectDeptInfo", { "deptId": jwt.deptId }, null, function(data) {
+					if (data && data.deptInfo) {
+						$('#deptNm_S').val(data.deptInfo.deptNm);
+					}
+				});
+			}
+			loadTeamMemberList();
 		}
 
 		function initPage() {
@@ -1116,6 +1136,16 @@
 			currentMonth = today.format('YYYY-MM');
 			$('#monthStS').val(prevMonth.format('YYYY-MM'));
 			$('#monthEdS').val(nextMonth.format('YYYY-MM'));
+
+			// 로그인 사용자 기본 부서 세팅
+			if (!$('#deptId_S').val() && jwt && jwt.deptId) {
+				$('#deptId_S').val(jwt.deptId);
+				postAjax("/admin/cm/cm04/selectDeptInfo", { "deptId": jwt.deptId }, null, function(data) {
+					if (data && data.deptInfo) {
+						$('#deptNm_S').val(data.deptInfo.deptNm);
+					}
+				});
+			}
 
 			// data-kind select 초기화 (모달은 main_area 바깥 형제 요소이므로 body 전체에서 탐색)
 			var selectArr = $('body select[data-kind]');
@@ -1132,7 +1162,7 @@
 
 			// 이벤트 바인딩
 			$('#btnSearch').on('click', function() {
-				searchData();
+				loadTeamMemberList();
 			});
 			// 검색조건 셀렉트박스 변경 시 자동 재조회
 			$('#attYn_S').on('change', function() {
@@ -1323,14 +1353,18 @@
 			};
 		}
 
-		function loadTeamMemberList() {
-			postAjax("/user/pm/pm60/selectTeamMemberList", {}, null, function(data) {
+		function loadTeamMemberList(cb) {
+			var deptId = $.trim($('#deptId_S').val());
+			postAjax("/user/pm/pm60/selectTeamMemberList", { deptId: deptId }, null, function(data) {
 				if (data && data.result) {
 					teamMemberList = data.result;
 					populateUserSelect();
 				}
-				// 팀원 목록 로드 완료 후 당월 현황을 바로 조회 (화면 진입 시 클릭 없이 표시)
-				searchData();
+				if (typeof cb === 'function') {
+					cb();
+				} else {
+					searchData();
+				}
 			});
 		}
 
@@ -1352,12 +1386,14 @@
 			var monthEdDt = range.monthEdDt;
 			var monthMoment = range.stMonthMoment;
 			var attYn = $.trim($('#attYn_S').val());
+			var deptId = $.trim($('#deptId_S').val());
 
 			// 예약 정보 조회
 			postAjax("/user/pm/pm60/selectRsvCalendar", {
 				monthStDt: monthStDt,
 				monthEdDt: monthEdDt,
-				attYn: attYn
+				attYn: attYn,
+				deptId: deptId
 			}, null, function(data) {
 				if (data && data.result) {
 					rsvList = data.result;
@@ -1367,7 +1403,8 @@
 				postAjax("/user/pm/pm60/selectRsvActualCalendar", {
 					monthStDt: monthStDt,
 					monthEdDt: monthEdDt,
-					attYn: attYn
+					attYn: attYn,
+					deptId: deptId
 				}, null, function(actualData) {
 					if (actualData && actualData.result) {
 						actualList = actualData.result;
@@ -1379,7 +1416,8 @@
 					postAjax("/user/pm/pm60/selectVacationCalendar", {
 						monthStDt: monthStDt,
 						monthEdDt: monthEdDt,
-						attYn: attYn
+						attYn: attYn,
+						deptId: deptId
 					}, null, function(vacationData) {
 						if (vacationData && vacationData.result) {
 							vacationList = vacationData.result;
@@ -1395,7 +1433,8 @@
 			// 외주 인력 정보 조회
 			postAjax("/user/pm/pm60/selectVndrList", {
 				monthStDt: monthStDt,
-				monthEdDt: monthEdDt
+				monthEdDt: monthEdDt,
+				deptId: deptId
 			}, null, function(data) {
 				vndrList = (data && data.result) ? data.result : [];
 				renderVndrCalendar(monthStDt, monthEdDt);
@@ -1405,7 +1444,8 @@
 			postAjax("/user/pm/pm60/selectRsvStatDaily", {
 				monthStDt: monthStDt,
 				monthEdDt: monthEdDt,
-				attYn: attYn
+				attYn: attYn,
+				deptId: deptId
 			}, null, function(data) {
 				if (data && data.result) {
 					kpiStatList = data.result;
@@ -1638,6 +1678,7 @@
 		var barDragMode = null; // 'move', 'resize-left', 'resize-right'
 		var barDragRsvNo = null;
 		var barDragUserId = null;
+		var barDragTargetUserId = null; // 'move' 모드에서 세로 드래그로 변경되는 대상 팀원(행)
 		var barDragOrigSt = null;
 		var barDragOrigEd = null;
 		var barDragTargetSt = null;
@@ -1726,6 +1767,7 @@
 				var $bar = $(this);
 				barDragRsvNo = $bar.attr('data-rsv-no');
 				barDragUserId = $bar.attr('data-user-id');
+				barDragTargetUserId = barDragUserId;
 				barDragOrigSt = $bar.attr('data-st-date');
 				barDragOrigEd = $bar.attr('data-ed-date');
 				barDragTargetSt = barDragOrigSt;
@@ -1775,9 +1817,21 @@
 						}
 					}
 
-					if (newSt !== barDragTargetSt || newEd !== barDragTargetEd) {
+					var newTargetUserId = barDragTargetUserId;
+					if (barDragMode === 'move') {
+						var elemAtPoint = document.elementFromPoint(e.clientX, e.clientY);
+						if (elemAtPoint) {
+							var $rowAtPoint = $(elemAtPoint).closest('#ganttTable tr[data-user-id]:not(.actual-row)');
+							if ($rowAtPoint.length > 0) {
+								newTargetUserId = $rowAtPoint.attr('data-user-id');
+							}
+						}
+					}
+
+					if (newSt !== barDragTargetSt || newEd !== barDragTargetEd || newTargetUserId !== barDragTargetUserId) {
 						barDragTargetSt = newSt;
 						barDragTargetEd = newEd;
+						barDragTargetUserId = newTargetUserId;
 						barDragHasMoved = true;
 						updateBarDragPreview();
 					}
@@ -1820,9 +1874,12 @@
 				if (isBarDragging) {
 					isBarDragging = false;
 					$('#ganttTable td.gantt-cell').removeClass('bar-drag-preview');
+					$('#ganttTable tr.row-drop-target').removeClass('row-drop-target');
 
-					if (barDragHasMoved && barDragRsvNo && (barDragTargetSt !== barDragOrigSt || barDragTargetEd !== barDragOrigEd)) {
-						updateRsvDates(barDragRsvNo, barDragTargetSt, barDragTargetEd);
+					var targetUserId = barDragTargetUserId || barDragUserId;
+					var userChanged = targetUserId !== barDragUserId;
+					if (barDragHasMoved && barDragRsvNo && (barDragTargetSt !== barDragOrigSt || barDragTargetEd !== barDragOrigEd || userChanged)) {
+						updateRsvDates(barDragRsvNo, barDragTargetSt, barDragTargetEd, userChanged ? targetUserId : null);
 					} else {
 						barDragHasMoved = false;
 					}
@@ -1850,10 +1907,16 @@
 
 		function updateBarDragPreview() {
 			$('#ganttTable td.gantt-cell').removeClass('bar-drag-preview');
+			$('#ganttTable tr.row-drop-target').removeClass('row-drop-target');
 
-			if (!barDragUserId || !barDragTargetSt || !barDragTargetEd) return;
+			var previewUserId = barDragTargetUserId || barDragUserId;
+			if (!previewUserId || !barDragTargetSt || !barDragTargetEd) return;
 
-			$('#ganttTable tr[data-user-id="' + barDragUserId + '"] td.gantt-cell').each(function() {
+			if (barDragTargetUserId && barDragTargetUserId !== barDragUserId) {
+				$('#ganttTable tr[data-user-id="' + previewUserId + '"]:not(.actual-row)').addClass('row-drop-target');
+			}
+
+			$('#ganttTable tr[data-user-id="' + previewUserId + '"]:not(.actual-row) td.gantt-cell').each(function() {
 				var dayStr = $(this).attr('data-day-str');
 				if (dayStr && dayStr >= barDragTargetSt && dayStr <= barDragTargetEd) {
 					$(this).addClass('bar-drag-preview');
@@ -1861,13 +1924,16 @@
 			});
 		}
 
-		function updateRsvDates(rsvNo, stDayStr, edDayStr) {
-			// 기존 상세 정보 조회를 거쳐 시작일/종료일만 업데이트
+		function updateRsvDates(rsvNo, stDayStr, edDayStr, targetUserId) {
+			// 기존 상세 정보 조회를 거쳐 시작일/종료일(및 세로 드래그 시 담당자)만 업데이트
 			postAjax("/user/pm/pm60/selectRsvDtl", { rsvNo: rsvNo }, null, function(data) {
 				if (data && data.result) {
 					var rsv = data.result;
 					rsv.tripStDtm = stDayStr + '000000';
 					rsv.tripEdDtm = edDayStr + '235959';
+					if (targetUserId) {
+						rsv.userId = targetUserId;
+					}
 
 					var stMoment = moment(stDayStr, 'YYYYMMDD');
 					var edMoment = moment(edDayStr, 'YYYYMMDD');
@@ -2822,6 +2888,23 @@
 			}, null, function(data) {
 				vndrList = (data && data.result) ? data.result : [];
 				renderVndrCalendar(monthStDt, monthEdDt);
+			});
+		}
+
+		//부서 검색
+		function openDeptTree() {
+			var paramObj = {
+				"coCd" : $('#coCd_S').val(),
+				"deptId": $('#deptId_S').val(),
+				"deptNm": $('#deptNm_S').val(),
+				"useYn": "Y"
+			};
+			openSecondModal("/static/html/cmn/modal/deptSearch.html", 300, 500, "부서 검색", paramObj, function (tree){
+				var checkedId = tree.get_checked()[0];
+				var checkedNode = tree.get_node(checkedId);
+				$('#deptId_S').val(checkedNode.id);
+				$('#deptNm_S').val(checkedNode.text);
+				loadTeamMemberList();
 			});
 		}
 

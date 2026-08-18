@@ -23,7 +23,15 @@
 			FROM TB_CM06M01 C
 			LEFT JOIN TB_CM04M01 D ON C.DEPT_ID = D.DEPT_ID
 			LEFT JOIN TB_CM07M01 L ON C.LEVEL_CD = L.LEVEL_CD
-			WHERE C.DEPT_ID = 'GUN6010'
+			WHERE 1 = 1
+			<choose>
+				<when test="deptId != null and deptId != ''">
+					AND C.DEPT_ID LIKE #{deptId} || '%'
+				</when>
+				<otherwise>
+					AND C.DEPT_ID LIKE 'GUN60%'
+				</otherwise>
+			</choose>
 			AND C.USE_YN = 'Y'
 			ORDER BY C.NAME ASC
 		)
@@ -60,6 +68,14 @@
 			UDT_DTTM AS UDT_DTTM
 		FROM TB_PM60M01
 		WHERE CO_CD = 'GUN'
+		<choose>
+			<when test="deptId != null and deptId != ''">
+				AND USER_ID IN (SELECT ID FROM TB_CM06M01 WHERE DEPT_ID LIKE #{deptId} || '%' AND USE_YN = 'Y')
+			</when>
+			<otherwise>
+				AND USER_ID IN (SELECT ID FROM TB_CM06M01 WHERE DEPT_ID LIKE 'GUN60%' AND USE_YN = 'Y')
+			</otherwise>
+		</choose>
 		<if test="monthStDt != null and monthStDt != '' and monthEdDt != null and monthEdDt != ''">
 			AND SUBSTR(TRIP_ST_DTM, 1, 8) &lt;= #{monthEdDt}
 			AND SUBSTR(TRIP_ED_DTM, 1, 8) &gt;= #{monthStDt}
@@ -108,7 +124,15 @@
 			FN_CM05M01_CD_TO_NM(M.TRIP_TYPE_CDS) AS TRIP_TYPE_CDS_NM
 		FROM TB_PM51D01 D
 		INNER JOIN TB_PM51M01 M ON M.TRIP_REQ_NO = D.TRIP_REQ_NO
-		WHERE D.USER_ID IN (SELECT ID FROM TB_CM06M01 WHERE DEPT_ID = 'GUN6010' AND USE_YN = 'Y')
+		WHERE 1 = 1
+		<choose>
+			<when test="deptId != null and deptId != ''">
+				AND D.USER_ID IN (SELECT ID FROM TB_CM06M01 WHERE DEPT_ID LIKE #{deptId} || '%' AND USE_YN = 'Y')
+			</when>
+			<otherwise>
+				AND D.USER_ID IN (SELECT ID FROM TB_CM06M01 WHERE DEPT_ID LIKE 'GUN60%' AND USE_YN = 'Y')
+			</otherwise>
+		</choose>
 		<if test="monthStDt != null and monthStDt != '' and monthEdDt != null and monthEdDt != ''">
 			AND SUBSTR(
 				NVL((
@@ -161,7 +185,14 @@
 				)
 			</otherwise>
 		</choose>
-		AND WORK_RPT_ID IN (SELECT ID FROM TB_CM06M01 WHERE DEPT_ID = 'GUN6010' AND USE_YN = 'Y')
+		<choose>
+			<when test="deptId != null and deptId != ''">
+				AND WORK_RPT_ID IN (SELECT ID FROM TB_CM06M01 WHERE DEPT_ID LIKE #{deptId} || '%' AND USE_YN = 'Y')
+			</when>
+			<otherwise>
+				AND WORK_RPT_ID IN (SELECT ID FROM TB_CM06M01 WHERE DEPT_ID LIKE 'GUN60%' AND USE_YN = 'Y')
+			</otherwise>
+		</choose>
 		<if test="monthStDt != null and monthStDt != '' and monthEdDt != null and monthEdDt != ''">
 			AND TO_CHAR(WORK_RPT_DT, 'YYYYMMDD') BETWEEN #{monthStDt} AND #{monthEdDt}
 		</if>
@@ -220,6 +251,7 @@
 	<update id="updateRsv" parameterType="Map">
 		UPDATE TB_PM60M01
 		SET
+			USER_ID = #{userId, jdbcType=VARCHAR},
 			TRIP_DIV = #{tripDiv, jdbcType=VARCHAR},
 			TRIP_TYPE_CDS = #{tripTypeCds, jdbcType=VARCHAR},
 			TRIP_COND_CD = #{tripCondCd, jdbcType=VARCHAR},
@@ -353,21 +385,37 @@
 				), D.TRIP_ED_DTM) AS EFF_ED_DTM
 			FROM TB_PM51D01 D
 			INNER JOIN TB_PM51M01 M ON M.TRIP_REQ_NO = D.TRIP_REQ_NO
-			WHERE D.USER_ID IN (SELECT ID FROM TB_CM06M01 WHERE DEPT_ID = 'GUN6010' AND USE_YN = 'Y')
+			WHERE 1 = 1
+			<choose>
+				<when test="deptId != null and deptId != ''">
+					AND D.USER_ID IN (SELECT ID FROM TB_CM06M01 WHERE DEPT_ID LIKE #{deptId} || '%' AND USE_YN = 'Y')
+				</when>
+				<otherwise>
+					AND D.USER_ID IN (SELECT ID FROM TB_CM06M01 WHERE DEPT_ID LIKE 'GUN60%' AND USE_YN = 'Y')
+				</otherwise>
+			</choose>
 		)
 		SELECT
 			C.WORK_DT AS WORK_DT,
 			SUBSTR(C.WORK_DT, 1, 4) || '-' || SUBSTR(C.WORK_DT, 5, 2) || '-' || SUBSTR(C.WORK_DT, 7, 2) AS WORK_DT_DISP,
-			(SELECT COUNT(*) FROM TB_CM06M01 WHERE DEPT_ID='GUN6010' AND USE_YN='Y') AS TOTAL_CNT,
+			(SELECT COUNT(*) FROM TB_CM06M01 WHERE USE_YN='Y' <choose><when test="deptId != null and deptId != ''">AND DEPT_ID LIKE #{deptId} || '%'</when><otherwise>AND DEPT_ID LIKE 'GUN60%'</otherwise></choose>) AS TOTAL_CNT,
 			COALESCE((
 				SELECT COUNT(DISTINCT USER_ID)
 				FROM TB_PM60M01
 				WHERE CO_CD = 'GUN'
 				AND SUBSTR(TRIP_ST_DTM, 1, 8) &lt;= C.WORK_DT
 				AND SUBSTR(TRIP_ED_DTM, 1, 8) &gt;= C.WORK_DT
+				<choose>
+					<when test="deptId != null and deptId != ''">
+						AND USER_ID IN (SELECT ID FROM TB_CM06M01 WHERE DEPT_ID LIKE #{deptId} || '%' AND USE_YN = 'Y')
+					</when>
+					<otherwise>
+						AND USER_ID IN (SELECT ID FROM TB_CM06M01 WHERE DEPT_ID LIKE 'GUN60%' AND USE_YN = 'Y')
+					</otherwise>
+				</choose>
 			), 0) AS PLAN_CNT,
 			COALESCE((
-				SELECT COUNT(*) FROM TB_CM06M01 WHERE DEPT_ID='GUN6010' AND USE_YN='Y'
+				SELECT COUNT(*) FROM TB_CM06M01 WHERE USE_YN='Y' <choose><when test="deptId != null and deptId != ''">AND DEPT_ID LIKE #{deptId} || '%'</when><otherwise>AND DEPT_ID LIKE 'GUN60%'</otherwise></choose>
 			), 0) - COALESCE((
 				SELECT COUNT(DISTINCT U.USER_ID)
 				FROM (
@@ -382,7 +430,7 @@
 					WHERE WORK_RPT_S LIKE '%9901'
 					AND TO_CHAR(WORK_RPT_DT, 'YYYYMMDD') = C.WORK_DT
 				) U
-				WHERE U.USER_ID IN (SELECT ID FROM TB_CM06M01 WHERE DEPT_ID='GUN6010' AND USE_YN='Y')
+				WHERE U.USER_ID IN (SELECT ID FROM TB_CM06M01 WHERE USE_YN='Y' <choose><when test="deptId != null and deptId != ''">AND DEPT_ID LIKE #{deptId} || '%'</when><otherwise>AND DEPT_ID LIKE 'GUN60%'</otherwise></choose>)
 			), 0) AS AVAIL_CNT,
 			(
 				COALESCE((
