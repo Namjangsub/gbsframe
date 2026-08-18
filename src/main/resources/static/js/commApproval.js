@@ -421,9 +421,9 @@ function Approval(htmlParam, param, popParam) {
 							notifyPm51NextApprover(paramMap.todoNo, PM51_SEQUENTIAL_DIV_MAP[paramMap.todoDiv2CodeId], paramMap.pgmId);
 						}
 					}
-					//결재처리 완료 - 상단 결재미완료/공유미확인 건수 갱신
+					//결재처리 완료 - 상단 결재미완료/공유미확인 건수 갱신 (isForce=true로 캐시 무시 및 타 탭 전파)
 					if (typeof myTodoStatusRtv === 'function') {
-						myTodoStatusRtv();
+						myTodoStatusRtv(true);
 					}
 				} else {
 					customAlert(data.resultMessage || "승인중 오류가 발생 되었습니다.");

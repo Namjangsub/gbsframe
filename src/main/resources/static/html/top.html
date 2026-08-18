@@ -197,29 +197,170 @@
 		$("#topUserNm").click(function() {topinsertDailyWorkModal("C");});
 		$("#personalStatus").click(function() {callPersonalStatus();});
 
-		//결재미완료 / 공유미확인 건수 처리 (최초 조회 + 3분 간격 갱신)
-		myTodoStatusRtv();
-		setInterval(myTodoStatusRtv, 180000);
+		//결재미완료 / 공유미확인 건수 처리 (최초 조회 + 3분 간격 갱신 + 탭간 동기화)
+		window.addEventListener("storage", function(e) {
+			var key = getTodoCacheKey();
+			if (key && e.key === key && e.newValue) {
+				try {
+					var cached = JSON.parse(e.newValue);
+					renderMyTodoCount(cached.approvalCnt, cached.shareCnt);
+				} catch (err) {}
+			}
+		});
+
+		document.addEventListener("visibilitychange", function() {
+			if (!document.hidden) {
+				myTodoStatusRtv(false);
+			}
+		});
+
+		renderFromCache();
+		myTodoStatusRtv(false);
+		setInterval(function() { myTodoStatusRtv(false); }, TODO_TTL_MS);
 
 	});
 
-	//결재미완료 / 공유미확인 건수 조회
-	function myTodoStatusRtv() {
-		// 로그인 여부 및 토큰 존재 검증 (다른 탭 로그아웃 시 localStorage 토큰 삭제됨)
-		if (!localStorage.getItem("access_token") || !jwt || !jwt.userId) {
+	var TODO_TTL_MS = 600000;       // 10분
+	var FETCH_LOCK_TTL_MS = 5000;   // 5초
+
+	var TODO_TAB_ID =
+		Date.now() + "_" +
+		Math.random().toString(36).substring(2);
+
+	function getTodoCacheKey() {
+		if (!jwt || !jwt.userId) {
+			return null;
+		}
+		return "GBS:todoCnt:" +
+			(jwt.coCd || "") + ":" +
+			jwt.userId;
+	}
+
+	function getTodoCache() {
+		var key = getTodoCacheKey();
+		if (!key) {
+			return null;
+		}
+		var raw = localStorage.getItem(key);
+		if (!raw) {
+			return null;
+		}
+		try {
+			return JSON.parse(raw);
+		} catch (e) {
+			localStorage.removeItem(key);
+			return null;
+		}
+	}
+
+	function renderMyTodoCount(approvalCnt, shareCnt) {
+		$("#myApprovalCount").text(approvalCnt || 0);
+		$("#myShareCount").text(shareCnt || 0);
+	}
+
+	function renderFromCache() {
+		var cached = getTodoCache();
+		if (!cached) {
+			return null;
+		}
+		renderMyTodoCount(
+			cached.approvalCnt,
+			cached.shareCnt
+		);
+		return cached;
+	}
+
+	function myTodoStatusRtv(isForce) {
+		if (!localStorage.getItem("access_token") ||
+			!jwt ||
+			!jwt.userId) {
 			return;
 		}
+
+		if (document.hidden && !isForce) {
+			return;
+		}
+
+		var cacheKey = getTodoCacheKey();
+		if (!cacheKey) {
+			return;
+		}
+
+		var lockKey = cacheKey + ":fetching";
+		var now = Date.now();
+		var cached = getTodoCache();
+
+		// 캐시 먼저 화면 반영
+		if (cached) {
+			renderMyTodoCount(
+				cached.approvalCnt,
+				cached.shareCnt
+			);
+		}
+
+		// 일반 조회는 TTL 이내면 종료
+		if (!isForce &&
+			cached &&
+			now - cached.at < TODO_TTL_MS) {
+			return;
+		}
+
+		// ★ Force 여부와 관계없이 Lock 확인
+		var fetchLock = localStorage.getItem(lockKey);
+		if (fetchLock &&
+			now - Number(fetchLock) < FETCH_LOCK_TTL_MS) {
+			return;
+		}
+
+		// 만료 Lock 정리
+		if (fetchLock) {
+			localStorage.removeItem(lockKey);
+		}
+
+		// Fetching Lock
+		localStorage.setItem(
+			lockKey,
+			String(now)
+		);
+
 		var formData = {
-			"coCd" 			: jwt.coCd,
-			"salesMngId" 	: jwt.userId,
-			"boardParam" 	: "BOARD",
-			"sanctnSttus" 	: "N"
+			coCd: jwt.coCd,
+			salesMngId: jwt.userId,
+			boardParam: "BOARD",
+			sanctnSttus: "N"
 		};
-		postAjax("/user/wb/wb20/selectToDoCountGrouped", formData, null, function(data) {
-			var result = data.result || {};
-			$("#myApprovalCount").text(result.approvalCnt || 0);
-			$("#myShareCount").text(result.shareCnt || 0);
-		}, false);
+
+		postAjax(
+			"/user/wb/wb20/selectToDoCountGrouped",
+			formData,
+			null,
+			function(data) {
+				var result = data.result || {};
+				var appCnt = Number(result.approvalCnt || 0);
+				var shareCnt = Number(result.shareCnt || 0);
+
+				var cacheObj = {
+					approvalCnt: appCnt,
+					shareCnt: shareCnt,
+					at: Date.now()
+				};
+
+				// 현재 탭 즉시 갱신
+				renderMyTodoCount(
+					appCnt,
+					shareCnt
+				);
+
+				// 다른 탭으로 전달
+				localStorage.setItem(
+					cacheKey,
+					JSON.stringify(cacheObj)
+				);
+
+				// Lock 해제
+				localStorage.removeItem(lockKey);
+			}
+		);
 	}
 
 	//결재화면(TO-DO LIST)으로 이동
