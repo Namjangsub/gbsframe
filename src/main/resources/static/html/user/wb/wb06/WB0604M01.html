@@ -430,37 +430,38 @@ function refreshSummariesOnly(){
     }
   }
 
-  // 2. 모든 부모 노드 실적(ACT) 및 계획(PLAN) 자동 요약 (Bottom-up approach)
-  // 깊이가 깊은 노드부터 처리하기 위해 모든 태스크를 역순 정렬하거나 반복적으로 처리
+  // 2. 모든 부모 노드 실적(ACT) 및 계획(PLAN) 자동 요약 (O(N) 고속 Map 집계)
   const allTasks = Array.from(STATE.tasks.values());
-  const parentTasks = allTasks.filter(t => allTasks.some(c => c.parentId === t.id));
-  
-  // 단순화를 위해 자식의 자식을 가지는 구조도 반영되도록 여러 번 수행하거나 트리 구조 순회
-  // 여기서는 수정을 최소화하면서 모든 부모가 자식을 집계하도록 루프 강화
-  parentTasks.forEach(t => {
-      const children = allTasks.filter(c => c.parentId === t.id);
-      if(children.length > 0){
-        let minS = null, maxE = null, totalProg = 0, countProg = 0;
-        let pMinS = null, pMaxE = null;
+  const childrenMap = new Map();
+  for (let idx = 0; idx < allTasks.length; idx++) {
+    const c = allTasks[idx];
+    if (c.parentId) {
+      if (!childrenMap.has(c.parentId)) childrenMap.set(c.parentId, []);
+      childrenMap.get(c.parentId).push(c);
+    }
+  }
 
-        children.forEach(c => {
-          // ACT 집계
-          if(c.actStartAt){
-            if(!minS || diffDays(minS, c.actStartAt) < 0) minS = c.actStartAt;
-          }
-          if(c.actEndAt){
-            if(!maxE || diffDays(maxE, c.actEndAt) > 0) maxE = c.actEndAt;
-          }
+  for (const [pid, children] of childrenMap.entries()) {
+    const t = STATE.tasks.get(pid);
+    if (!t || !children || children.length === 0) continue;
 
-          totalProg += (c.actProgress || 0);
-          countProg++;
-        });
-
-        t.actStartAt = minS;
-        t.actEndAt = maxE;
-        t.actProgress = countProg > 0 ? Math.round(totalProg / countProg) : 0;
+    let minS = null, maxE = null, totalProg = 0, countProg = 0;
+    for (let cIdx = 0; cIdx < children.length; cIdx++) {
+      const c = children[cIdx];
+      if (c.actStartAt) {
+        if (!minS || diffDays(minS, c.actStartAt) < 0) minS = c.actStartAt;
       }
-  });
+      if (c.actEndAt) {
+        if (!maxE || diffDays(maxE, c.actEndAt) > 0) maxE = c.actEndAt;
+      }
+      totalProg += (c.actProgress || 0);
+      countProg++;
+    }
+
+    t.actStartAt = minS;
+    t.actEndAt = maxE;
+    t.actProgress = countProg > 0 ? Math.round(totalProg / countProg) : 0;
+  }
     
   // 3. 모든 노드(부모 포함)의 상태(status)와 상태코드(wbsPlanStsCodeId)를 날짜/진척율 기반으로 재계산
   for(const t of STATE.tasks.values()){
@@ -2670,10 +2671,15 @@ function init(){
   elSlider.val(currentDayW);
   elZoomVal.text(currentDayW);
 
+  let zoomRafId = null;
   elSlider.on("input", (e) => {
     const v = $(e.target).val();
     elZoomVal.text(v);
-    applyZoom(v);
+    document.documentElement.style.setProperty("--dayW", v + "px");
+    if (zoomRafId) cancelAnimationFrame(zoomRafId);
+    zoomRafId = requestAnimationFrame(() => {
+      applyZoom(v);
+    });
   });
   
   // 결재/첨부 팝업 (Global Handler)
