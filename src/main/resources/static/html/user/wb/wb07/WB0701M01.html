@@ -461,7 +461,19 @@ onkeyup="(event.keyCode == 8 || event.keyCode == 46) ? wbsPlanMngId_S.value = ''
       });
     }
     // business-day aware: count only weekdays (Mon-Fri)
+    // 순수 함수이므로 (a,b) 기준 메모이제이션. 간트 Bar 1개당 2~4회, Bar 수백개 x 수백일 루프를 제거한다.
+    const DAYS_BETWEEN_CACHE = new Map();
+    const DAYS_BETWEEN_CACHE_MAX = 20000;
     function daysBetween(a, b){
+      const ck = (typeof a) + ':' + a + '|' + (typeof b) + ':' + b;
+      const hit = DAYS_BETWEEN_CACHE.get(ck);
+      if(hit !== undefined) return hit;
+      const val = daysBetweenCalc(a, b);
+      if(DAYS_BETWEEN_CACHE.size >= DAYS_BETWEEN_CACHE_MAX) DAYS_BETWEEN_CACHE.clear();
+      DAYS_BETWEEN_CACHE.set(ck, val);
+      return val;
+    }
+    function daysBetweenCalc(a, b){
       const da = (typeof a === 'number') ? new Date(a) : parseYMD(a);
       const db = (typeof b === 'number') ? new Date(b) : parseYMD(b);
       if(!da || !db) {
@@ -2983,9 +2995,11 @@ onkeyup="(event.keyCode == 8 || event.keyCode == 46) ? wbsPlanMngId_S.value = ''
     /***********************
      * 7) 드래그/리사이즈
      ************************/
-    function bindBars(){
+    function bindBars($root){
       // jQuery UI 객체 중복 생성 방지: destroy 후 재생성
-      $(".bar").each(function(){
+      // $root 가 주어지면 해당 영역의 .bar 만 재바인딩한다(부분 갱신 시 전체 재생성 방지)
+      const $targets = $root && $root.length ? $root.find(".bar").addBack(".bar") : $(".bar");
+      $targets.each(function(){
         const $b = $(this);
 
         const segId = $b.data("seg");

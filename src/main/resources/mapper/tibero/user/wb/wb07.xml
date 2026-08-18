@@ -12,21 +12,21 @@
 				SELECT *
 				FROM (
 	                      SELECT 'WBSCODE01' AS WBS_PLAN_CODE_ID, '수주확정' AS FULL_NM,  '수주확정' AS DEPT_NM,  'S01' AS DEPT_ID, 'GUN30' AS MNG_DEPT FROM DUAL
-	                UNION SELECT 'WBSCODE02',                     '원가PFU',              '원가PFU',            'S02',            'GUN30' FROM DUAL
-	                UNION SELECT 'WBSCODE03',                     '설계',                 '설계',             	'S03',            'GUN40' FROM DUAL
-	                UNION SELECT 'WBSCODE17',                     '모델링',               '모델링',             'S04',            'TRN50' FROM DUAL
-	                UNION SELECT 'WBSCODE04',                     '구매',                 '구매',             	'S05',            'TRN50' FROM DUAL
-	                UNION SELECT 'WBSCODE18',                     '샘플공급',             '샘플공급',           'S06',            'GUN30' FROM DUAL
-	                UNION SELECT 'WBSCODE05',                     '기계조립',             '기계조립',           'S07',            'GUN60' FROM DUAL
-	                UNION SELECT 'WBSCODE06',                     '전기',                 '전기',             	'S08',            'TRN50' FROM DUAL
-	                UNION SELECT 'WBSCODE07',                     '자체시운전',           '자체시운전',         'S09',            'GUN30' FROM DUAL
-	                UNION SELECT 'WBSCODE16',                     '외부검수',             '외부검수',           'S10',            'GUN60' FROM DUAL
-	                UNION SELECT 'WBSCODE09',                     '고객검수',             '고객검수',           'S11',            'GUN30' FROM DUAL
-	                UNION SELECT 'WBSCODE10',                     '포장',                 '포장',             	'S12',            'GUN30' FROM DUAL
-	                UNION SELECT 'WBSCODE11',                     '출고',                 '출고',             	'S13',            'GUN30' FROM DUAL
-	                UNION SELECT 'WBSCODE12',                     '도착',                 '도착',             	'S14',            'GUN30' FROM DUAL
-	                UNION SELECT 'WBSCODE13',                     '설치출발',             '설치출발',           'S15',            'GUN30' FROM DUAL
-	                UNION SELECT 'WBSCODE14',                     '설치복귀',             '설치복귀',           'S16',            'GUN30' FROM DUAL
+	                UNION ALL SELECT 'WBSCODE02',                     '원가PFU',              '원가PFU',            'S02',            'GUN30' FROM DUAL
+	                UNION ALL SELECT 'WBSCODE03',                     '설계',                 '설계',             	'S03',            'GUN40' FROM DUAL
+	                UNION ALL SELECT 'WBSCODE17',                     '모델링',               '모델링',             'S04',            'TRN50' FROM DUAL
+	                UNION ALL SELECT 'WBSCODE04',                     '구매',                 '구매',             	'S05',            'TRN50' FROM DUAL
+	                UNION ALL SELECT 'WBSCODE18',                     '샘플공급',             '샘플공급',           'S06',            'GUN30' FROM DUAL
+	                UNION ALL SELECT 'WBSCODE05',                     '기계조립',             '기계조립',           'S07',            'GUN60' FROM DUAL
+	                UNION ALL SELECT 'WBSCODE06',                     '전기',                 '전기',             	'S08',            'TRN50' FROM DUAL
+	                UNION ALL SELECT 'WBSCODE07',                     '자체시운전',           '자체시운전',         'S09',            'GUN30' FROM DUAL
+	                UNION ALL SELECT 'WBSCODE16',                     '외부검수',             '외부검수',           'S10',            'GUN60' FROM DUAL
+	                UNION ALL SELECT 'WBSCODE09',                     '고객검수',             '고객검수',           'S11',            'GUN30' FROM DUAL
+	                UNION ALL SELECT 'WBSCODE10',                     '포장',                 '포장',             	'S12',            'GUN30' FROM DUAL
+	                UNION ALL SELECT 'WBSCODE11',                     '출고',                 '출고',             	'S13',            'GUN30' FROM DUAL
+	                UNION ALL SELECT 'WBSCODE12',                     '도착',                 '도착',             	'S14',            'GUN30' FROM DUAL
+	                UNION ALL SELECT 'WBSCODE13',                     '설치출발',             '설치출발',           'S15',            'GUN30' FROM DUAL
+	                UNION ALL SELECT 'WBSCODE14',                     '설치복귀',             '설치복귀',           'S16',            'GUN30' FROM DUAL
 	                ) T
 	                LEFT OUTER JOIN (
 	             SELECT  substr(VIEW_DEPT_ID,1,5) VIEW_DEPT_ID, MNG_ID AS TEAM_MNG_ID
@@ -55,6 +55,22 @@
 				      LEFT JOIN TB_BM02M01 B ON B.CLNT_CD  = M.ORDRS_CLNT_CD
 				      </if>
 			          WHERE 1 = 1
+					  <!-- 조회기간이 지정된 경우 ROW_NUMBER 계산 전에 대상 SALES_CD 를 미리 축소한다.
+					       (SALES_CD 는 PARTITION BY 키이므로 남는 파티션의 RN 값은 변하지 않는다.
+					        sales CTE 가 동일 조건으로 INNER JOIN 하므로 결과는 동일) -->
+					  <if test="salesCd == null or salesCd == ''">
+					  <if test="strtDt != null and !strtDt.equals('') and endDt != null and !endDt.equals('')">
+					   AND EXISTS (
+					        SELECT 1
+					          FROM TB_CR02D02 D2
+					          JOIN TB_CR02M01 C2 ON C2.CO_CD = D2.CO_CD AND C2.ORDRS_NO = D2.ORDRS_NO
+					         WHERE D2.CO_CD    = P.CO_CD
+					           AND D2.SALES_CD = P.SALES_CD
+					           AND C2.CO_CD    = 'GUN'
+					           AND C2.ORDRS_DT BETWEEN TO_DATE(#{strtDt},'YYYYMMDD') AND TO_DATE(#{endDt},'YYYYMMDD')
+					       )
+					  </if>
+					  </if>
 					  <if test="endYn != null and endYn != ''">
 			           AND NVL(P.END_YN, 'N') = #{endYn}
 				      </if>
@@ -71,7 +87,8 @@
 				WHERE T.RN = 1
 			)
 			, sales AS (
-				SELECT    C.CO_CD
+				SELECT /*+ MATERIALIZE */
+						  C.CO_CD
 						, C.ORDRS_NO
 						, D.SALES_CD
 						, D.EQP_NM
@@ -121,7 +138,7 @@
 			,totPlan AS (
 			<choose>
 				<when test="wbsPlanMngIdNm != null and !wbsPlanMngIdNm.equals('')">
-				SELECT
+				SELECT /*+ MATERIALIZE */
 					W.CO_CD,
 					W.SALES_CD,
 					D.DEPT_ID,
@@ -151,7 +168,7 @@
 				AND M.NAME LIKE '%' || #{wbsPlanMngIdNm} || '%'
 				</when>
 				<otherwise>
-				SELECT
+				SELECT /*+ MATERIALIZE */
 					W.CO_CD,
 					W.SALES_CD,
 					D.DEPT_ID,
@@ -178,7 +195,7 @@
 			</choose>
 			)
 			,src AS (
-				SELECT
+				SELECT /*+ MATERIALIZE */
 					W.CO_CD,
 					W.SALES_CD,
 					W.DEPT_ID,
@@ -191,11 +208,9 @@
 					W.FILE_TRGT_KEY,
 					W.WBS_CLOSE_YN AS WBS_CLOSE_YN,
 					W.WBS_PLAN_MNG_ID,
-					C.NAME 	  AS WBS_PLAN_MNG_ID_NM,
 					W.VER_NO,
 					W.WBS_PLAN_NO
 				FROM totPlan W
-				LEFT JOIN TB_CM06M01 C ON C.ID = W.WBS_PLAN_MNG_ID
 				WHERE W.WBS_PLAN_CODE_KIND = 'WBSCODE'
 			)
 			, un_plan AS (
@@ -241,7 +256,8 @@
 			)
 			-- level2 plan 등록건수
 			,l2PlanCnt AS (
-				SELECT  W.CO_CD, W.SALES_CD, W.WBS_PLAN_CODE_KIND,
+				SELECT  /*+ MATERIALIZE */
+						W.CO_CD, W.SALES_CD, W.WBS_PLAN_CODE_KIND,
 				        COUNT(W.FILE_TRGT_KEY) AS NOT_WBSCODE_COUNT
 				FROM totPlan W
 				WHERE W.WBS_PLAN_CODE_KIND != 'WBSCODE'
@@ -277,7 +293,7 @@
 		),
 		/* 여기서 먼저 run 단위로 집계(최종 GROUP BY 문제 제거) */
 		final_base AS (
-			SELECT
+			SELECT /*+ MATERIALIZE */
 				CO_CD,
 				SALES_CD,
 				RUN_ID,
@@ -327,7 +343,6 @@
 			  GROUP BY A.CO_CD, A.SALES_CD, A.WBS_PLAN_CODE_KIND
 		),
 		WB AS (
-		    /*+ MATERIALIZE */
 		    SELECT
 		        W.CO_CD,
 		        W.VER_NO,
@@ -339,12 +354,6 @@
 		    JOIN sales  ON sales.CO_CD = W.CO_CD AND sales.SALES_CD = W.SALES_CD
 		    WHERE W.WBS_PLAN_CODE_KIND = 'WBSCODE'
 		      AND W.WBS_PLANS_DT IS NOT NULL
-		)
-		,WBK AS (
-		    /*+ MATERIALIZE */
-		    SELECT DISTINCT
-		        CO_CD, VER_NO, SALES_CD, WBS_PLAN_CODE_ID
-		    FROM WB
 		)
 		, plan AS (
 			SELECT
