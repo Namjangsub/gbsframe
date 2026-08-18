@@ -1,4 +1,33 @@
 
+// PM51(출장신청서 TODODIV2190/2191, 출장복명서 TODODIV2200/2201) 순차결재 안내문구 생성.
+// 본인이 결재 대상이지만 차례가 아니어서 결재버튼이 숨겨진 경우, 현재 어느 결재자에서 멈춰 있는지 표시한다.
+// 대상 문서가 아니거나 안내가 필요 없으면 빈 문자열을 반환하므로 타 모듈에는 영향이 없다.
+function pm51PendingNoticeHtml(list, applyBtn, colSpan) {
+	if (applyBtn || !list || list.length === 0) return '';
+	var pm51SeqDivs = ["TODODIV2190", "TODODIV2191", "TODODIV2200", "TODODIV2201"];
+	var myRow = null;
+	$.each(list, function(idx, row) {
+		if (row.todoId == jwt.userId) { myRow = row; return false; }
+	});
+	if (!myRow || $.inArray(myRow.todoDiv2CodeId, pm51SeqDivs) < 0) return '';
+	if (myRow.sanctnSttus == 'Y') return '';
+
+	var mySn = Number(myRow.sanctnSn || 0);
+	var blocker = null;
+	$.each(list, function(idx, row) {
+		if (row.sanctnSttus == 'Y') return;
+		var sn = Number(row.sanctnSn || 0);
+		if (!sn || sn >= mySn) return;
+		if (!blocker || sn < Number(blocker.sanctnSn || 0)) blocker = row;
+	});
+	if (!blocker) return '';
+
+	return '<tr><td colspan="' + colSpan + '" style="text-align:left; padding:8px; color:#d9534f; background:#fff8f8; border-top:1px solid #dbdbdb;">'
+		+ '순번 ' + blocker.sanctnSn + ' <b>' + (blocker.todoNm || '') + '</b> 결재자의 승인 대기중입니다.<br>'
+		+ '이전 결재가 완료되어야 결재를 진행할 수 있습니다.'
+		+ '</td></tr>';
+}
+
 //결재승인 버튼
 ///commApprovalMobile.js 모듈에서 일괄 처리하게 변경
 //function approvalConfirm() {
@@ -154,12 +183,21 @@ function Approval(htmlParam, param, popParam) {
 									} else if( data.sanctnSn == "1" && typeof(data.preSttus)=="undefined" ) {
 										applyBtn = true;
 									}
-									//결재문서가 수주목표가 결재가 아니면 순서 상관없이 결재처리 가능함. 20240625 남장섭
-									if (data.todoDiv2CodeId != "TODODIV2100") {
-										applyBtn = true;
+									//PM51(출장신청서 TODODIV2190/2191, 출장복명서 TODODIV2200/2201)은 순차결재 문서이므로
+									//차례가 아닌 결재자에게는 결재버튼을 노출하지 않는다(서버 validatePm51SequentialApproval과 동일 기준).
+									//단, 본인이 이미 승인한 건은 결재의견 수정을 위해 버튼을 유지한다.
+									var pm51SeqDivs = ["TODODIV2190", "TODODIV2191", "TODODIV2200", "TODODIV2201"];
+									var isPm51Seq = ($.inArray(data.todoDiv2CodeId, pm51SeqDivs) > -1);
+									if (isPm51Seq) {
+										if (data.sanctnSttus == "Y") applyBtn = true;	//의견수정
+									} else {
+										//결재문서가 수주목표가 결재가 아니면 순서 상관없이 결재처리 가능함. 20240625 남장섭
+										if (data.todoDiv2CodeId != "TODODIV2100") {
+											applyBtn = true;
+										}
+										//다음순번이 미결재일 경우 결재의견 가능하게 변경
+										if( data.nextSttus=="N") applyBtn = true;
 									}
-									//다음순번이 미결재일 경우 결재의견 가능하게 변경
-									if( data.nextSttus=="N") applyBtn = true;
 									//만족시 버튼 show
 									if( applyBtn == true ) {
 										approvalParam.todoKey = data.todoKey;
@@ -223,6 +261,9 @@ function Approval(htmlParam, param, popParam) {
 
 						//팀장 이슈 조치결과 결재일경우 위험성 평가 기능 추가 하기위함   남장섭 240618
 						$("#appLine").append(confrmActDngEval);
+
+						//PM51 순차결재: 본인 차례가 아니어서 결재버튼이 숨겨진 경우 어느 결재자에서 대기중인지 안내
+						$("#appLine").append(pm51PendingNoticeHtml(list, applyBtn, 6));
 
 				});		//end ajax
 			}
@@ -391,6 +432,14 @@ function Approval(htmlParam, param, popParam) {
 							paramMap.bigo = "";		//보완요청일경우만 자료가 있음.
 							
 							sendTodoFinal(paramMap);
+						} else if (PM51_SEQUENTIAL_DIV_MAP.hasOwnProperty(paramMap.todoDiv2CodeId)) {
+							// PM51 순차결재: 중간 결재자가 결재의견 없이 승인하면 sendTodoFinal()이 호출되지 않아
+							// 다음 차례 결재자에게 결재요청 알림톡이 발송되지 않던 문제 보완.
+							var pm51HasNext = notifyPm51NextApprover(paramMap.todoNo, paramMap.todoDiv2CodeId, paramMap.pgmId);
+							if (!pm51HasNext) {
+								// 신청부서(개인) 결재가 모두 완료됨 -> 관리부서 결재 1번 순번에게 시작 알림
+								notifyPm51NextApprover(paramMap.todoNo, PM51_SEQUENTIAL_DIV_MAP[paramMap.todoDiv2CodeId], paramMap.pgmId);
+							}
 						}
 
 					} else {
