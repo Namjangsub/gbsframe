@@ -1,31 +1,82 @@
 
-// PM51(출장신청서 TODODIV2190/2191, 출장복명서 TODODIV2200/2201) 순차결재 안내문구 생성.
-// 본인이 결재 대상이지만 차례가 아니어서 결재버튼이 숨겨진 경우, 현재 어느 결재자에서 멈춰 있는지 표시한다.
-// 대상 문서가 아니거나 안내가 필요 없으면 빈 문자열을 반환하므로 타 모듈에는 영향이 없다.
-function pm51PendingNoticeHtml(list, applyBtn, colSpan) {
-	if (applyBtn || !list || list.length === 0) return '';
-	var pm51SeqDivs = ["TODODIV2190", "TODODIV2191", "TODODIV2200", "TODODIV2201"];
+// PM51 순차결재 대상 결재구분. 값이 있으면 "선행되어야 하는 신청부서 결재구분"을 의미한다.
+// (관리부서 결재는 신청부서 결재가 모두 완료되어야 진행 가능 - 서버 validatePm51SequentialApproval과 동일 기준)
+var PM51_SEQ_GENERAL_OF = {
+	'TODODIV2190': '', 'TODODIV2200': '',					// 신청부서(출장신청서/출장복명서)
+	'TODODIV2191': 'TODODIV2190', 'TODODIV2201': 'TODODIV2200'	// 관리부서(출장신청서/출장복명서)
+};
+
+// 결재행 중 미결(sanctnSttus!=='Y')인 최소 순번 행을 반환. maxSn을 주면 그 순번보다 앞선 행만 대상으로 한다.
+function pm51FirstPendingRow(rows, maxSn) {
+	var found = null;
+	$.each(rows || [], function(idx, row) {
+		if (row.sanctnSttus == 'Y') return;
+		var sn = Number(row.sanctnSn || 0);
+		if (!sn) return;
+		if (maxSn && sn >= maxSn) return;
+		if (!found || sn < Number(found.sanctnSn || 0)) found = row;
+	});
+	return found;
+}
+
+// PM51(출장신청서 TODODIV2190/2191, 출장복명서 TODODIV2200/2201) 순차결재 진입 안내.
+// 본인 차례가 아니면 blocked=true(결재버튼 차단)와 함께 어느 결재자에서 멈춰 있는지 알림문구/안내행을 만든다.
+// 대상 문서가 아니거나 본인 차례이면 빈 결과를 반환하므로 타 모듈에는 영향이 없다.
+function pm51SequentialNotice(list, colSpan) {
+	var result = { blocked: false, message: '', html: '' };
+	if (!list || list.length === 0) return result;
+
 	var myRow = null;
 	$.each(list, function(idx, row) {
 		if (row.todoId == jwt.userId) { myRow = row; return false; }
 	});
-	if (!myRow || $.inArray(myRow.todoDiv2CodeId, pm51SeqDivs) < 0) return '';
-	if (myRow.sanctnSttus == 'Y') return '';
+	if (!myRow || !PM51_SEQ_GENERAL_OF.hasOwnProperty(myRow.todoDiv2CodeId)) return result;
+	if (myRow.sanctnSttus == 'Y') return result;	//본인 승인 완료 건(결재의견 수정)은 제한하지 않는다.
 
-	var mySn = Number(myRow.sanctnSn || 0);
-	var blocker = null;
-	$.each(list, function(idx, row) {
-		if (row.sanctnSttus == 'Y') return;
-		var sn = Number(row.sanctnSn || 0);
-		if (!sn || sn >= mySn) return;
-		if (!blocker || sn < Number(blocker.sanctnSn || 0)) blocker = row;
-	});
-	if (!blocker) return '';
+	//1) 같은 결재선의 이전 순번 미결자
+	var blockerDesc = '이전결재자';
+	var blocker = pm51FirstPendingRow(list, Number(myRow.sanctnSn || 0));
 
-	return '<tr><td colspan="' + colSpan + '" style="text-align:left; padding:8px; color:#d9534f; background:#fff8f8; border-top:1px solid #dbdbdb;">'
-		+ '순번 ' + blocker.sanctnSn + ' <b>' + (blocker.todoNm || '') + '</b> 결재자의 승인 대기중입니다.<br>'
+	//2) 관리부서 결재자는 신청부서 결재가 모두 완료되어야 진행 가능
+	if (!blocker) {
+		var generalDiv = PM51_SEQ_GENERAL_OF[myRow.todoDiv2CodeId];
+		if (generalDiv && myRow.todoNo) {
+			var generalRows = [];
+			postAjaxSync("/user/wb/wb20/selectGetApprovalList", { todoNo: myRow.todoNo, todoDiv2CodeId: generalDiv }, null, function(data) {
+				generalRows = data.resultList || [];
+			});
+			blocker = pm51FirstPendingRow(generalRows, 0);
+			blockerDesc = '신청부서 결재자';
+		}
+	}
+	if (!blocker) return result;
+
+	var blockerNm = pm51NameWithJik(blocker);
+	var particle = pm51SubjectParticle(blockerNm);
+	result.blocked = true;
+	result.message = blockerDesc + ' ' + blockerNm + particle + ' 승인하지 않은 상태입니다.\r\n이전 결재가 완료되어야 결재를 진행할 수 있습니다.';
+	result.html = '<tr><td colspan="' + colSpan + '" style="text-align:left; padding:8px; color:#d9534f; background:#fff8f8; border-top:1px solid #dbdbdb;">'
+		+ blockerDesc + ' <b>' + blockerNm + '</b>(순번 ' + blocker.sanctnSn + ')' + particle + ' 승인하지 않은 상태입니다.<br>'
 		+ '이전 결재가 완료되어야 결재를 진행할 수 있습니다.'
 		+ '</td></tr>';
+	return result;
+}
+
+// 결재자 표기: 이름 뒤에 직급을 붙인다. (예: 홍길동팀장) 직급이 없으면 이름만 사용한다.
+function pm51NameWithJik(row) {
+	var nm = $.trim((row && (row.todoNm || row.todoId)) || '');
+	var jik = String((row && row.jik) || '').replace(/\s/g, '');	//직급 가운데 공백까지 제거
+	return jik ? (nm + jik) : nm;
+}
+
+// 주격조사 선택: 마지막 글자에 받침이 있으면 '이', 없으면 '가'. (예: 홍길동팀장이 / 김영희대리가)
+function pm51SubjectParticle(text) {
+	var last = (text || '').slice(-1);
+	var code = last.charCodeAt(0);
+	if (code >= 0xAC00 && code <= 0xD7A3) {
+		return ((code - 0xAC00) % 28) > 0 ? '이' : '가';
+	}
+	return '이';
 }
 
 //결재승인 버튼
@@ -262,8 +313,13 @@ function Approval(htmlParam, param, popParam) {
 						//팀장 이슈 조치결과 결재일경우 위험성 평가 기능 추가 하기위함   남장섭 240618
 						$("#appLine").append(confrmActDngEval);
 
-						//PM51 순차결재: 본인 차례가 아니어서 결재버튼이 숨겨진 경우 어느 결재자에서 대기중인지 안내
-						$("#appLine").append(pm51PendingNoticeHtml(list, applyBtn, 6));
+						//PM51 순차결재: 본인 차례가 아니면 결재버튼을 차단하고, 진입 시 어느 결재자에서 멈춰 있는지 알린다.
+						var pm51Notice = pm51SequentialNotice(list, 6);
+						if (pm51Notice.blocked) {
+							applyBtn = false;
+							$("#appLine").append(pm51Notice.html);
+							customAlert(pm51Notice.message);
+						}
 
 				});		//end ajax
 			}

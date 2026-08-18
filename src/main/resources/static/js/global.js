@@ -1575,6 +1575,7 @@ function setCommonSelect(selectArr){
 				optionHtml += item.codeNm;
 				optionHtml += '</option>';
 			});
+			$(elem).find("option:gt(0)").remove();
 			$(elem).append(optionHtml);
 		})
 	})

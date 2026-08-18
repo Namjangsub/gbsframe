@@ -396,7 +396,7 @@ public class WB20SvcImpl implements WB20Svc {
 			List<Map<String, String>> reqLines = wb20Mapper.selectApprovalLineOrder(reqParam);
 			for (Map<String, String> line : reqLines) {
 				if (!"Y".equals(line.get("sanctnSttus"))) {
-					throw new RuntimeException("신청부서 결재가 모두 완료되어야 관리부서 결재를 진행할 수 있습니다.");
+					throw new RuntimeException(pm51PendingApproverMessage("신청부서 결재자", line));
 				}
 			}
 		}
@@ -420,10 +420,42 @@ public class WB20SvcImpl implements WB20Svc {
 				continue;
 			}
 			if (sn < currentSn && !"Y".equals(line.get("sanctnSttus"))) {
-				String prevName = line.get("todoNm") != null ? String.valueOf(line.get("todoNm")) : "이전결재자";
-				throw new RuntimeException("이전결재자 " + prevName + "가 승인하지 않은 상태이므로 결재 진행할 수 없습니다.");
+				throw new RuntimeException(pm51PendingApproverMessage("이전결재자", line));
 			}
 		}
+	}
+
+	// 순차결재 안내문구 - 화면(commApproval.js / PM5101P01.html)의 안내와 동일한 형식으로 맞춘다.
+	// 예) 이전결재자 홍길동팀장이 승인하지 않은 상태입니다.\n이전 결재가 완료되어야 결재를 진행할 수 있습니다.
+	private String pm51PendingApproverMessage(String approverDesc, Map<String, String> line) {
+		String suffix = "\n이전 결재가 완료되어야 결재를 진행할 수 있습니다.";
+		String nameWithJik = pm51ApproverNameWithJik(line);
+		if (nameWithJik.isEmpty()) {
+			return approverDesc + "가 승인하지 않은 상태입니다." + suffix;
+		}
+		return approverDesc + " " + nameWithJik + pm51SubjectParticle(nameWithJik) + " 승인하지 않은 상태입니다." + suffix;
+	}
+
+	// 결재자 표기: 이름 뒤에 직급을 붙인다(직급 가운데 공백 제거). 예) 홍길동팀장
+	private String pm51ApproverNameWithJik(Map<String, String> line) {
+		if (line == null) {
+			return "";
+		}
+		String name = line.get("todoNm") == null ? "" : String.valueOf(line.get("todoNm")).trim();
+		String jik = line.get("jik") == null ? "" : String.valueOf(line.get("jik")).replaceAll("\\s", "");
+		return name + jik;
+	}
+
+	// 주격조사 선택: 마지막 글자에 받침이 있으면 '이', 없으면 '가'. 예) 홍길동팀장이 / 김영희대리가
+	private String pm51SubjectParticle(String text) {
+		if (text == null || text.isEmpty()) {
+			return "이";
+		}
+		char last = text.charAt(text.length() - 1);
+		if (last >= 0xAC00 && last <= 0xD7A3) {
+			return ((last - 0xAC00) % 28) > 0 ? "이" : "가";
+		}
+		return "이";
 	}
 
 	private boolean isPm51SalesApproval(Map<String, String> paramMap) {
