@@ -59,7 +59,12 @@ public class PM01SvcImpl implements PM01Svc {
 	Gson gsonDtl = new GsonBuilder().disableHtmlEscaping().create();
 	Type dtlMap = new TypeToken<ArrayList<Map<String, String>>>(){}.getType();
 
-	int result = pm01Mapper.updateDailyWork(paramMap);
+	int result = 0;
+	if (!"Y".equals(paramMap.get("onlyTrip")) && !"TE".equals(paramMap.get("actionType"))) {
+		result = pm01Mapper.updateDailyWork(paramMap);
+	} else {
+		result = 1;
+	}
 
 
 	//---------------------------------------------------------------  
@@ -68,8 +73,10 @@ public class PM01SvcImpl implements PM01Svc {
 	cm08Svc.uploadFile("PM0101M01_M", paramMap.get("fileTrgtKey"), mRequest);
 	Gson gson = new Gson();
 	String[] deleteFileArr = gson.fromJson(paramMap.get("deleteFileArr"), String[].class);
-	List<String> deleteFileList = Arrays.asList(deleteFileArr);
-    if (deleteFileList != null && !deleteFileList.isEmpty()) {
+	//TE(PM5102P01에서 경비만 수정) 진입 시에는 deleteFileArr 파라미터 자체가 없어 null이 된다.
+	//Arrays.asList(null)은 NPE를 발생시켜 아래 경비/영수증 처리 전체가 롤백되므로 반드시 null을 먼저 걸러야 함.
+	List<String> deleteFileList = (deleteFileArr == null) ? new ArrayList<String>() : Arrays.asList(deleteFileArr);
+    if (!deleteFileList.isEmpty()) {
 		for(String fileKey : deleteFileList) {
 	        if (fileKey != null && !fileKey.isEmpty()) {	//경비내역이 있으면 처리함.
 	        	cm08Svc.deleteFile(fileKey);

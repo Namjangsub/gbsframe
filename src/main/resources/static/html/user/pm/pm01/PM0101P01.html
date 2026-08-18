@@ -488,7 +488,7 @@
 			} else {
 				//"I" --> 문제현황에서 조회모드로 넘어온 파라메터임 (BM1901M01.html)
 				 $('#actionBtn').remove();  //"I" --> 문제현황에서 조회모드로 넘어온 파라메터임 (BM1901M01.html)
-				 $('.i_search_w').remove();
+				 getMyPopupArea().find('.i_search_w').remove();
 				 
 				//input readonly, radio.checkbox disabled
 				$.each($('#popForm select, input, textarea, button'), function(idx, elem){
@@ -507,7 +507,7 @@
 
 			}
 		} else if (actionType == "TE") {
-			// 출장복명서(PM5102P01)에서 더블클릭 진입: 작업일보는 읽기전용, 비용부분만 편집 가능
+			// 출장복명서(PM5102P01)에서 더블클릭 진입: 상단 작업일보는 수정 불가(읽기전용), 하단 경비내용만 수정 가능
 			getMyPopupArea().find('.tit').text('작업일보 - 경비 수정');
 			selectDailyWorkInfo();
 
@@ -516,38 +516,52 @@
 				updateDailyWork();
 			});
 
-			// selectDailyWorkInfo는 Ajax 동기이므로 DOM이 준비된 직후 readonly 처리
-			// .tripTable 외부의 모든 입력 필드를 readonly/불활성화
-			var $mainFields = $('#popForm').find('select, input, textarea, button, a').filter(function() {
-				return $(this).closest('.tripTable').length === 0;
-			});
-			// 경비(일일 출장비) 조작용 버튼과 모달 자체 버튼은 살려두고, 작업일보 영역 버튼(첨부파일 등)만 잠근다.
-			var keepBtnIds = ['addDayileRptTrpButton', 'removeDayileRptTrpButton', 'actionBtn'];
-			$mainFields.each(function() {
-				var $el = $(this);
-				var tag = $el.prop('tagName');
-				if (tag === 'INPUT')    { $el.attr('readonly', true).css('background', '#fafafa'); }
-				if (tag === 'TEXTAREA') { $el.attr('readonly', true).css('background', '#fafafa'); }
-				if (tag === 'SELECT')   { $el.css({'background-color': '#f4f4f4', 'pointer-events': 'none'}); }
-				if (tag === 'A')        { $el.css('pointer-events', 'none').off('click'); }
-				if (tag === 'BUTTON') {
-					var btnId = $el.attr('id') || '';
-					if ($.inArray(btnId, keepBtnIds) < 0 && !$el.hasClass('close_btn')) {
-						$el.prop('disabled', true).css({'opacity': '0.5', 'pointer-events': 'none'});
+			function lockMainFieldsForTE() {
+				// .tripTable 및 하단 경비 영역 외부(상단 작업일보 폼)의 모든 입력 필드를 읽기 전용/수정 불가로 차단
+				var $mainTable = $('#popForm').find('table').filter(function() {
+					return $(this).closest('.tripTable').length === 0;
+				});
+
+				// 1. INPUT 및 TEXTAREA 필드 잠금
+				$mainTable.find('input, textarea').each(function() {
+					$(this).attr('readonly', true).css({'background-color': '#f4f4f4', 'pointer-events': 'none'});
+				});
+
+				// 2. SELECT 박스 잠금 (작업분류, 작업구분, 고객사PJT, 아이템구분 등)
+				$mainTable.find('select').each(function() {
+					$(this).css({'background-color': '#f4f4f4', 'pointer-events': 'none'})
+					       .attr('tabindex', '-1')
+					       .off('click mousedown change');
+				});
+
+				// 3. 상단 돋보기 및 검색 링크(A 태그) 제거/차단
+				$mainTable.find('a').each(function() {
+					$(this).css('pointer-events', 'none').off('click').removeAttr('onclick');
+				});
+				$mainTable.find('.i_search_w').remove();
+
+				// 4. 작성일자 datepicker 완전히 비활성화
+				try { $('#workRptDt').datepicker('destroy'); } catch(e){}
+				$('#workRptDt').attr('readonly', true).css({'background-color': '#f4f4f4', 'pointer-events': 'none'});
+
+				// 5. 작업일보 영역 버튼(첨부파일 등) 잠금 (경비 조작용 및 닫기 버튼은 유지)
+				var keepBtnIds = ['addDayileRptTrpButton', 'removeDayileRptTrpButton', 'actionBtn'];
+				$mainTable.find('button').each(function() {
+					var btnId = $(this).attr('id') || '';
+					if ($.inArray(btnId, keepBtnIds) < 0 && !$(this).hasClass('close_btn')) {
+						$(this).prop('disabled', true).css({'opacity': '0.5', 'pointer-events': 'none'});
 					}
-				}
-			});
-			// 작업일보 날짜 datepicker 비활성화
-			$('#workRptDt').datepicker('destroy').attr('readonly', true);
-			// 돋보기(사용자검색) 제거
-			getMyPopupArea().find('.i_search_w').remove();
+				});
+			}
+
+			lockMainFieldsForTE();
 
 			// 경비내용을 실제로 수정한 경우에만 "경비 저장" 버튼 활성화
 			setTripSaveBtnEnabled(false);
-			$('#dayilyRpt').on('input change', 'input, select, textarea', function() {
+			$('#dayilyRpt').off('input.te change.te').on('input.te change.te', 'input, select, textarea', function() {
 				if ($(this).closest('.tripTable').length > 0) setTripSaveBtnEnabled(true);
 			});
-			$('#addDayileRptTrpButton').on('click', function() {
+			$('#addDayileRptTrpButton').off('click.te').on('click.te', function() {
 				setTripSaveBtnEnabled(true);
 			});
 		}
@@ -922,8 +936,8 @@
 				$("#field01").hide();
 				$("#field02").hide();
 			}
-			//본인 작업일보만 수정가능함.
-			if ($('#popForm #workRptId').val() != jwt.userId) {
+			//본인 작업일보만 수정가능함 (단, TE 모드인 경우 작성자가 달라도 회계팀/검토자가 비용 수정 후 저장 가능)
+			if (actionType !== 'TE' && $('#popForm #workRptId').val() != jwt.userId) {
 				$('#actionBtn').hide();
 			}
 		  	txtareaHeightResize($('#popForm #workRptRmk'));  //비고 크기 조절하기
@@ -1071,6 +1085,10 @@
 			}
 		});
 		
+		formData.append("actionType", actionType);
+		if(actionType == "TE"){
+			formData.append("onlyTrip", "Y");
+		}
 		if(actionType == "U"){
 			formData.append("deleteFileArr", JSON.stringify(deleteFileArr));
 		}
@@ -1190,8 +1208,13 @@
 	  			fileKey			: fileKey,
 	  			
 
-	  		    coCd			: jwt.coCd,
-	  		    workRptId		: jwt.userId,
+	  		    //신규등록(C)은 로그인 사용자의 회사코드, 그 외(U/I/TE 수정모드)는 조회된 작업일보의 회사코드를 사용한다.
+	  		    //(TE 모드는 회계담당자와 작성자의 회사가 다를 수 있어 jwt.coCd를 쓰면 update/delete의 CO_CD 조건이 어긋남)
+	  		    coCd			: (actionType == 'C' ? jwt.coCd : ($('#popForm #coCd').val() || jwt.coCd)),
+	  		    //TE(PM5102P01 회계담당자 경비수정) 모드는 작성자와 수정자가 다르다.
+	  		    //신규 경비를 로그인 ID로 저장하면 PM5102P01 경비현황 조회조건(WORK_RPT_ID IN 출장자)에
+	  		    //걸리지 않아 그리드에 나타나지 않으므로, 반드시 해당 작업일보 작성자 ID로 저장한다.
+	  		    workRptId		: ($('#popForm #workRptId').val() || jwt.userId),
 	  		    workRptNo		: $('#workRptNo').val(), //수정모드일경우만 값이 존재함.
 	  		    workRptDt		: $('#workRptDt').val(),
 	  		    fileTrgtKey		: fileTrgtKey,
