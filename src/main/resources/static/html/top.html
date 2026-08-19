@@ -199,6 +199,10 @@
 
 		//결재미완료 / 공유미확인 건수 처리 (최초 조회 + 3분 간격 갱신 + 탭간 동기화)
 		window.addEventListener("storage", function(e) {
+			if (e.key === "access_token" && !e.newValue) {
+				renderMyTodoCount(0, 0);
+				return;
+			}
 			var key = getTodoCacheKey();
 			if (key && e.key === key && e.newValue) {
 				try {
@@ -214,13 +218,14 @@
 			}
 		});
 
+		// 최초 화면 진입 시: 캐시 먼저 표시 후, 백엔드 최신 조회 1회 수행(isForce=true)
 		renderFromCache();
-		myTodoStatusRtv(false);
+		myTodoStatusRtv(true);
 		setInterval(function() { myTodoStatusRtv(false); }, TODO_TTL_MS);
 
 	});
 
-	var TODO_TTL_MS = 600000;       // 10분
+	var TODO_TTL_MS = 180000;       // 3분
 	var FETCH_LOCK_TTL_MS = 5000;   // 5초
 
 	var TODO_TAB_ID =
@@ -274,6 +279,7 @@
 		if (!localStorage.getItem("access_token") ||
 			!jwt ||
 			!jwt.userId) {
+			renderMyTodoCount(0, 0);
 			return;
 		}
 
@@ -298,7 +304,7 @@
 			);
 		}
 
-		// 일반 조회는 TTL 이내면 종료
+		// 일반 주기적 조회의 경우만 TTL(3분) 이내면 스킵 (최초 진입/결재완료/isForce=true는 통신 수행)
 		if (!isForce &&
 			cached &&
 			now - cached.at < TODO_TTL_MS) {
