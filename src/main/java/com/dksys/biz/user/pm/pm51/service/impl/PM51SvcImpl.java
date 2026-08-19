@@ -226,10 +226,14 @@ public class PM51SvcImpl implements PM51Svc {
 
 				int iSharng = 1;
 				int iApproval = 1;
+				// 자체승인(1번 결재자=작성자) 처리는 결재선 전체가 등록된 뒤로 미룬다.
+				// 루프 도중에 처리하면 결재선이 1건뿐인 상태에서 결재완료 여부(MIN(SANCTN_STTUS))가 판정되어
+				// 출장신청서 결재상태가 완료(APRVSTS03)로 잘못 기록된다.
+				List<Map<String, String>> selfApprovalList = new ArrayList<>();
 				for (Map<String, String> approvalMap : approvalArr) {
 					approvalMap.put("reqNo", paramMap.get("reqNo"));
 					approvalMap.put("fileTrgtKey", paramMap.get("fileTrgtKey"));
-					approvalMap.put("salesCd", paramMap.get("salesCd"));
+					approvalMap.put("salesCd", approvalSalesCd(paramMap));
 					fillApprovalBaseParam(approvalMap, paramMap);
 
 					if ("공유".equals(approvalMap.get("gb"))) {
@@ -251,9 +255,12 @@ public class PM51SvcImpl implements PM51Svc {
 								approvalMap.put("todoKey", value.toString());
 							}
 
-							wb20Svc.insertApprovalLine(approvalMap);
+							selfApprovalList.add(approvalMap);
 						}
 					}
+				}
+				for (Map<String, String> selfApprovalMap : selfApprovalList) {
+					wb20Svc.insertApprovalLine(selfApprovalMap);
 				}
 			}
 		}
@@ -380,6 +387,10 @@ public class PM51SvcImpl implements PM51Svc {
 
 				int iSharng = 1;
 				int iApproval = 1;
+				// 자체승인(1번 결재자=작성자) 처리는 결재선 전체가 등록된 뒤로 미룬다.
+				// 루프 도중에 처리하면 결재선이 1건뿐인 상태에서 결재완료 여부(MIN(SANCTN_STTUS))가 판정되어
+				// 출장신청서 결재상태가 완료(APRVSTS03)로 잘못 기록된다.
+				List<Map<String, String>> selfApprovalList = new ArrayList<>();
 				for (Map<String, String> approvalMap : approvalArr) {
 					approvalMap.put("reqNo", paramMap.get("reqNo"));
 					approvalMap.put("fileTrgtKey", paramMap.get("fileTrgtKey"));
@@ -405,9 +416,12 @@ public class PM51SvcImpl implements PM51Svc {
 								approvalMap.put("todoKey", value.toString());
 							}
 
-							wb20Svc.insertApprovalLine(approvalMap);
+							selfApprovalList.add(approvalMap);
 						}
 					}
+				}
+				for (Map<String, String> selfApprovalMap : selfApprovalList) {
+					wb20Svc.insertApprovalLine(selfApprovalMap);
 				}
 			}
 		}
@@ -630,7 +644,55 @@ public class PM51SvcImpl implements PM51Svc {
 		if (hasText(orgMap.get("payDt"))) {
 			throw new RuntimeException("이미 지급완료 처리된 출장신청서입니다.");
 		}
+		validateTripReqGeneralApprovalDone(paramMap.get("tripReqNo"));
 		return pm51Mapper.updateTripReqPayDone(paramMap);
+	}
+
+	// 지급완료 처리 전 신청부서(일반) 결재선(TODODIV2190)이 모두 승인되었는지 검증한다.
+	// 안내문구는 화면(commApproval.js / PM5101P01.html) 및 WB20SvcImpl의 순차결재 안내와 동일한 형식으로 맞춘다.
+	private void validateTripReqGeneralApprovalDone(String tripReqNo) {
+		if (!hasText(tripReqNo)) {
+			return;
+		}
+		Map<String, String> lineParam = new HashMap<>();
+		lineParam.put("todoNo", tripReqNo);
+		lineParam.put("todoDiv2CodeId", "TODODIV2190");
+		List<Map<String, String>> reqLines = wb20Svc.selectGetApprovalList(lineParam);
+		if (reqLines == null || reqLines.isEmpty()) {
+			throw new RuntimeException("일반결재선이 등록되지 않아 지급완료 처리할 수 없습니다.");
+		}
+
+		Map<String, String> pendingLine = null;
+		int pendingSn = 0;
+		for (Map<String, String> line : reqLines) {
+			if ("Y".equals(line.get("sanctnSttus"))) {
+				continue;
+			}
+			int sn;
+			try {
+				sn = Integer.parseInt(String.valueOf(line.get("sanctnSn")));
+			} catch (Exception e) {
+				continue;
+			}
+			if (pendingLine == null || sn < pendingSn) {
+				pendingLine = line;
+				pendingSn = sn;
+			}
+		}
+		if (pendingLine == null) {
+			return;
+		}
+
+		String suffix = "\n일반결재가 완료되어야 지급완료 처리할 수 있습니다.";
+		String name = pendingLine.get("todoNm") == null ? "" : String.valueOf(pendingLine.get("todoNm")).trim();
+		String jik = pendingLine.get("jik") == null ? "" : String.valueOf(pendingLine.get("jik")).replaceAll("\\s", "");
+		String nameWithJik = name + jik;
+		if (nameWithJik.isEmpty()) {
+			throw new RuntimeException("일반결재자가 승인하지 않은 상태입니다." + suffix);
+		}
+		char last = nameWithJik.charAt(nameWithJik.length() - 1);
+		String particle = (last >= 0xAC00 && last <= 0xD7A3 && ((last - 0xAC00) % 28) == 0) ? "가" : "이";
+		throw new RuntimeException("일반결재자 " + nameWithJik + particle + " 승인하지 않은 상태입니다." + suffix);
 	}
 
 	@Override
@@ -787,7 +849,7 @@ public class PM51SvcImpl implements PM51Svc {
 				for (Map<String, String> approvalMap : approvalArr) {
 					approvalMap.put("reqNo", paramMap.get("reqNo"));
 					approvalMap.put("fileTrgtKey", paramMap.get("fileTrgtKey"));
-					approvalMap.put("salesCd", paramMap.get("salesCd"));
+					approvalMap.put("salesCd", approvalSalesCd(paramMap));
 					fillApprovalBaseParam(approvalMap, paramMap);
 
 					if ("공유".equals(approvalMap.get("gb"))) {
@@ -921,7 +983,7 @@ public class PM51SvcImpl implements PM51Svc {
 				for (Map<String, String> approvalMap : approvalArr) {
 					approvalMap.put("reqNo", paramMap.get("reqNo"));
 					approvalMap.put("fileTrgtKey", paramMap.get("fileTrgtKey"));
-					approvalMap.put("salesCd", paramMap.get("salesCd"));
+					approvalMap.put("salesCd", approvalSalesCd(paramMap));
 					fillApprovalBaseParam(approvalMap, paramMap);
 
 					if ("공유".equals(approvalMap.get("gb"))) {
@@ -1108,8 +1170,32 @@ public class PM51SvcImpl implements PM51Svc {
 	}
 
 	//영업코드 조회
+	// 결재행(TB_WB20M03)에 저장할 Sales Code.
+	// 지급처리 흐름처럼 화면이 salesCd를 전달하지 않는 저장 경로에서도 값이 비지 않도록 마스터에서 보완한다.
+	// SALES_CD가 NULL이면 결재함의 '이전 미결자 존재여부' 판정 조인(S.SALES_CD = T.SALES_CD)이
+	// NULL 비교로 항상 어긋나서, 순차결재 대상인데도 이전 미결이 없는 것으로 취급된다.
 	private String approvalSalesCd(Map<String, String> paramMap) {
-		return paramMap.get("salesCd");
+		String salesCd = paramMap.get("salesCd");
+		if (hasText(salesCd)) {
+			return salesCd;
+		}
+		try {
+			if (hasText(paramMap.get("tripRptNo"))) {			// 출장복명서: 연결된 출장신청서의 Sales Code
+				Map<String, String> rptParam = new HashMap<>();
+				rptParam.put("tripRptNo", paramMap.get("tripRptNo"));
+				salesCd = pm51Mapper.selectTripRptSalesCd(rptParam);
+			} else if (hasText(paramMap.get("tripReqNo"))) {	// 출장신청서
+				Map<String, String> reqParam = new HashMap<>();
+				reqParam.put("tripReqNo", paramMap.get("tripReqNo"));
+				Map<String, String> m01 = pm51Mapper.selectTripReqM01(reqParam);
+				if (m01 != null && m01.get("salesCd") != null) {
+					salesCd = String.valueOf(m01.get("salesCd"));
+				}
+			}
+		} catch (Exception e) {
+			// 보완 조회 실패 시에는 기존과 동일하게 전달값(null)을 사용한다.
+		}
+		return salesCd;
 	}
 
 	//출장비 결재확인

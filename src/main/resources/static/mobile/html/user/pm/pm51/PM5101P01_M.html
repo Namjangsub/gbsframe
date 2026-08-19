@@ -142,35 +142,61 @@
             margin-left: 5px;
         }
 
+        /* M08.html 스타일: 버튼을 붙여서 가로폭 기준 가운데 배치 */
         .action_area {
-            padding: 15px;
+            padding: 12px 15px;
             background-color: #f8f9fa;
             border-top: 1px solid #ddd;
+            text-align: center;
             display: flex;
-            gap: 10px;
             justify-content: center;
+            align-items: center;
+            gap: 6px;
         }
 
         .action_btn {
-            flex: 1;
-            max-width: 150px;
-            padding: 12px 15px;
-            font-size: 14px;
+            height: 36px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0 16px;
+            font-size: 13px;
             font-weight: bold;
-            border: none;
+            border: 1px solid transparent;
             border-radius: 4px;
             cursor: pointer;
-            transition: all 0.3s;
+            line-height: 1;
+            margin: 0 2px;
+            transition: all 0.2s;
         }
 
-        /* 공용 결재위젯(commApprovalMobile.js)의 버튼바(.mobile_mid_btn)는 sub.css에서 position:fixed;bottom:15px로 정의되어
-           화면 최하단에 고정되므로, 스크롤 중인 다른 섹션과 겹쳐 보인다. 이 페이지 안에서는 섹션 내부에 자연스럽게 놓이도록 무효화한다. */
+        /* 공용 결재위젯(commApprovalMobile.js)의 버튼바(.mobile_mid_btn)도 M08.html처럼 중앙 배치 및 가로폭 통일 */
         #approval_area .mobile_mid_btn {
             position: static;
-            width: auto;
+            width: 100%;
             bottom: auto;
-            padding: 0;
+            padding: 10px 0;
             margin-top: 10px;
+            text-align: center !important;
+            display: flex !important;
+            justify-content: center !important;
+            align-items: center !important;
+            gap: 6px !important;
+        }
+
+        #approval_area .mobile_mid_btn button {
+            height: 36px !important;
+            display: inline-flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            padding: 0 16px !important;
+            font-size: 13px !important;
+            font-weight: bold !important;
+            border-radius: 4px !important;
+            line-height: 1 !important;
+            margin: 0 2px !important;
+            width: auto !important;
+            min-width: 80px !important;
         }
 
         .btn_confirm {
@@ -829,11 +855,38 @@
         return pending;
     }
 
-    function handleSalesConfirm() {
-        // 영업팀 확인 필수 체크 검증
+    function validateSalesRequiredMobile() {
         if (!$('#salesCnfrmYn').is(':checked')) {
-            alert('영업팀 확인 체크박스에 체크해주셔야 영업확인 및 결재처리가 가능합니다.');
+            alert("영업팀 확인 체크박스에 체크해주셔야 영업확인 및 결재처리가 가능합니다.");
             $('#salesCnfrmYn').focus();
+            return false;
+        }
+        if (!$('input[name="tripCondCd"]:checked').val()) {
+            alert("출장조건을 선택해주세요.");
+            $('input[name="tripCondCd"]').eq(0).focus();
+            return false;
+        }
+        if ($('input[name="tripCondCd"]:checked').val() === 'TRIPCOND99' && !$.trim($('#tripCondEtc').val() || '')) {
+            alert("출장조건 기타 내용을 입력해주세요.");
+            $('#tripCondEtc').focus();
+            return false;
+        }
+        if ($('input[name="sprtChk"]:checked').length === 0) {
+            alert("고객사지원범위를 선택해주세요.");
+            $('input[name="sprtChk"]').eq(0).focus();
+            return false;
+        }
+        if ($('input[name="sprtChk"][value="ETC"]').is(':checked') && !$.trim($('#sprtEtcTxt').val() || '')) {
+            alert("고객사지원범위 기타 내용을 입력해주세요.");
+            $('#sprtEtcTxt').focus();
+            return false;
+        }
+        return true;
+    }
+
+    function handleSalesConfirm() {
+        // 필수 검증 (PC버전 PM5101P01.html validateSalesRequired와 동일)
+        if (!validateSalesRequiredMobile()) {
             return;
         }
 
@@ -884,71 +937,40 @@
             pgmId: $('#pgmId').val() || 'PM5101P01'
         };
 
+        // 백엔드 pm51Svc.updateTripReqSalesInfo 내부에서 영업확인 저장 + 영업PM 본인 결재 승인(insertApprovalLine)까지 원스톱으로 처리함
         postAjax("/user/pm/pm51/updateTripReqSalesInfo", param, null, function (data) {
+            showLoading(false);
             if (data.resultCode === 200) {
-                // 결재선 목록에서 본인의 미결 결재 건 정보(todoKey, sanctnSn, todoDiv2CodeId 등) 탐색
-                var selfApprovalItem = null;
-                var allApprovals = approvalLineReq.concat(approvalLineMng);
-                $.each(allApprovals, function(idx, elem) {
-                    var userId = elem.usrNm || elem.todoId || '';
-                    var isDone = $.trim(elem.todoCfDt || '') || elem.sanctnSttus === 'Y';
-                    if (userId === jwt.userId && elem.gb === '결재' && !isDone) {
-                        selfApprovalItem = elem;
-                        return false;
-                    }
-                });
+                // 본인 행 로컬 갱신
+                markSelfApprovedRowLocally();
 
-                // 공용 결재 승인 API (/user/wb/wb20/insertApprovalLine) 파라미터 구성
-                var approvalParamMap = Object.assign({}, selfApprovalItem || {}, {
-                    "userId": jwt.userId,
-                    "todoId": jwt.userId,
-                    "sanctnSttus": "Y",
-                    "todoCfOpn": "영업확인 완료",
-                    "etcField1": "",
-                    "issNo": $('#tripReqNo').val(),
-                    "reqNo": $('#tripReqNo').val(),
-                    "coCd": paramObj.coCd || jwt.coCd,
-                    "todoNo": $('#tripReqNo').val(),
-                    "todoKey": (selfApprovalItem && selfApprovalItem.todoKey) ? String(selfApprovalItem.todoKey) : String(paramObj.todoKey || ""),
-                    "sanctnSn": (selfApprovalItem && selfApprovalItem.sanctnSn) ? String(selfApprovalItem.sanctnSn) : String(paramObj.sanctnSn || ""),
-                    "todoDiv1CodeId": (selfApprovalItem && selfApprovalItem.todoDiv1CodeId) ? selfApprovalItem.todoDiv1CodeId : (paramObj.todoDiv1CodeId || "TODODIV20"),
-                    "todoDiv2CodeId": (selfApprovalItem && selfApprovalItem.todoDiv2CodeId) ? selfApprovalItem.todoDiv2CodeId : (paramObj.todoDiv2CodeId || "TODODIV2190"),
-                    "pgmId": $('#pgmId').val() || 'PM5101P01'
-                });
+                // 결재 승인 후 다음 차례 결재자에게 알림톡 발송
+                kakaoTodo($('#tripReqNo').val());
 
-                postAjax("/user/wb/wb20/insertApprovalLine", approvalParamMap, null, function (appRes) {
-                    if (appRes && appRes.resultCode === 200) {
-                        // 본인 행 로컬 갱신
-                        markSelfApprovedRowLocally();
+                // 상단 결재/공유 건수 강제 최신화 (Storage 이벤트 전파)
+                if (typeof myTodoStatusRtv === 'function') {
+                    myTodoStatusRtv(true);
+                }
 
-                        // 카카오 알림톡 발송
-                        kakaoTodo($('#tripReqNo').val());
+                alert(data.resultMessage || '영업확인 자료 저장 및 결재 승인 처리가 완료되었습니다.');
 
-                        alert('영업확인 자료 저장 및 결재 승인 처리가 완료되었습니다.');
+                // 부모 창 목록 재조회 함수 호출 (존재 시)
+                if (window.opener && typeof window.opener.gridView !== 'undefined' && typeof window.opener.gridView.setData === 'function') {
+                    window.opener.gridView.setData(0);
+                } else if (parent && parent.gridView && typeof parent.gridView.setData === 'function') {
+                    parent.gridView.setData(0);
+                }
 
-                        // 부모 창 목록 재조회 함수 호출 (존재 시)
-                        if (window.opener && typeof window.opener.gridView !== 'undefined' && typeof window.opener.gridView.setData === 'function') {
-                            window.opener.gridView.setData(0);
-                        } else if (parent && parent.gridView && typeof parent.gridView.setData === 'function') {
-                            parent.gridView.setData(0);
-                        }
-
-                        // 팝업 창 닫기 또는 모바일 뷰 이탈 처리
-                        if (typeof modalStack !== 'undefined' && modalStack.last()) {
-                            modalStack.close();
-                        } else if (window.history.length > 1) {
-                            window.history.back();
-                        } else {
-                            window.close();
-                        }
-                    } else {
-                        showError('영업확인 저장 후 결재 승인 처리 중 오류가 발생했습니다: ' + (appRes ? appRes.resultMessage : ''));
-                        showLoading(false);
-                    }
-                });
+                // 팝업 창 닫기 또는 모바일 뷰 이탈 처리
+                if (typeof modalStack !== 'undefined' && modalStack.last()) {
+                    modalStack.close();
+                } else if (window.history.length > 1) {
+                    window.history.back();
+                } else {
+                    window.close();
+                }
             } else {
                 showError('영업확인 처리 중 오류가 발생했습니다: ' + (data.resultMessage || ''));
-                showLoading(false);
             }
         });
     }
