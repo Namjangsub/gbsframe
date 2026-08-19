@@ -73,6 +73,23 @@
 	        <div class="tit_contents">
 	            <h4 class="tit">To-Do List</h4>
 	        </div>
+
+			<!-- 상단 탭 필터 영역 -->
+			<div class="todo_tab_bar" style="display: flex; gap: 4px; margin: 8px 0 12px 0; background: #f8f9fa; padding: 4px; border-radius: 8px; border: 1px solid #e9ecef; overflow-x: auto;">
+				<button type="button" class="btn todo_tab_btn active" data-tab="ready" onclick="changeTodoTab('ready')" style="flex: 1; min-width: 75px; height: 34px; padding: 0 4px; font-size: 12px; font-weight: bold; border-radius: 6px; border: none; background: #5cb85c; color: #fff;">
+					즉시결재 <span id="readyCntBadge" class="badge" style="background: #fff; color: #5cb85c; font-size: 10px; padding: 2px 5px; margin-left: 2px;">0</span>
+				</button>
+				<button type="button" class="btn todo_tab_btn" data-tab="pending" onclick="changeTodoTab('pending')" style="flex: 1; min-width: 75px; height: 34px; padding: 0 4px; font-size: 12px; font-weight: bold; border-radius: 6px; border: 1px solid #ddd; background: #fff; color: #d9534f;">
+					순차대기 <span id="pendingCntBadge" class="badge" style="background: #d9534f; color: #fff; font-size: 10px; padding: 2px 5px; margin-left: 2px;">0</span>
+				</button>
+				<button type="button" class="btn todo_tab_btn" data-tab="share" onclick="changeTodoTab('share')" style="flex: 1; min-width: 75px; height: 34px; padding: 0 4px; font-size: 12px; font-weight: bold; border-radius: 6px; border: 1px solid #ddd; background: #fff; color: #0275d8;">
+					공유확인 <span id="shareCntBadge" class="badge" style="background: #0275d8; color: #fff; font-size: 10px; padding: 2px 5px; margin-left: 2px;">0</span>
+				</button>
+				<button type="button" class="btn todo_tab_btn" data-tab="all" onclick="changeTodoTab('all')" style="flex: 1; min-width: 75px; height: 34px; padding: 0 4px; font-size: 12px; font-weight: bold; border-radius: 6px; border: 1px solid #ddd; background: #fff; color: #333;">
+					전체 <span id="allCntBadge" class="badge" style="background: #6c757d; color: #fff; font-size: 10px; padding: 2px 5px; margin-left: 2px;">0</span>
+				</button>
+			</div>
+
 			<!-- 카드를 표시할 div 추가 -->
 			<div id="cardContainer" class="card-container"></div>
 			<!-- 카드를 표시할 div 끝 -->
@@ -81,6 +98,7 @@
 
 <script type="text/javascript">
 	var list = [];   //전체 list 저장용
+	var currentTab = 'ready'; // 기본 탭: 즉시결재
 	var sameTimeResult = '';
 
 	$(document).ready(function () {
@@ -107,88 +125,223 @@
  	    	formData.beforeNotConfirm = "Yes" //전무님은 순차결재완료 된것만 조회가능하게 변경 2025.03.06
  	    }
 		postAjax("/user/wb/wb20/M08selectToDoList", formData, null, function(data){
-			list = data.resultList;
+			list = data.resultList || [];
 
-			let cardContainer = $("#cardContainer");
-			cardContainer.empty();
-            // 데이터를 이용하여 카드 생성 및 표시
-            if (list.length > 0) {
-	            $.each(list, function (index, item){
-			    	var cardClass = "card-" + index;
-			    	if  (item.teamManager==undefined) item.teamManager ='';
+			// 각 항목에 이전 미결자(순차대기) 상태 세팅 및 인덱스 보존
+			$.each(list, function(idx, item) {
+				item.origIndex = idx;
+				item.isBeforeNotConfirm = checkSequentialPending(item);
+			});
 
-			    	// 이전 미결자 존재 여부 (1명 이상 복수 미결자 포함 동일 판정)
-			    	var isBeforeNotConfirm = checkSequentialPending(item);
-			    	var pendingBadge = isBeforeNotConfirm 
-			    		? '<span style="display: inline-block; background-color: #d9534f; color: #ffffff; font-size: 11px; font-weight: bold; padding: 2px 6px; border-radius: 3px; margin-left: 6px; vertical-align: middle;">[이전결재 미결]</span>' 
-			    		: '';
-			    	var div1NameText = item.todoDiv1CodeNm + (isBeforeNotConfirm ? ' <span style="color: #d9534f; font-weight: bold; font-size: 10px;">(순차대기)</span>' : '');
-			    	var btnClass = isBeforeNotConfirm ? 'btn-warning' : 'btn-success';
-			    	var cardBorderStyle = isBeforeNotConfirm ? 'border: 2px solid #d9534f;' : 'border: 1px solid #EEEEEE;';
+			// 탭 카운트 업데이트
+			updateTabBadges();
 
-		            var cardHtml =
-		                `<div class="square-box">
-		                    <div class="card ${cardClass}" style="${cardBorderStyle} margin-bottom: 10px;">
-		                        <table class="tg">
-		                            <tr>
-		                            <td class="tg-title" colspan="4">${item.todoTitl} ${pendingBadge}</td>
-			                        </tr>
-			                        <tr>
-			                         	<td class="tg-menu">작업내용</td>
-			                            <td class="tg-rspn" colspan="3">${item.todoDiv2CodeNm}</td>
-			                        </tr>
-			                        <tr>
-			                            <td class="tg-menu">SALES CODE</td>
-			                            <td class="tg-rspn">${item.salesCd}</td>
-			                            <td class="tg-menu">구분</td>
-			                            <td class="tg-rspn">${div1NameText}</td>
-			                        </tr>
-			                        <tr>
-			                            <td class="tg-menu">요청자</td>
-			                            <td class="tg-rspn">${item.creatNm}</td>
-			                            <td class="tg-menu">요청일자</td>
-			                            <td class="tg-rspn">${item.creatDttm}</td>
-			                        </tr>
-			                        <tr>
-			                            <td class="tg-menu">관리번호</td>
-			                            <td class="tg-rspn">${item.todoNo}</td>
-			                            <td class="tg-menu">평가대상</td>
-			                            <td class="tg-rspn" style="color: blue;">${item.teamManager}</td>
-			                        </tr>
-			                        <tr>
-			                            <td class="tg-rspn" colspan="4" style="text-align: center; padding: 6px 0;">
-			                            <button class="btn btn-primary" style="height: 30px; display: inline-flex; align-items: center; justify-content: center; padding: 0 14px; line-height: 1;" onclick="openSecondModal(${index})">상세조회</button>
-			                            <button class="btn ${btnClass}" style="height: 30px; display: inline-flex; align-items: center; justify-content: center; padding: 0 14px; line-height: 1; margin-left: 6px;" onclick="toDoConfirmApproval(${index})">${item.todoDiv1CodeNm}</button>
-			                            </td>
-		                            </tr>
-
-		                        </table>
-		                    </div>
-		                </div>`;
-
-	        		cardContainer.append(cardHtml);
-
-	                // 각 카드에 고유한 클래스를 부여
-	                $(".card." + cardClass).addClass(cardClass);
-	        	});
-	            // 코드 끝
-            } else {
-
-            	cardContainer.append('<h6 style="font-size:20px;">결재 확인 자료가 없습니다.</h6>');
-            }
+			// 현재 탭 카드 렌더링
+			renderFilteredCards();
     	});
 	}
 
-	// 순차 미결재(이전 결재자가 1명 이상 미결인 상태) 여부 판정
+	// 탭 카운트 배지 갱신
+	function updateTabBadges() {
+		var readyCnt = 0;
+		var pendingCnt = 0;
+		var shareCnt = 0;
+		var allCnt = list.length;
+
+		$.each(list, function(_, item) {
+			if (item.todoDiv1CodeNm === '결재') {
+				if (item.isBeforeNotConfirm) {
+					pendingCnt++;
+				} else {
+					readyCnt++;
+				}
+			} else if (item.todoDiv1CodeNm === '공유') {
+				shareCnt++;
+			}
+		});
+
+		$('#readyCntBadge').text(readyCnt);
+		$('#pendingCntBadge').text(pendingCnt);
+		$('#shareCntBadge').text(shareCnt);
+		$('#allCntBadge').text(allCnt);
+	}
+
+	// 탭 변경
+	function changeTodoTab(tabName) {
+		currentTab = tabName;
+		$('.todo_tab_btn').each(function() {
+			var tab = $(this).attr('data-tab');
+			if (tab === tabName) {
+				$(this).addClass('active');
+				if (tab === 'ready') {
+					$(this).css({ background: '#5cb85c', color: '#fff', border: 'none' });
+				} else if (tab === 'pending') {
+					$(this).css({ background: '#d9534f', color: '#fff', border: 'none' });
+				} else if (tab === 'share') {
+					$(this).css({ background: '#0275d8', color: '#fff', border: 'none' });
+				} else {
+					$(this).css({ background: '#6c757d', color: '#fff', border: 'none' });
+				}
+			} else {
+				$(this).removeClass('active');
+				var textColor = '#333';
+				if (tab === 'pending') textColor = '#d9534f';
+				if (tab === 'share') textColor = '#0275d8';
+				if (tab === 'ready') textColor = '#5cb85c';
+				$(this).css({ background: '#fff', color: textColor, border: '1px solid #ddd' });
+			}
+		});
+		renderFilteredCards();
+	}
+
+	// 현재 탭 기준 필터링 및 아코디언 카테고리 렌더링
+	function renderFilteredCards() {
+		var cardContainer = $("#cardContainer");
+		cardContainer.empty();
+
+		var filteredList = $.grep(list, function(item) {
+			if (currentTab === 'ready') {
+				return item.todoDiv1CodeNm === '결재' && !item.isBeforeNotConfirm;
+			} else if (currentTab === 'pending') {
+				return item.todoDiv1CodeNm === '결재' && item.isBeforeNotConfirm;
+			} else if (currentTab === 'share') {
+				return item.todoDiv1CodeNm === '공유';
+			}
+			return true; // 'all'
+		});
+
+		if (!filteredList || filteredList.length === 0) {
+			var emptyMsg = '해당하는 결재/공유 자료가 없습니다.';
+			if (currentTab === 'ready') emptyMsg = '즉시 결재 처리 가능한 자료가 없습니다.';
+			else if (currentTab === 'pending') emptyMsg = '순차대기 중인 결재 자료가 없습니다.';
+			else if (currentTab === 'share') emptyMsg = '미확인 공유 자료가 없습니다.';
+			cardContainer.append('<h6 style="font-size:18px; text-align:center; padding: 30px 0; color:#666;">' + emptyMsg + '</h6>');
+			return;
+		}
+
+		// 업무 발생프로그램명(todoDiv2CodeNm) 기준으로 그룹화
+		var groups = {};
+		var groupOrder = [];
+		$.each(filteredList, function(_, item) {
+			var groupKey = item.todoDiv2CodeNm || '기타';
+			if (!groups[groupKey]) {
+				groups[groupKey] = [];
+				groupOrder.push(groupKey);
+			}
+			groups[groupKey].push(item);
+		});
+
+		$.each(groupOrder, function(gIdx, groupKey) {
+			var groupItems = groups[groupKey];
+			var groupId = 'todoGroup_' + gIdx;
+			var groupHeaderHtml = `
+				<div class="todo_group_container" style="margin-bottom: 12px; border: 1px solid #d1d5db; border-radius: 8px; overflow: hidden; background: #fff;">
+					<div class="todo_group_header" onclick="toggleTodoGroup(this)" style="display: flex; justify-content: space-between; align-items: center; background: #f3f4f6; padding: 10px 14px; font-weight: bold; cursor: pointer; border-bottom: 1px solid #e5e7eb; user-select: none;">
+						<span style="font-size: 14px; color: #1f2937;">
+							<i class="group_icon" style="display: inline-block; margin-right: 6px; font-style: normal; font-weight: bold; color: #0275d8;">▼</i>
+							${groupKey}
+						</span>
+						<span class="badge" style="background: #0275d8; color: #ffffff; font-size: 11px; padding: 3px 8px; border-radius: 10px;">${groupItems.length}건</span>
+					</div>
+					<div class="todo_group_body" style="padding: 10px 10px 2px 10px; display: block;">
+			`;
+
+			var groupBodyCardsHtml = '';
+			$.each(groupItems, function(_, item) {
+				var index = item.origIndex;
+				var cardClass = "card-" + index;
+				if (item.teamManager == undefined) item.teamManager = '';
+
+				var isBeforeNotConfirm = item.isBeforeNotConfirm;
+				var pendingBadge = isBeforeNotConfirm 
+					? '<span style="display: inline-block; background-color: #d9534f; color: #ffffff; font-size: 11px; font-weight: bold; padding: 2px 6px; border-radius: 3px; margin-left: 6px; vertical-align: middle;">[이전결재 미결]</span>' 
+					: '<span style="display: inline-block; background-color: #5cb85c; color: #ffffff; font-size: 11px; font-weight: bold; padding: 2px 6px; border-radius: 3px; margin-left: 6px; vertical-align: middle;">[즉시결재 가능]</span>';
+				
+				if (item.todoDiv1CodeNm === '공유') {
+					pendingBadge = '<span style="display: inline-block; background-color: #0275d8; color: #ffffff; font-size: 11px; font-weight: bold; padding: 2px 6px; border-radius: 3px; margin-left: 6px; vertical-align: middle;">[공유건]</span>';
+				}
+
+				var div1NameText = item.todoDiv1CodeNm + (isBeforeNotConfirm ? ' <span style="color: #d9534f; font-weight: bold; font-size: 10px;">(순차대기)</span>' : '');
+				var btnClass = isBeforeNotConfirm ? 'btn-warning' : 'btn-success';
+				var cardBorderStyle = isBeforeNotConfirm ? 'border: 2px solid #d9534f;' : 'border: 1px solid #EEEEEE;';
+
+				var cardHtml =
+					`<div class="square-box">
+						<div class="card ${cardClass}" style="${cardBorderStyle} margin-bottom: 10px;">
+							<table class="tg">
+								<tr>
+								<td class="tg-title" colspan="4">${item.todoTitl} ${pendingBadge}</td>
+								</tr>
+								<tr>
+									<td class="tg-menu">작업내용</td>
+									<td class="tg-rspn" colspan="3">${item.todoDiv2CodeNm}</td>
+								</tr>
+								<tr>
+									<td class="tg-menu">SALES CODE</td>
+									<td class="tg-rspn">${item.salesCd}</td>
+									<td class="tg-menu">구분</td>
+									<td class="tg-rspn">${div1NameText}</td>
+								</tr>
+								<tr>
+									<td class="tg-menu">요청자</td>
+									<td class="tg-rspn">${item.creatNm}</td>
+									<td class="tg-menu">요청일자</td>
+									<td class="tg-rspn">${item.creatDttm}</td>
+								</tr>
+								<tr>
+									<td class="tg-menu">관리번호</td>
+									<td class="tg-rspn">${item.todoNo}</td>
+									<td class="tg-menu">평가대상</td>
+									<td class="tg-rspn" style="color: blue;">${item.teamManager}</td>
+								</tr>
+								<tr>
+									<td class="tg-rspn" colspan="4" style="text-align: center; padding: 6px 0;">
+									<button class="btn btn-primary" style="height: 30px; display: inline-flex; align-items: center; justify-content: center; padding: 0 14px; line-height: 1;" onclick="openSecondModal(${index})">상세조회</button>
+									<button class="btn ${btnClass}" style="height: 30px; display: inline-flex; align-items: center; justify-content: center; padding: 0 14px; line-height: 1; margin-left: 6px;" onclick="toDoConfirmApproval(${index})">${item.todoDiv1CodeNm}</button>
+									</td>
+								</tr>
+							</table>
+						</div>
+					</div>`;
+				groupBodyCardsHtml += cardHtml;
+			});
+
+			var fullGroupHtml = groupHeaderHtml + groupBodyCardsHtml + `</div></div>`;
+			cardContainer.append(fullGroupHtml);
+		});
+	}
+
+	// 아코디언 그룹 접기/펼치기
+	function toggleTodoGroup(headerElem) {
+		var $header = $(headerElem);
+		var $body = $header.next('.todo_group_body');
+		var $icon = $header.find('.group_icon');
+		$body.slideToggle(150, function() {
+			if ($body.is(':visible')) {
+				$icon.text('▼');
+			} else {
+				$icon.text('▶');
+			}
+		});
+	}
+
+	// 순차 미결재(순차 결재 전용 문서 중 이전 결재자가 1명 이상 미결인 상태) 여부 판정
 	function checkSequentialPending(item) {
 		if (!item || item.todoDiv1CodeNm !== '결재') return false;
 
-		// 1) 동일 결재선 내 이전 미결자 수가 1명 이상인 경우 (복수 미결자 포함)
-		if (Number(item.beforeNotConfirm || 0) > 0) {
-			return true;
+		// 순차 결재 규칙이 명확히 적용된 전용 문서 코드만 지정 (동시/병렬 결재 건 오판 방지)
+		var seqStrictDocCodes = [
+			"TODODIV2190", "TODODIV2191", "TODODIV2200", "TODODIV2201", // 출장신청서 / 출장복명서
+			"TODODIV2100", // 수주복표원가
+			"TODODIV2120"  // PFU 결재
+		];
+
+		// 엄격한 순차 결재 문서가 아니면 이전결재 미결 대상 아님 (동시 결재 건)
+		if (seqStrictDocCodes.indexOf(item.todoDiv2CodeId) < 0) {
+			return false;
 		}
 
-		// 2) 2단계 순차결재 문서(관리부서 결재자 TODODIV2191, TODODIV2201 등)의 경우 선행 신청부서 결재선(TODODIV2190, TODODIV2200) 미결자 존재 여부 검사
+		// 1) 2단계 순차결재 문서(관리부서 결재자 TODODIV2191, TODODIV2201 등)의 경우 선행 신청부서 결재선(TODODIV2190, TODODIV2200) 미결자 존재 여부 검사
 		if (typeof PM51_SEQ_GENERAL_OF !== 'undefined') {
 			var generalDiv = PM51_SEQ_GENERAL_OF[item.todoDiv2CodeId];
 			if (generalDiv && item.todoNo) {
@@ -208,7 +361,8 @@
 			}
 		}
 
-		return false;
+		// 2) 동일 결재선 내 이전 미결자 수가 1명 이상인 경우
+		return Number(item.beforeNotConfirm || 0) > 0;
 	}
 
 	// 공유확인/결재 처리
