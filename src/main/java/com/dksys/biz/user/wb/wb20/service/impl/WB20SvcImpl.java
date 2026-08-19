@@ -67,9 +67,10 @@ public class WB20SvcImpl implements WB20Svc {
 				if (cntObj != null) {
 					cnt = Integer.parseInt(String.valueOf(cntObj));
 				}
-				if ("TODODIV10".equals(div1)) {
+				// TODODIV20: 결재, TODODIV10: 공유
+				if ("TODODIV20".equals(div1)) {
 					approvalCnt += cnt;
-				} else if ("TODODIV20".equals(div1)) {
+				} else if ("TODODIV10".equals(div1)) {
 					shareCnt += cnt;
 				}
 			}

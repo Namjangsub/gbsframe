@@ -33,7 +33,15 @@
 		<!-- 사용자 프로필 영역 -->
 		<div class="user_profile_box">
 			<div class="user_info">
-				<span class="user_name"><b id="userNmDisplay">사용자</b>님, 반갑습니다.</span>
+				<div class="user_name"><b id="userNmDisplay">사용자</b>님, 반갑습니다.</div>
+				<div class="todo_badge_area" style="margin-top: 6px; font-size: 13px; display: flex; align-items: center;">
+					<span onclick="goUrl('/static/mobile/admin/cm/cm11/M08.html');" style="cursor: pointer; display: inline-flex; align-items: center; background: #fff0f0; border: 1px solid #ffcccc; color: #d9534f; padding: 3px 10px; border-radius: 12px; font-weight: bold; margin-right: 8px;">
+						결재 <b id="mApprovalCount" style="margin-left: 4px; color: #d9534f;">0</b>건
+					</span>
+					<span onclick="goUrl('/static/mobile/admin/cm/cm11/M08.html');" style="cursor: pointer; display: inline-flex; align-items: center; background: #f0f7ff; border: 1px solid #cce5ff; color: #004085; padding: 3px 10px; border-radius: 12px; font-weight: bold;">
+						공유 <b id="mShareCount" style="margin-left: 4px; color: #004085;">0</b>건
+					</span>
+				</div>
 			</div>
 			<div class="user_action">
 				<button type="button" class="mini_logout_btn" onclick="mobilelogoutClick();">로그아웃</button>
@@ -191,6 +199,42 @@
 		}
 
 
+		function loadMobileTodoCount() {
+			if (!jwt || !jwt.userId) return;
+			var cacheKey = "GBS:todoCnt:" + (jwt.coCd || "") + ":" + jwt.userId;
+			var cachedRaw = localStorage.getItem(cacheKey);
+			if (cachedRaw) {
+				try {
+					var cached = JSON.parse(cachedRaw);
+					$('#mApprovalCount').text(cached.approvalCnt || 0);
+					$('#mShareCount').text(cached.shareCnt || 0);
+				} catch(e) {}
+			}
+
+			var formData = {
+				coCd: jwt.coCd,
+				salesMngId: jwt.userId,
+				boardParam: "BOARD",
+				sanctnSttus: "N"
+			};
+
+			postAjax("/user/wb/wb20/selectToDoCountGrouped", formData, null, function(data) {
+				var result = data.result || {};
+				var appCnt = Number(result.approvalCnt || 0);
+				var shareCnt = Number(result.shareCnt || 0);
+
+				$('#mApprovalCount').text(appCnt);
+				$('#mShareCount').text(shareCnt);
+
+				var cacheObj = {
+					approvalCnt: appCnt,
+					shareCnt: shareCnt,
+					at: Date.now()
+				};
+				localStorage.setItem(cacheKey, JSON.stringify(cacheObj));
+			});
+		}
+
 		$(document).ready(function () {
 			// 토큰 없으면 로그아웃 처리 유지
 			if (!authorizationToken) {
@@ -202,6 +246,8 @@
 			if (jwt) {
 				$('#userNmDisplay').text(jwt.userNm || jwt.userId);
 			}
+
+			loadMobileTodoCount();
 
 			const authSet = buildAuthSet(jwt && jwt.authInfo); //AUTH100 추출
 			renderMobileMenu(MENU_CONFIG, authSet);
