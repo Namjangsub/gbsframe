@@ -177,11 +177,28 @@
 							<div class="col-resizer"></div>
 						</td>
 						<td style="text-align: left;">
-							<h3 class="location"><span class="page_tit">To-Do List</span>
-								<select id="coCd3" data-kind="CO" onchange="setByCoCd(this); gridView.setData(); workGridView.setData();">
-									<option value="">전체</option>
-								</select>
-							</h3>
+							<div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; margin-bottom: 2px;">
+								<h3 class="location" style="margin: 0;">
+									<span class="page_tit">To-Do List</span>
+									<select id="coCd3" data-kind="CO" onchange="setByCoCd(this); gridView.setData(); workGridView.setData();">
+										<option value="">전체</option>
+									</select>
+								</h3>
+								<div class="todo_quick_filter" style="display: inline-flex; gap: 3px;">
+									<button type="button" class="btn btn-xs todo_qfilter_btn active" data-qfilter="ready" onclick="filterDashboardTodo('ready', this)" style="background: #5cb85c; color: #fff; border: none; font-weight: bold; padding: 2px 6px;">
+										즉시결재 <span id="qReadyCnt" class="badge" style="background: #fff; color: #5cb85c; font-size: 9px; padding: 1px 4px;">0</span>
+									</button>
+									<button type="button" class="btn btn-xs todo_qfilter_btn" data-qfilter="pending" onclick="filterDashboardTodo('pending', this)" style="background: #fff; color: #d9534f; border: 1px solid #ddd; font-weight: bold; padding: 2px 6px;">
+										순차대기 <span id="qPendingCnt" class="badge" style="background: #d9534f; color: #fff; font-size: 9px; padding: 1px 4px;">0</span>
+									</button>
+									<button type="button" class="btn btn-xs todo_qfilter_btn" data-qfilter="share" onclick="filterDashboardTodo('share', this)" style="background: #fff; color: #0275d8; border: 1px solid #ddd; font-weight: bold; padding: 2px 6px;">
+										공유 <span id="qShareCnt" class="badge" style="background: #0275d8; color: #fff; font-size: 9px; padding: 1px 4px;">0</span>
+									</button>
+									<button type="button" class="btn btn-xs todo_qfilter_btn" data-qfilter="all" onclick="filterDashboardTodo('all', this)" style="background: #fff; color: #333; border: 1px solid #ddd; font-weight: bold; padding: 2px 6px;">
+										전체 <span id="qAllCnt" class="badge" style="background: #6c757d; color: #fff; font-size: 9px; padding: 1px 4px;">0</span>
+									</button>
+								</div>
+							</div>
 							<span>※ 해당 Row 더블클릭은 내용 조회 후 확인 또는 결재 처리</span>
 						</td>
 					</tr>
@@ -584,9 +601,16 @@
 					{key: "todoTitl",      		label: "내용",      		align: "left",   width: 150,
 						formatter: function () {
 							var isPending = checkSequentialPending(this.item);
-							var badgeHtml = isPending 
-								? '<span style="display: inline-block; background-color: #d9534f; color: #ffffff; font-size: 11px; font-weight: bold; padding: 1px 5px; border-radius: 3px; margin-right: 6px; vertical-align: middle;">[이전결재 미결]</span>' 
-								: '';
+							var badgeHtml = '';
+							if (this.item.todoDiv1CodeNm === '결재') {
+								if (isPending) {
+									badgeHtml = '<span style="display: inline-block; background-color: #d9534f; color: #ffffff; font-size: 10px; font-weight: bold; padding: 1px 5px; border-radius: 3px; margin-right: 5px; vertical-align: middle;">[이전결재 미결]</span>';
+								} else {
+									badgeHtml = '<span style="display: inline-block; background-color: #5cb85c; color: #ffffff; font-size: 10px; font-weight: bold; padding: 1px 5px; border-radius: 3px; margin-right: 5px; vertical-align: middle;">[즉시결재 가능]</span>';
+								}
+							} else if (this.item.todoDiv1CodeNm === '공유') {
+								badgeHtml = '<span style="display: inline-block; background-color: #0275d8; color: #ffffff; font-size: 10px; font-weight: bold; padding: 1px 5px; border-radius: 3px; margin-right: 5px; vertical-align: middle;">[공유건]</span>';
+							}
 							return badgeHtml + (this.value || '');
 						}
 					},
@@ -608,20 +632,69 @@
 			postAjax("/user/wb/wb20/selectToDoList", formData, null, function(data){
 				try {
 					adjustGridHeight();
-					var list = data.resultList;
-					if (list != undefined)
-					targetObj.setData({
-						list : list,
-						page : {
-							totalElements : list.length
-						}
-					});
+					var list = data.resultList || [];
+					_dashboardRawTodoList = list;
+					updateDashboardQFilterBadges();
+					filterDashboardTodo(_currentDashboardQFilter);
 				} catch (error) {
-// 					alert("오류 발생!! 전산실 연락 바랍니다", error.message);
-					return null; // 오류 발생 시 null 반환
-				} finally {
-					// console.log("함수 실행 완료.");
+					return null;
 				}
+			});
+		}
+	}
+
+	var _dashboardRawTodoList = [];
+	var _currentDashboardQFilter = 'ready';
+
+	function updateDashboardQFilterBadges() {
+		var readyCnt = 0, pendingCnt = 0, shareCnt = 0, allCnt = _dashboardRawTodoList.length;
+		$.each(_dashboardRawTodoList, function(_, item) {
+			if (item.todoDiv1CodeNm === '결재') {
+				if (checkSequentialPending(item)) pendingCnt++;
+				else readyCnt++;
+			} else if (item.todoDiv1CodeNm === '공유') {
+				shareCnt++;
+			}
+		});
+		$('#qReadyCnt').text(readyCnt);
+		$('#qPendingCnt').text(pendingCnt);
+		$('#qShareCnt').text(shareCnt);
+		$('#qAllCnt').text(allCnt);
+	}
+
+	function filterDashboardTodo(filterType, btnElem) {
+		_currentDashboardQFilter = filterType;
+		$('.todo_qfilter_btn').each(function() {
+			var f = $(this).attr('data-qfilter');
+			if (f === filterType) {
+				$(this).addClass('active');
+				var bg = '#5cb85c';
+				if (f === 'pending') bg = '#d9534f';
+				if (f === 'share') bg = '#0275d8';
+				if (f === 'all') bg = '#6c757d';
+				$(this).css({ background: bg, color: '#fff', border: 'none' });
+			} else {
+				$(this).removeClass('active');
+				var c = '#333';
+				if (f === 'pending') c = '#d9534f';
+				if (f === 'share') c = '#0275d8';
+				if (f === 'ready') c = '#5cb85c';
+				$(this).css({ background: '#fff', color: c, border: '1px solid #ddd' });
+			}
+		});
+
+		var filtered = $.grep(_dashboardRawTodoList, function(item) {
+			var isPending = checkSequentialPending(item);
+			if (_currentDashboardQFilter === 'ready') return item.todoDiv1CodeNm === '결재' && !isPending;
+			if (_currentDashboardQFilter === 'pending') return item.todoDiv1CodeNm === '결재' && isPending;
+			if (_currentDashboardQFilter === 'share') return item.todoDiv1CodeNm === '공유';
+			return true;
+		});
+
+		if (gridView && gridView.target) {
+			gridView.target.setData({
+				list: filtered,
+				page: { totalElements: filtered.length }
 			});
 		}
 	}
