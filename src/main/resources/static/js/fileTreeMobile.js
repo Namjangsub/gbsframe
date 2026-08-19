@@ -7,6 +7,19 @@ var approvalWorkingGrid; //팝업화면에서 결재정보 저장용
 	var currPgmAuthChk = true; // true:저장권한, false:저장권한 없음
 	var fileTempCocd = '';
 	var fileTree_fileList_area = '';
+
+	// 결재/공유 처리 버튼(callApprovalWorking) 생성 가능 여부.
+	// 화면에서 window.canShowApprovalWorkingBtn(row) 를 정의한 경우에만 그 판정을 따른다.
+	// (정의하지 않은 화면은 항상 true를 반환하므로 기존 동작과 완전히 동일하다.)
+	// 사용 예: 순차결재 문서에서 본인 차례가 아니면 버튼 자체를 생성하지 않도록 화면이 false를 반환한다.
+	function canAppendApprovalWorkingBtn(row) {
+		if (typeof window.canShowApprovalWorkingBtn !== 'function') return true;
+		try {
+			return window.canShowApprovalWorkingBtn(row) !== false;
+		} catch (e) {
+			return true;
+		}
+	}
 	//최초 진입시점---
 	//   1. 파일트리명 = 각 화면의 트리구조를 보여줄 div테그 ID ex) <div id="deptTree" ></div>
 	//   2. 그리드명  = 각 화면의 ax5-grid Html Tag ID  ex) <div id="my-grid" data-ax5grid="file-grid" data-ax5grid-config="{}" style="height: 100%; width: 100%"></div>
@@ -86,8 +99,10 @@ var approvalWorkingGrid; //팝업화면에서 결재정보 저장용
 						const callCmd = `<button class="callApprovalWorking" onclick="treeModule.callApprovalWorking('${todoKey}', '${approvalWorkingGrid.creatPgm}')">${actionType}</button>`;
 						$('#popForm a:has(i.i_search_w)').removeAttr('onclick');  //popForm ID안에 있는 <a>태그중 자식으로 i태그 i_search_w 클래스가 있으면 onclick 제거--> 결재창과 중복 방지를 위함
 						$('#popForm a:has(i.i_search_w)').remove();  //I 태그도 삭제
-						$('.popup_bottom_btn').last().append(callCmd);
-						
+						if (canAppendApprovalWorkingBtn(approvalWorkingGrid)) {	//화면이 거부하면 버튼을 생성하지 않는다.
+							$('.popup_bottom_btn').last().append(callCmd);
+						}
+
 						if (approvalWorkingGrid.teamManager) {
 							//발주요청처리결과화면이면
 							if (params.fileTrgtTyp == 'QM0101P03' || params.fileTrgtTyp == 'QM0101P01') {
@@ -134,7 +149,9 @@ var approvalWorkingGrid; //팝업화면에서 결재정보 저장용
 
 								$('#popForm a:has(i.i_search_w)').removeAttr('onclick');  //popForm ID안에 있는 <a>태그중 자식으로 i태그 i_search_w 클래스가 있으면 onclick 제거--> 결재창과 중복 방지를 위함
 								$('#popForm a:has(i.i_search_w)').remove();  //I 태그도 삭제
+								if (canAppendApprovalWorkingBtn(approvalWorkingGrid)) {	//화면이 거부하면 버튼을 생성하지 않는다.
 								$('.popup_bottom_btn').last().append(callCmd);	//마지막 popup_bottom_btn class에서 버튼 추가
+							}
 								
 								if (approvalWorkingGrid.teamManager == '평가') {
 									//발주요청처리결과화면이면 수정 가능하게 속성 변경 처리

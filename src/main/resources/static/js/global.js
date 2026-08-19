@@ -1530,6 +1530,15 @@ function favoritesMenuControl(obj){
 
 //로그아웃
 function logoutClick(){
+	try {
+		for (var i = localStorage.length - 1; i >= 0; i--) {
+			var key = localStorage.key(i);
+			if (key && key.indexOf("GBS:todoCnt:") === 0) {
+				localStorage.removeItem(key);
+			}
+		}
+	} catch (e) {}
+
 	localStorage.removeItem("access_token");
 	localStorage.removeItem("authArr");
 

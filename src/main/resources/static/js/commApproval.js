@@ -6,21 +6,9 @@ var PM51_SEQ_GENERAL_OF = {
 	'TODODIV2191': 'TODODIV2190', 'TODODIV2201': 'TODODIV2200'	// 관리부서(출장신청서/출장복명서)
 };
 
-// 결재행 중 미결(sanctnSttus!=='Y')인 최소 순번 행을 반환. maxSn을 주면 그 순번보다 앞선 행만 대상으로 한다.
-function pm51FirstPendingRow(rows, maxSn) {
-	var found = null;
-	$.each(rows || [], function(idx, row) {
-		if (row.sanctnSttus == 'Y') return;
-		var sn = Number(row.sanctnSn || 0);
-		if (!sn) return;
-		if (maxSn && sn >= maxSn) return;
-		if (!found || sn < Number(found.sanctnSn || 0)) found = row;
-	});
-	return found;
-}
-
 // PM51(출장신청서 TODODIV2190/2191, 출장복명서 TODODIV2200/2201) 순차결재 진입 안내.
-// 본인 차례가 아니면 blocked=true(결재버튼 차단)와 함께 어느 결재자에서 멈춰 있는지 알림문구/안내행을 만든다.
+// 본인 차례가 아니면 blocked=true(결재버튼 차단)와 함께 순차 순서상 가장 앞선 미결자를 지목한다.
+// 관리부서(2191/2201) 결재자는 신청부서(2190/2200) 결재가 먼저 완료되어야 하므로 신청부서 미결자를 우선 안내한다.
 // 대상 문서가 아니거나 본인 차례이면 빈 결과를 반환하므로 타 모듈에는 영향이 없다.
 function pm51SequentialNotice(list, colSpan) {
 	var result = { blocked: false, message: '', html: '' };
@@ -33,33 +21,78 @@ function pm51SequentialNotice(list, colSpan) {
 	if (!myRow || !PM51_SEQ_GENERAL_OF.hasOwnProperty(myRow.todoDiv2CodeId)) return result;
 	if (myRow.sanctnSttus == 'Y') return result;	//본인 승인 완료 건(결재의견 수정)은 제한하지 않는다.
 
-	//1) 같은 결재선의 이전 순번 미결자
-	var blockerDesc = '이전결재자';
-	var blocker = pm51FirstPendingRow(list, Number(myRow.sanctnSn || 0));
+	var generalDiv = PM51_SEQ_GENERAL_OF[myRow.todoDiv2CodeId];	//관리부서 결재구분이면 선행 신청부서 결재구분
+	var isMngApprover = !!generalDiv;
 
-	//2) 관리부서 결재자는 신청부서 결재가 모두 완료되어야 진행 가능
-	if (!blocker) {
-		var generalDiv = PM51_SEQ_GENERAL_OF[myRow.todoDiv2CodeId];
-		if (generalDiv && myRow.todoNo) {
-			var generalRows = [];
-			postAjaxSync("/user/wb/wb20/selectGetApprovalList", { todoNo: myRow.todoNo, todoDiv2CodeId: generalDiv }, null, function(data) {
-				generalRows = data.resultList || [];
-			});
-			blocker = pm51FirstPendingRow(generalRows, 0);
-			blockerDesc = '신청부서 결재자';
-		}
+	//순차 순서(신청부서 -> 관리부서)대로 본인 차례 앞의 미결자를 모두 모은다.
+	var pendingList = [];
+	if (isMngApprover && myRow.todoNo) {
+		$.each(pm51PendingRowsAsc(pm51FetchApprovalLine(myRow.todoNo, generalDiv), 0), function(idx, row) {
+			pendingList.push({ lineNm: '신청부서', row: row });
+		});
 	}
-	if (!blocker) return result;
+	// 결재함 진입 파라미터(todoKey/sanctnSn)에 따라 list에 본인 행 1건만 담겨 오는 경우가 있으므로,
+	// 같은 결재선의 앞 순번 판정은 문서번호+결재구분으로 전체를 다시 조회해서 수행한다.
+	var ownRows = pm51FetchApprovalLine(myRow.todoNo, myRow.todoDiv2CodeId);
+	if (ownRows.length === 0) ownRows = list;
+	$.each(pm51PendingRowsAsc(ownRows, Number(myRow.sanctnSn || 0)), function(idx, row) {
+		pendingList.push({ lineNm: isMngApprover ? '관리부서' : '신청부서', row: row });
+	});
+	if (pendingList.length === 0) return result;
 
-	var blockerNm = pm51NameWithJik(blocker);
-	var particle = pm51SubjectParticle(blockerNm);
+	//순차상 가장 앞선 미결자를 지목하고, 미결자가 여러 명이면 순서대로 함께 안내한다.
+	var firstItem = pendingList[0];
+	var firstNm = pm51NameWithJik(firstItem.row);
+	var firstDesc = (isMngApprover && firstItem.lineNm === '신청부서') ? '신청부서 결재자' : '이전결재자';
+	var particle = pm51SubjectParticle(firstNm);
+
 	result.blocked = true;
-	result.message = blockerDesc + ' ' + blockerNm + particle + ' 승인하지 않은 상태입니다.\r\n이전 결재가 완료되어야 결재를 진행할 수 있습니다.';
+	// 본인이 바로 다음 차례(앞의 미결자가 1명)이면 해당 결재자를 지목해서 알리고,
+	// 부사장처럼 앞에 여러 명이 남아 있으면 특정인을 지목하지 않고 진행 불가 사유만 알린다.
+	// 미결자 전체 목록은 결재선 아래 안내문구(html)에 계속 표시된다.
+	var closingMsg = '이전 결재가 완료되어야 결재를 진행할 수 있습니다.';
+	result.message = (pendingList.length === 1)
+		? (firstDesc + ' ' + firstNm + particle + ' 승인하지 않은 상태입니다.\r\n' + closingMsg)
+		: closingMsg;
+
+	var htmlList = '';
+	if (pendingList.length > 1) {
+		$.each(pendingList, function(idx, item) {
+			htmlList += '<br>' + (idx + 1) + '. ' + item.lineNm + ' ' + item.row.sanctnSn + '순번 ' + pm51NameWithJik(item.row);
+		});
+		htmlList = '<br><b>[미결 결재자]</b>' + htmlList;
+	}
 	result.html = '<tr><td colspan="' + colSpan + '" style="text-align:left; padding:8px; color:#d9534f; background:#fff8f8; border-top:1px solid #dbdbdb;">'
-		+ blockerDesc + ' <b>' + blockerNm + '</b>(순번 ' + blocker.sanctnSn + ')' + particle + ' 승인하지 않은 상태입니다.<br>'
+		+ firstDesc + ' <b>' + firstNm + '</b>(순번 ' + firstItem.row.sanctnSn + ')' + particle + ' 승인하지 않은 상태입니다.<br>'
 		+ '이전 결재가 완료되어야 결재를 진행할 수 있습니다.'
+		+ htmlList
 		+ '</td></tr>';
 	return result;
+}
+
+// 지정한 문서번호/결재구분의 결재선 전체를 조회한다. (결재함 진입 파라미터에 따라 화면에 넘어온 목록이
+// 본인 행만 담고 있을 수 있으므로, 순차 판정은 항상 이 조회 결과를 기준으로 한다.)
+function pm51FetchApprovalLine(todoNo, todoDiv2CodeId) {
+	if (!todoNo || !todoDiv2CodeId) return [];
+	var rows = [];
+	postAjaxSync("/user/wb/wb20/selectGetApprovalList", { todoNo: todoNo, todoDiv2CodeId: todoDiv2CodeId }, null, function(data) {
+		rows = data.resultList || [];
+	});
+	return rows;
+}
+
+// 미결(sanctnSttus!=='Y') 결재행을 순번 오름차순으로 반환. maxSn을 주면 그 순번보다 앞선 행만 대상으로 한다.
+function pm51PendingRowsAsc(rows, maxSn) {
+	var pending = [];
+	$.each(rows || [], function(idx, row) {
+		if (row.sanctnSttus == 'Y') return;
+		var sn = Number(row.sanctnSn || 0);
+		if (!sn) return;
+		if (maxSn && sn >= maxSn) return;
+		pending.push(row);
+	});
+	pending.sort(function(a, b) { return Number(a.sanctnSn || 0) - Number(b.sanctnSn || 0); });
+	return pending;
 }
 
 // 결재자 표기: 이름 뒤에 직급을 붙인다. (예: 홍길동팀장) 직급이 없으면 이름만 사용한다.
@@ -289,7 +322,7 @@ function Approval(htmlParam, param, popParam) {
 					if (pm51Notice.blocked) {
 						applyBtn = false;
 						$("#appLine").append(pm51Notice.html);
-						customAlert(pm51Notice.message);
+						if (pm51Notice.message) customAlert(pm51Notice.message);
 					}
 
 			});		//end ajax
