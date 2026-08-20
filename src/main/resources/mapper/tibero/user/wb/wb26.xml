@@ -2489,6 +2489,11 @@
             S.SJ_FILE_TRGT_KEY, --과제마스터키
             S.CLOSE_YN,		--과제마감여부
             S.WBS_REMARK,	--WBS 특이사항
+			CASE WHEN EXISTS (
+				SELECT 1
+				FROM TB_WB21M01_REMARK_HIST RH
+				WHERE RH.FILE_TRGT_KEY = S.SJ_FILE_TRGT_KEY
+			) THEN 1 ELSE 0 END AS WBS_REMARK_HIST_CNT,
             S.SMRIZE_ID,
             F.WBS_PLAN_MNG_ID,
             C.NAME 				AS WBS_PLAN_MNG_NM,
@@ -2556,6 +2561,47 @@
 			 , UDT_DTTM = SYSDATE
 		WHERE  FILE_TRGT_KEY = #{sjFileTrgtKey}
 	</update>
+
+	<insert id="insertWbsRemarkHist" parameterType="Map">
+		INSERT INTO TB_WB21M01_REMARK_HIST
+		(
+			  HIST_SEQ
+			, SALES_CD
+			, FILE_TRGT_KEY
+			, CO_CD
+			, WBS_REMARK
+			, HIST_DIV
+			, HIST_ID
+			, HIST_PGM
+			, HIST_DTTM
+		)
+		SELECT
+			  SEQ_WB21M01_REMARK_HIST.NEXTVAL
+			, M.SALES_CD
+			, M.FILE_TRGT_KEY
+			, M.CO_CD
+			, M.WBS_REMARK
+			, #{histDiv}
+			, #{userId}
+			, #{pgmId}
+			, CURRENT_TIMESTAMP
+		FROM TB_WB21M01 M
+		WHERE M.FILE_TRGT_KEY = #{sjFileTrgtKey}
+	</insert>
+
+	<select id="selectWbsRemarkHist" parameterType="Map" resultType="camelMap">
+		SELECT
+			  H.HIST_SEQ
+			, H.HIST_DIV
+			, H.HIST_ID
+			, NVL(U.NAME, H.HIST_ID) AS HIST_USER_NM
+			, TO_CHAR(H.HIST_DTTM, 'YYYY-MM-DD HH24:MI:SS') AS HIST_DTTM
+			, H.WBS_REMARK AS CHANGE_CONTENT
+		FROM TB_WB21M01_REMARK_HIST H
+		LEFT JOIN TB_CM06M01 U ON U.ID = H.HIST_ID
+		WHERE H.FILE_TRGT_KEY = #{sjFileTrgtKey}
+		ORDER BY H.HIST_SEQ DESC
+	</select>
 
 	<insert id="insertWbsScheduleHIST" parameterType="Map">
 		INSERT INTO TB_WB22M01_HIST

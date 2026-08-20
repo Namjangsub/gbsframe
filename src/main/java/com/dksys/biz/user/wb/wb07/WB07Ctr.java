@@ -54,8 +54,15 @@ public class WB07Ctr {
   			model.addAttribute("resultCode", 900);
   			model.addAttribute("resultMessage", e.getMessage());
   		}
-  		return "jsonView";
+		return "jsonView";
     }
+
+	@PostMapping(value = "/selectWbsRemarkHist")
+	public String selectWbsRemarkHist(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		List<Map<String, String>> result = wb07svc.selectWbsRemarkHist(paramMap);
+		model.addAttribute("result", result);
+		return "jsonView";
+	}
 
 
 	@PostMapping(value = "/updateWbsSchedule")

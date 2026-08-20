@@ -158,7 +158,20 @@ public class WB26SvcImpl implements WB26Svc {
 
 	@Override
 	public int updateWbsRemarks(Map<String, String> paramMap) {
-		return wb26Mapper.updateWbsRemarks(paramMap);
+		int updated = wb26Mapper.updateWbsRemarks(paramMap);
+		if (updated == 1) {
+			paramMap.put("histDiv", "UPDATE");
+			int histInserted = wb26Mapper.insertWbsRemarkHist(paramMap);
+			if (histInserted != 1) {
+				throw new IllegalStateException("WBS 비고 이력 저장에 실패했습니다.");
+			}
+		}
+		return updated;
+	}
+
+	@Override
+	public List<Map<String, String>> selectWbsRemarkHist(Map<String, String> paramMap) {
+		return wb26Mapper.selectWbsRemarkHist(paramMap);
 	}
 	
 	
