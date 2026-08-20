@@ -9,9 +9,27 @@
 		<if test="coCd != null and !coCd.equals('')">
 			AND T.CO_CD = #{coCd}
 		</if>
-		<if test="todoFromDt != null and !todoFromDt.equals('')" >
-			<if test="todoToDt != null and !todoToDt.equals('')">
-			AND T.CREAT_DTTM BETWEEN TO_DATE(#{todoFromDt}, 'YYYYMMDD') AND TO_DATE(#{todoToDt}, 'YYYYMMDD')+1
+		<!-- Sales Code 검색 시에는 작성일자를 적용하지 않음 -->
+		<if test="salesCd == null or salesCd.equals('')">
+			<if test="todoFromDt != null and !todoFromDt.equals('')">
+				<if test="todoToDt != null and !todoToDt.equals('')">
+					<choose>
+						<!-- 완료 조회: 선택한 작성일자 범위 적용 -->
+						<when test='sanctnSttus != null and sanctnSttus == "Y"'>
+							AND T.CREAT_DTTM BETWEEN TO_DATE(#{todoFromDt}, 'YYYYMMDD') AND TO_DATE(#{todoToDt}, 'YYYYMMDD')+1
+						</when>
+						<!-- 전체 조회: 미결재는 전 기간, 완료 건만 작성일자 범위 적용 -->
+						<when test="sanctnSttus == null or sanctnSttus.equals('')">
+							AND (
+								T.SANCTN_STTUS = 'N'
+								OR (
+									T.SANCTN_STTUS = 'Y'
+									AND T.CREAT_DTTM BETWEEN TO_DATE(#{todoFromDt}, 'YYYYMMDD') AND TO_DATE(#{todoToDt}, 'YYYYMMDD')+1
+								)
+							)
+						</when>
+					</choose>
+				</if>
 			</if>
 		</if>
 		<if test="todoNo != null and !todoNo.equals('')">
@@ -94,6 +112,12 @@
                     OR (NVL(ISU.ISS_STS,'ISSSTS01') != 'ISSSTS03' AND ISU.REQ_NO IS NULL)
                 )
 			AND (ISU.ACT_ID = #{salesMngId} OR QM.ORDRG_ID = #{salesMngId} )
+			<if test="salesCd != null and !salesCd.equals('')">
+				AND ISU.SALES_CD LIKE '%'||#{salesCd}||'%'
+			</if>
+			<if test='sanctnSttus != null and sanctnSttus == "Y"'>
+				AND 1 = 0
+			</if>
 		)
 	FROM DUAL;
 	</select>
@@ -305,6 +329,12 @@
 	                        OR (NVL(ISU.ISS_STS,'ISSSTS01') != 'ISSSTS03' AND ISU.REQ_NO IS NULL)
 	                    )
 					AND (ISU.ACT_ID = #{salesMngId} OR QM.ORDRG_ID = #{salesMngId} )
+					<if test="salesCd != null and !salesCd.equals('')">
+						AND ISU.SALES_CD LIKE '%'||#{salesCd}||'%'
+					</if>
+					<if test='sanctnSttus != null and sanctnSttus == "Y"'>
+						AND 1 = 0
+					</if>
 					ORDER BY TODO_DIV1_CODE_NM, TODO_DIV2_CODE_NM, CREAT_DTTM DESC, SALES_CD DESC, TODO_NM
 				) AS X
 				WHERE 1=1
@@ -682,7 +712,7 @@
 						LEFT OUTER JOIN TB_CM07M01 D ON A.LEVEL_CD = D.LEVEL_CD
 						INNER JOIN TB_CM04M01 B ON A.DEPT_ID = B.DEPT_ID
 					WHERE C.TODO_FILE_TRGT_KEY = #{fileTrgtKey}
-					AND C.TODO_NO = #{reqNo}
+					AND (C.TODO_NO = #{reqNo} OR C.TODO_NO = #{fileTrgtKey})
 					<if test="etcField2 != null and !etcField2.equals('')">
 					AND C.ETC_FIELD2 = #{etcField2}
 					</if>
