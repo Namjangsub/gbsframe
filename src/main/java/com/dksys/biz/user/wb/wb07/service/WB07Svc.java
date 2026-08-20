@@ -26,6 +26,7 @@ public interface WB07Svc {
 	int updateWbsLevel2ActGantt(Map<String, String> paramMap) throws Exception;
 
 	int updateWbsRemarks(Map<String, String> paramMap);
+	List<Map<String, String>> selectWbsRemarkHist(Map<String, String> paramMap);
 
 	int updateWbsSchedule(Map<String, String> paramMap) throws Exception;
 	int wbsLevel2PlanChange(Map<String, String> paramMap) throws Exception;

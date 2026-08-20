@@ -41,6 +41,8 @@ public interface WB26Mapper {
 
 	// 프론트엔드의 간트차트에서 수정되는 내용 처리 용
 	int updateWbsRemarks(Map<String, String> param);
+	int insertWbsRemarkHist(Map<String, String> param);
+	List<Map<String, String>> selectWbsRemarkHist(Map<String, String> param);
 	int updateWbsSchedule(Map<String, String> param);
 	int insertWbsScheduleHIST(Map<String, String> param);
 	int updateWbsScheduleVersionUp(Map<String, String> param);

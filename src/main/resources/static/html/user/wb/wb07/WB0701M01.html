@@ -264,6 +264,21 @@ onkeyup="(event.keyCode == 8 || event.keyCode == 46) ? ordrsClntCd_S.value = '' 
   <div class="toast" id="toast"></div>
   <div class="bar-tooltip" id="barTooltip"></div>
 
+  <div id="remarkHistoryPopover" class="remark-history-popover" role="dialog" aria-modal="false" aria-hidden="true">
+    <div class="remark-history-popover-head">
+      <div id="remarkHistoryTitle" class="remark-history-popover-title">비고 변경 이력</div>
+      <button type="button" id="remarkHistoryClose" class="remark-history-close" aria-label="비고 변경 이력 닫기">&times;</button>
+    </div>
+    <div class="remark-history-list">
+      <div class="remark-history-table-head" role="row">
+        <span role="columnheader">변경일시</span>
+        <span role="columnheader">변경자</span>
+        <span role="columnheader">변경내용</span>
+      </div>
+      <div id="remarkHistoryRows"></div>
+    </div>
+  </div>
+
   <!-- Modal -->
   <div class="modal-backdrop" id="modal">
     <div class="modal">
@@ -1131,7 +1146,9 @@ onkeyup="(event.keyCode == 8 || event.keyCode == 46) ? ordrsClntCd_S.value = '' 
 	        		  problemCls: problemCls,
 	        		  scheduleText: scheduleText,
 	        		  scheduleCls: scheduleCls,
-	        		  remarks: r.remarks || '',
+                  remarks: r.remarks || '',
+                  sjFileTrgtKey: r.sjFileTrgtKey || '',
+                  remarkHistCnt: Number(r.remarkHistCnt || 0),
 	        		  wbsCloseYn: r.wbsCloseYn || '',
 	        		  closeYn: r.closeYn || '',
 	        		  rows: []
@@ -1734,6 +1751,7 @@ onkeyup="(event.keyCode == 8 || event.keyCode == 46) ? ordrsClntCd_S.value = '' 
         const showclntPjtNm = true;
         const safeRemarks = (r.remarks ? escapeHtml(r.remarks) : '');
         const remarksHtml = safeRemarks ? safeRemarks : '<small>&nbsp;</small>';
+		const dataRemarksHtml = buildRemarkCellHtml(r.remarks, r.sjFileTrgtKey, r.remarkHistCnt);
 
         if (r.type === "summary") {
             const summaryKey = (r.ordrsNo || 'NOORD') + "-SUMMARY";
@@ -1832,7 +1850,10 @@ onkeyup="(event.keyCode == 8 || event.keyCode == 46) ? ordrsClntCd_S.value = '' 
             </div>
             <div class="pane-right">
               <div class="cell c-problem ${escapeHtml(r.problemCls || '')}">${escapeHtml(r.problemText || '')}</div>
-              <div class="remarks" data-remarks="${safeRemarks}">${remarksHtml}</div>
+              <div class="remarks" data-remarks="${safeRemarks}"
+                   data-sjfiletrgtkey="${escapeHtml(r.sjFileTrgtKey || '')}"
+                   data-salescd="${escapeHtml(r.salesCd || '')}"
+                   data-remarkhistcnt="${Number(r.remarkHistCnt || 0)}">${dataRemarksHtml}</div>
             </div>
           </div>
         `);
@@ -3774,8 +3795,141 @@ onkeyup="(event.keyCode == 8 || event.keyCode == 46) ? ordrsClntCd_S.value = '' 
       }
     }
 
+    const REMARK_HISTORY_API = "/user/wb/wb07/selectWbsRemarkHist";
+    let REMARK_HISTORY_REQUEST_TOKEN = 0;
+
+    function buildRemarkCellHtml(value, sjFileTrgtKey, histCnt){
+      const raw = String(value == null ? "" : value);
+      const textHtml = raw
+        ? '<span class="remark-history-text">' + escapeHtml(raw) + '</span>'
+        : '<span class="remark-history-text"><small>&nbsp;</small></span>';
+      const hasHistory = Number(histCnt || 0) > 0;
+      if(!sjFileTrgtKey || (!raw.trim() && !hasHistory)) return textHtml;
+      return textHtml
+        + '<button type="button" class="remark-history-trigger"'
+        + ' title="비고 변경 이력" aria-label="비고 변경 이력 조회">!</button>';
+    }
+
+    function renderRemarkCell($cell, value, row){
+      const sjFileTrgtKey = row && row.sjFileTrgtKey !== undefined
+        ? row.sjFileTrgtKey
+        : $cell.attr("data-sjfiletrgtkey");
+      const salesCd = row && row.salesCd !== undefined
+        ? row.salesCd
+        : $cell.attr("data-salescd");
+      const histCnt = row && row.remarkHistCnt !== undefined
+        ? row.remarkHistCnt
+        : $cell.attr("data-remarkhistcnt");
+
+      $cell.data("remarks", String(value == null ? "" : value));
+      $cell.attr("data-sjfiletrgtkey", sjFileTrgtKey || "");
+      $cell.attr("data-salescd", salesCd || "");
+      $cell.attr("data-remarkhistcnt", Number(histCnt || 0));
+      $cell.html(buildRemarkCellHtml(value, sjFileTrgtKey, histCnt));
+    }
+
+    function closeRemarkHistoryPopover(){
+      REMARK_HISTORY_REQUEST_TOKEN++;
+      const popover = document.getElementById("remarkHistoryPopover");
+      if(!popover) return;
+      popover.classList.remove("is-open");
+      popover.setAttribute("aria-hidden", "true");
+    }
+
+    function positionRemarkHistoryPopover(triggerEl){
+      const popover = document.getElementById("remarkHistoryPopover");
+      if(!popover || !triggerEl) return;
+
+      const triggerRect = triggerEl.getBoundingClientRect();
+      const gap = 6;
+      const edge = 8;
+      const popoverWidth = popover.offsetWidth;
+      const popoverHeight = popover.offsetHeight;
+
+      let left = triggerRect.right - popoverWidth;
+      left = Math.max(edge, Math.min(left, window.innerWidth - popoverWidth - edge));
+
+      let top = triggerRect.bottom + gap;
+      if(top + popoverHeight > window.innerHeight - edge){
+        top = triggerRect.top - popoverHeight - gap;
+      }
+      top = Math.max(edge, Math.min(top, window.innerHeight - popoverHeight - edge));
+
+      popover.style.left = left + "px";
+      popover.style.top = top + "px";
+    }
+
+    function renderRemarkHistoryList(list){
+      const $rows = $("#remarkHistoryRows").empty();
+      if(!Array.isArray(list) || !list.length){
+        $("<div>").addClass("remark-history-state").text("변경 이력이 없습니다.").appendTo($rows);
+        return;
+      }
+
+      list.forEach(item => {
+        const histId = String(item.histId || "");
+        const userNm = String(item.histUserNm || histId || "-");
+        const content = item.changeContent == null || String(item.changeContent) === ""
+          ? "(내용 삭제)"
+          : String(item.changeContent);
+        const $item = $("<div>").addClass("remark-history-item");
+        $("<span>").addClass("remark-history-date").text(item.histDttm || "-").appendTo($item);
+        $("<span>").addClass("remark-history-user").text(userNm).attr("title", userNm).appendTo($item);
+        $("<div>").addClass("remark-history-content").text(content).attr("title", content).appendTo($item);
+        $item.appendTo($rows);
+      });
+    }
+
+    function openRemarkHistoryPopover(triggerEl){
+      const $cell = $(triggerEl).closest(".remarks");
+      const sjFileTrgtKey = String($cell.attr("data-sjfiletrgtkey") || "");
+      const salesCd = String($cell.attr("data-salescd") || "");
+      if(!sjFileTrgtKey) return;
+
+      const popover = document.getElementById("remarkHistoryPopover");
+      if(!popover) return;
+
+      const requestToken = ++REMARK_HISTORY_REQUEST_TOKEN;
+      $("#remarkHistoryTitle").text("비고 변경 이력 · " + (salesCd || sjFileTrgtKey));
+      $("#remarkHistoryRows").empty().append(
+        $("<div>").addClass("remark-history-state").text("이력을 조회 중입니다.")
+      );
+      popover.classList.add("is-open");
+      popover.setAttribute("aria-hidden", "false");
+      positionRemarkHistoryPopover(triggerEl);
+
+      postAjax(REMARK_HISTORY_API, { sjFileTrgtKey: sjFileTrgtKey }, null, function(resp){
+        if(requestToken !== REMARK_HISTORY_REQUEST_TOKEN) return;
+        renderRemarkHistoryList(resp && Array.isArray(resp.result) ? resp.result : []);
+        positionRemarkHistoryPopover(triggerEl);
+      }, false);
+    }
+
+    function bindRemarkHistoryEvents($wbs){
+      $wbs.off("click.remarkHistory").on("click.remarkHistory", ".remark-history-trigger", function(event){
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        openRemarkHistoryPopover(this);
+      });
+
+      $("#remarkHistoryClose").off("click.remarkHistory").on("click.remarkHistory", function(event){
+        event.preventDefault();
+        event.stopPropagation();
+        closeRemarkHistoryPopover();
+      });
+
+      $(document).off("mousedown.remarkHistory").on("mousedown.remarkHistory", function(event){
+        if($(event.target).closest("#remarkHistoryPopover, .remark-history-trigger").length) return;
+        closeRemarkHistoryPopover();
+      });
+
+      $(window).off("resize.remarkHistory").on("resize.remarkHistory", closeRemarkHistoryPopover);
+      $("#wbsScroll").off("scroll.remarkHistory").on("scroll.remarkHistory", closeRemarkHistoryPopover);
+    }
+
     function bindRemarks(){
       const $wbs = $('#wbs');
+      bindRemarkHistoryEvents($wbs);
       $wbs.off('click.remarks').on('click.remarks', '.remarks', function(){
         const $cell = $(this);
         if($cell.hasClass('editing')) return;
@@ -3792,13 +3946,13 @@ onkeyup="(event.keyCode == 8 || event.keyCode == 46) ? ordrsClntCd_S.value = '' 
           // 값이 변경되지 않았으면 리턴
           if(val === originalVal) {
             $cell.removeClass('editing');
-            $cell.html(val ? escapeHtml(val) : '<small>&nbsp;</small>');
+            renderRemarkCell($cell, val);
             return;
           }
 
           $cell.removeClass('editing');
           $cell.data('remarks', val);
-          $cell.html(val ? escapeHtml(val) : '<small>&nbsp;</small>');
+          renderRemarkCell($cell, val);
 
           // 로컬 STATE 업데이트
           const $row = $cell.closest('.wbs-row');
@@ -3834,6 +3988,8 @@ onkeyup="(event.keyCode == 8 || event.keyCode == 46) ? ordrsClntCd_S.value = '' 
             // 백엔드 API 호출
             postAjax("/user/wb/wb07/updateWbsRemarks", updateData, null, function(response) {
               if(response && response.resultCode === 200) {
+                updatedRow.remarkHistCnt = 1;
+                renderRemarkCell($cell, val, updatedRow);
                 toast('비고가 성공적으로 저장되었습니다.');
 //                 console.log('Remarks 업데이트 성공');
               } else {
@@ -3841,7 +3997,7 @@ onkeyup="(event.keyCode == 8 || event.keyCode == 46) ? ordrsClntCd_S.value = '' 
                 console.error('Remarks 업데이트 실패:', response);
                 // 실패 시 로컬 상태도 원래대로 복원
                 $cell.data('remarks', originalVal);
-                $cell.html(originalVal ? escapeHtml(originalVal) : '<small>&nbsp;</small>');
+                renderRemarkCell($cell, originalVal, updatedRow);
                 if(updatedRow) updatedRow.remarks = originalVal;
               }
             }, function(error) {
@@ -3849,7 +4005,7 @@ onkeyup="(event.keyCode == 8 || event.keyCode == 46) ? ordrsClntCd_S.value = '' 
               console.error('Remarks 업데이트 오류:', error);
               // 오류 시 로컬 상태 복원
               $cell.data('remarks', originalVal);
-              $cell.html(originalVal ? escapeHtml(originalVal) : '<small>&nbsp;</small>');
+              renderRemarkCell($cell, originalVal, updatedRow);
               if(updatedRow) updatedRow.remarks = originalVal;
             });
           }
@@ -3857,7 +4013,7 @@ onkeyup="(event.keyCode == 8 || event.keyCode == 46) ? ordrsClntCd_S.value = '' 
 
         const cancel = () => {
           $cell.removeClass('editing');
-          $cell.html(raw ? escapeHtml(raw) : '<small>&nbsp;</small>');
+          renderRemarkCell($cell, raw);
         };
 
         $input.on('blur', commit);
@@ -4951,6 +5107,7 @@ onkeyup="(event.keyCode == 8 || event.keyCode == 46) ? ordrsClntCd_S.value = '' 
         clntNm: item.clntNm || '',
         eqpNm: item.eqpNm || '',
         remarks: item.wbsRemark || '',
+        remarkHistCnt: Number(item.wbsRemarkHistCnt || 0),
         closeYn: item.closeYn || '',
         wbsPlanMngId: item.wbsPlanMngId || '',
         wbsPlanMngNm: item.wbsPlanMngNm || '',
