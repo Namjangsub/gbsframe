@@ -114,6 +114,8 @@
 <script type="text/javascript" src="/static/js/global.js"></script>
 <script type="text/javascript" src="/static/js/fileTree.js"></script>
 <script type="text/javascript" src="/static/js/workingDayCalc.js"></script>
+<!-- 사용자별 그리드 컬럼 설정 (패널 ⚙ 버튼에서 사용) -->
+<script type="text/javascript" src="/static/js/common/GridColumnConfig.js"></script>
 <script type="text/javascript" src="/static/js/korean-lunar-calendar.min.js"></script>
 <script src="/static/js/heic2any.min.js"></script>
 <style>
@@ -126,7 +128,8 @@
 		display: flex;
 		align-items: center;
 		justify-content: space-between;
-		flex-wrap: nowrap;
+		/* 열 폭이 좁을 때 버튼이 화면 밖으로 밀려 안 보이는 문제 방지 : 부족하면 다음 줄로 내린다 */
+		flex-wrap: wrap;
 		gap: 4px;
 		margin-bottom: 0px;
 		padding: 1px 0;
@@ -253,8 +256,10 @@
 							<div class="col-resizer"></div>
 						</td>
 						<td style="text-align: left;">
-							<div class="panel_head" style="flex-wrap: nowrap; gap: 4px;">
-								<h3 class="location" style="margin: 0; white-space: nowrap; display: inline-flex; align-items: center; gap: 4px;">
+							<!-- To-Do 패널은 3열(28%) 폭이 좁아 한 줄에 다 들어가지 않는다.
+							     nowrap 이면 퀵필터/⚙ 버튼이 화면 밖으로 밀려 안 보이므로 wrap 으로 둘 것. -->
+							<div class="panel_head" style="flex-wrap: wrap; gap: 4px;">
+								<h3 class="location" style="margin: 0; white-space: nowrap; display: inline-flex; align-items: center; gap: 4px; min-width: 0;">
 									<span class="page_tit">To-Do List</span>
 									<span class="panel_cnt" id="cntTodo">0</span>
 									<select id="coCd3" data-kind="CO" onchange="setByCoCd(this); gridView.setData(); workGridView.setData();" style="height: 24px; padding: 0 2px; font-size: 11px;">
@@ -262,8 +267,8 @@
 									</select>
 									<span class="panel_help" title="해당 Row를 더블클릭하면 내용 조회 후 확인 또는 결재 처리가 가능합니다.">i</span>
 								</h3>
-								<div class="panel_tools" style="display: inline-flex; align-items: center; gap: 3px; margin-left: auto; flex-wrap: nowrap;">
-									<div class="todo_quick_filter" style="display: inline-flex; gap: 2px; flex-wrap: nowrap;">
+								<div class="panel_tools" style="display: inline-flex; align-items: center; gap: 3px; margin-left: auto; flex-wrap: wrap; min-width: 0;">
+									<div class="todo_quick_filter" style="display: inline-flex; gap: 2px; flex-wrap: wrap;">
 										<button type="button" class="btn btn-xs todo_qfilter_btn active" data-qfilter="ready" onclick="filterDashboardTodo('ready', this)" style="background: #5cb85c; color: #fff; border: none; font-weight: bold; padding: 1px 4px; font-size: 11px;">
 											즉시결재 <span id="qReadyCnt" class="badge" style="background: #fff; color: #5cb85c; font-size: 9px; padding: 1px 3px;">0</span>
 										</button>
@@ -383,8 +388,26 @@
 	};
 
 	// 미수금 그리드
+	// 미수금 그리드 기본 컬럼 정의 (사용자별 컬럼설정 병합 대상)
+	var clmnDefaultColumns = [
+		{key: "ordrsClntNm", label: "고객사"     , align: "left"  , width: 140, formatter: function () {
+			return this.value.slice(0,8) + "(" + this.item.clntPjtNm + ")"}},
+		{key: "ctrtNm"       , label: "계약명"     , align: "left"  , width: 130},
+		{key: "clmnPlanDivNm", label: "구분"   , align: "center", width: 70, formatter: function () {
+			return this.value + " " + (this.item.clmnDivSeqNm == undefined ? "" :this.item.clmnDivSeqNm) }},
+		{key: "planClmnAmtTot"   , label: "수금예정금액", align: "right" , width: 100, formatter: "money", styleClass: "grid-font-blue-bold" },
+		{key: "sellBillAmtSumTot", label: "계산서발행"   , align: "right" , width: 95, formatter: "money"},
+		{key: "clmnAmtMiTot"     , label: "미수금액"   , align: "right" , width: 100, formatter: "money", styleClass: "grid-font-red-bold" },
+		{key: "planClmnDt"    , label: "수금예정일"   , align: "center", width: 80},
+		{key: "mngNm"    	  , label: "담당자"   , align: "center", width: 60},
+		{key: "currNm"    	  , label: "통화"   , align: "center", width: 60},
+		{key: "exrate"    	  , label: "환율"   , align: "center", width: 60, formatter: "money"},
+		{key: "ordrsNo"    	  , label: "수주번호"   , align: "center", width: 60}
+	];
+
 	var clmnGridView = {
 		initView : function() {
+			var cols = GridColumnConfig.apply("CM1001M01", "clmn-grid", clmnDefaultColumns);
 			this.target = new ax5.ui.grid();
 			this.target.setConfig({
 				showRowSelector : false,
@@ -408,31 +431,16 @@
 					display : true,
 				},
 				footSum: [
-					[
-						{label: "[ 합계 ]", 	  align:"center",	  colspan : 3},
-						{key: "planClmnAmtTot"   , collector: "sum", formatter: "money", align: "right", styleClass: "grid-font-blue-bold" },
-						{key: "sellBillAmtSumTot", collector: "sum", formatter: "money", align: "right"},
-						{key: "clmnAmtMiTot"     , collector: "sum", formatter: "money", align: "right", styleClass: "grid-font-red-bold" }
-					]
+					GridColumnConfig.buildSumRow(cols, {
+						label: "[ 합계 ]",
+						sums: {
+							"planClmnAmtTot"    : {collector: "sum", formatter: "money", align: "right", styleClass: "grid-font-blue-bold"},
+							"sellBillAmtSumTot" : {collector: "sum", formatter: "money", align: "right"},
+							"clmnAmtMiTot"      : {collector: "sum", formatter: "money", align: "right", styleClass: "grid-font-red-bold"}
+						}
+					})
 				],
-				columns: [
-
-					{key: "ordrsClntNm", label: "고객사"     , align: "left"  , width: 140, formatter: function () {
-						return this.value.slice(0,8) + "(" + this.item.clntPjtNm + ")"}},
-					{key: "ctrtNm"       , label: "계약명"     , align: "left"  , width: 130},
-					{key: "clmnPlanDivNm", label: "구분"   , align: "center", width: 70, formatter: function () {
-						return this.value + " " + (this.item.clmnDivSeqNm == undefined ? "" :this.item.clmnDivSeqNm) }},
-					{key: "planClmnAmtTot"   , label: "수금예정금액", align: "right" , width: 100, formatter: "money", styleClass: "grid-font-blue-bold" },
-
-					{key: "sellBillAmtSumTot", label: "계산서발행"   , align: "right" , width: 95, formatter: "money"},
-					{key: "clmnAmtMiTot"     , label: "미수금액"   , align: "right" , width: 100, formatter: "money", styleClass: "grid-font-red-bold" },
-					{key: "planClmnDt"    , label: "수금예정일"   , align: "center", width: 80},
-					{key: "mngNm"    	  , label: "담당자"   , align: "center", width: 60},
-					{key: "currNm"    	  , label: "통화"   , align: "center", width: 60},
-					{key: "exrate"    	  , label: "환율"   , align: "center", width: 60, formatter: "money"},
-					{key: "ordrsNo"    	  , label: "수주번호"   , align: "center", width: 60},
-
-				]
+				columns: cols
 			});
 			return this;
 		},
@@ -542,6 +550,30 @@
 // 	}
 
 	// 문제현황 그리드
+	// 문제현황 그리드 기본 컬럼 정의 (사용자별 컬럼설정 병합 대상)
+	var issueDefaultColumns = [
+			{key: "salesCd",	    label: "SalesCode",		    width: 105,		align: "left"}
+			,{key: "actIdNm",	    label: "담당자",		    width: 60,		align: "center", 	hidden:false}
+			,{key: "issStsNm",	    	label: "상태",			width: 50,		align: "center", 	hidden:false,
+				styleClass: function () {
+					if (this.item.issStsNm == "진행중") {
+						return "grid-font-blue-bold";
+					} else if (this.item.issStsNm == "접수"){
+						return "grid-font-red-bold";
+					}
+					return "";
+				}
+			}
+			,{key: "creatIdNm",	    label: "작성자",		    width: 60,		align: "center", 	hidden:false}
+			,{key: "creatDttm",	    label: "등록일",			width: 80,		align: "center",formatter: function () { return ( moment(this.item.creatDttm).format('YYYY-MM-DD'));},}
+			,{key: "issSj",	    	label: "이슈제목",		    width: 240,		align: "left", 	    hidden:false}
+			,{key: "reqNo",	    	label: "발주요청번호",	    width: 90,		align: "center", 	hidden:false}
+			,{key: "codeIdNm",	    label: "작업단계",		    width: 80,		align: "left", 	    hidden:false}
+			,{key: "issDivNm",	    label: "이슈유형",		    width: 70,		align: "center", 	hidden:false}
+			,{key: "gubun",	    	label: "구분",		    width: 45,		align: "center", 	hidden:false}
+			,{key: "issCnts",	    label: "내 용",		    width: 300,		align: "left", 	    hidden:false}
+	];
+
 	var issueGridView = {
 		initView : function() {
 			this.target = new ax5.ui.grid();
@@ -566,30 +598,7 @@
 				page : {
 					display : true,
 				},
-				columns: [
-						{key: "salesCd",	    label: "SalesCode",		    width: 105,		align: "left"}
-						,{key: "actIdNm",	    label: "담당자",		    width: 60,		align: "center", 	hidden:false}
-						,{key: "issStsNm",	    	label: "상태",			width: 50,		align: "center", 	hidden:false,
-							styleClass: function () {
-								if (this.item.issStsNm == "진행중") {
-									styleClass = "grid-font-blue-bold";
-								} else if (this.item.issStsNm == "접수"){
-									styleClass = "grid-font-red-bold";
-								} else {
-									styleClass = "";
-								}
-								return styleClass;
-							}
-						}
-						,{key: "creatIdNm",	    label: "작성자",		    width: 60,		align: "center", 	hidden:false}
-						,{key: "creatDttm",	    label: "등록일",			width: 80,		align: "center",formatter: function () { return ( moment(this.item.creatDttm).format('YYYY-MM-DD'));},}
-						,{key: "issSj",	    	label: "이슈제목",		    width: 240,		align: "left", 	    hidden:false}
-						,{key: "reqNo",	    	label: "발주요청번호",	    width: 90,		align: "center", 	hidden:false}
-						,{key: "codeIdNm",	    label: "작업단계",		    width: 80,		align: "left", 	    hidden:false}
-						,{key: "issDivNm",	    label: "이슈유형",		    width: 70,		align: "center", 	hidden:false}
-						,{key: "gubun",	    	label: "구분",		    width: 45,		align: "center", 	hidden:false}
-						,{key: "issCnts",	    label: "내 용",		    width: 300,		align: "left", 	    hidden:false}
-				]
+				columns: GridColumnConfig.apply("CM1001M01", "ordrg-grid", issueDefaultColumns)
 			});
 			return this;
 		},
@@ -622,6 +631,32 @@
 			});
 		}
 	}
+
+	// To-Do 그리드 기본 컬럼 정의 (사용자별 컬럼설정 병합 대상)
+	var todoDefaultColumns = [
+		{key: "todoDiv1CodeNm",     label: "*구분",  			align: "center",   width: 50, styleClass: function () {return  "grid-cell-orange";}},
+		{key: "todoDiv2CodeNm",     label: "*작업내용",      	align: "center",   width: 90, styleClass: function () {return  "grid-cell-orange";}},
+		{key: "salesCd",      		label: "SALES CODE",    align: "center",   width: 105},
+		{key: "creatNm",      		label: "요청자",      	align: "center",   width: 60},
+		{key: "creatDttm",      	label: "요청일자",      	align: "center",   width: 75},
+		{key: "todoTitl",      		label: "내용",      		align: "left",   width: 150,
+			formatter: function () {
+				var isPending = checkSequentialPending(this.item);
+				var badgeHtml = '';
+				if (this.item.todoDiv1CodeNm === '결재') {
+					if (isPending) {
+						badgeHtml = '<span style="display: inline-block; background-color: #d9534f; color: #ffffff; font-size: 10px; font-weight: bold; padding: 1px 5px; border-radius: 3px; margin-right: 5px; vertical-align: middle;">[이전결재 미결]</span>';
+					} else {
+						badgeHtml = '<span style="display: inline-block; background-color: #5cb85c; color: #ffffff; font-size: 10px; font-weight: bold; padding: 1px 5px; border-radius: 3px; margin-right: 5px; vertical-align: middle;">[즉시결재 가능]</span>';
+					}
+				} else if (this.item.todoDiv1CodeNm === '공유') {
+					badgeHtml = '<span style="display: inline-block; background-color: #0275d8; color: #ffffff; font-size: 10px; font-weight: bold; padding: 1px 5px; border-radius: 3px; margin-right: 5px; vertical-align: middle;">[공유건]</span>';
+				}
+				return badgeHtml + (this.value || '');
+			}
+		},
+		{key: "todoNo",      		label: "관리번호",      	align: "center",   width: "*"}
+	];
 
 	// Todo 그리드
 	var gridView = {
@@ -693,31 +728,7 @@
 				page : {
 					display : true,
 				},
-				columns: [
-					{key: "todoDiv1CodeNm",     label: "*구분",  			align: "center",   width: 50, styleClass: function () {return  "grid-cell-orange";}},
-					{key: "todoDiv2CodeNm",     label: "*작업내용",      	align: "center",   width: 90, styleClass: function () {return  "grid-cell-orange";}},
-					{key: "salesCd",      		label: "SALES CODE",    align: "center",   width: 105},
-// 			        {key: "todoNm",      		label: "결재/공유자",    	align: "center",   width: 80},
-					{key: "creatNm",      		label: "요청자",      	align: "center",   width: 60},
-					{key: "creatDttm",      	label: "요청일자",      	align: "center",   width: 75},
-					{key: "todoTitl",      		label: "내용",      		align: "left",   width: 150,
-						formatter: function () {
-							var isPending = checkSequentialPending(this.item);
-							var badgeHtml = '';
-							if (this.item.todoDiv1CodeNm === '결재') {
-								if (isPending) {
-									badgeHtml = '<span style="display: inline-block; background-color: #d9534f; color: #ffffff; font-size: 10px; font-weight: bold; padding: 1px 5px; border-radius: 3px; margin-right: 5px; vertical-align: middle;">[이전결재 미결]</span>';
-								} else {
-									badgeHtml = '<span style="display: inline-block; background-color: #5cb85c; color: #ffffff; font-size: 10px; font-weight: bold; padding: 1px 5px; border-radius: 3px; margin-right: 5px; vertical-align: middle;">[즉시결재 가능]</span>';
-								}
-							} else if (this.item.todoDiv1CodeNm === '공유') {
-								badgeHtml = '<span style="display: inline-block; background-color: #0275d8; color: #ffffff; font-size: 10px; font-weight: bold; padding: 1px 5px; border-radius: 3px; margin-right: 5px; vertical-align: middle;">[공유건]</span>';
-							}
-							return badgeHtml + (this.value || '');
-						}
-					},
-					{key: "todoNo",      		label: "관리번호",      	align: "center",   width: "*"},
-				]
+				columns: GridColumnConfig.apply("CM1001M01", "todo-grid", todoDefaultColumns)
 			});
 			return this;
 		},
@@ -803,8 +814,25 @@
 	}
 
 	// 미청구 그리드
+	// 미청구 그리드 기본 컬럼 정의 (사용자별 컬럼설정 병합 대상)
+	var taxDefaultColumns = [
+		{key: "ordrsClntNm", label: "고객사"     , align: "left"  , width: 140, formatter: function () {
+			return this.value.slice(0,8) + "(" + this.item.clntPjtNm + ")"}},
+		{key: "ctrtNm"       , label: "계약명"     , align: "left"  , width: 120},
+		{key: "clmnPlanDivNm", label: "구분"     , align: "center"  , width: 70, formatter: function () {
+			return this.value + " " + (this.item.clmnDivSeqNm == undefined ? "" :this.item.clmnDivSeqNm) }},
+		{key: "planClmnAmtTot"   , label: "수금계획금액", align: "right" , width: 95, formatter: "money", styleClass: "grid-font-blue-bold" },
+		{key: "sellDcsnAmtSumTot", label: "매출확정금액", align: "right" , width: 95, formatter: "money"},
+		{key: "sellBillAmtMiTot" , label: "미청구 금액", align: "right" , width: 95, formatter: "money", styleClass: "grid-font-red-bold" },
+		{key: "planClmnDt"    , label: "수금예정일"   , align: "center", width: 80},
+		{key: "mngNm"    	  , label: "담당자"   , align: "center", width: 60},
+		{key: "ordrsNo"    	  , label: "수주번호"   , align: "center", width: 60}
+	];
+
 	var taxGridView = {
 		initView : function() {
+
+			var cols = GridColumnConfig.apply("CM1001M01", "tax-grid", taxDefaultColumns);
 
 			this.target = new ax5.ui.grid();
 			this.target.setConfig({
@@ -830,29 +858,17 @@
 				page : {
 					display : true,
 				},
-			columns : [
-				{key: "ordrsClntNm", label: "고객사"     , align: "left"  , width: 140, formatter: function () {
-					return this.value.slice(0,8) + "(" + this.item.clntPjtNm + ")"}},
-				{key: "ctrtNm"       , label: "계약명"     , align: "left"  , width: 120},
-				{key: "clmnPlanDivNm", label: "구분"     , align: "center"  , width: 70, formatter: function () {
-					return this.value + " " + (this.item.clmnDivSeqNm == undefined ? "" :this.item.clmnDivSeqNm) }},
-				{key: "planClmnAmtTot"   , label: "수금계획금액", align: "right" , width: 95, formatter: "money", styleClass: "grid-font-blue-bold" },
-				{key: "sellDcsnAmtSumTot", label: "매출확정금액", align: "right" , width: 95, formatter: "money"},
-				{key: "sellBillAmtMiTot" , label: "미청구 금액", align: "right" , width: 95, formatter: "money", styleClass: "grid-font-red-bold" },
-				{key: "planClmnDt"    , label: "수금예정일"   , align: "center", width: 80},
-				{key: "mngNm"    	  , label: "담당자"   , align: "center", width: 60},
-				{key: "ordrsNo"    	  , label: "수주번호"   , align: "center", width: 60},
-			],
-
-			footSum: [
-				[
-					{label: "[ 합계 ]", 	  align:"center",	  colspan : 3},
-					{key: "planClmnAmtTot"   , collector: "sum", formatter: "money", align: "right", styleClass: "grid-font-blue-bold" },
-					{key: "sellDcsnAmtSumTot", collector: "sum", formatter: "money", align: "right"},
-					{key: "sellBillAmtMiTot" , collector: "sum", formatter: "money", align: "right"},
-					{},
+				columns : cols,
+				footSum: [
+					GridColumnConfig.buildSumRow(cols, {
+						label: "[ 합계 ]",
+						sums: {
+							"planClmnAmtTot"    : {collector: "sum", formatter: "money", align: "right", styleClass: "grid-font-blue-bold"},
+							"sellDcsnAmtSumTot" : {collector: "sum", formatter: "money", align: "right"},
+							"sellBillAmtMiTot"  : {collector: "sum", formatter: "money", align: "right"}
+						}
+					})
 				]
-			],
 			});
 			return this;
 		},
@@ -888,6 +904,38 @@
 	}
 
 
+	// 완료예정업무 그리드 기본 컬럼 정의 (사용자별 컬럼설정 병합 대상)
+	var workDefaultColumns = [
+		{key: "clntNm", 	label: "고객사"     , 	align: "left"  , width: 130, formatter: function () {
+			return this.value + "-" + this.item.clntPjtNm},},
+		{key: "wbsMngNm", 		label: "담당자", 		align: "center"  , width: 60},
+		{key: "salesCd", 		label: "Sales Code",	align: "left"  , width: 105},
+		{key: "wbsTaskNm", 		label: "업무명",		align: "left" , width: 125},
+		{key: "wbsRate", 		label: "%",				align: "center" , width: 50},
+		{key: "wbsStrtDt" , 	label: "시작일", 		align: "center" , width: 80},
+		{key: "wbsEndDt", 		label: "종료예정일", 	align: "center", width: 80},
+		{key: "ctrtNm", 		label: "계약명", 		align: "left"  , width: 160}
+	];
+
+	// 사용자별 그리드 컬럼 설정 팝업 (저장/복원 후 해당 그리드 재구성)
+	// 각 패널 헤더의 ⚙ 버튼에서 호출한다.
+	function openGridColumnConfig(gridId) {
+		var meta = {
+			"clmn-grid"  : {def: clmnDefaultColumns,  view: clmnGridView},
+			"tax-grid"   : {def: taxDefaultColumns,   view: taxGridView},
+			"ordrg-grid" : {def: issueDefaultColumns, view: issueGridView},
+			"todo-grid"  : {def: todoDefaultColumns,  view: gridView},
+			"work-grid"  : {def: workDefaultColumns,  view: workGridView}
+		}[gridId];
+		if (!meta) return;
+
+		GridColumnConfig.openEditor("CM1001M01", gridId, meta.def, function() {
+			$('[data-ax5grid="' + gridId + '"]').empty();
+			meta.view.initView().setData();
+			adjustGridHeight();
+		});
+	}
+
 	// 완료예정업무 그리드
 	var workGridView = {
 		initView : function() {
@@ -920,17 +968,7 @@
 				page : {
 					display : true,
 				},
-			columns : [
-				{key: "clntNm", 	label: "고객사"     , 	align: "left"  , width: 130, formatter: function () {
-					return this.value + "-" + this.item.clntPjtNm},},
-					{key: "wbsMngNm", 		label: "담당자", 		align: "center"  , width: 60},
-				{key: "salesCd", 		label: "Sales Code",	align: "left"  , width: 105},
-				{key: "wbsTaskNm", 		label: "업무명",		align: "left" , width: 125},
-				{key: "wbsRate", 		label: "%",				align: "center" , width: 50},
-				{key: "wbsStrtDt" , 	label: "시작일", 		align: "center" , width: 80},
-				{key: "wbsEndDt", 		label: "종료예정일", 	align: "center", width: 80},
-				{key: "ctrtNm", 		label: "계약명", 		align: "left"  , width: 160},
-			]
+				columns : GridColumnConfig.apply("CM1001M01", "work-grid", workDefaultColumns)
 			});
 			return this;
 		},
@@ -1410,7 +1448,10 @@
 		}
 
 		// 동적 오프셋 측정 (상단 헤더 마진, 탭 영역 높이 차감)
-		var occupiedOffset = isIframe ? 190 : 130;
+		// 패널 헤더가 좁은 폭에서 두 줄로 접히면 그만큼 thead 가 높아지므로 초과분을 실측해서 추가 차감한다.
+		// (한 줄일 때는 0 이 되어 기존 동작과 동일)
+		var theadExtra = Math.max(0, ($('#scndTable thead').outerHeight(true) || 0) - 28);
+		var occupiedOffset = (isIframe ? 190 : 130) + theadExtra;
 		var availableHeight = winHeight - occupiedOffset;
 
 		// 최소 해상도 가드
