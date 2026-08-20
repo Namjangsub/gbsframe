@@ -40,7 +40,14 @@
 <script src="/static/js/LunarCalendar.js"></script>
 <script type="text/javascript" src="/static/js/workingDayCalc.js"></script>
 <script type="text/javascript" src="/static/js/korean-lunar-calendar.min.js"></script>
-<script src="/static/js/jquery.blockUI.js"></script>
+<style>
+.grid-splitter:hover {
+	background: #dee2e6 !important;
+}
+.grid-splitter:hover span {
+	color: #007bff !important;
+}
+</style>
 </head>
 
 <body>
@@ -106,6 +113,11 @@
         <div data-ax5grid="first-grid" data-ax5grid-config="{}" style="height: 440px; width: 100%"></div>
         <div data-ax5grid="excel-grid" data-ax5grid-config="{}" style="display: none;"></div>
       </div>
+    </div>
+
+    <!-- 상하 그리드 높이 조절 스플리터 바 -->
+    <div class="grid-splitter" id="gridSplitter1" style="height: 10px; cursor: row-resize; background: #e9ecef; border-top: 1px solid #ced4da; border-bottom: 1px solid #ced4da; text-align: center; line-height: 8px; margin: 4px 0; user-select: none;" title="드래그하여 위아래 그리드 높이를 조절할 수 있습니다.">
+      <span style="font-size: 8px; color: #888; letter-spacing: 2px;">•••</span>
     </div>
 
 	<div class="contents_tit">
@@ -427,7 +439,7 @@
 							totalElements : data.paginationInfo.totalRecordCount,
 						}
 					});
-					gridHeightResize(dailyGridView, 654); // 659 = 919 - 260 : 화면 Body 높이 919 - 그리드 기본크기 260
+					// gridHeightResize(dailyGridView, 654); // 스플리터 지정 높이 유지를 위해 하드코딩 리셋 제거
 
 					// 선택한 일자(lastDay)가 유효한 숫자인지 검증 후 하단 그리드 행 포커스 이동
 					// targetObj.setData 이후 가공(소계 삽입) 완료된 targetObj.list를 기준으로 순회해야 화면 dindex와 일치합니다.
@@ -517,11 +529,103 @@
   		$('[data-search]').on("change", function(){
   			gridView.setData(0);
   		});
-  		$('#workYm').on("change", function(){
-  			setByMonth();
+  		// 상하 그리드 높이 조절 스플리터 드래그 이벤트
+  		var isDragging = false;
+  		var startY = 0;
+  		var startTopH = 0;
+  		var startBottomH = 0;
+
+  		$('#gridSplitter1').on('mousedown', function(e) {
+  			isDragging = true;
+  			startY = e.pageY;
+  			startTopH = $('[data-ax5grid="first-grid"]').height();
+  			startBottomH = $('[data-ax5grid="second-grid"]').height();
+  			$('body').css({'cursor': 'row-resize', 'user-select': 'none'});
+  			e.preventDefault();
   		});
 
+  		$(document).on('mousemove', function(e) {
+  			if (!isDragging) return;
+  			var deltaY = e.pageY - startY;
+  			var newTopH = Math.max(100, startTopH + deltaY);
+  			var newBottomH = Math.max(150, startBottomH - deltaY);
+
+  			$('[data-ax5grid="first-grid"]').css('height', newTopH + 'px');
+  			$('[data-ax5grid="second-grid"]').css('height', newBottomH + 'px');
+
+  			if (gridView && gridView.target) {
+  				gridView.target.setHeight(newTopH);
+  			}
+  			if (dailyGridView && dailyGridView.target) {
+  				dailyGridView.target.setHeight(newBottomH);
+  			}
+  			_gridHeightRatio = newTopH / (newTopH + newBottomH);
+  		});
+
+  		$(document).on('mouseup', function() {
+  			if (isDragging) {
+  				isDragging = false;
+  				$('body').css({'cursor': '', 'user-select': ''});
+  				if (gridView && gridView.target) gridView.target.align();
+  				if (dailyGridView && dailyGridView.target) dailyGridView.target.align();
+  			}
+  		});
+
+  		// 화면 해상도 / 창 크기 변경 이벤트 대응
+  		$(window).on('resize', function() {
+  			adjustPM0103LayoutHeight();
+  		});
+
+  		// 초기 로드 시 높이 핏 계산
+  		setTimeout(function() {
+  			adjustPM0103LayoutHeight();
+  		}, 100);
   	});
+
+	// 화면 해상도 및 창 크기 변경 시 상/하 그리드 높이를 실시간 동적 재계산하는 반응형 함수
+	var _gridHeightRatio = 0.6; // 기본 상단 60%, 하단 40%
+
+	function adjustPM0103LayoutHeight() {
+		var winHeight = $(window).height();
+		var isIframe = (window.self !== window.top);
+		if (isIframe) {
+			try { winHeight = window.top.innerHeight; } catch (e) { winHeight = $(window).height(); }
+		}
+
+		// 상단 검색 폼, 헤더, 타이틀, 스플리터 등의 차지 높이 동적 계산
+		var occupied = 0;
+		$('.contents').not(function() {
+			return $(this).find('[data-ax5grid]').length > 0;
+		}).each(function() {
+			occupied += $(this).outerHeight(true) || 0;
+		});
+		$('.contents_tit').each(function() {
+			occupied += $(this).outerHeight(true) || 0;
+		});
+		occupied += $('#gridSplitter1').outerHeight(true) || 0;
+		occupied += 50; // 여백 및 padding 여유분
+
+		var availableHeight = winHeight - occupied;
+		if (availableHeight < 300) availableHeight = 300;
+
+		var topH = Math.floor(availableHeight * _gridHeightRatio);
+		var bottomH = availableHeight - topH;
+
+		if (topH < 120) topH = 120;
+		if (bottomH < 150) bottomH = 150;
+
+		$('[data-ax5grid="first-grid"]').css('height', topH + 'px');
+		$('[data-ax5grid="second-grid"]').css('height', bottomH + 'px');
+
+		if (gridView && gridView.target) {
+			gridView.target.setHeight(topH);
+			gridView.target.align();
+		}
+		if (dailyGridView && dailyGridView.target) {
+			dailyGridView.target.setHeight(bottomH);
+			dailyGridView.target.align();
+		}
+	}
 
 	// 사용자에 따른 코드 설정 , 회사코드 set
 	function setByCoCd() {
