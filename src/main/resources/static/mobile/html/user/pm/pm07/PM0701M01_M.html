@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+	<meta charset="utf-8">
+	<meta http-equiv="X-UA-Compatible" content="IE=edge">
+	<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+
+	<link rel="icon" href="/static/favicon.ico" type="image/x-icon">
+	<link rel="stylesheet" href="/static/bootstrap/css/bootstrap.min.css">
+	<link rel="stylesheet" href="/static/bootstrap/css/bootstrap-theme.min.css">
+	<link rel="stylesheet" href="/static/bootstrap/css/dashboard.css">
+	<link rel="stylesheet" href="/static/bootstrap/css/bootstrap-datepicker.css">
+	<link rel="stylesheet" href="/static/fontawesome/css/all.css">
+	<link rel="stylesheet" href="/static/css/ax5/ax5grid.css" />
+	<link rel="stylesheet" href="/static/css/ax5/ax5mask.css" />
+	<link rel="stylesheet" href="/static/css/ax5/ax5modal.css" />
+	<link rel="stylesheet" href="/static/css/gnb.css" />
+	<link rel="stylesheet" href="/static/css/main.css" />
+	<link rel="stylesheet" href="/static/css/sub.css" />
+	<link rel="stylesheet" href="/static/css/common.css" />
+	<link rel="stylesheet" href="/static/css/mobile.css" />
+
+	<script src="/static/js/jquery-latest.min.js"></script>
+	<script src="/static/js/jquery.serializeObject.js"></script>
+	<script src="/static/bootstrap/js/bootstrap.min.js"></script>
+	<script src="/static/bootstrap/js/bootstrap-datepicker.min.js"></script>
+	<script src="/static/bootstrap/js/bootstrap-datepicker.ko.min.js"></script>
+	<script src="/static/js/moment/moment-with-locales.js"></script>
+	<script src="/static/js/ax5/ax5core.min.js"></script>
+	<script src="/static/js/ax5/ax5grid.min.js"></script>
+	<script src="/static/js/ax5/ax5mask.min.js"></script>
+	<script src="/static/js/ax5/ax5modal.min.js"></script>
+	<script src="/static/js/global.js"></script>
+	<script src="/static/js/jquery.blockUI.js"></script>
+	<script src="/static/js/workingDayCalc.js"></script>
+
+	<style>
+		.card {
+			display: table;
+			border: 1px solid #EEEEEE;
+			margin-bottom: 10px;
+			width: 100%;
+		}
+		.tg { border-collapse: collapse; border-spacing: 0; width: 100%;}
+		.tg td { border-color: black; border-width: 0.5px; font-size: 10px; overflow: hidden; padding: 10px 5px; word-break: normal;}
+		.tg .tg-title { background-color:antiquewhite; text-align: left; vertical-align: middle;}
+		.tg .tg-menu { background-color:#EEEEEE;text-align: right; vertical-align: middle; font-size: 11px;  padding-right: 5px;}
+		.tg .tg-rspn { width: 10px; text-align: left; vertical-align: middle; font-size: 11px;  padding-left: 5px;}
+		.btn-success {
+		}
+		table.search td {
+			border-right : none !important;
+			border-bottom-width: 1px;
+		}
+		button {
+			margin: 1px;
+		}
+		.card-container {
+			display: table;
+			width: 100%;
+			margin-bottom: 1px;
+			height: 10px;
+		}
+		#main_area {
+			padding: 0px 0px;
+			overflow: auto;
+		}
+		.sanctn-badge {
+			display: inline-block;
+			padding: 4px 8px;
+			border-radius: 3px;
+			font-size: 10px;
+			font-weight: bold;
+			color: white;
+		}
+		.sanctn-badge.temp { background-color: #999; }
+		.sanctn-badge.req { background-color: #ff6b6b; }
+		.sanctn-badge.ing { background-color: #4c6ef5; }
+		.sanctn-badge.end { background-color: #51cf66; }
+		.sanctn-badge.rtn { background-color: #ffa94d; }
+	</style>
+</head>
+
+<body>
+	<div id="head_area" class="off" >
+		<div class="left_btn" onclick="history.back(-1)">
+			<a class="back_btn"></a>
+		</div>
+		<h1 class="logo">
+			<img src="/static/img/Logo_gunyangitt.gif" alt="건양ITT" />
+		</h1>
+	</div>
+
+	<div id="main_area">
+		<div id="vacPopup" class="popup_area" >
+			<div class="tit_contents">
+				<h4 class="tit">휴가신청</h4>
+			</div>
+			<table class="search">
+				<tr style="width:100%;">
+					<th style="width:10%;">신청일자</th>
+					<td style="width:12%;">
+						<div class="date_input">
+							<input id="reqDtFrom" name="reqDtFrom" class="input_calendar" autocomplete="off" onkeyup="dateMask(this);">
+						</div>
+					</td>
+					<td style="width:3%;" class="text-center">~</td>
+					<td style="width:12%;">
+						<div class="date_input">
+							<input id="reqDtTo" name="reqDtTo" class="input_calendar" autocomplete="off" onkeyup="dateMask(this);">
+						</div>
+					</td>
+					<th style="width:8%;">결재상태</th>
+					<td style="width:15%;">
+						<select id="sanctnSts" name="sanctnSts" class="form-control" style="height: 30px;">
+							<option value="">전체</option>
+							<option value="TEMP">임시저장</option>
+							<option value="REQ">신청</option>
+							<option value="ING">진행중</option>
+							<option value="END">완료</option>
+							<option value="RTN">반려</option>
+						</select>
+					</td>
+					<td style="width:13%;">
+						<button class="btn btn-success" style="height: 30px; float: right;" onClick="openCreateModal()">신청등록</button>
+					</td>
+				</tr>
+			</table>
+			<br>
+			<div id="cardContainer" class="card-container"></div>
+		</div>
+	</div>
+
+	<script type="text/javascript">
+		var list = [];
+		var userDept = jwt.deptId.substr(0, 5);
+
+		function toDashDate(dateStr) {
+			if (!dateStr || dateStr.length !== 8) return '';
+			return dateStr.substring(0, 4) + '-' + dateStr.substring(4, 6) + '-' + dateStr.substring(6, 8);
+		}
+
+		function getSanctnStsNm(sts) {
+			var stsMap = {
+				'TEMP': '임시저장',
+				'REQ': '신청',
+				'ING': '진행중',
+				'END': '완료',
+				'RTN': '반려'
+			};
+			return stsMap[sts] || sts;
+		}
+
+		function getSanctnBadgeClass(sts) {
+			var classMap = {
+				'TEMP': 'temp',
+				'REQ': 'req',
+				'ING': 'ing',
+				'END': 'end',
+				'RTN': 'rtn'
+			};
+			return classMap[sts] || '';
+		}
+
+		$(document).ready(function() {
+			var newScreenWidth = $(window).width();
+			var newScreenHeight = $(window).height();
+
+			const now = moment();
+			const oneMonthAgo = now.clone().add(-1, 'M');
+
+			$('#reqDtFrom').datepicker({
+				format: "yyyy-mm-dd",
+				language: "ko",
+				autoclose: true
+			})
+			.datepicker("setDate", oneMonthAgo.toDate())
+			.on("changeDate", function() {
+				if ($('#reqDtFrom').val() > $('#reqDtTo').val()) {
+					$('#reqDtTo').datepicker("setDate", new Date($('#reqDtFrom').val()));
+				}
+				vacationList();
+			});
+
+			$('#reqDtTo').datepicker({
+				format: "yyyy-mm-dd",
+				language: "ko",
+				autoclose: true
+			})
+			.datepicker("setDate", now.toDate())
+			.on("changeDate", function() {
+				if ($('#reqDtFrom').val() > $('#reqDtTo').val()) {
+					$('#reqDtFrom').datepicker("setDate", new Date($('#reqDtTo').val()));
+				}
+				vacationList();
+			});
+
+			$('#sanctnSts').on('change', vacationList);
+
+			vacationList();
+			$('.popup_area').css('min-width', (newScreenWidth - 15) + 'px');
+			authChk();
+		});
+
+		function vacationList() {
+			var formData = {
+				"coCd": jwt.coCd,
+				"reqDtFrom": $("#reqDtFrom").val().replace(/\-/g, ''),
+				"reqDtTo": $("#reqDtTo").val().replace(/\-/g, ''),
+				"sanctnSts": $("#sanctnSts").val(),
+				"pageNo": 1,
+				"recordCnt": 999999999
+			};
+
+			postAjax("/user/pm/pm07/selectVacationList", formData, null, function(data) {
+				list = data.result || [];
+				let cardContainer = $("#cardContainer");
+				cardContainer.empty();
+
+				if (list.length > 0) {
+					$.each(list, function(index, item) {
+						if (item.vacTypeCd === undefined) item.vacTypeCd = '';
+						if (item.vacTypeNm === undefined) item.vacTypeNm = '';
+						if (item.stDt === undefined) item.stDt = '';
+						if (item.edDt === undefined) item.edDt = '';
+						if (item.ampmCd === undefined) item.ampmCd = '';
+						if (item.stTm === undefined) item.stTm = '';
+						if (item.edTm === undefined) item.edTm = '';
+						if (item.vacDays === undefined) item.vacDays = '';
+						if (item.deductDays === undefined) item.deductDays = '';
+						if (item.reqRmk === undefined) item.reqRmk = '';
+						if (item.reqDt === undefined) item.reqDt = '';
+						if (item.sanctnSts === undefined) item.sanctnSts = '';
+						if (item.sanctnStsNm === undefined) item.sanctnStsNm = '';
+
+						var stDtDisplay = toDashDate(item.stDt);
+						var edDtDisplay = toDashDate(item.edDt);
+						var reqDtDisplay = toDashDate(item.reqDt);
+
+						var cardHtml =
+							`<div class="square-box">
+								<div class="card" style="border: 1px solid #EEEEEE; margin-bottom: 10px;">
+									<table class="tg">
+										<tr>
+											<td class="tg-title" colspan="2" style="width:60%; border-right: 0px">
+												<span>
+													${item.reqNo} - ${item.vacTypeNm || item.vacTypeCd || ''}
+												</span>
+											</td>
+											<td class="tg-title" style="text-align: right; vertical-align: middle; border-left: 0px;">
+												<span class="sanctn-badge ${getSanctnBadgeClass(item.sanctnSts)}">
+													${item.sanctnStsNm || getSanctnStsNm(item.sanctnSts)}
+												</span>
+											</td>
+										</tr>
+										<tr>
+											<td class="tg-menu">신청일자</td>
+											<td class="tg-rspn" colspan="2">${reqDtDisplay}</td>
+										</tr>
+										<tr>
+											<td class="tg-menu">시작~종료</td>
+											<td class="tg-rspn" colspan="2">${stDtDisplay} ~ ${edDtDisplay}</td>
+										</tr>
+										<tr>
+											<td class="tg-menu">오전/오후</td>
+											<td class="tg-rspn" colspan="2">${item.ampmCd || '-'}</td>
+										</tr>
+										<tr>
+											<td class="tg-menu">시각</td>
+											<td class="tg-rspn" colspan="2">${item.stTm ? item.stTm.substring(0, 2) + ':' + item.stTm.substring(2, 4) : '-'} ~ ${item.edTm ? item.edTm.substring(0, 2) + ':' + item.edTm.substring(2, 4) : '-'}</td>
+										</tr>
+										<tr>
+											<td class="tg-menu">휴가일수</td>
+											<td class="tg-rspn" colspan="2">${item.vacDays || '-'}</td>
+										</tr>
+										<tr>
+											<td class="tg-menu">차감일수</td>
+											<td class="tg-rspn" colspan="2">${item.deductDays || '-'}</td>
+										</tr>
+										<tr>
+											<td class="tg-menu">사유</td>
+											<td class="tg-rspn" colspan="2"><span style="display: block;white-space: pre-wrap;word-break: break-all;">${item.reqRmk || ''}</span></td>
+										</tr>
+										<tr>
+											<td colspan="3" style="text-align: right; padding: 5px;">
+												<button class="btn btn-primary btn-sm" style="height: 30px;" onclick="openDetailModal(${index})">상세</button>
+											</td>
+										</tr>
+									</table>
+								</div>
+							</div>`;
+						cardContainer.append(cardHtml);
+					});
+				} else {
+					cardContainer.append('<h6 style="font-size:16px; padding: 20px;">신청한 휴가가 없습니다.</h6>');
+				}
+			});
+		}
+
+		function openDetailModal(index) {
+			const gridList = list[index];
+			var paramObj = {
+				"actionType": "U",
+				"coCd": jwt.coCd,
+				"userId": jwt.userId,
+				"userNm": jwt.userNm,
+				"reqNo": gridList.reqNo,
+				"pgmId": "PM0701M01_M"
+			};
+			$.each(gridList, function(key, val) {
+				if (typeof(val) === "undefined") val = "";
+				paramObj[key] = val;
+			});
+
+			var nextUrl = '/static/mobile/html/user/pm/pm07/PM0701P01_M.html';
+			sessionStorage.setItem('paramObj', JSON.stringify(paramObj));
+			insertPgmHistory(nextUrl);
+			location.href = nextUrl;
+		}
+
+		function openCreateModal() {
+			var paramObj = {
+				"actionType": "C",
+				"coCd": jwt.coCd,
+				"userId": jwt.userId,
+				"userNm": jwt.userNm,
+				"pgmId": "PM0701M01_M"
+			};
+
+			var nextUrl = '/static/mobile/html/user/pm/pm07/PM0701P01_M.html';
+			sessionStorage.setItem('paramObj', JSON.stringify(paramObj));
+			insertPgmHistory(nextUrl);
+			location.href = nextUrl;
+		}
+	</script>
+</body>
+
+</html>

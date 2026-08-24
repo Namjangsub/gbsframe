@@ -1,0 +1,111 @@
+package com.dksys.biz.user.pm.pm07;
+
+import java.util.List;
+import java.util.Map;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Controller;
+import org.springframework.ui.ModelMap;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.multipart.MultipartHttpServletRequest;
+
+import com.dksys.biz.cmn.vo.PaginationInfo;
+import com.dksys.biz.user.pm.pm07.service.PM07Svc;
+import com.dksys.biz.util.MessageUtils;
+
+@Controller
+@RequestMapping("/user/pm/pm07")
+public class PM07Ctr {
+
+	@Autowired
+	MessageUtils messageUtils;
+
+	@Autowired
+	PM07Svc pm07Svc;
+
+	@PostMapping(value = "/selectVacationList")
+	public String selectVacationList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		int totalCnt = pm07Svc.selectVacationCount(paramMap);
+		PaginationInfo paginationInfo = new PaginationInfo(paramMap, totalCnt);
+		model.addAttribute("paginationInfo", paginationInfo);
+		List<Map<String, String>> result = pm07Svc.selectVacationList(paramMap);
+		model.addAttribute("result", result);
+		return "jsonView";
+	}
+
+	@PostMapping(value = "/selectVacationDtl")
+	public String selectVacationDtl(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		Map<String, String> result = pm07Svc.selectVacationDtl(paramMap);
+		model.addAttribute("result", result);
+		return "jsonView";
+	}
+
+	@PostMapping(value = "/insertVacation")
+	public String insertVacation(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) {
+		try {
+			Map<String, String> result = pm07Svc.insertVacation(paramMap, mRequest);
+			model.addAttribute("result", result);
+			model.addAttribute("resultCode", result.get("resultCode"));
+			model.addAttribute("resultMessage", result.get("resultMessage"));
+		} catch (Exception e) {
+			model.addAttribute("resultCode", 500);
+			model.addAttribute("resultMessage", messageUtils.getMessage("insert") + " 실패");
+		}
+		return "jsonView";
+	}
+
+	@PostMapping(value = "/updateVacation")
+	public String updateVacation(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) {
+		try {
+			Map<String, String> result = pm07Svc.updateVacation(paramMap, mRequest);
+			model.addAttribute("result", result);
+			model.addAttribute("resultCode", result.get("resultCode"));
+			model.addAttribute("resultMessage", result.get("resultMessage"));
+		} catch (Exception e) {
+			model.addAttribute("resultCode", 500);
+			model.addAttribute("resultMessage", messageUtils.getMessage("update") + " 실패");
+		}
+		return "jsonView";
+	}
+
+	@PutMapping(value = "/deleteVacation")
+	public String deleteVacation(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		try {
+			Map<String, String> result = pm07Svc.deleteVacation(paramMap);
+			model.addAttribute("result", result);
+			model.addAttribute("resultCode", result.get("resultCode"));
+			model.addAttribute("resultMessage", result.get("resultMessage"));
+		} catch (Exception e) {
+			model.addAttribute("resultCode", 500);
+			model.addAttribute("resultMessage", messageUtils.getMessage("delete") + " 실패");
+		}
+		return "jsonView";
+	}
+
+	@PostMapping(value = "/selectAnnualBalance")
+	public String selectAnnualBalance(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		Map<String, String> result = pm07Svc.selectAnnualBalance(paramMap);
+		model.addAttribute("result", result);
+		model.addAttribute("resultCode", result.get("resultCode"));
+		return "jsonView";
+	}
+
+	@PostMapping(value = "/saveAnnualGrant")
+	public String saveAnnualGrant(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		try {
+			Map<String, String> result = pm07Svc.saveAnnualGrant(paramMap);
+			model.addAttribute("result", result);
+			model.addAttribute("resultCode", result.get("resultCode"));
+			model.addAttribute("resultMessage", result.get("resultMessage"));
+		} catch (Exception e) {
+			model.addAttribute("resultCode", 500);
+			model.addAttribute("resultMessage", messageUtils.getMessage("update") + " 실패");
+		}
+		return "jsonView";
+	}
+
+}
