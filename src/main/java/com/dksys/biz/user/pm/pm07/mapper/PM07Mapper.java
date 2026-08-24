@@ -32,15 +32,25 @@ public interface PM07Mapper {
 
 	Map<String, String> selectAnnualGrant(Map<String, String> paramMap);
 
+	List<Map<String, String>> selectAnnualGrantList(Map<String, String> paramMap);
+
+	int deleteAnnualGrant(Map<String, String> paramMap);
+
+	List<Map<String, String>> selectUnregisteredUserList(Map<String, String> paramMap);
+
 	String selectVacationReqNoNext(Map<String, String> paramMap);
 
 	Map<String, String> selectWorkRptCodeByDept(Map<String, String> paramMap);
+
+	String selectFileTrgtKeyNext();
 
 	int insertDailyWorkReport(Map<String, String> paramMap);
 
 	String selectUserEnterDt(Map<String, String> paramMap);
 
 	int selectVacationApprovalChk(Map<String, String> paramMap);
+
+	int selectApprovalCount(Map<String, String> paramMap);
 
 	int updateVacationApprovalStatus(Map<String, String> paramMap);
 
@@ -52,6 +62,10 @@ public interface PM07Mapper {
 
 	int deleteVacationDates(Map<String, String> paramMap);
 
+	int deleteDailyWorkReportByVacation(Map<String, String> paramMap);
+
 	List<Map<String, String>> selectVacationDateList(Map<String, String> paramMap);
+
+	int updateVacationDateWorkRptNo(Map<String, String> paramMap);
 
 }

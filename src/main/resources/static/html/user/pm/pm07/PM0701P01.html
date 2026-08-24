@@ -104,6 +104,13 @@
 			<!-- 공통 파일 영역 -->
 			<div id="fileList_area"></div>
 
+			<!-- 임시저장 작업일보 미생성 안내 문구 -->
+			<div style="margin-top: 10px; margin-bottom: 5px;">
+				<p style="color: #d9534f; font-size: 12px; font-weight: bold; line-height: 1.5; margin: 0; padding: 6px 10px; background-color: #fdf2f2; border: 1px solid #f5c6cb; border-radius: 3px;">
+					<i class="fas fa-exclamation-circle"></i> <span>안내: 임시저장 상태에서는 작업일보에 휴가가 자동 등록되지 않으며, 결재자 지정 후 결재 상신(신청) 시에만 작업일보에 등록됩니다.</span>
+				</p>
+			</div>
+
 			<!-- 하단 버튼 영역 -->
 			<div class="col-xs-12 text-right popup_bottom_btn" style="margin-top: 15px; padding-right: 0;">
 				<button type="button" class="btn btn-default btn-sm" onclick="saveVacation();">저 장</button>
@@ -963,11 +970,16 @@
 			// 기존 결재선/공유선 표시
 			loadApprovalLine(dtlData.reqNo || reqNoVal);
 
-			// 결재가 진행 중이거나 완료된 건은 읽기 전용 제어
-			// TEMP(임시저장) 외의 모든 상태(REQ 결재요청 / ING 결재진행 / END 결재완료)에서 수정 불가.
+			// 결재가 실제로 진행(누군가 승인/반려)되었거나 완료된 건만 읽기 전용 제어.
+			// selectVacationDtl 의 SANCTN_STS 산출 기준(pm07.xml selectVacationDtl):
+			//   TEMP - 결재선 없음, REQ - 결재선은 있으나 아무도 승인 안 함(=결재 진행된 게 없음),
+			//   ING - 1명 이상 승인, END - 전원 승인완료, RTN - 반려(승인action 발생).
+			// TEMP/REQ 는 "결재 진행된 게 없는" 상태이므로 수정 가능해야 한다.
 			var sanctnSts = dtlData.sanctnSts || paramObj.sanctnSts || "";
-			if (sanctnSts && sanctnSts !== "TEMP") {
-				var stsNm = (sanctnSts === "END") ? "결재완료" : "결재진행중";
+			var isEditable = (!sanctnSts || sanctnSts === "TEMP" || sanctnSts === "SANCTN01" || sanctnSts === "0" || sanctnSts === "REQ");
+
+			if (!isEditable) {
+				var stsNm = (sanctnSts === "END" || sanctnSts === "SANCTN04" || sanctnSts === "Y") ? "결재완료" : "결재진행중";
 				$('#popupTitle').text("휴가신청 - 상세 (" + stsNm + " - 수정불가)");
 				// 셀렉터는 .popup_area 로 한정한다 (모달이 목록 화면과 같은 DOM 을 공유하므로 전역 #popForm 금지)
 				$('.popup_area #popForm input, .popup_area #popForm select, .popup_area #popForm textarea')

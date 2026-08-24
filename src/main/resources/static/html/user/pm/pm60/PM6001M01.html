@@ -183,9 +183,30 @@
 		#kpiTable tr.metric-highlight td.row-label { background-color: #eaf2ff; }
 		/* 외주 근무시간 테이블 전용 */
 		#vndrTable .gantt-cell.has-value {
-			background-color: #fffbea;
+			background-color: #e3f2fd;
+			color: #1565c0;
 			font-weight: 700;
-			color: #8a6d00;
+			cursor: pointer;
+		}
+		/* 외주 투입 등록 작업자 태그 전용 */
+		.worker-tag-item {
+			display: inline-flex;
+			align-items: center;
+			background-color: #e9ecef;
+			border: 1px solid #ced4da;
+			border-radius: 12px;
+			padding: 2px 8px;
+			font-size: 12px;
+			color: #495057;
+		}
+		.worker-tag-item .tag-del-btn {
+			margin-left: 6px;
+			cursor: pointer;
+			color: #868e96;
+			font-weight: bold;
+		}
+		.worker-tag-item .tag-del-btn:hover {
+			color: #fa5252;
 		}
 		#vndrTable .gantt-cell.has-value:hover {
 			background-color: #fff3c4 !important;
@@ -874,32 +895,47 @@
 			<form id="vndrForm" onsubmit="return false;">
 				<div class="modal-body-box">
 					<input type="hidden" id="vndrRsvNo" name="rsvNo">
+					<input type="hidden" id="vndrClntCd" name="clntCd">
 
 					<div class="form-group-modal">
-						<label for="vndrNm">업체명 <span style="color: red;">*</span></label>
-						<input type="text" id="vndrNm" name="vndrNm" placeholder="업체명 입력" required msg="업체명">
+						<label for="vndrNm">외주업체 <span style="color: red;">*</span></label>
+						<div class="search_form" style="display: flex; align-items: center; gap: 5px;">
+							<input type="text" class="form-control input-sm" id="vndrNm" name="vndrNm" placeholder="거래처 검색 (클릭)" readonly style="background-color: #fafafa; cursor: pointer; flex: 1;" onclick="openVndrClntSearch();" required msg="외주업체">
+							<a class="btn btn-default btn-sm" onclick="openVndrClntSearch();" style="height: 30px; line-height: 20px; padding: 4px 8px;"><i class="i_search_w"></i></a>
+						</div>
+					</div>
+
+					<div class="form-group-modal">
+						<label for="workerNmInput">외주 인력 (작업자명)</label>
+						<div style="display: flex; gap: 5px; margin-bottom: 5px;">
+							<input type="text" class="form-control input-sm" id="workerNmInput" placeholder="작업자명 입력 후 추가 (예: 김길동)" onkeypress="if(event.keyCode==13){addWorkerTag(); return false;}" style="flex: 1;">
+							<button type="button" class="btn btn-default btn-sm" onclick="addWorkerTag();">추 가</button>
+						</div>
+						<div id="workerTagContainer" style="display: flex; flex-wrap: wrap; gap: 5px; min-height: 34px; padding: 5px; border: 1px solid #d2d6de; border-radius: 4px; background: #fafafa;">
+						</div>
+						<div style="font-size: 11px; color: #667085; margin-top: 4px;">여러 명의 작업자를 텍스트로 추가하여 동시에 투입 등록할 수 있습니다.</div>
 					</div>
 
 					<div class="form-group-modal" style="display: flex; gap: 10px;">
 						<div style="flex: 1;">
 							<label for="vndrWorkStDt">근무 시작일 <span style="color: red;">*</span></label>
-							<input type="text" id="vndrWorkStDt" name="workStDt" onkeyup="dateMask(this);" autocomplete="off" style="cursor:pointer;" placeholder="YYYY-MM-DD" required msg="근무 시작일">
+							<input type="text" class="form-control input-sm" id="vndrWorkStDt" name="workStDt" onkeyup="dateMask(this);" autocomplete="off" style="cursor:pointer;" placeholder="YYYY-MM-DD" required msg="근무 시작일">
 						</div>
 						<div style="flex: 1;">
 							<label for="vndrWorkEdDt">근무 종료일 <span style="color: red;">*</span></label>
-							<input type="text" id="vndrWorkEdDt" name="workEdDt" onkeyup="dateMask(this);" autocomplete="off" style="cursor:pointer;" placeholder="YYYY-MM-DD" required msg="근무 종료일">
+							<input type="text" class="form-control input-sm" id="vndrWorkEdDt" name="workEdDt" onkeyup="dateMask(this);" autocomplete="off" style="cursor:pointer;" placeholder="YYYY-MM-DD" required msg="근무 종료일">
 						</div>
 					</div>
 					<div id="vndrRangeHint" style="display: none; font-size: 11px; color: #667085; margin: -8px 0 12px;">기간을 선택하면 종료일까지 매일 동일한 근무시간으로 등록됩니다.</div>
 
 					<div class="form-group-modal">
 						<label for="vndrWorkHour">근무시간 <span style="color: red;">*</span></label>
-						<input type="number" id="vndrWorkHour" name="workHour" placeholder="근무시간 (숫자)" step="0.5" min="0" required msg="근무시간">
+						<input type="number" class="form-control input-sm" id="vndrWorkHour" name="workHour" placeholder="근무시간 (숫자)" step="0.5" min="0" required msg="근무시간">
 					</div>
 
 					<div class="form-group-modal">
 						<label for="vndrEtc">비고</label>
-						<textarea id="vndrEtc" name="etc" placeholder="기타 사항 입력"></textarea>
+						<textarea class="form-control input-sm" id="vndrEtc" name="etc" placeholder="기타 사항 입력"></textarea>
 					</div>
 				</div>
 
@@ -2391,7 +2427,7 @@
 			});
 		}
 
-		// ─ 외주 인력 근무시간 캘린더 테이블 ─
+		// ─ 외주 인력 근무시간 캘린더 테이블 (작업자 개인별 Row 표출) ─
 		function renderVndrCalendar(monthStDt, monthEdDt) {
 			var stMoment = moment(monthStDt, 'YYYYMMDD');
 			var edMoment = moment(monthEdDt, 'YYYYMMDD');
@@ -2399,17 +2435,30 @@
 
 			$('#vndrTable').find('colgroup').remove();
 			$(buildColGroup(dayCount, ROW_LABEL_WIDTH)).prependTo('#vndrTable');
-			$('#vndrTable thead').html(buildDateHeaderRow(stMoment, dayCount, '업체명', ROW_LABEL_WIDTH));
+			$('#vndrTable thead').html(buildDateHeaderRow(stMoment, dayCount, '업체(작업자명)', ROW_LABEL_WIDTH));
 
-			// 데이터에 등장하는 업체명을 행으로 사용 (없으면 빈 상태 표시)
-			var vndrNames = [];
+			// 데이터에 등장하는 (업체명 + 작업자명) 조합을 행으로 구함
+			var vndrRows = []; // { rowKey, vndrNm, clntCd, workerNm, label }
+			var rowKeyMap = {};
 			$.each(vndrList, function(idx, v) {
-				if (vndrNames.indexOf(v.vndrNm) === -1) {
-					vndrNames.push(v.vndrNm);
+				var vndrNm = v.vndrNm || '';
+				var workerNm = v.workerNm || '';
+				var clntCd = v.clntCd || '';
+				var key = vndrNm + '___' + workerNm;
+				if (!rowKeyMap[key]) {
+					rowKeyMap[key] = true;
+					var label = workerNm ? (vndrNm + ' (' + workerNm + ')') : vndrNm;
+					vndrRows.push({
+						rowKey: key,
+						vndrNm: vndrNm,
+						clntCd: clntCd,
+						workerNm: workerNm,
+						label: label
+					});
 				}
 			});
 
-			if (vndrNames.length === 0) {
+			if (vndrRows.length === 0) {
 				$('#vndrTableBody').html('');
 				$('#vndrTable').hide();
 				$('#vndrEmptyMsg').show();
@@ -2419,9 +2468,9 @@
 			$('#vndrEmptyMsg').hide();
 
 			var tbody = '';
-			$.each(vndrNames, function(idx, vndrNm) {
+			$.each(vndrRows, function(idx, rowInfo) {
 				tbody += '<tr>';
-				tbody += '<td class="row-label" title="' + vndrNm + '">' + vndrNm + '</td>';
+				tbody += '<td class="row-label" title="' + rowInfo.label + '">' + rowInfo.label + '</td>';
 
 				for (var i = 0; i < dayCount; i++) {
 					var day = stMoment.clone().add(i, 'days');
@@ -2431,11 +2480,16 @@
 					if (dayNum === 6) dayClass = ' sat';
 					else if (dayNum === 0) dayClass = ' sun';
 
-					var rec = findVndrRecord(vndrNm, dayStr);
+					var rec = findVndrRecord(rowInfo.vndrNm, rowInfo.workerNm, dayStr);
 					if (rec) {
 						tbody += '<td class="gantt-cell has-value' + dayClass + '" onclick="onVndrCellClick(\'' + rec.rsvNo + '\')" title="' + (rec.etc || '') + '">' + rec.workHour + 'h</td>';
 					} else {
-						tbody += '<td class="gantt-cell empty' + dayClass + '" data-vndr-nm="' + vndrNm.replace(/"/g, '&quot;') + '" data-day-str="' + dayStr + '"></td>';
+						tbody += '<td class="gantt-cell empty' + dayClass + '" ' +
+							'data-row-key="' + rowInfo.rowKey.replace(/"/g, '&quot;') + '" ' +
+							'data-vndr-nm="' + rowInfo.vndrNm.replace(/"/g, '&quot;') + '" ' +
+							'data-clnt-cd="' + (rowInfo.clntCd || '').replace(/"/g, '&quot;') + '" ' +
+							'data-worker-nm="' + (rowInfo.workerNm || '').replace(/"/g, '&quot;') + '" ' +
+							'data-day-str="' + dayStr + '"></td>';
 					}
 				}
 				tbody += '</tr>';
@@ -2450,14 +2504,20 @@
 
 		// 외주 캘린더 드래그(기간 선택) 상태 변수
 		var isVndrDragging = false;
-		var vndrDragRowNm = null;
+		var vndrDragRowKey = null;
+		var vndrDragVndrNm = null;
+		var vndrDragClntCd = null;
+		var vndrDragWorkerNm = null;
 		var vndrDragStartDay = null;
 		var vndrDragCurrentDay = null;
 
 		function bindVndrDragEvents() {
 			$('#vndrTable td.gantt-cell.empty').off('mousedown').on('mousedown', function(e) {
 				isVndrDragging = true;
-				vndrDragRowNm = $(this).attr('data-vndr-nm');
+				vndrDragRowKey = $(this).attr('data-row-key');
+				vndrDragVndrNm = $(this).attr('data-vndr-nm');
+				vndrDragClntCd = $(this).attr('data-clnt-cd');
+				vndrDragWorkerNm = $(this).attr('data-worker-nm');
 				vndrDragStartDay = $(this).attr('data-day-str');
 				vndrDragCurrentDay = vndrDragStartDay;
 				updateVndrDragHighlight();
@@ -2469,9 +2529,9 @@
 				if (elem) {
 					var $cell = $(elem).closest('td.gantt-cell');
 					if ($cell.length > 0 && $cell.closest('#vndrTable').length > 0) {
-						var cellVndrNm = $cell.attr('data-vndr-nm');
+						var cellRowKey = $cell.attr('data-row-key');
 						var hoverDayStr = $cell.attr('data-day-str');
-						if (cellVndrNm === vndrDragRowNm && hoverDayStr && vndrDragCurrentDay !== hoverDayStr) {
+						if (cellRowKey === vndrDragRowKey && hoverDayStr && vndrDragCurrentDay !== hoverDayStr) {
 							vndrDragCurrentDay = hoverDayStr;
 							updateVndrDragHighlight();
 						}
@@ -2483,16 +2543,19 @@
 				if (!isVndrDragging) return;
 				isVndrDragging = false;
 
-				if (vndrDragRowNm && vndrDragStartDay && vndrDragCurrentDay) {
+				if (vndrDragRowKey && vndrDragStartDay && vndrDragCurrentDay) {
 					var stDay = vndrDragStartDay < vndrDragCurrentDay ? vndrDragStartDay : vndrDragCurrentDay;
 					var edDay = vndrDragStartDay < vndrDragCurrentDay ? vndrDragCurrentDay : vndrDragStartDay;
 					var stFmt = stDay.substring(0, 4) + '-' + stDay.substring(4, 6) + '-' + stDay.substring(6, 8);
 					var edFmt = edDay.substring(0, 4) + '-' + edDay.substring(4, 6) + '-' + edDay.substring(6, 8);
-					openNewVndrModal(vndrDragRowNm, stFmt, edFmt);
+					openNewVndrModal(vndrDragVndrNm, vndrDragClntCd, vndrDragWorkerNm, stFmt, edFmt);
 				}
 
 				$('#vndrTable td.gantt-cell').removeClass('drag-selecting');
-				vndrDragRowNm = null;
+				vndrDragRowKey = null;
+				vndrDragVndrNm = null;
+				vndrDragClntCd = null;
+				vndrDragWorkerNm = null;
 				vndrDragStartDay = null;
 				vndrDragCurrentDay = null;
 			});
@@ -2500,12 +2563,12 @@
 
 		function updateVndrDragHighlight() {
 			$('#vndrTable td.gantt-cell').removeClass('drag-selecting');
-			if (!vndrDragRowNm || !vndrDragStartDay || !vndrDragCurrentDay) return;
+			if (!vndrDragRowKey || !vndrDragStartDay || !vndrDragCurrentDay) return;
 
 			var stDay = vndrDragStartDay < vndrDragCurrentDay ? vndrDragStartDay : vndrDragCurrentDay;
 			var edDay = vndrDragStartDay < vndrDragCurrentDay ? vndrDragCurrentDay : vndrDragStartDay;
 
-			$('#vndrTable td.gantt-cell[data-vndr-nm="' + vndrDragRowNm + '"]').each(function() {
+			$('#vndrTable td.gantt-cell[data-row-key="' + vndrDragRowKey.replace(/"/g, '\\"') + '"]').each(function() {
 				var d = $(this).attr('data-day-str');
 				if (d && d >= stDay && d <= edDay) {
 					$(this).addClass('drag-selecting');
@@ -2513,9 +2576,11 @@
 			});
 		}
 
-		function findVndrRecord(vndrNm, dayStr) {
+		function findVndrRecord(vndrNm, workerNm, dayStr) {
+			var targetWorker = workerNm || '';
 			for (var i = 0; i < vndrList.length; i++) {
-				if (vndrList[i].vndrNm === vndrNm && vndrList[i].workDt === dayStr) {
+				var vWork = vndrList[i].workerNm || '';
+				if (vndrList[i].vndrNm === vndrNm && vWork === targetWorker && vndrList[i].workDt === dayStr) {
 					return vndrList[i];
 				}
 			}
@@ -2531,165 +2596,70 @@
 			}
 		}
 
-		// ─ 일자별 인력 현황 요약 캘린더 테이블 ─
-		var kpiMetricRows = [
-			{ key: 'totalCnt', label: '전체 인원' },
-			{ key: 'planCnt', label: 'A계획 인원' },
-			{ key: 'actualCnt', label: 'B실적 인원' },
-			{ key: 'installCnt', label: ' └ 설치(a)' },
-			{ key: 'paidCnt', label: ' └ 유상(b)' },
-			{ key: 'freeCnt', label: ' └ 무상(c)' },
-			{ key: 'etcCnt', label: ' └ 기타(d)' },
-			{ key: 'diffCnt', label: 'C(실적-계획)', highlight: true },
-			{ key: 'availCnt', label: '가용 인원' },
-		];
-
-		function computeKpiDerivedFields(dataList) {
-			$.each(dataList, function(idx, item) {
-				var install = Number(item.installCnt) || 0;
-				var paid = Number(item.paidCnt) || 0;
-				var free = Number(item.freeCnt) || 0;
-				var etc = Number(item.etcCnt) || 0;
-
-				// B 실적 인원은 세부 구분(a 설치 + b 유상 + c 무상 + d 기타)의 합계와 일치하도록 보장
-				item.actualCnt = install + paid + free + etc;
-
-				var actual = Number(item.actualCnt) || 0;
-				var plan = Number(item.planCnt) || 0;
-				item.diffCnt = actual - plan;
-			});
-		}
-
-		function renderKpiCalendar(monthStDt, monthEdDt) {
-			var stMoment = moment(monthStDt, 'YYYYMMDD');
-			var edMoment = moment(monthEdDt, 'YYYYMMDD');
-			var dayCount = edMoment.diff(stMoment, 'days') + 1;
-
-			$('#kpiTable').find('colgroup').remove();
-			$(buildColGroup(dayCount, ROW_LABEL_WIDTH)).prependTo('#kpiTable');
-			$('#kpiTable thead').html(buildDateHeaderRow(stMoment, dayCount, '구분', ROW_LABEL_WIDTH));
-
-			var tbody = '';
-			$.each(kpiMetricRows, function(rowIdx, metric) {
-				tbody += '<tr' + (metric.highlight ? ' class="metric-diff metric-highlight"' : '') + '>';
-				tbody += '<td class="row-label">' + metric.label + '</td>';
-
-				for (var i = 0; i < dayCount; i++) {
-					var day = stMoment.clone().add(i, 'days');
-					var dayStr = day.format('YYYYMMDD');
-					var dayNum = day.day();
-					var dayClass = '';
-					if (dayNum === 6) dayClass = ' weekend-sat';
-					else if (dayNum === 0) dayClass = ' weekend-sun';
-
-					var item = kpiStatList.filter(function(x) { return x.workDt === dayStr; })[0];
-					var cellText = '-';
-					var cellCls = '';
-					if (item) {
-						var raw = item[metric.key];
-						if (metric.isRate) {
-							cellText = raw ? (raw * 100).toFixed(1) + '%' : '-';
-						} else if (metric.highlight) {
-							var num = Number(raw) || 0;
-							cellText = num === 0 ? '-' : ((num > 0 ? '+' : '') + num);
-							cellCls = num > 0 ? ' pos' : (num < 0 ? ' neg' : '');
-						} else if (metric.key === 'totalCnt') {
-							// 전체 인원은 0이어도 그대로 표시 (이상 상태를 숨기지 않음)
-							cellText = (raw === null || raw === undefined || raw === '') ? '-' : raw;
-						} else {
-							var numVal = Number(raw) || 0;
-							cellText = (raw === null || raw === undefined || raw === '' || numVal === 0) ? '-' : raw;
-						}
-					}
-					tbody += '<td class="metric-cell' + dayClass + cellCls + '">' + cellText + '</td>';
+		// ─ 외주 투입 모달 헬퍼 및 이벤트 ─
+		function openVndrClntSearch() {
+			var paramObj = {
+				"searchValue": $('#vndrNm').val() || ''
+			};
+			openSecondModal("/static/html/cmn/modal/clntSearch.html", 650, 650, "거래처 검색", paramObj, function (grid) {
+				var row = grid.target.getList("selected")[0];
+				if (row) {
+					$('#vndrClntCd').val(row.clntCd || '');
+					$('#vndrNm').val(row.clntNm || '');
 				}
-				tbody += '</tr>';
 			});
-			$('#kpiTableBody').html(tbody);
-			autoFitRowLabels('kpiTable');
-			autoFitKpiCells();
 		}
 
-		// ─ 상단 대시보드 카드 (엑셀 "25년 출장현황(월)" 시트 재현) ─
-		function renderTopDashboardCard(stMonthMoment, edMonthMoment, dataList) {
-			var $container = $('#topDashboardCard');
-			if (!dataList || dataList.length === 0) {
-				$container.html('');
+		function addWorkerTag(workerNm) {
+			var name = $.trim(workerNm || $('#workerNmInput').val());
+			if (!name) return;
+			var exists = false;
+			$('#workerTagContainer .worker-tag-item').each(function() {
+				if ($(this).attr('data-worker-nm') === name) {
+					exists = true;
+					return false;
+				}
+			});
+			if (exists) {
+				alert('이미 추가된 작업자입니다.');
+				$('#workerNmInput').val('').focus();
 				return;
 			}
-
-			// 시작월=종료월이면 "YYYY년 MM월", 다르면 "YYYY년 MM월~MM월"(연도 다르면 양쪽 다 표기)
-			var titleText;
-			if (stMonthMoment.format('YYYY-MM') === edMonthMoment.format('YYYY-MM')) {
-				titleText = stMonthMoment.format('YYYY년 MM월');
-			} else if (stMonthMoment.format('YYYY') === edMonthMoment.format('YYYY')) {
-				titleText = stMonthMoment.format('YYYY년 MM월') + '~' + edMonthMoment.format('MM월');
-			} else {
-				titleText = stMonthMoment.format('YYYY년 MM월') + '~' + edMonthMoment.format('YYYY년 MM월');
-			}
-
-			var sum = summarizeKpiList(dataList);
-			var dayCount = dataList.length;
-			var teamCnt = teamMemberList.length;
-			var capacity = teamCnt * dayCount; // 이번달 보유 M/D = 인원수 x 일수
-			var tripPct = capacity > 0 ? (sum.actualCnt / capacity) * 100 : 0;
-			var officePct = 100 - tripPct;
-			var diffSum = sum.actualCnt - sum.planCnt;
-			var diffCls = diffSum > 0 ? 'pos' : (diffSum < 0 ? 'neg' : '');
-			var diffArrow = diffSum > 0 ? '▲' : (diffSum < 0 ? '▼' : '');
-
-			function pctOfB(v) {
-				return sum.actualCnt > 0 ? '(' + Math.round((v / sum.actualCnt) * 100) + '%)' : '';
-			}
-
-			var avgAvail = dayCount > 0 ? (sum.availCnt / dayCount) : 0;
-			var avgTotal = dayCount > 0 ? (sum.totalCnt / dayCount) : 0;
-			var avgAbsenceRate = avgTotal > 0 ? (1 - (avgAvail / avgTotal)) * 100 : 0;
-
-			var html = '';
-			html += '<div class="td-month">';
-			html += '<div class="td-month-title">' + titleText + '</div>';
-			html += '<div class="td-office-trip"><span class="tag office-pct">사내 ' + officePct.toFixed(0) + '%</span><span class="tag trip-pct">출장 ' + tripPct.toFixed(0) + '%</span></div>';
-			html += '</div>';
-
-			html += '<div class="td-metric head-plan"><div class="td-metric-head">A 계획</div><div class="td-metric-body">' + sum.planCnt + '</div></div>';
-			html += '<div class="td-metric head-actual"><div class="td-metric-head">B 실적</div><div class="td-metric-body">' + sum.actualCnt + '</div></div>';
-			html += '<div class="td-metric head-install"><div class="td-metric-head">a 설치</div><div class="td-metric-body">' + sum.installCnt + '<span class="td-metric-sub">' + pctOfB(sum.installCnt) + '</span></div></div>';
-			html += '<div class="td-metric head-paid"><div class="td-metric-head">b 유상</div><div class="td-metric-body">' + sum.paidCnt + '<span class="td-metric-sub">' + pctOfB(sum.paidCnt) + '</span></div></div>';
-			html += '<div class="td-metric head-free"><div class="td-metric-head">c 무상</div><div class="td-metric-body">' + sum.freeCnt + '<span class="td-metric-sub">' + pctOfB(sum.freeCnt) + '</span></div></div>';
-			html += '<div class="td-metric head-etc"><div class="td-metric-head">d 기타</div><div class="td-metric-body">' + sum.etcCnt + '<span class="td-metric-sub">' + pctOfB(sum.etcCnt) + '</span></div></div>';
-			html += '<div class="td-metric head-diff"><div class="td-metric-head">C 실적-계획</div><div class="td-metric-body ' + diffCls + '">' + diffArrow + Math.abs(diffSum) + '</div></div>';
-			html += '<div class="td-metric head-people"><div class="td-metric-head">생산 인원</div><div class="td-metric-body">' + teamCnt + '</div></div>';
-			html += '<div class="td-metric head-avail"><div class="td-metric-head">일평균 가용인원</div><div class="td-metric-body">' + avgAvail.toFixed(1) + '<span class="td-metric-sub">명</span></div></div>';
-			html += '<div class="td-metric head-absence"><div class="td-metric-head">일평균 결근률</div><div class="td-metric-body">' + avgAbsenceRate.toFixed(1) + '<span class="td-metric-sub">%</span></div></div>';
-
-			$container.html(html);
+			var html = '<span class="worker-tag-item" data-worker-nm="' + name.replace(/"/g, '&quot;') + '">' +
+				'<span>' + name + '</span>' +
+				'<span class="tag-del-btn" onclick="$(this).parent().remove();">&times;</span>' +
+				'</span>';
+			$('#workerTagContainer').append(html);
+			$('#workerNmInput').val('').focus();
 		}
 
-		function summarizeKpiList(dataList) {
-			var sum = { planCnt: 0, actualCnt: 0, installCnt: 0, paidCnt: 0, freeCnt: 0, etcCnt: 0, availCnt: 0, totalCnt: 0 };
-			$.each(dataList, function(idx, item) {
-				sum.planCnt += Number(item.planCnt) || 0;
-				sum.actualCnt += Number(item.actualCnt) || 0;
-				sum.installCnt += Number(item.installCnt) || 0;
-				sum.paidCnt += Number(item.paidCnt) || 0;
-				sum.freeCnt += Number(item.freeCnt) || 0;
-				sum.etcCnt += Number(item.etcCnt) || 0;
-				sum.availCnt += Number(item.availCnt) || 0;
-				sum.totalCnt += Number(item.totalCnt) || 0;
+		function clearWorkerTags() {
+			$('#workerTagContainer').empty();
+		}
+
+		function getWorkerTagList() {
+			var list = [];
+			$('#workerTagContainer .worker-tag-item').each(function() {
+				var name = $(this).attr('data-worker-nm');
+				if (name) list.push(name);
 			});
-			return sum;
+			return list;
 		}
 
-		// ─ 외주 투입 모달 함수 ─
 		function closeVndrModal() {
 			$('#vndrModal').hide();
 		}
 
 		function openEditVndrModal(rowData) {
-			// 수정 모달 오픈 (기존 레코드는 항상 단일 일자 - 종료일 입력 잠금)
+			// 수정 모달 오픈 (단일 레코드 수정)
 			$('#vndrRsvNo').val(rowData.rsvNo || '');
+			$('#vndrClntCd').val(rowData.clntCd || '');
 			$('#vndrNm').val(rowData.vndrNm || '');
+
+			clearWorkerTags();
+			if (rowData.workerNm) {
+				addWorkerTag(rowData.workerNm);
+			}
 
 			// 날짜 포맷 변환 (YYYYMMDD → YYYY-MM-DD)
 			var workDt = rowData.workDt;
@@ -2708,13 +2678,20 @@
 			$('#vndrModal').show();
 		}
 
-		function openNewVndrModal(vndrNm, stDt, edDt) {
-			// 신규 등록 모달 오픈 (기간 드래그 시 시작~종료일 범위 입력 가능)
+		function openNewVndrModal(vndrNm, clntCd, workerNm, stDt, edDt) {
+			// 신규 등록 모달 오픈 (시작~종료일 지정)
 			if (!edDt) {
 				edDt = stDt;
 			}
 			$('#vndrRsvNo').val('');
+			$('#vndrClntCd').val(clntCd || '');
 			$('#vndrNm').val(vndrNm || '');
+
+			clearWorkerTags();
+			if (workerNm) {
+				addWorkerTag(workerNm);
+			}
+
 			$('#vndrWorkStDt').val(stDt || '');
 			$('#vndrWorkEdDt').val(edDt || '');
 			$('#vndrWorkEdDt').prop('readonly', false).css('background-color', '');
@@ -2735,13 +2712,19 @@
 
 		function saveVndr() {
 			// 유효성 검사
+			var clntCd = $.trim($('#vndrClntCd').val());
 			var vndrNm = $.trim($('#vndrNm').val());
 			var workStDt = $.trim($('#vndrWorkStDt').val());
 			var workEdDt = $.trim($('#vndrWorkEdDt').val()) || workStDt;
 			var workHour = $.trim($('#vndrWorkHour').val());
 
-			if (!vndrNm || !workStDt || !workEdDt || !workHour) {
-				alert('필수 필드를 모두 입력하세요.');
+			if (!vndrNm) {
+				alert('외주업체를 선택하세요.');
+				openVndrClntSearch();
+				return;
+			}
+			if (!workStDt || !workEdDt || !workHour) {
+				alert('필수 필드(근무 시작일, 종료일, 근무시간)를 모두 입력하세요.');
 				return;
 			}
 			if (workEdDt < workStDt) {
@@ -2749,15 +2732,29 @@
 				return;
 			}
 
+			// 작업자 태그 목록 추출
+			var workers = getWorkerTagList();
+			var pendingInput = $.trim($('#workerNmInput').val());
+			if (pendingInput) {
+				addWorkerTag(pendingInput);
+				workers = getWorkerTagList();
+			}
+			if (workers.length === 0) {
+				// 작업자를 지정하지 않은 경우 빈 값으로 등록 처리
+				workers = [''];
+			}
+
 			var rsvNo = $.trim($('#vndrRsvNo').val());
 			var etc = $.trim($('#vndrEtc').val());
 			var hourVal = parseFloat(workHour) || 0;
 
-			// 수정 모드(단일 일자, rsvNo 존재)는 기존과 동일하게 단건 저장
+			// 수정 모드 (단일 레코드)
 			if (rsvNo) {
 				postAjax('/user/pm/pm60/updateVndr', {
 					rsvNo: rsvNo,
+					clntCd: clntCd,
 					vndrNm: vndrNm,
+					workerNm: workers[0] || '',
 					workDt: workStDt.replace(/-/g, ''),
 					workHour: hourVal,
 					etc: etc,
@@ -2775,7 +2772,7 @@
 				return;
 			}
 
-			// 신규 등록: 시작~종료일 범위의 매일에 대해 순차 저장(기존 값이 있으면 수정, 없으면 등록)
+			// 신규 등록: 시작~종료일 범위 x 선택된 작업자 목록(workers)에 대해 순차 등록/수정
 			var days = [];
 			var cur = moment(workStDt, 'YYYY-MM-DD');
 			var end = moment(workEdDt, 'YYYY-MM-DD');
@@ -2784,22 +2781,32 @@
 				cur.add(1, 'days');
 			}
 
+			// (작업자 x 날짜) 조합 생성
+			var requests = [];
+			$.each(workers, function(wIdx, wNm) {
+				$.each(days, function(dIdx, dayStr) {
+					requests.push({ workerNm: wNm, dayStr: dayStr });
+				});
+			});
+
 			var okCnt = 0, failCnt = 0;
-			function saveNextDay(idx) {
-				if (idx >= days.length) {
+			function saveNextTask(idx) {
+				if (idx >= requests.length) {
 					alert('저장되었습니다. (등록/수정 ' + okCnt + '건' + (failCnt > 0 ? ', 실패 ' + failCnt + '건' : '') + ')');
 					closeVndrModal();
 					loadVndrList();
 					return;
 				}
 
-				var dayStr = days[idx];
-				var existing = findVndrRecord(vndrNm, dayStr);
+				var req = requests[idx];
+				var existing = findVndrRecord(vndrNm, req.workerNm, req.dayStr);
 				var endpoint = existing ? '/user/pm/pm60/updateVndr' : '/user/pm/pm60/insertVndr';
 				var paramObj = {
 					rsvNo: existing ? existing.rsvNo : undefined,
+					clntCd: clntCd,
 					vndrNm: vndrNm,
-					workDt: dayStr,
+					workerNm: req.workerNm,
+					workDt: req.dayStr,
 					workHour: hourVal,
 					etc: etc,
 					coCd: jwt.coCd,
@@ -2812,11 +2819,11 @@
 					} else {
 						failCnt++;
 					}
-					saveNextDay(idx + 1);
+					saveNextTask(idx + 1);
 				});
 			}
 
-			saveNextDay(0);
+			saveNextTask(0);
 		}
 
 		function deleteVndr() {

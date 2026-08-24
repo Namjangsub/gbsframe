@@ -108,4 +108,34 @@ public class PM07Ctr {
 		return "jsonView";
 	}
 
+	@PostMapping(value = "/selectAnnualGrantList")
+	public String selectAnnualGrantList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		List<Map<String, String>> resultList = pm07Svc.selectAnnualGrantList(paramMap);
+		model.addAttribute("resultList", resultList);
+		model.addAttribute("resultCode", 200);
+		return "jsonView";
+	}
+
+	@PostMapping(value = "/saveAnnualGrantList")
+	public String saveAnnualGrantList(@RequestBody Map<String, Object> paramMap, ModelMap model) {
+		try {
+			Map<String, String> result = pm07Svc.saveAnnualGrantList(paramMap);
+			model.addAttribute("result", result);
+			model.addAttribute("resultCode", result.get("resultCode"));
+			model.addAttribute("resultMessage", result.get("resultMessage"));
+		} catch (Exception e) {
+			model.addAttribute("resultCode", 500);
+			model.addAttribute("resultMessage", "저장 실패: " + e.getMessage());
+		}
+		return "jsonView";
+	}
+
+	@PostMapping(value = "/selectAutoCalcAnnualGrantList")
+	public String selectAutoCalcAnnualGrantList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		List<Map<String, String>> resultList = pm07Svc.selectAutoCalcAnnualGrantList(paramMap);
+		model.addAttribute("resultList", resultList);
+		model.addAttribute("resultCode", 200);
+		return "jsonView";
+	}
+
 }

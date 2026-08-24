@@ -23,8 +23,16 @@ public interface PM07Svc {
 
 	Map<String, String> saveAnnualGrant(Map<String, String> paramMap);
 
+	List<Map<String, String>> selectAnnualGrantList(Map<String, String> paramMap);
+
+	Map<String, String> saveAnnualGrantList(Map<String, Object> paramMap);
+
 	int calcAnnualGrantDays(String enterDt, String yy);
 
+	List<Map<String, String>> selectAutoCalcAnnualGrantList(Map<String, String> paramMap);
+
 	int applyVacationApproved(Map<String, String> paramMap) throws Exception;
+
+	int ensureDailyWorkReport(Map<String, String> paramMap);
 
 }

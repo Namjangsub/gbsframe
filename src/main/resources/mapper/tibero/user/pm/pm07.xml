@@ -7,9 +7,6 @@
 		SELECT COUNT(*)
 		FROM TB_PM07M01
 		WHERE 1=1
-		<if test="coCd != null and !coCd.equals('')">
-		AND CO_CD = #{coCd}
-		</if>
 		<if test="reqDtFrom != null and !reqDtFrom.equals('') and reqDtTo != null and !reqDtTo.equals('')">
 		AND REQ_DT BETWEEN #{reqDtFrom} AND #{reqDtTo}
 		</if>
@@ -51,23 +48,36 @@
 					VAC_DAYS,
 					DEDUCT_DAYS,
 					REQ_RMK,
-					SANCTN_STS,
+					/* 실시간 결재선(TB_WB20M03) 기준 결재상태 정밀 판단 (공유자 TODODIV10 제외, 결재자 TODODIV20 전용) */
+					/* (미확인 결재자의 SANCTN_STTUS = 'N' 초기값으로 인한 반려 오인 방지: TODO_CF_DT IS NOT NULL 조건 수식) */
+					/* 1. 결재자가 없으면: 임시저장(TEMP) */
+					/* 2. 본인 결재만 진행되면: 승인요청(REQ) */
+					/* 3. 본인 외 다른 사람 결재 진행 시: 진행중(ING) */
+					/* 4. 모든 결재자 승인 완료 시: 완료(END) */
+					/* 5. 확인일자(TODO_CF_DT)가 존재하고 반려(N/R)된 경우: 반려(RTN) */
+					NVL((
+						SELECT
+							CASE
+								WHEN SUM(CASE WHEN W.TODO_CF_DT IS NOT NULL AND (W.SANCTN_STTUS = 'N' OR W.SANCTN_STTUS = 'R' OR W.SANCTN_STTUS = '4') THEN 1 ELSE 0 END) > 0 THEN 'RTN'
+								WHEN COUNT(W.TODO_KEY) = 0 THEN 'TEMP'
+								WHEN COUNT(W.TODO_KEY) > 0 AND COUNT(W.TODO_KEY) = SUM(CASE WHEN W.TODO_CF_DT IS NOT NULL AND W.SANCTN_STTUS != 'N' THEN 1 ELSE 0 END) THEN 'END'
+								WHEN SUM(CASE WHEN W.SANCTN_SN > 1 AND W.TODO_CF_DT IS NOT NULL AND W.SANCTN_STTUS != 'N' THEN 1 ELSE 0 END) > 0 THEN 'ING'
+								ELSE 'REQ'
+							END
+						FROM TB_WB20M03 W
+						WHERE W.TODO_NO = TB_PM07M01.REQ_NO
+						  AND W.TODO_DIV1_CODE_ID = 'TODODIV20'
+					), NVL(SANCTN_STS, 'TEMP')) AS SANCTN_STS,
 					WORK_RPT_YN,
 					CREAT_ID,
 					TO_CHAR(CREAT_DTTM, 'YYYY-MM-DD HH24:MI:SS') AS CREAT_DTTM
 				FROM TB_PM07M01
 				WHERE 1=1
-				<if test="coCd != null and !coCd.equals('')">
-				AND CO_CD = #{coCd}
-				</if>
 				<if test="reqDtFrom != null and !reqDtFrom.equals('') and reqDtTo != null and !reqDtTo.equals('')">
 				AND REQ_DT BETWEEN #{reqDtFrom} AND #{reqDtTo}
 				</if>
 				<if test="vacTypeCd != null and !vacTypeCd.equals('')">
 				AND VAC_TYPE_CD = #{vacTypeCd}
-				</if>
-				<if test="sanctnSts != null and !sanctnSts.equals('')">
-				AND SANCTN_STS = #{sanctnSts}
 				</if>
 				<if test="reqId != null and !reqId.equals('')">
 				AND REQ_ID = #{reqId}
@@ -77,37 +87,55 @@
 				</if>
 				ORDER BY REQ_DT DESC, REQ_NO DESC
 			) A
+			WHERE 1=1
+			<if test="sanctnSts != null and !sanctnSts.equals('')">
+			AND A.SANCTN_STS = #{sanctnSts}
+			</if>
 		)
 		WHERE RNUM BETWEEN #{firstIndex} AND #{lastIndex}
 	</select>
 
 	<select id="selectVacationDtl" parameterType="Map" resultType="CamelMap">
 		SELECT
-			CO_CD,
-			REQ_NO,
-			REQ_DT,
-			REQ_TITL,
-			REQ_ID,
-			REQ_DEPT_ID,
-			VAC_TYPE_CD,
-			(SELECT CODE_NM FROM TB_CM05M01 WHERE CODE_ID = VAC_TYPE_CD) AS VAC_TYPE_NM,
-			FN_CM06M01_ID_TO_NM(REQ_ID) AS REQ_ID_NM,
-			(SELECT DEPT_NM FROM TB_CM04M01 WHERE DEPT_ID = REQ_DEPT_ID) AS REQ_DEPT_NM,
-			AMPM_CD,
-			TO_CHAR(TO_DATE(ST_DT, 'YYYYMMDD'), 'YYYY-MM-DD') AS ST_DT,
-			TO_CHAR(TO_DATE(ED_DT, 'YYYYMMDD'), 'YYYY-MM-DD') AS ED_DT,
-			TO_CHAR(TO_DATE(ST_TM, 'HH24MI'), 'HH24:MI')       AS ST_TM,
-			TO_CHAR(TO_DATE(ED_TM, 'HH24MI'), 'HH24:MI')       AS ED_TM,
-			VAC_DAYS,
-			DEDUCT_DAYS,
-			REQ_RMK,
-			SANCTN_STS,
-			WORK_RPT_YN,
-			FILE_TRGT_KEY,
-			CREAT_ID,
-			TO_CHAR(CREAT_DTTM, 'YYYY-MM-DD HH24:MI:SS') AS CREAT_DTTM
-		FROM TB_PM07M01
-		WHERE CO_CD = #{coCd} AND REQ_NO = #{reqNo}
+			M.CO_CD,
+			M.REQ_NO,
+			M.REQ_DT,
+			M.REQ_TITL,
+			M.REQ_ID,
+			/* 개인 정보(TB_CM06M01) 사원 마스터의 실제 부서코드를 최우선으로 적용 */
+			NVL((SELECT U.DEPT_ID FROM TB_CM06M01 U WHERE U.ID = M.REQ_ID), M.REQ_DEPT_ID) AS REQ_DEPT_ID,
+			M.VAC_TYPE_CD,
+			(SELECT CODE_NM FROM TB_CM05M01 WHERE CODE_ID = M.VAC_TYPE_CD) AS VAC_TYPE_NM,
+			FN_CM06M01_ID_TO_NM(M.REQ_ID) AS REQ_ID_NM,
+			(SELECT DEPT_NM FROM TB_CM04M01 WHERE DEPT_ID = NVL((SELECT U.DEPT_ID FROM TB_CM06M01 U WHERE U.ID = M.REQ_ID), M.REQ_DEPT_ID)) AS REQ_DEPT_NM,
+			M.AMPM_CD,
+			TO_CHAR(TO_DATE(M.ST_DT, 'YYYYMMDD'), 'YYYY-MM-DD') AS ST_DT,
+			TO_CHAR(TO_DATE(M.ED_DT, 'YYYYMMDD'), 'YYYY-MM-DD') AS ED_DT,
+			TO_CHAR(TO_DATE(M.ST_TM, 'HH24MI'), 'HH24:MI')       AS ST_TM,
+			TO_CHAR(TO_DATE(M.ED_TM, 'HH24MI'), 'HH24:MI')       AS ED_TM,
+			M.VAC_DAYS,
+			M.DEDUCT_DAYS,
+			M.REQ_RMK,
+			/* 상세 조회 시에도 실시간 결재선(TB_WB20M03) 기준 결재상태 정밀 산출 */
+			NVL((
+				SELECT
+					CASE
+						WHEN SUM(CASE WHEN W.TODO_CF_DT IS NOT NULL AND (W.SANCTN_STTUS = 'N' OR W.SANCTN_STTUS = 'R' OR W.SANCTN_STTUS = '4') THEN 1 ELSE 0 END) > 0 THEN 'RTN'
+						WHEN COUNT(W.TODO_KEY) = 0 THEN 'TEMP'
+						WHEN COUNT(W.TODO_KEY) > 0 AND COUNT(W.TODO_KEY) = SUM(CASE WHEN W.TODO_CF_DT IS NOT NULL AND W.SANCTN_STTUS != 'N' THEN 1 ELSE 0 END) THEN 'END'
+						WHEN SUM(CASE WHEN W.SANCTN_SN > 1 AND W.TODO_CF_DT IS NOT NULL AND W.SANCTN_STTUS != 'N' THEN 1 ELSE 0 END) > 0 THEN 'ING'
+						ELSE 'REQ'
+					END
+				FROM TB_WB20M03 W
+				WHERE W.TODO_NO = M.REQ_NO
+				  AND W.TODO_DIV1_CODE_ID = 'TODODIV20'
+			), NVL(M.SANCTN_STS, 'TEMP')) AS SANCTN_STS,
+			M.WORK_RPT_YN,
+			M.FILE_TRGT_KEY,
+			M.CREAT_ID,
+			TO_CHAR(M.CREAT_DTTM, 'YYYY-MM-DD HH24:MI:SS') AS CREAT_DTTM
+		FROM TB_PM07M01 M
+		WHERE M.REQ_NO = #{reqNo}
 	</select>
 
 	<insert id="insertVacation" parameterType="Map">
@@ -174,12 +202,12 @@
 			UPDT_ID = #{userId, jdbcType=VARCHAR},
 			UPDT_PGM = 'PM0701P01',
 			UPDT_DTTM = SYSDATE
-		WHERE CO_CD = #{coCd, jdbcType=VARCHAR} AND REQ_NO = #{reqNo, jdbcType=VARCHAR}
+		WHERE REQ_NO = #{reqNo, jdbcType=VARCHAR}
 	</update>
 
 	<delete id="deleteVacation" parameterType="Map">
 		DELETE FROM TB_PM07M01
-		WHERE CO_CD = #{coCd} AND REQ_NO = #{reqNo}
+		WHERE REQ_NO = #{reqNo}
 	</delete>
 
 	<select id="selectAnnualBalance" parameterType="Map" resultType="int">
@@ -212,14 +240,14 @@
 			CREAT_PGM,
 			CREAT_DTTM
 		) VALUES (
-			#{coCd},
-			#{yy},
-			#{userId},
-			#{grantDays},
-			#{autoYn},
-			#{rmk},
-			#{userId},
-			'PM0701M01',
+			#{coCd, jdbcType=VARCHAR},
+			#{yy, jdbcType=VARCHAR},
+			#{userId, jdbcType=VARCHAR},
+			#{grantDays, jdbcType=NUMERIC},
+			NVL(#{autoYn, jdbcType=VARCHAR}, 'N'),
+			#{rmk, jdbcType=VARCHAR},
+			#{userId, jdbcType=VARCHAR},
+			'PM0701P02',
 			SYSDATE
 		)
 	</insert>
@@ -227,13 +255,15 @@
 	<update id="updateAnnualGrant" parameterType="Map">
 		UPDATE TB_PM07M02
 		SET
-			GRANT_DAYS = #{grantDays},
-			AUTO_YN = #{autoYn},
-			RMK = #{rmk},
-			UPDT_ID = #{userId},
-			UPDT_PGM = 'PM0701M01',
+			GRANT_DAYS = #{grantDays, jdbcType=NUMERIC},
+			AUTO_YN = NVL(#{autoYn, jdbcType=VARCHAR}, 'N'),
+			RMK = #{rmk, jdbcType=VARCHAR},
+			UPDT_ID = #{userId, jdbcType=VARCHAR},
+			UPDT_PGM = 'PM0701P02',
 			UPDT_DTTM = SYSDATE
-		WHERE CO_CD = #{coCd} AND YY = #{yy} AND USER_ID = #{userId}
+		WHERE CO_CD = #{coCd, jdbcType=VARCHAR} 
+		  AND YY = #{yy, jdbcType=VARCHAR} 
+		  AND USER_ID = #{userId, jdbcType=VARCHAR}
 	</update>
 
 	<select id="selectAnnualGrantCount" parameterType="Map" resultType="int">
@@ -256,24 +286,122 @@
 		WHERE CO_CD = #{coCd} AND YY = #{yy} AND USER_ID = #{userId}
 	</select>
 
+	<select id="selectAnnualGrantList" parameterType="Map" resultType="CamelMap">
+		SELECT
+			T.CO_CD,
+			T.YY,
+			T.USER_ID,
+			T.USER_NM,
+			T.DEPT_NM,
+			T.ENTER_DT,
+			T.LEAVE_DT,
+			T.GRANT_DAYS,
+			T.USED_DAYS,
+			(T.GRANT_DAYS - T.USED_DAYS) AS BALANCE_DAYS,
+			T.AUTO_YN,
+			T.RMK,
+			T.VAC_INFO_LIST
+		FROM (
+			SELECT
+				M.CO_CD,
+				M.YY,
+				M.USER_ID,
+				U.NAME AS USER_NM,
+				D.DEPT_NM,
+				NVL(D.SORT_NO, 9999) AS DEPT_SORT_NO,
+				TO_CHAR(U.ENTER_DT, 'YYYY-MM-DD') AS ENTER_DT,
+				TO_CHAR(U.LEAVE_DT, 'YYYY-MM-DD') AS LEAVE_DT,
+				NVL(M.GRANT_DAYS, 0) AS GRANT_DAYS,
+				NVL((
+					SELECT SUM(V.DEDUCT_DAYS)
+					FROM TB_PM07M01 V
+					WHERE V.CO_CD = M.CO_CD
+					  AND V.REQ_ID = M.USER_ID
+					  AND V.ST_DT LIKE M.YY || '%'
+					  AND V.SANCTN_STS = 'END'
+				), 0) AS USED_DAYS,
+				(
+					SELECT LISTAGG(
+						TO_CHAR(TO_DATE(V.ST_DT, 'YYYYMMDD'), 'YYYY-MM-DD') || 
+						CASE WHEN V.ED_DT IS NOT NULL AND V.ED_DT != V.ST_DT THEN '~' || TO_CHAR(TO_DATE(V.ED_DT, 'YYYYMMDD'), 'MM-DD') ELSE '' END || 
+						' (' || NVL((SELECT CODE_NM FROM TB_CM05M01 WHERE CODE_ID = V.VAC_TYPE_CD), V.VAC_TYPE_CD) || ' ' || V.DEDUCT_DAYS || '일)', 
+						'; '
+					) WITHIN GROUP (ORDER BY V.ST_DT ASC)
+					FROM TB_PM07M01 V
+					WHERE V.REQ_ID = M.USER_ID
+					  AND V.ST_DT LIKE M.YY || '%'
+					  AND V.SANCTN_STS = 'END'
+				) AS VAC_INFO_LIST,
+				M.AUTO_YN,
+				M.RMK
+			FROM TB_PM07M02 M
+			LEFT OUTER JOIN TB_CM06M01 U ON M.USER_ID = U.ID
+			LEFT OUTER JOIN TB_CM04M01 D ON D.DEPT_ID = SUBSTR(NVL(U.VIEW_DEPT_ID, U.DEPT_ID), 1, 5)
+			WHERE 1=1
+			<if test="yy != null and !yy.equals('')">
+			  AND M.YY = #{yy}
+			</if>
+			<if test="userId != null and !userId.equals('')">
+			  AND M.USER_ID = #{userId}
+			</if>
+			<if test="searchValue != null and !searchValue.equals('')">
+			  AND (U.NAME LIKE '%' || #{searchValue} || '%' OR M.USER_ID LIKE '%' || #{searchValue} || '%')
+			</if>
+		) T
+		ORDER BY T.YY DESC, T.DEPT_SORT_NO ASC, T.DEPT_NM ASC, T.USER_NM ASC
+	</select>
+
+	<delete id="deleteAnnualGrant" parameterType="Map">
+		DELETE FROM TB_PM07M02
+		WHERE CO_CD = #{coCd} AND YY = #{yy} AND USER_ID = #{userId}
+	</delete>
+
+	<select id="selectUnregisteredUserList" parameterType="Map" resultType="CamelMap">
+		<!-- 미등록 재직 사원 연차 자동계산 대상 조회 (임원실: GUN00, 실적관리용: GUN95 부서는 자동계산 대상에서 제외됨) -->
+		SELECT
+			U.ID AS USER_ID,
+			U.NAME AS USER_NM,
+			D.DEPT_NM,
+			TO_CHAR(U.ENTER_DT, 'YYYY-MM-DD') AS ENTER_DT,
+			TO_CHAR(U.LEAVE_DT, 'YYYY-MM-DD') AS LEAVE_DT
+		FROM TB_CM06M01 U
+		LEFT OUTER JOIN TB_CM04M01 D ON D.DEPT_ID = SUBSTR(NVL(U.VIEW_DEPT_ID, U.DEPT_ID), 1, 5)
+		WHERE U.USE_YN = 'Y'
+		  /* 임원실(GUN00), 실적관리용(GUN95) 부서는 제외 */
+		  AND SUBSTR(NVL(U.VIEW_DEPT_ID, U.DEPT_ID), 1, 5) NOT IN ('GUN00', 'GUN95')
+		  AND (U.LEAVE_DT IS NULL OR TO_CHAR(U.LEAVE_DT, 'YYYY') >= #{yy})
+		  AND NOT EXISTS (
+			SELECT 1 FROM TB_PM07M02 M
+			WHERE M.YY = #{yy}
+			  AND M.USER_ID = U.ID
+		  )
+		ORDER BY NVL(D.SORT_NO, 9999) ASC, D.DEPT_NM ASC, U.NAME ASC
+	</select>
+
 	<select id="selectVacationReqNoNext" parameterType="Map" resultType="String">
 		SELECT 'VAC' || TO_CHAR(SYSDATE, 'YYYYMMDD') || '-' || LPAD(MOD(TB_PM07M01_SQ01.NEXTVAL, 10000), 4, '0') FROM DUAL
 	</select>
 
 	<select id="selectWorkRptCodeByDept" parameterType="Map" resultType="CamelMap">
-		<!-- 부서별 업무코드 조회: 소분류(S)에서 부모를 거슬러 올라가는 자기참조 계층 -->
-		<!-- 별칭은 반드시 대문자+언더스코어로 쓴다. Tibero 는 따옴표 없는 별칭을 대문자로 접으므로
-		     AS workRptS 로 쓰면 컬럼명이 WORKRPTS 가 되고, underscoreToCamelCase 로도 workRptS 가
-		     되지 않아(workrpts) 조회값이 전부 null 로 들어온다. -->
+		<!-- 부서별 휴가 업무코드(9901) 조회 (부서 5자리 + 개인업무 99 + 휴가 01) -->
 		SELECT S.CODE_ID   AS WORK_RPT_S,
 		       S.CODE_KIND AS WORK_RPT_M,
 		       M.CODE_KIND AS WORK_RPT_L
 		  FROM TB_CM05M01 S
 		  JOIN TB_CM05M01 M ON M.CODE_ID = S.CODE_KIND
-		 WHERE S.CODE_ID LIKE #{deptId} || '%'
-		   AND S.CODE_ID LIKE '%09901'
+		 WHERE S.CODE_ID LIKE '%9901'
+		   AND (
+		         S.CODE_ID LIKE SUBSTR(#{deptId}, 1, 5) || '%'
+		      OR S.CODE_ID LIKE #{deptId} || '%'
+		      OR 1=1
+		   )
 		   AND S.USE_YN = 'Y'
+		 ORDER BY (CASE WHEN S.CODE_ID LIKE SUBSTR(#{deptId}, 1, 5) || '%' THEN 1 ELSE 2 END) ASC
 		 FETCH FIRST 1 ROWS ONLY
+	</select>
+
+	<select id="selectFileTrgtKeyNext" resultType="String">
+		SELECT TB_PM01M01_SQ01.NEXTVAL FROM DUAL
 	</select>
 
 	<insert id="insertDailyWorkReport" parameterType="Map">
@@ -288,6 +416,7 @@
 			WORK_RPT_S,
 			WORK_RPT_HOUR,
 			WORK_RPT_RMK,
+			ISSUE_YN,
 			CREAT_ID,
 			CREAT_PGM,
 			CREAT_DTTM
@@ -302,6 +431,7 @@
 			#{workRptS, jdbcType=VARCHAR},
 			#{workRptHour, jdbcType=VARCHAR},
 			#{workRptRmk, jdbcType=VARCHAR},
+			NVL(#{issueYn, jdbcType=VARCHAR}, 'N'),
 			#{userId, jdbcType=VARCHAR},
 			'PM0701P01',
 			SYSDATE
@@ -317,11 +447,20 @@
 		<!-- 결재정보 확인 용도 -->
 		SELECT COUNT(*)
 		FROM TB_WB20M03
-		WHERE TODO_FILE_TRGT_KEY = #{fileTrgtKey}
-		AND TODO_CO_CD = #{coCd}
-		AND TODO_NO = #{reqNo}
+		WHERE TODO_NO = #{reqNo}
+		<if test="fileTrgtKey != null and !fileTrgtKey.equals('')">
+		  AND TODO_FILE_TRGT_KEY = #{fileTrgtKey}
+		</if>
 		AND TODO_DIV1_CODE_ID = 'TODODIV20'
 		AND SANCTN_STTUS = 'Y'
+	</select>
+
+	<select id="selectApprovalCount" parameterType="Map" resultType="int">
+		/* 해당 문서(REQ_NO)의 순수 결재자(TODODIV20) 수 조회 */
+		SELECT COUNT(*)
+		FROM TB_WB20M03
+		WHERE TODO_NO = #{reqNo}
+		  AND TODO_DIV1_CODE_ID = 'TODODIV20'
 	</select>
 
 	<update id="updateVacationApprovalStatus" parameterType="Map">
@@ -333,7 +472,7 @@
 		<if test="workRptYn != null and !workRptYn.equals('')">
 			, WORK_RPT_YN = #{workRptYn, jdbcType=VARCHAR}
 		</if>
-		WHERE CO_CD = #{coCd, jdbcType=VARCHAR} AND REQ_NO = #{reqNo, jdbcType=VARCHAR}
+		WHERE REQ_NO = #{reqNo, jdbcType=VARCHAR}
 	</update>
 
 	<select id="selectDailyWorkReportSeqNext" parameterType="Map" resultType="String">
@@ -359,15 +498,31 @@
 		)
 	</insert>
 
-	<delete id="deleteVacationDates" parameterType="Map">
-		DELETE FROM TB_PM07M03
-		WHERE CO_CD = #{coCd} AND REQ_NO = #{reqNo}
+	<delete id="deleteDailyWorkReportByVacation" parameterType="Map">
+		/* 휴가 삭제/수정 시 TB_PM01M01 에 자동 등록된 일일작업일지 휴가 레코드 제거 */
+		DELETE FROM TB_PM01M01
+		WHERE WORK_RPT_ID = (SELECT REQ_ID FROM TB_PM07M01 WHERE REQ_NO = #{reqNo})
+		  AND WORK_RPT_DT IN (SELECT VAC_DT FROM TB_PM07M03 WHERE REQ_NO = #{reqNo})
+		  AND WORK_RPT_S LIKE '%9901'
 	</delete>
 
+	<delete id="deleteVacationDates" parameterType="Map">
+		DELETE FROM TB_PM07M03
+		WHERE REQ_NO = #{reqNo}
+	</delete>
+
+	<update id="updateVacationDateWorkRptNo" parameterType="Map">
+		UPDATE TB_PM07M03
+		SET WORK_RPT_NO = #{workRptNo, jdbcType=VARCHAR}
+		WHERE CO_CD = #{coCd, jdbcType=VARCHAR}
+		  AND REQ_NO = #{reqNo, jdbcType=VARCHAR}
+		  AND VAC_DT = #{vacDt, jdbcType=VARCHAR}
+	</update>
+
 	<select id="selectVacationDateList" parameterType="Map" resultType="CamelMap">
-		SELECT CO_CD, REQ_NO, VAC_DT, WORK_HOUR
+		SELECT CO_CD, REQ_NO, VAC_DT, WORK_HOUR, WORK_RPT_NO
 		FROM TB_PM07M03
-		WHERE CO_CD = #{coCd} AND REQ_NO = #{reqNo}
+		WHERE REQ_NO = #{reqNo}
 		ORDER BY VAC_DT ASC
 	</select>
 

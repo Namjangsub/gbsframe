@@ -600,6 +600,11 @@ public class WB20SvcImpl implements WB20Svc {
 	}
 
 	@Override
+	public int deleteTodoMasterByTodoNo(Map<String, String> param) {
+		return wb20Mapper.deleteTodoMasterByTodoNo(param);
+	}
+
+	@Override
 	public Map<String, String> selectMobileTodoSelect(Map<String, String> paramMap) {
 		return wb20Mapper.selectMobileTodoSelect(paramMap);
 	}

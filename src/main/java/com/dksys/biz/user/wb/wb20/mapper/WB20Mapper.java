@@ -55,6 +55,8 @@ public interface WB20Mapper {
 
 	int deleteAllTodoMaster(Map<String, String> param);
 
+	int deleteTodoMasterByTodoNo(Map<String, String> param);
+
 	//결재 todo 삭제시 순번
 	int updateTodoMasterSanctnSn(Map<String, String> paramMap);
 

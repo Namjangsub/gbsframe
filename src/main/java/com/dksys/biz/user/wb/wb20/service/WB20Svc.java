@@ -43,6 +43,8 @@ public interface WB20Svc {
 
 	int deleteTodoMaster(Map<String, String> param);
 
+	int deleteTodoMasterByTodoNo(Map<String, String> param);
+
 	Map<String, String> selectMobileTodoSelect(Map<String, String> paramMap);
 
 	Map<String, String> selectTodoFinalYn(Map<String, String> paramMap);
