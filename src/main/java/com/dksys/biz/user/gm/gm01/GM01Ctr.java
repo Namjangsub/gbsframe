@@ -38,7 +38,7 @@ public class GM01Ctr {
 
 	// 보안USB 불출 등록
 	@PostMapping("/insertSecUsbOut")
-	public String insertSecUsbOut(@RequestBody Map<String, String> paramMap, ModelMap model) {
+	public String insertSecUsbOut(@RequestBody Map<String, Object> paramMap, ModelMap model) {
 		try {
 			if (gm01Svc.insertSecUsbOut(paramMap) != 0) {
 				model.addAttribute("resultCode", 200);
@@ -56,7 +56,7 @@ public class GM01Ctr {
 
 	// 보안USB 불출 수정
 	@PutMapping("/updateSecUsbOut")
-	public String updateSecUsbOut(@RequestBody Map<String, String> paramMap, ModelMap model) {
+	public String updateSecUsbOut(@RequestBody Map<String, Object> paramMap, ModelMap model) {
 		try {
 			if (gm01Svc.updateSecUsbOut(paramMap) != 0) {
 				model.addAttribute("resultCode", 200);
@@ -123,6 +123,14 @@ public class GM01Ctr {
 			model.addAttribute("resultCode", 900);
 			model.addAttribute("resultMessage", e.getMessage());
 		}
+		return "jsonView";
+	}
+
+	// 보안USB 불출 상세 목록 조회
+	@PostMapping("/selectSecUsbDtlList")
+	public String selectSecUsbDtlList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		List<Map<String, String>> result = gm01Svc.selectSecUsbDtlList(paramMap);
+		model.addAttribute("result", result);
 		return "jsonView";
 	}
 

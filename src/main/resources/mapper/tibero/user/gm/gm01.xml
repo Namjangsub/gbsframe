@@ -33,7 +33,7 @@
 		   AND A.VEND_CLNT_CD = #{vendClntCd, jdbcType=VARCHAR}
 		</if>
 		<if test="salesCd != null and salesCd != ''">
-		   AND UPPER(A.SALES_CD) LIKE '%' || UPPER(#{salesCd, jdbcType=VARCHAR}) || '%'
+		   AND EXISTS (SELECT 1 FROM TB_GM01D01 D WHERE D.CO_CD = A.CO_CD AND D.MNG_NO = A.MNG_NO AND UPPER(D.SALES_CD) LIKE '%' || UPPER(#{salesCd, jdbcType=VARCHAR}) || '%')
 		</if>
 		<if test="rmk != null and rmk != ''">
 		   AND UPPER(A.RMK) LIKE '%' || UPPER(#{rmk, jdbcType=VARCHAR}) || '%'
@@ -65,10 +65,9 @@
 		            , A.VEND_CLNT_CD
 		            , A.VEND_CLNT_NM
 		            , A.VEND_USER_NM
-		            , A.SALES_CD
-		            , A.CLNT_PJT
-		            , A.CLNT_PJT_NM
-		            , A.EQP_NM
+		            , (SELECT COUNT(*) FROM TB_GM01D01 D WHERE D.CO_CD = A.CO_CD AND D.MNG_NO = A.MNG_NO) AS SALES_CD_CNT
+		            , (SELECT D.SALES_CD FROM TB_GM01D01 D WHERE D.CO_CD = A.CO_CD AND D.MNG_NO = A.MNG_NO AND D.DTL_SEQ = (SELECT MIN(D2.DTL_SEQ) FROM TB_GM01D01 D2 WHERE D2.CO_CD = A.CO_CD AND D2.MNG_NO = A.MNG_NO)) AS FIRST_SALES_CD
+		            , (SELECT D.SALES_CD FROM TB_GM01D01 D WHERE D.CO_CD = A.CO_CD AND D.MNG_NO = A.MNG_NO AND D.DTL_SEQ = (SELECT MIN(D2.DTL_SEQ) FROM TB_GM01D01 D2 WHERE D2.CO_CD = A.CO_CD AND D2.MNG_NO = A.MNG_NO)) AS SALES_CD
 		            , A.RMK
 		            , A.IN_DT
 		            , A.IN_USER_ID
@@ -113,7 +112,7 @@
 		          AND A.VEND_CLNT_CD = #{vendClntCd, jdbcType=VARCHAR}
 		       </if>
 		       <if test="salesCd != null and salesCd != ''">
-		          AND UPPER(A.SALES_CD) LIKE '%' || UPPER(#{salesCd, jdbcType=VARCHAR}) || '%'
+		          AND EXISTS (SELECT 1 FROM TB_GM01D01 D WHERE D.CO_CD = A.CO_CD AND D.MNG_NO = A.MNG_NO AND UPPER(D.SALES_CD) LIKE '%' || UPPER(#{salesCd, jdbcType=VARCHAR}) || '%')
 		       </if>
 		       <if test="rmk != null and rmk != ''">
 		          AND UPPER(A.RMK) LIKE '%' || UPPER(#{rmk, jdbcType=VARCHAR}) || '%'
@@ -134,15 +133,13 @@
 	<insert id="insertSecUsbOut" parameterType="Map">
 		INSERT INTO TB_GM01M01 (
 			CO_CD, MNG_NO, OUT_DT, USB_CD, OUT_DEPT_ID, OUT_DEPT_NM, OWN_DEPT_ID, OWN_DEPT_NM,
-			OWN_USER_ID, OWN_USER_NM, VEND_CLNT_CD, VEND_CLNT_NM, VEND_USER_NM, SALES_CD,
-			CLNT_PJT, CLNT_PJT_NM, EQP_NM, RMK, CREAT_ID, CREAT_DTTM, CREAT_PGM
+			OWN_USER_ID, OWN_USER_NM, VEND_CLNT_CD, VEND_CLNT_NM, VEND_USER_NM, RMK, CREAT_ID, CREAT_DTTM, CREAT_PGM
 		) VALUES (
 			#{coCd, jdbcType=VARCHAR}, #{mngNo, jdbcType=VARCHAR}, #{outDt, jdbcType=VARCHAR}, #{usbCd, jdbcType=VARCHAR},
 			NVL(#{outDeptId, jdbcType=VARCHAR}, (SELECT CODE_ETC FROM TB_CM05M01 WHERE CODE_ID = #{usbCd, jdbcType=VARCHAR} AND ROWNUM = 1)),
 			NVL(#{outDeptNm, jdbcType=VARCHAR}, (SELECT DEPT_NM FROM TB_CM04M01 WHERE DEPT_ID = (SELECT CODE_ETC FROM TB_CM05M01 WHERE CODE_ID = #{usbCd, jdbcType=VARCHAR} AND ROWNUM = 1) AND ROWNUM = 1)),
 			#{ownDeptId, jdbcType=VARCHAR}, #{ownDeptNm, jdbcType=VARCHAR},
-			#{ownUserId, jdbcType=VARCHAR}, #{ownUserNm, jdbcType=VARCHAR}, #{vendClntCd, jdbcType=VARCHAR}, #{vendClntNm, jdbcType=VARCHAR}, #{vendUserNm, jdbcType=VARCHAR}, #{salesCd, jdbcType=VARCHAR},
-			#{clntPjt, jdbcType=VARCHAR}, #{clntPjtNm, jdbcType=VARCHAR}, #{eqpNm, jdbcType=VARCHAR}, #{rmk, jdbcType=VARCHAR}, #{userId, jdbcType=VARCHAR}, SYSDATE, #{pgmId, jdbcType=VARCHAR}
+			#{ownUserId, jdbcType=VARCHAR}, #{ownUserNm, jdbcType=VARCHAR}, #{vendClntCd, jdbcType=VARCHAR}, #{vendClntNm, jdbcType=VARCHAR}, #{vendUserNm, jdbcType=VARCHAR}, #{rmk, jdbcType=VARCHAR}, #{userId, jdbcType=VARCHAR}, SYSDATE, #{pgmId, jdbcType=VARCHAR}
 		)
 	</insert>
 
@@ -160,10 +157,6 @@
 		     , VEND_CLNT_CD = #{vendClntCd, jdbcType=VARCHAR}
 		     , VEND_CLNT_NM = #{vendClntNm, jdbcType=VARCHAR}
 		     , VEND_USER_NM = #{vendUserNm, jdbcType=VARCHAR}
-		     , SALES_CD     = #{salesCd, jdbcType=VARCHAR}
-		     , CLNT_PJT     = #{clntPjt, jdbcType=VARCHAR}
-		     , CLNT_PJT_NM   = #{clntPjtNm, jdbcType=VARCHAR}
-		     , EQP_NM       = #{eqpNm, jdbcType=VARCHAR}
 		     , RMK          = #{rmk, jdbcType=VARCHAR}
 		     , UDT_ID       = #{userId, jdbcType=VARCHAR}
 		     , UDT_DTTM     = SYSDATE
@@ -206,6 +199,36 @@
 	<delete id="deleteSecUsb" parameterType="Map">
 		DELETE FROM TB_GM01M01
 		 WHERE CO_CD  = #{coCd, jdbcType=VARCHAR}
+		   AND MNG_NO = #{mngNo, jdbcType=VARCHAR}
+	</delete>
+
+	<!-- 보안USB 불출 상세 목록 조회 -->
+	<select id="selectSecUsbDtlList" parameterType="Map" resultType="camelMap">
+		SELECT CO_CD, MNG_NO, DTL_SEQ, SALES_CD, CLNT_PJT, CLNT_PJT_NM, EQP_NM, CREAT_ID, CREAT_DTTM
+		  FROM TB_GM01D01
+		 WHERE CO_CD = #{coCd, jdbcType=VARCHAR}
+		   AND MNG_NO = #{mngNo, jdbcType=VARCHAR}
+		 ORDER BY DTL_SEQ ASC
+	</select>
+
+	<!-- 보안USB 상세 시퀀스 채번 -->
+	<select id="selectSecUsbNextDtlSeq" parameterType="Map" resultType="String">
+		SELECT LPAD(NVL(MAX(TO_NUMBER(DTL_SEQ)), 0) + 1, 4, '0')
+		  FROM TB_GM01D01
+		 WHERE CO_CD = #{coCd, jdbcType=VARCHAR}
+		   AND MNG_NO = #{mngNo, jdbcType=VARCHAR}
+	</select>
+
+	<!-- 보안USB 불출 상세 등록 -->
+	<insert id="insertSecUsbDtl" parameterType="Map">
+		INSERT INTO TB_GM01D01 (CO_CD, MNG_NO, DTL_SEQ, SALES_CD, CLNT_PJT, CLNT_PJT_NM, EQP_NM, CREAT_ID, CREAT_DTTM)
+		VALUES (#{coCd, jdbcType=VARCHAR}, #{mngNo, jdbcType=VARCHAR}, #{dtlSeq, jdbcType=VARCHAR}, #{salesCd, jdbcType=VARCHAR}, #{clntPjt, jdbcType=VARCHAR}, #{clntPjtNm, jdbcType=VARCHAR}, #{eqpNm, jdbcType=VARCHAR}, #{userId, jdbcType=VARCHAR}, SYSDATE)
+	</insert>
+
+	<!-- 보안USB 불출 상세 전체 삭제 -->
+	<delete id="deleteSecUsbDtlAll" parameterType="Map">
+		DELETE FROM TB_GM01D01
+		 WHERE CO_CD = #{coCd, jdbcType=VARCHAR}
 		   AND MNG_NO = #{mngNo, jdbcType=VARCHAR}
 	</delete>
 
