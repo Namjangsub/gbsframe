@@ -2,7 +2,7 @@
 // PM51 순차결재 대상 결재구분. 값이 있으면 "선행되어야 하는 신청부서 결재구분"을 의미한다.
 // (관리부서 결재는 신청부서 결재가 모두 완료되어야 진행 가능 - 서버 validatePm51SequentialApproval과 동일 기준)
 var PM51_SEQ_GENERAL_OF = {
-	'TODODIV2190': '', 'TODODIV2200': '',					// 신청부서(출장신청서/출장복명서)
+	'TODODIV2190': '', 'TODODIV2200': '', 'TODODIV2300': '',		// 신청부서(출장신청서/출장복명서/휴가신청서)
 	'TODODIV2191': 'TODODIV2190', 'TODODIV2201': 'TODODIV2200'	// 관리부서(출장신청서/출장복명서)
 };
 

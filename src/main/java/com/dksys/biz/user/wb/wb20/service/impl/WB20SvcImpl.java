@@ -12,6 +12,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.dksys.biz.admin.cm.cm16.mapper.CM16Mapper;
 import com.dksys.biz.user.im.im01.mapper.IM01Mapper;
+import com.dksys.biz.user.pm.pm07.service.PM07Svc;
 import com.dksys.biz.user.pm.pm51.mapper.PM51Mapper;
 import com.dksys.biz.user.qm.qm01.mapper.QM01Mapper;
 import com.dksys.biz.user.wb.wb20.mapper.WB20Mapper;
@@ -43,6 +44,9 @@ public class WB20SvcImpl implements WB20Svc {
 
 	@Autowired
 	PM51Mapper pm51Mapper;
+
+	@Autowired
+	PM07Svc pm07Svc;
 
 	@Autowired
 	ExceptionThrower thrower;
@@ -317,6 +321,22 @@ public class WB20SvcImpl implements WB20Svc {
 			updatePm51AprvSts(paramMap, "Y".equals(resultMap.get("todoYn")) ? "APRVSTS03" : "APRVSTS02");
 		}
 
+		// PM07 휴가신청서: 결재 상태 갱신 + 최종승인 시 일일업무일지(TB_PM01M01) 반영
+		if ("TODODIV2300".equals(todoDiv2CodeId)) {
+			try {
+				Map<String, String> pm07Param = new HashMap<>();
+				pm07Param.put("todoNo", paramMap.get("todoNo"));
+				pm07Param.put("coCd", paramMap.get("coCd"));
+				pm07Param.put("todoYn", resultMap.get("todoYn"));
+				pm07Svc.applyVacationApproved(pm07Param);
+			} catch (Exception e) {
+				// 후처리 실패 시 결재는 정상 처리 (로그만 남김).
+				// applyVacationApproved 는 바깥(이) 트랜잭션 안에서 실행되며(PM51 updatePm51AprvSts 와 동일),
+				// 내부에서 예외를 자체 흡수하므로 여기까지 전파되지 않는다. 이 catch 는 방어용이다.
+				e.printStackTrace();
+			}
+		}
+
 		// PFU결재완료 시 추가 공유자 설정
 		resultMap.put("RESULT_COUNT", Integer.toString(result));
 		resultMap.put("PFU_SHARE_TARGET_YN", "N");
@@ -373,7 +393,8 @@ public class WB20SvcImpl implements WB20Svc {
 		if (!"TODODIV20".equals(todoDiv1CodeId)) {
 			return;
 		}
-		boolean isGeneralLine = "TODODIV2190".equals(todoDiv2CodeId) || "TODODIV2200".equals(todoDiv2CodeId);
+		boolean isGeneralLine = "TODODIV2190".equals(todoDiv2CodeId) || "TODODIV2200".equals(todoDiv2CodeId)
+			|| "TODODIV2300".equals(todoDiv2CodeId); // PM07 휴가신청서도 대상
 		boolean isMngLine = GENERAL_TO_MNG_TODODIV2.containsKey(todoDiv2CodeId);
 		if (!isGeneralLine && !isMngLine) {
 			return;

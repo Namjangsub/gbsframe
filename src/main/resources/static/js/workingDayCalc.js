@@ -288,3 +288,59 @@ function myWorkDay(workingDays, holiDaysCnt)
     this.workingDays = workingDays;
     this.holiDays = holiDaysCnt;
 }
+
+/*
+ * 시작~종료 구간의 영업일 "목록"을 반환한다. (기존 calculateHolidayCnt 는 개수만 반환)
+ * 판정 기준은 calculateHolidayCnt 와 완전히 동일하다 - 주말 + yearHolidayTable(양력/음력/대체공휴일).
+ * 서버(Java)에는 음력 변환 수단이 없으므로, 화면에서 이 목록을 만들어 저장하고
+ * 서버는 저장된 목록을 그대로 쓴다. (PM07 휴가신청 - 일일업무일지 생성에 사용)
+ *
+ * @param startDate "YYYY-MM-DD"
+ * @param endDate   "YYYY-MM-DD"
+ * @return ["YYYY-MM-DD", ...] 영업일만. 오류 시 빈 배열.
+ */
+function listWorkingDays(startDate, endDate) {
+	var result = [];
+	try {
+		var start = new Date(startDate);
+		var end = new Date(endDate);
+		var hol = new Date();
+		var yearHolidays = [];
+		var lunaChkYear = 0;
+
+		while (start <= end) {
+			var day = start.getDay();			// 0:일요일, 6:토요일
+			var chkYear = start.getFullYear();
+
+			if (lunaChkYear != chkYear) {		// 년도가 바뀌면 해당년도 휴일테이블 재생성
+				yearHolidays = yearHolidayTable(chkYear);
+				lunaChkYear = chkYear;
+			}
+
+			var holDaySw = 0;
+			if (day == 0 || day == 6) {
+				holDaySw = 1;
+			} else {
+				for (var i = 0; i < yearHolidays.length; i++) {
+					var holiday = yearHolidays[i];
+					hol.setTime(Date.parse(holiday.slice(0, 4) + "-" + holiday.slice(4, 6) + "-" + holiday.slice(6, 8)));
+					if (start.toISOString().slice(0, 10) < hol.toISOString().slice(0, 10)) break;
+					if (start.toISOString().slice(0, 10) === hol.toISOString().slice(0, 10)) {
+						holDaySw = 1;
+						break;
+					}
+				}
+			}
+
+			if (!holDaySw) {
+				result.push(start.toISOString().slice(0, 10));
+			}
+
+			start.setDate(start.getDate() + 1);
+		}
+	} catch (error) {
+		console.error(error);
+		return [];
+	}
+	return result;
+}

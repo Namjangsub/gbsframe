@@ -906,7 +906,7 @@
 						var row = this.item;
 						openRptDateTimePicker(dindex, row);
 					} else if (key === 'tripStTm' || key === 'tripEdTm') {
-						openRptTimeSelectPopup(this.dindex);
+						openRptTimeSelectPopup(this.dindex, key);
 					}
 				},
 				onDataChanged: function () {
@@ -3246,6 +3246,65 @@
 			}
 		});
 		$('#travelerPickerTimeRow, #rptPickerTimeRow').remove();
+	}
+
+	// 복명서 출장자 그리드 시간 선택 피커 팝업
+	function openRptTimeSelectPopup(dindex, key) {
+		if (isRptTravelerGridEditBlocked()) return;
+
+		$('#rptTimePickerLayer').remove();
+
+		var timeOptions = [
+			"06:00", "06:30", "07:00", "07:30", "08:00", "08:30",
+			"09:00", "09:30", "10:00", "10:30", "11:00", "11:30",
+			"12:00", "12:30", "13:00", "13:30", "14:00", "14:30",
+			"15:00", "15:30", "16:00", "16:30", "17:00", "17:30",
+			"18:00", "18:30", "19:00", "19:30", "20:00", "20:30",
+			"21:00", "21:30", "22:00", "22:30", "23:00", "23:30"
+		];
+
+		var curVal = "";
+		if (rptTravelerGridView && rptTravelerGridView.target && rptTravelerGridView.target.list[dindex]) {
+			curVal = rptTravelerGridView.target.list[dindex][key] || "";
+		}
+
+		var html = '<div id="rptTimePickerLayer" style="position: absolute; z-index: 999999; background: #ffffff; border: 1px solid #3b62b1; box-shadow: 0 4px 14px rgba(0,0,0,0.2); border-radius: 6px; padding: 10px; width: 250px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px;">';
+		$.each(timeOptions, function(idx, tm) {
+			var activeStyle = (curVal === tm) ? 'background: #3b62b1; color: #fff; font-weight: bold; border-color: #3b62b1;' : 'background: #f4f6fa; color: #333;';
+			html += '<button type="button" class="rpt-time-chip" style="border: 1px solid #d0d7e5; border-radius: 4px; padding: 6px 0; font-size: 12px; cursor: pointer; ' + activeStyle + '" onclick="selectRptTimeVal(' + dindex + ', \'' + key + '\', \'' + tm + '\');">' + tm + '</button>';
+		});
+		html += '</div>';
+
+		$('body').append(html);
+
+		var e = window.event;
+		var posX = e ? e.pageX : ($(window).width() / 2 - 125);
+		var posY = e ? e.pageY : ($(window).height() / 2);
+
+		$('#rptTimePickerLayer').css({
+			top: (posY + 10) + 'px',
+			left: Math.min(posX, $(window).width() - 270) + 'px'
+		});
+
+		setTimeout(function() {
+			$(document).one('click', function(evt) {
+				if (!$(evt.target).closest('#rptTimePickerLayer').length) {
+					$('#rptTimePickerLayer').remove();
+				}
+			});
+		}, 10);
+	}
+
+	function selectRptTimeVal(dindex, key, val) {
+		if (rptTravelerGridView && rptTravelerGridView.target) {
+			rptTravelerGridView.target.setValue(dindex, key, val);
+			calculateRptTravelerCounts(dindex, key);
+			updateRptTravelerRowTotal(dindex);
+			updateActualTripPeriodFromRptTravelers();
+			resizeRptTravelerGrid();
+			rptTravelerGridView.target.repaint();
+		}
+		$('#rptTimePickerLayer').remove();
 	}
 
 	function checkRptProjectRowDateOverlap(gridInstance, currentDindex, newStDt, newEdDt) {
