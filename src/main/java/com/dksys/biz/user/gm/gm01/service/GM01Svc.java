@@ -9,14 +9,16 @@ public interface GM01Svc {
 
 	List<Map<String, String>> selectSecUsbList(Map<String, String> paramMap);
 
-	int insertSecUsbOut(Map<String, String> paramMap);
+	int insertSecUsbOut(Map<String, Object> paramMap);
 
-	int updateSecUsbOut(Map<String, String> paramMap);
+	int updateSecUsbOut(Map<String, Object> paramMap);
 
 	int updateSecUsbIn(Map<String, String> paramMap);
 
 	int cancelSecUsbIn(Map<String, String> paramMap);
 
 	int deleteSecUsb(Map<String, String> paramMap);
+
+	List<Map<String, String>> selectSecUsbDtlList(Map<String, String> paramMap);
 
 }

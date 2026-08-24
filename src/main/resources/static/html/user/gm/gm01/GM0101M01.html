@@ -198,6 +198,21 @@
 		return v;
 	};
 
+	// Sales Code 건수 포맷터 (호버 툴팁 형식)
+	ax5.ui.grid.formatter["salesCdCntFormatter"] = function () {
+		var item = this.item || {};
+		var firstSalesCd = item.firstSalesCd || item.salesCd || this.value || '';
+		var cnt = item.salesCdCnt ? parseInt(item.salesCdCnt) : (firstSalesCd ? 1 : 0);
+		var mngNo = item.mngNo || '';
+
+		if (!firstSalesCd && cnt === 0) return "-";
+		var displayText = firstSalesCd;
+		if (cnt > 1) {
+			displayText = (firstSalesCd ? (firstSalesCd + ' ') : '') + '외 ' + (cnt - 1) + '개';
+		}
+		return '<span class="sales-cd-hover" data-mng-no="' + mngNo + '" style="cursor:pointer;color:blue;text-decoration:underline;">' + displayText + '</span>';
+	};
+
 	// 기본 컬럼 정의 (사용자별 컬럼설정 병합 대상)
 	var defaultColumns = [
 		 {key: "coCd",        label: "회사코드",     width:  80, align: "center", hidden: true}
@@ -213,10 +228,7 @@
 		,{key: "vendClntCd",  label: "외주업체코드", width:  90, align: "center", hidden: true}
 		,{key: "vendClntNm",  label: "외주업체",     width: 130, align: "left"}
 		,{key: "vendUserNm",  label: "업체담당",     width:  90, align: "center"}
-		,{key: "clntPjt",     label: "프로젝트코드", width: 100, align: "center", hidden: true}
-		,{key: "clntPjtNm",   label: "프로젝트명",   width: 100, align: "left"}
-		,{key: "salesCd",     label: "Sales Code", width: 110, align: "center"}
-		,{key: "eqpNm",       label: "장비명",       width: 150, align: "left"}
+		,{key: "salesCd",     label: "Sales Code", width: 180, align: "left", formatter: "salesCdCntFormatter"}
 		,{key: "rmk",         label: "내용",        width: 250, align: "left"}
 		,{key: "creatId",     label: "등록자ID",     width:  90, align: "center", hidden: true}
 		,{key: "creatNm",     label: "등록자",       width:  60, align: "center"}
@@ -335,6 +347,7 @@
 	function isMyDeptRow(row) {
 		if (!row || !row.outDeptId) return true;
 		var userDept5 = (jwt.deptId || '').substring(0, 5);
+		if (userDept5 === "GUN80") return true;
 		var rowDept5  = (row.outDeptId || '').substring(0, 5);
 		if (userDept5 && rowDept5 && userDept5 !== rowDept5) {
 			alert("자신의 부서(동일 소속 부서)의 보안USB만 처리할 수 있습니다.");
@@ -603,5 +616,129 @@
 			}
 		});
 	}
+
+	// 호버 툴팁 관련 변수 및 함수
+	var salesCdHoverCache = {}; // {mngNo: {salesCd, clntPjt, clntPjtNm, eqpNm, ...}}
+	var salesCdHoverTimeout = null;
+	var currentHoverMngNo = null;
+
+	// gridView.setData() 호출 시 캐시 초기화
+	var originalSetData = gridView.setData;
+	gridView.setData = function(_pageNo) {
+		salesCdHoverCache = {}; // 캐시 clear
+		originalSetData.call(this, _pageNo);
+	};
+
+	// Sales Code 상세 데이터 fetch (너무 자주 호출되면 캐시 활용)
+	function fetchSalesCdDetails(mngNo, callback) {
+		if (salesCdHoverCache[mngNo]) {
+			callback(salesCdHoverCache[mngNo]);
+			return;
+		}
+
+		var formData = {
+			"coCd"  : "GUN",
+			"mngNo" : mngNo
+		};
+
+		$.ajax({
+			type: "POST",
+			url: "/user/gm/gm01/selectSecUsbDtlList",
+			contentType: "application/json; charset=utf-8",
+			data: JSON.stringify(formData),
+			beforeSend: function(request) {
+				request.setRequestHeader("Authorization", authorizationToken);
+			},
+			success: function(data) {
+				if (data && data.result) {
+					salesCdHoverCache[mngNo] = data.result;
+					callback(data.result);
+				}
+			},
+			error: function() {
+				// 오류 발생 시 빈 배열 반환
+				callback([]);
+			}
+		});
+	}
+
+	// 호버 툴팁 표시
+	function showSalesCdTooltip(elem, mngNo) {
+		currentHoverMngNo = mngNo;
+
+		fetchSalesCdDetails(mngNo, function(dtlList) {
+			// stale response 가드: 현재 hover가 다른 행으로 바뀌었으면 무시
+			if (currentHoverMngNo !== mngNo) return;
+
+			// 기존 tooltip 제거
+			$('#salesCdHoverTip').remove();
+
+			if (!dtlList || dtlList.length === 0) {
+				return; // 상세가 없으면 표시하지 않음
+			}
+
+			// 테이블 HTML 생성
+			var html = '<table style="border-collapse:collapse;width:100%;font-size:11px;">';
+			html += '<tr style="background:#f0f0f0;"><th style="border:1px solid #999;padding:4px;">Sales Code</th><th style="border:1px solid #999;padding:4px;">프로젝트</th><th style="border:1px solid #999;padding:4px;">장비명</th></tr>';
+			$.each(dtlList, function(i, item) {
+				html += '<tr>';
+				html += '<td style="border:1px solid #ddd;padding:4px;">' + (item.salesCd || '') + '</td>';
+				html += '<td style="border:1px solid #ddd;padding:4px;">' + (item.clntPjtNm || '') + '</td>';
+				html += '<td style="border:1px solid #ddd;padding:4px;">' + (item.eqpNm || '') + '</td>';
+				html += '</tr>';
+			});
+			html += '</table>';
+
+			var tooltip = $('<div id="salesCdHoverTip" style="position:fixed;background:white;border:1px solid #999;box-shadow:0 2px 8px rgba(0,0,0,0.2);padding:8px;z-index:9999;max-width:500px;border-radius:3px;">' + html + '</div>');
+			$('body').append(tooltip);
+
+			// 위치 계산
+			var rect = elem.getBoundingClientRect();
+			var left = rect.left;
+			var top = rect.bottom + 5;
+
+			// 오른쪽 끝 체크: 너무 오른쪽으로 나가면 조정
+			var w = tooltip.outerWidth() || 400;
+			if (left + w > window.innerWidth) {
+				left = window.innerWidth - w - 10;
+			}
+
+			tooltip.css({
+				'left': left + 'px',
+				'top': top + 'px'
+			});
+		});
+	}
+
+	// 호버 이벤트 처리 (이벤트 위임)
+	$(document).on('mouseenter', '.sales-cd-hover', function(e) {
+		clearTimeout(salesCdHoverTimeout);
+		var mngNo = $(this).data('mng-no');
+		showSalesCdTooltip(this, mngNo);
+	});
+
+	// 마우스가 텍스트를 벗어났을 때
+	$(document).on('mouseleave', '.sales-cd-hover', function() {
+		salesCdHoverTimeout = setTimeout(function() {
+			// tooltip에 마우스가 있는지 확인
+			if (!$('#salesCdHoverTip:hover').length) {
+				$('#salesCdHoverTip').remove();
+				currentHoverMngNo = null;
+			}
+		}, 150);
+	});
+
+	// tooltip 위에 마우스가 있을 때
+	$(document).on('mouseenter', '#salesCdHoverTip', function() {
+		clearTimeout(salesCdHoverTimeout);
+	});
+
+	// tooltip을 벗어났을 때
+	$(document).on('mouseleave', '#salesCdHoverTip', function() {
+		salesCdHoverTimeout = setTimeout(function() {
+			$('#salesCdHoverTip').remove();
+			currentHoverMngNo = null;
+		}, 150);
+	});
 
 </script>

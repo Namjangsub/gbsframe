@@ -24,4 +24,12 @@ public interface GM01Mapper {
 
 	int deleteSecUsb(Map<String, String> paramMap);
 
+	List<Map<String, String>> selectSecUsbDtlList(Map<String, String> paramMap);
+
+	String selectSecUsbNextDtlSeq(Map<String, String> paramMap);
+
+	int insertSecUsbDtl(Map<String, String> paramMap);
+
+	int deleteSecUsbDtlAll(Map<String, String> paramMap);
+
 }

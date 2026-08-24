@@ -47,37 +47,45 @@
 						<th class="hit">외주업체</th>
 						<td>
 							<div class="search_form" style="width: 100%;">
-								<input type="text" id="vendClntNm" name="vendClntNm" required msg="외주업체" readonly
+								<input type="text" id="vendClntNm" name="vendClntNm" class="form-control input-sm" required msg="외주업체" readonly style="background: #fafafa !important;"
 									onkeyup="if(event.keyCode == 8 || event.keyCode == 46){ vendClntCd.value = ''; this.value = ''; }">
 								<a onclick="openVendClntSearch();"><i class="i_search_w"></i></a>
 							</div>
 						</td>
 						<th>업체담당</th>
 						<td>
-							<input type="text" id="vendUserNm" name="vendUserNm" class="form-control" maxlength="50" placeholder="외주업체 직원명">
+							<input type="text" id="vendUserNm" name="vendUserNm" class="form-control input-sm" maxlength="50" placeholder="외주업체 직원명">
 						</td>
 						<th>관리부서</th>
 						<td>
-							<input type="text" id="outDeptNm" name="outDeptNm" class="form-control" readonly style="background: #fafafa !important;">
+							<input type="text" id="outDeptNm" name="outDeptNm" class="form-control input-sm" readonly style="background: #fafafa !important;">
 						</td>
 					</tr>
-					<!-- 3행 -->
-					<tr>
-						<th class="hit">Sales Code</th>
-						<td>
+					<!-- 3행 : 프로젝트 여러 건 (U/C 공통) -->
+					<tr id="salesCdRow_multi">
+						<th class="hit">프로젝트</th>
+						<td colspan="5">
 							<div class="search_form" style="width: 100%;">
-								<input type="text" id="salesCd" name="salesCd" required msg="Sales Code" readonly
-									onkeyup="if(event.keyCode == 8 || event.keyCode == 46){ this.value = ''; clntPjt.value = ''; clntPjtNm.value = ''; eqpNm.value = ''; }">
-								<a onclick="openSalesCodeSearch();"><i class="i_search_w"></i></a>
+								<input type="text" id="salesCdAddView" class="form-control input-sm" readonly style="background: #fafafa !important;" placeholder="검색 버튼으로 Sales Code를 추가하세요 (같은 USB에 여러 건 등록 가능)">
+								<a onclick="openSalesCodeSearchAdd();" id="salesCdAddBtn"><i class="i_search_w"></i></a>
 							</div>
-						</td>
-						<th>장비명</th>
-						<td>
-							<input type="text" id="eqpNm" name="eqpNm" class="form-control" readonly style="background: #fafafa !important;">
-						</td>
-						<th>프로젝트명</th>
-						<td>
-							<input type="text" id="clntPjtNm" name="clntPjtNm" class="form-control" readonly style="background: #fafafa !important;">
+							<table class="popup_table" style="width: 100%; margin-top: 6px; border: 1px solid #d2d6de;">
+								<colgroup>
+									<col width="20%">
+									<col width="15%">
+									<col width="55%">
+									<col width="10%">
+								</colgroup>
+								<thead>
+									<tr>
+										<th class="tc" style="font-size: 12px; font-weight: 600; padding: 5px;">Sales Code</th>
+										<th class="tc" style="font-size: 12px; font-weight: 600; padding: 5px;">프로젝트명</th>
+										<th class="tc" style="font-size: 12px; font-weight: 600; padding: 5px;">장비명</th>
+										<th class="tc" style="font-size: 12px; font-weight: 600; padding: 5px;">삭제</th>
+									</tr>
+								</thead>
+								<tbody id="salesCdListBody"></tbody>
+							</table>
 						</td>
 					</tr>
 					<!-- 4행 -->
@@ -118,6 +126,8 @@
 <script type="text/javascript">
 
 	var gmActionType = "C";
+	// 등록(C) 모드 - 추가된 Sales Code 목록 (같은 USB를 공유하는 여러 건) - ready 핸들러가 즉시 실행될 수 있어 최상단에서 선언
+	var salesCdList = [];
 
 	$(document).ready(function() {
 
@@ -139,8 +149,11 @@
 			autoclose : true
 		});
 
+		// U/C 공통: 멀티 UI 사용
+		$('#salesCdRow_multi').show();
+
 		if (gmActionType == "U") {
-			// 기존 자료 세팅
+			// 수정 모드: 기존 자료 세팅 및 Sales Code 상세 목록 조회
 			$.each(popParam, function(key, val) {
 				var $el = $(".popup_area #" + key);
 				if ($el.length > 0 && $el.prop("tagName")) {
@@ -151,13 +164,31 @@
 			$('#outDt').val(formatDateStr(popParam.outDt));
 			$('#usbCd').val(popParam.usbCd || '');
 
-			// 반입완료 건은 조회 전용
-			if (popParam.inDt) {
-				$('#inInfoRow').show();
-				$('#inDt').val(formatDateStr(popParam.inDt));
-				setReadOnlyMode();
-			}
+			// 기존 Sales Code 상세 목록 조회
+			postAjax("/user/gm/gm01/selectSecUsbDtlList", {coCd: "GUN", mngNo: popParam.mngNo}, null, function(data) {
+				if (data && data.result) {
+					salesCdList = (data.result || []).map(function(r) {
+						return {
+							 salesCd   : r.salesCd
+							,clntPjt   : r.clntPjt
+							,clntPjtNm : r.clntPjtNm
+							,eqpNm     : r.eqpNm
+						};
+					});
+				}
+				renderSalesCdList();
+
+				// 반입완료 건은 조회 전용 - readonly 및 버튼 숨김 재적용
+				if (popParam.inDt) {
+					$('#inInfoRow').show();
+					$('#inDt').val(formatDateStr(popParam.inDt));
+					setReadOnlyMode();
+				}
+			});
 		} else {
+			// 신규 등록 모드: 신규 Sales Code 추가 UI 초기화
+			renderSalesCdList();
+
 			$('#outDt').datepicker("setDate", new Date());
 			$('#ownUserId').val(popParam.userId || '');
 			$('#ownUserNm').val(popParam.userNm || '');
@@ -167,13 +198,16 @@
 			setOutDeptByUsbCd();
 		}
 
+		// 불출되지 않은(현재 불출 중이지 않은) USB만 옵션에 표시
+		filterIssuedUsbCd();
+
 		authChk();
 	});
 
 	// USB 종류 셀렉트 박스 자기 부서(부서코드 앞 5자리 일치) 필터링 함수
 	function filterUsbCdByMyDept() {
 		var userDept5 = (jwt.deptId || '').substring(0, 5);
-		if (!userDept5) return;
+		if (!userDept5 || userDept5 === "GUN80") return;
 
 		var curUsbCd = $('#usbCd').val();
 		$(".popup_area #usbCd option").each(function() {
@@ -183,6 +217,27 @@
 			var optDept5 = etcVal.substring(0, 5);
 			if (optDept5 && optDept5 !== userDept5) {
 				$(this).remove();
+			}
+		});
+	}
+
+	// 현재 불출 중인(미반입) USB를 옵션 목록에서 제거 (불출되지 않은 USB만 선택 가능)
+	function filterIssuedUsbCd() {
+		var curUsbCd = $('#usbCd').val();
+		postAjax("/user/gm/gm01/selectSecUsbList", { "coCd": "GUN", "stsCd": "OUT", "firstIndex": 1, "lastIndex": 9999 }, null, function(data) {
+			if (data && data.result && data.result.length > 0) {
+				var issuedCds = [];
+				$.each(data.result, function(idx, item) {
+					if (item.usbCd && item.usbCd !== curUsbCd) {
+						issuedCds.push(item.usbCd);
+					}
+				});
+				$(".popup_area #usbCd option").each(function() {
+					var val = $(this).val();
+					if (val && $.inArray(val, issuedCds) !== -1) {
+						$(this).remove();
+					}
+				});
 			}
 		});
 	}
@@ -215,6 +270,76 @@
 		}
 	}
 
+	/* Sales Code 검색 (등록 모드 - 다중 선택 팝업 연동) */
+	function openSalesCodeSearchAdd() {
+		var paramObj = {
+			 "coCd"    : jwt.coCd
+			,"salesCd" : ""
+		};
+		openSecondModal("/static/html/cmn/modal/wbsSalesCodeSearchMulti.html", 1200, 700, "SALES CODE 멀티 검색", paramObj, function(grid) {
+			var selectedList = grid.target.getList("selected");
+			if (!selectedList || selectedList.length == 0) return;
+
+			var dupCount = 0;
+			var addedCount = 0;
+			$.each(selectedList, function(i, row) {
+				var dup = false;
+				$.each(salesCdList, function(idx, item) {
+					if (item.salesCd == row.salesCd) { dup = true; return false; }
+				});
+				if (dup) {
+					dupCount++;
+					return true;
+				}
+				salesCdList.push({
+					 salesCd   : row.salesCd
+					,clntPjt   : row.clntPjt
+					,clntPjtNm : row.clntPjtNm
+					,eqpNm     : row.eqpNm
+				});
+				addedCount++;
+			});
+			if (dupCount > 0 && addedCount == 0) {
+				alert("이미 추가된 Sales Code 입니다.");
+			}
+			renderSalesCdList();
+		});
+	}
+
+	var isPopReadOnly = false;
+
+	/* 추가된 Sales Code 목록 렌더링 */
+	function renderSalesCdList() {
+		var $tbody = $('#salesCdListBody');
+		$tbody.empty();
+		if (salesCdList.length == 0) {
+			$tbody.append('<tr><td colspan="4" class="tc" style="color:#999; font-size: 12px; padding: 6px 5px;">추가된 Sales Code가 없습니다.</td></tr>');
+			return;
+		}
+		$.each(salesCdList, function(idx, item) {
+			var $tr = $('<tr></tr>');
+			$tr.append($('<td class="tc" style="font-size: 12px; padding: 5px;"></td>').text(item.salesCd || ''));
+			$tr.append($('<td class="tl" style="font-size: 12px; padding: 5px;"></td>').text(item.clntPjtNm || ''));
+			$tr.append($('<td class="tl" style="font-size: 12px; padding: 5px;"></td>').text(item.eqpNm || ''));
+			var $delTd = $('<td class="tc" style="font-size: 12px; padding: 5px;"></td>');
+			if (!isPopReadOnly) {
+				var $delBtn = $('<a class="btn btn-default btn-xs" style="height: 22px; line-height: 14px; padding: 2px 6px;" title="삭제"><i class="fas fa-trash-alt" style="color: #e74c3c;"></i></a>');
+				$delBtn.on('click', (function(i) { return function() { removeSalesCdRow(i); }; })(idx));
+				$delTd.append($delBtn);
+			} else {
+				$delTd.text('-');
+			}
+			$tr.append($delTd);
+			$tbody.append($tr);
+		});
+	}
+
+	/* 추가된 Sales Code 목록에서 제거 */
+	function removeSalesCdRow(idx) {
+		salesCdList.splice(idx, 1);
+		renderSalesCdList();
+	}
+
 	// yyyyMMdd -> yyyy-MM-dd
 	function formatDateStr(v) {
 		if (!v) return '';
@@ -225,10 +350,12 @@
 
 	// 반입완료 건 : 전체 편집 불가
 	function setReadOnlyMode() {
+		isPopReadOnly = true;
 		$(".popup_area #popForm input, .popup_area #popForm textarea").prop("readonly", true);
 		$(".popup_area #popForm select").prop("disabled", true);
 		$(".popup_area .search_form a").hide();
 		$(".popup_area #saveBtn").hide();
+		renderSalesCdList();
 	}
 
 	/* 저장 (불출 등록 / 수정) */
@@ -236,14 +363,20 @@
 
 		if (!inputValidation($('.popup_area [required]'))) return;
 
+		// Sales Code 검증
+		if (salesCdList.length == 0) {
+			alert("Sales Code를 1건 이상 추가하세요.");
+			return;
+		}
+
 		var userDept5 = (jwt.deptId || '').substring(0, 5);
 		var outDept5  = ($('#outDeptId').val() || '').substring(0, 5);
-		if (userDept5 && outDept5 && userDept5 !== outDept5) {
+		if (userDept5 && userDept5 !== "GUN80" && outDept5 && userDept5 !== outDept5) {
 			alert("자신의 부서(동일 소속 부서)의 보안USB만 등록/수정할 수 있습니다.");
 			return;
 		}
 
-		var formData = {
+		var commonData = {
 			 "coCd"        : "GUN"
 			,"mngNo"       : $('#mngNo').val()
 			,"outDt"       : $('#outDt').val().replace(/\-/g, '')
@@ -257,17 +390,18 @@
 			,"vendClntCd"  : $('#vendClntCd').val()
 			,"vendClntNm"  : $('#vendClntNm').val()
 			,"vendUserNm"  : $('#vendUserNm').val()
-			,"salesCd"     : $('#salesCd').val()
-			,"clntPjt"     : $('#clntPjt').val()
-			,"clntPjtNm"   : $('#clntPjtNm').val()
-			,"eqpNm"       : $('#eqpNm').val()
 			,"rmk"         : $('#rmk').val()
 			,"userId"      : jwt.userId
 			,"pgmId"       : "GM0101P01"
+			,"dtlList"     : salesCdList
 		};
 
+		$('#saveBtn').prop('disabled', true);
+
 		if (gmActionType == "C") {
-			postAjax("/user/gm/gm01/insertSecUsbOut", formData, null, function(data) {
+			// 신규 등록: insertSecUsbOut (단일 호출)
+			postAjax("/user/gm/gm01/insertSecUsbOut", commonData, null, function(data) {
+				$('#saveBtn').prop('disabled', false);
 				alert(data.resultMessage);
 				if (data.resultCode == 200) {
 					modalStack.close();
@@ -277,7 +411,9 @@
 				}
 			});
 		} else {
-			putAjax("/user/gm/gm01/updateSecUsbOut", formData, null, function(data) {
+			// 수정: updateSecUsbOut (단일 호출)
+			putAjax("/user/gm/gm01/updateSecUsbOut", commonData, null, function(data) {
+				$('#saveBtn').prop('disabled', false);
 				alert(data.resultMessage);
 				if (data.resultCode == 200) {
 					modalStack.close();
