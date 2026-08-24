@@ -1,0 +1,691 @@
+<style>
+/* ax5grid 셀 텍스트 마우스 드래그 및 Ctrl+C 클립보드 복사 허용 */
+[data-ax5grid="grantGrid"] .ax5grid-cell-content {
+	-webkit-user-select: text !important;
+	-moz-user-select: text !important;
+	-ms-user-select: text !important;
+	user-select: text !important;
+}
+/* WB0701M01 메모 팝오버 디자인 톤앤매너 100% 계승 툴팁 레이어 */
+.vacation-info-popover {
+	position: absolute;
+	z-index: 999999;
+	display: none;
+	background: #ffffff;
+	border: 1px solid #337ab7;
+	border-radius: 5px;
+	box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+	padding: 10px 14px;
+	min-width: 240px;
+	max-width: 360px;
+	font-size: 12px;
+	color: #333333;
+	pointer-events: auto;
+}
+.vacation-info-popover .popover-title {
+	font-weight: bold;
+	color: #337ab7;
+	border-bottom: 1px solid #e9ecef;
+	padding-bottom: 5px;
+	margin-bottom: 6px;
+	font-size: 12px;
+}
+.vacation-info-popover .popover-item {
+	padding: 4px 0;
+	line-height: 1.4;
+	color: #444444;
+	border-bottom: 1px dashed #f0f0f0;
+}
+.vacation-info-popover .popover-item:last-child {
+	border-bottom: none;
+}
+</style>
+<div class="popup_area of_a" style="width: 100%; height: 100%;">
+	<!-- 팝업 헤더 타이틀 -->
+	<div class="tit_contents">
+		<h4 class="tit">연차부여 내역 관리 (사원·연도별)</h4>
+	</div>
+
+	<!-- 연차지급 산정기준 안내 박스 -->
+	<div style="background-color: #f8f9fa; border: 1px solid #e9ecef; border-left: 4px solid #337ab7; padding: 8px 12px; margin: 5px 0 10px 0; font-size: 12px; line-height: 1.5; color: #333;">
+		<span style="font-weight: bold; color: #337ab7;"><i class="fas fa-info-circle"></i> 연차지급 산정기준 안내 (매년 1월 1일 회계연도 산정기준)</span>
+		<ul style="margin: 3px 0 0 15px; padding: 0; list-style-type: disc; color: #555;">
+			<li><strong>당해연도 입사자:</strong> 비례 산정 (15일 × 잔여근무월수 / 12) &nbsp;/&nbsp; <strong>1년 이상 ~ 3년 미만:</strong> 기본 15일 부여</li>
+			<li><strong>3년 이상 근무자:</strong> 최초 1년 초과 매 2년에 1일 가산 (15일 + Math.floor((근속년수 - 1) / 2), 최대 25일)</li>
+			<li style="color: #d9534f; font-weight: bold; list-style-type: none; margin-left: -15px; margin-top: 2px;">※ 임원실, 실적관리용 부서는 자동계산 대상에서 제외됨</li>
+		</ul>
+	</div>
+
+	<!-- 검색 조건 테이블 영역 (FI0202M01.html 연도 셀렉트 & PM0101M01.html 사원검색 폼 패턴 적용, 팝업용 미사용 _S 규칙 엄수) -->
+	<div class="popup_table">
+		<table class="table_input">
+			<colgroup>
+				<col width="12%">
+				<col width="30%">
+				<col width="12%">
+				<col width="46%">
+			</colgroup>
+			<tr>
+				<th>부여연도</th>
+				<td>
+					<!-- FI0202M01.html searchYear 연도 셀렉트박스 패턴 -->
+					<select id="yy" name="yy" class="form-control input-sm" style="width: 110px;" onchange="searchGrantGrid();"></select>
+				</td>
+				<th>사원검색</th>
+				<td>
+					<!-- PM0101M01.html 사원 검색 폼 패턴 -->
+					<div class="search_form" style="width: 100%;">
+						<input type="hidden" id="userId" name="userId">
+						<input type="text" id="userNm" name="userNm" class="form-control input-sm" placeholder="사원 검색" onkeyup="(event.keyCode == 8 || event.keyCode == 46) ? userId.value = '' : event.keyCode == 13 ? searchGrantGrid() : '';">
+						<a onclick="openSearchUserModal();"><i class="i_search_w"></i></a>
+					</div>
+				</td>
+			</tr>
+		</table>
+	</div>
+
+	<!-- 그리드 상단 버튼바 -->
+	<div class="contents no_bg" style="margin-top: 10px;">
+		<div class="contents_tit">
+			<span style="height: 30px; line-height: 30px; font-size: 13px; font-weight: bold; color: blue;">연차부여 내역</span>
+			<div class="add_btn_small pdl10">
+				<a onclick="searchGrantGrid();" style="height: 28px; line-height: 26px; width: 65px;"><i class="fas fa-search"></i> 조 회</a>
+				<a onclick="calcAutoGrantAll();" style="height: 28px; line-height: 26px; width: 90px;"><i class="fas fa-calculator"></i> 자동계산</a>
+				<a onclick="addGrantRow();" style="height: 28px; line-height: 26px; width: 75px;"><i class="fas fa-plus"></i> 행추가</a>
+				<a onclick="deleteGrantRow();" style="height: 28px; line-height: 26px; width: 75px;"><i class="fas fa-minus"></i> 행삭제</a>
+			</div>
+		</div>
+	</div>
+
+	<!-- 연차부여 그리드 영역 (1200x900 모달 해상도에 맞춘 620px 높이 확대) -->
+	<div class="contents" style="padding: 0; margin-top: 5px;">
+		<div class="ax5_grid">
+			<div data-ax5grid="grantGrid" data-ax5grid-config="{}" style="height: 620px; width: 100%;"></div>
+		</div>
+	</div>
+
+	<!-- 하단 버튼 영역 -->
+	<div class="col-xs-12 text-right popup_bottom_btn" style="margin-top: 15px; padding-right: 0;">
+		<button type="button" id="btnSaveGrantList" class="btn btn-default btn-sm" onclick="saveGrantList();">저 장</button>
+		<button type="button" class="btn btn-default btn-sm" onclick="modalStack.close();">닫 기</button>
+	</div>
+</div>
+
+<script type="text/javascript">
+	var deleteGrantList = []; // 삭제 대기 행 리스트
+
+	// 숫자 0일 때 셀에 공백("")으로 표출하는 커스텀 포맷터
+	ax5.ui.grid.formatter["zeroEmptyFormatter"] = function () {
+		var val = this.value;
+		if (val === null || val === undefined || val === "" || Number(val) === 0) {
+			return "";
+		}
+		return val;
+	};
+
+	// 사용일수 시각적 포맷터 (0일 때 공백, 사용일수가 있을 때 파란색+돋보기 아이콘 표출)
+	ax5.ui.grid.formatter["usedDaysInfoFormatter"] = function () {
+		var val = this.value;
+		if (val === null || val === undefined || val === "" || Number(val) === 0) {
+			return "";
+		}
+		return '<span class="used-days-info-trigger" style="cursor: pointer; color: #337ab7; font-weight: bold;" title="마우스 호버/클릭 시 상세 휴가신청 내역 표출">' + val + ' <i class="fas fa-search-plus" style="font-size: 10px; color: #5bc0de;"></i></span>';
+	};
+
+	// FI0202M01.html 패턴의 연도 셀렉트박스 동적 옵션 생성 함수
+	function setGrantYm() {
+		var now = new Date();
+		var nyear = now.getFullYear();
+
+		$("#yy").empty();
+		for (var sy = 2020; sy <= nyear + 1; sy++) {
+			$("#yy").append("<option value='" + sy + "'>" + sy + "년</option>");
+		}
+
+		var initYy = (typeof paramObj !== "undefined" && paramObj.yy) ? paramObj.yy : nyear;
+		$("#yy").val(initYy);
+	}
+
+	var grantGridView = {
+		initView : function() {
+			this.target = new ax5.ui.grid();
+			this.target.setConfig({
+				showLineNumber : true,
+				lineNumberColumnWidth : 40,
+				showRowSelector : true,
+				multipleSelect : true,
+				sortable : true,
+				target : $('[data-ax5grid="grantGrid"]'),
+				header : {
+					align : "center",
+					selector : true
+				},
+				body : {
+					mergeCells : ['deptNm'],
+					onClick : function() {
+						this.self.select(this.dindex);
+						if (this.column.key === "usedDays") {
+							showVacationPopover($(this.element), this.item);
+						}
+					},
+					onDBLClick : function() {
+						// 사원 셀 더블클릭 시 사원/사용자 트리 검색 팝업
+						if (this.column.key === "userId" || this.column.key === "userNm") {
+							openGrantGridUserSearch(this.dindex);
+						}
+					},
+					onDataChanged : function() {
+						// 수정된 행의 상태를 'U'(수정)로 마킹 (신규행 'C'인 경우 신호 유지)
+						if (this.item && this.item.__status !== "C") {
+							this.item.__status = "U";
+						}
+
+						// 데이터가 하나라도 수정되면 저장 버튼을 시인성 높게 주황색(#f0ad4e)으로 강조 표시
+						markGrantGridDirty(true);
+
+						// 부여일수(grantDays)가 수정되면 잔여일수(balanceDays = grantDays - usedDays) 자동 재계산 및 포커스 이탈 스타일 정리
+						if (this.key === "grantDays" || this.key === "usedDays") {
+							var numVal = Number(String(this.item.grantDays || 0).replace(/[^0-9.]/g, ''));
+							if (isNaN(numVal)) numVal = 0;
+							var u = Number(this.item.usedDays || 0);
+							this.self.setValue(this.dindex, "grantDays", numVal);
+							this.self.setValue(this.dindex, "balanceDays", numVal - u);
+						}
+					}
+				},
+				page : {
+					display : false
+				},
+				columns : [
+					 {key: "coCd",        label: "회사코드", width:  50, align: "center", hidden: true}
+					,{key: "yy",          label: "부여연도", width:  90, align: "center", hidden: true}
+					,{key: "userId",      label: "사원ID(더블클릭)", width: 110, align: "center", hidden: true}
+					,{key: "deptNm",      label: "부서",     width: 140, align: "left"}
+					,{key: "userNm",      label: "성명",     width: 110, align: "center"}
+					,{key: "enterDt",     label: "입사일자", width: 110, align: "center"}
+					,{key: "leaveDt",     label: "퇴사일자", width: 110, align: "center"}
+					,{key: "grantDays",   label: "부여일수", width: 100, align: "center", editor: {type: "text"}, formatter: "zeroEmptyFormatter"}
+					,{key: "usedDays",    label: "사용일수", width: 100, align: "center", formatter: "usedDaysInfoFormatter"}
+					,{key: "balanceDays", label: "잔여일수", width: 100, align: "center", formatter: "zeroEmptyFormatter"}
+					,{key: "rmk",         label: "비고",     width: 320, align: "left", editor: {type: "text"}}
+				]
+			});
+			return this;
+		},
+		setData : function(list) {
+			var rawList = list || [];
+			$.each(rawList, function(i, row) {
+				row.__status = ""; // 초기 조회 시 변경 상태 없음
+			});
+			this.target.setData({
+				list : rawList,
+				page : { display: false, totalElements: rawList.length }
+			});
+		}
+	};
+
+	var VACATION_POPOVER_TIMER = null;
+
+	// 사용일수 마우스 호버 시 휴가신청일자 및 유형 팝오버 툴팁 표출 함수 (WB0701M01 메모 팝오버 패턴)
+	function showVacationPopover($el, item) {
+		if (VACATION_POPOVER_TIMER) {
+			clearTimeout(VACATION_POPOVER_TIMER);
+			VACATION_POPOVER_TIMER = null;
+		}
+
+		var $pop = $('#vacationInfoPopover');
+		if ($pop.length === 0) {
+			$('body').append(
+				'<div id="vacationInfoPopover" class="vacation-info-popover">' +
+					'<div class="popover-title"><i class="fas fa-calendar-check"></i> <span id="popUserNm"></span> 님의 휴가신청 이력</div>' +
+					'<div id="popContent"></div>' +
+				'</div>'
+			);
+			$pop = $('#vacationInfoPopover');
+
+			// 팝오버 창 위에 마우스가 위치했을 때 닫힘 방지
+			$pop.on('mouseenter', function() {
+				if (VACATION_POPOVER_TIMER) {
+					clearTimeout(VACATION_POPOVER_TIMER);
+					VACATION_POPOVER_TIMER = null;
+				}
+			}).on('mouseleave', function() {
+				hideVacationPopoverImmediately();
+			});
+		}
+
+		$('#popUserNm').text(item.userNm || '사원');
+
+		var infoText = item.vacInfoList || '';
+		var htmlStr = '';
+		if (infoText) {
+			var items = infoText.split(';');
+			$.each(items, function(i, val) {
+				if ($.trim(val)) {
+					htmlStr += '<div class="popover-item"><i class="fas fa-check-circle" style="color: #337ab7; margin-right: 5px;"></i> ' + $.trim(val) + '</div>';
+				}
+			});
+		} else {
+			htmlStr = '<div class="popover-item" style="color: #888888;">등록된 휴가신청 상세 내역이 없습니다.</div>';
+		}
+
+		$('#popContent').html(htmlStr);
+
+		var offset = $el.offset();
+		$pop.css({
+			top: (offset.top + $el.outerHeight() + 2) + 'px',
+			left: Math.max(10, offset.left - 20) + 'px'
+		}).show();
+	}
+
+	function hideVacationPopover() {
+		if (VACATION_POPOVER_TIMER) {
+			clearTimeout(VACATION_POPOVER_TIMER);
+		}
+		VACATION_POPOVER_TIMER = setTimeout(function() {
+			$('#vacationInfoPopover').hide();
+			VACATION_POPOVER_TIMER = null;
+		}, 300);
+	}
+
+	function hideVacationPopoverImmediately() {
+		if (VACATION_POPOVER_TIMER) {
+			clearTimeout(VACATION_POPOVER_TIMER);
+			VACATION_POPOVER_TIMER = null;
+		}
+		$('#vacationInfoPopover').hide();
+	}
+
+	// 그리드 셀 마우스 호버/클릭 이벤트 바인딩 (사용일수 usedDays 호버 팝오버)
+	$(document).off('mouseenter mouseleave click', '.used-days-info-trigger, [data-ax5grid="grantGrid"] [data-ax5grid-column-key="usedDays"]');
+	$(document).on({
+		mouseenter: function(e) {
+			var $el = $(this);
+			var $tr = $el.closest('[data-ax5grid-data-index]');
+			var rowIdx = $tr.attr('data-ax5grid-data-index');
+			if (rowIdx !== undefined && grantGridView.target.list && grantGridView.target.list[rowIdx]) {
+				var item = grantGridView.target.list[rowIdx];
+				showVacationPopover($el, item);
+			}
+		},
+		mouseleave: function(e) {
+			hideVacationPopover();
+		},
+		click: function(e) {
+			e.stopPropagation();
+			var $el = $(this);
+			var $tr = $el.closest('[data-ax5grid-data-index]');
+			var rowIdx = $tr.attr('data-ax5grid-data-index');
+			if (rowIdx !== undefined && grantGridView.target.list && grantGridView.target.list[rowIdx]) {
+				var item = grantGridView.target.list[rowIdx];
+				showVacationPopover($el, item);
+			}
+		}
+	}, '.used-days-info-trigger, [data-ax5grid="grantGrid"] [data-ax5grid-column-key="usedDays"]');
+
+	// 그리드 데이터 수정/추가/삭제 감지 시 저장 버튼 주황색(#f0ad4e) 강조 스타일 제어 함수
+	function markGrantGridDirty(isDirty) {
+		var $btn = $('#btnSaveGrantList');
+		if (isDirty) {
+			$btn.removeClass('btn-default').addClass('btn-warning')
+				.css({
+					'background-color': '#f0ad4e',
+					'color': '#ffffff',
+					'font-weight': 'bold',
+					'border-color': '#eea236'
+				})
+				.html('<i class="fas fa-save"></i> 저 장 *');
+		} else {
+			$btn.removeClass('btn-warning').addClass('btn-default')
+				.css({
+					'background-color': '',
+					'color': '',
+					'font-weight': '',
+					'border-color': ''
+				})
+				.html('저 장');
+		}
+	}
+
+	// 연차부여 내역 조회
+	function searchGrantGrid() {
+		var formData = {
+			"coCd"        : "GUN",
+			"yy"          : $('#yy').val(),
+			"userId"      : $('#userId').val(),
+			"searchValue" : $('#userNm').val()
+		};
+		postAjax("/user/pm/pm07/selectAnnualGrantList", formData, null, function(data) {
+			deleteGrantList = [];
+			grantGridView.setData(data.resultList || []);
+			markGrantGridDirty(false); // 조회 후 저장 버튼 초기화
+		});
+	}
+
+	// 날짜 포맷 유연 변환 함수 (YYYYMMDD ➔ YYYY-MM-DD)
+	function formatDtStrJS(str) {
+		if (!str) return "";
+		var s = String(str).replace(/[^0-9]/g, '');
+		if (s.length === 8) {
+			return s.substring(0, 4) + "-" + s.substring(4, 6) + "-" + s.substring(6, 8);
+		}
+		return str;
+	}
+
+	// 매년 1월 1일 기준 회계연도 연차지급 산정 수식
+	function calculateAnnualGrantDaysJS(enterDtStr, targetYy) {
+		if (!enterDtStr) return 15;
+		var cleanDt = String(enterDtStr).replace(/[^0-9]/g, '');
+		if (cleanDt.length < 8) return 15;
+
+		var enterYear  = parseInt(cleanDt.substring(0, 4), 10);
+		var enterMonth = parseInt(cleanDt.substring(4, 6), 10);
+		var targetYear = parseInt(targetYy, 10);
+
+		if (enterYear > targetYear) {
+			return 0; // 미래 입사자
+		}
+
+		var diffYears = targetYear - enterYear;
+		if (diffYears === 0) {
+			// 당해연도 입사자: 매년 1월 1일 회계연도 비례 산정 (15일 * 잔여근무월수 / 12)
+			var workMonths = 12 - enterMonth + 1;
+			var propDays = Math.round((15 * workMonths) / 12);
+			return Math.max(propDays, 1);
+		} else if (diffYears < 3) {
+			// 1년 이상 ~ 3년 미만: 기본 15일
+			return 15;
+		} else {
+			// 3년 이상: 2년마다 1일 가산 (15 + Math.floor((diffYears - 1) / 2)), 최대 25일
+			var addDays = Math.floor((diffYears - 1) / 2);
+			return Math.min(15 + addDays, 25);
+		}
+	}
+
+	// 현재 근무 중인 미등록 직원 전체 자동계산 및 행 추가 (백엔드 정통 API 우선 호출)
+	function calcAutoGrantAll() {
+		var curYy = $('#yy').val();
+		if (!curYy) {
+			alert("부여연도를 선택하세요.");
+			return;
+		}
+
+		// 현재 그리드에 존재하는 사원 ID 목록
+		var gridList = grantGridView.target.list || [];
+		var existUserMap = {};
+		$.each(gridList, function(idx, item) {
+			if (item.userId) {
+				existUserMap[item.userId] = true;
+			}
+		});
+
+		var paramObj = {
+			"coCd" : "GUN",
+			"yy"   : curYy
+		};
+
+		// 1. 백엔드 정통 연차자동계산 API 호출
+		postAjax("/user/pm/pm07/selectAutoCalcAnnualGrantList", paramObj, null, function(data) {
+			var autoList = data.resultList || [];
+			if (autoList.length > 0) {
+				var addedCount = 0;
+				$.each(autoList, function(idx, item) {
+					if (!existUserMap[item.userId]) {
+						var enterDtFormatted = formatDtStrJS(item.enterDt);
+						var gDays = Number(item.grantDays || 0);
+						if (gDays <= 0) {
+							gDays = calculateAnnualGrantDaysJS(enterDtFormatted, curYy);
+						}
+						grantGridView.target.addRow({
+							coCd        : item.coCd || "GUN",
+							yy          : curYy,
+							userId      : item.userId,
+							userNm      : item.userNm,
+							deptNm      : item.deptNm,
+							enterDt     : enterDtFormatted,
+							leaveDt     : formatDtStrJS(item.leaveDt),
+							grantDays   : gDays,
+							usedDays    : Number(item.usedDays || 0),
+							balanceDays : gDays - Number(item.usedDays || 0),
+							autoYn      : "Y",
+							rmk         : item.rmk || "연차기준 자동계산"
+						}, "last");
+						existUserMap[item.userId] = true;
+						addedCount++;
+					}
+				});
+				if (addedCount > 0) {
+					alert("현재 근무 중인 미등록 직원 " + addedCount + "명이 연차지급기준으로 자동계산되어 추가되었습니다.");
+				} else {
+					alert("현재 근무 중인 미등록 직원이 없거나 이미 전원 추가되어 있습니다.");
+				}
+			} else {
+				// 서버 미재기동 시 Fallback 처리 (/admin/cm/cm06/selectUserTree)
+				calcAutoGrantAllFallback(curYy, existUserMap);
+			}
+		});
+	}
+
+	// 서버 미재기동 환경 하위호환 Fallback 처리
+	function calcAutoGrantAllFallback(curYy, existUserMap) {
+		var paramObj = {
+			"coCd"  : "GUN",
+			"useYn" : "Y"
+		};
+		postAjax("/admin/cm/cm06/selectUserTree", paramObj, null, function(data) {
+			var treeData = data.deptTree || data.userTree || data;
+			if (!Array.isArray(treeData)) return;
+
+			var addedCount = 0;
+			$.each(treeData, function(idx, node) {
+				if (node.type === "person" || (node.original && node.original.id)) {
+					var orig = node.original || node;
+					var userId = orig.id || node.id;
+					var userNm = node.text || orig.name || "";
+					var deptNm = orig.deptNm || orig.deptName || "";
+					var enterDt = formatDtStrJS(orig.enterDt || orig.enter_dt || orig.enterDate || orig.enter_date || "");
+					var leaveDt = formatDtStrJS(orig.leaveDt || orig.leave_dt || orig.leaveDate || orig.leave_date || "");
+
+					// GUN00, GUN95 부서코드 사원 제외
+					var deptId = String(orig.deptId || orig.dept_id || orig.viewDeptId || orig.view_dept_id || "");
+					if (deptId.indexOf("GUN00") === 0 || deptId.indexOf("GUN95") === 0) {
+						return;
+					}
+
+					if (leaveDt) {
+						var leaveYy = leaveDt.replace(/[^0-9]/g, '').substring(0, 4);
+						if (leaveYy && parseInt(leaveYy, 10) < parseInt(curYy, 10)) {
+							return;
+						}
+					}
+
+					if (existUserMap[userId]) {
+						return;
+					}
+
+					// 정밀 근속연수 연차 산정 수식 호출 (15일 강제 덮어쓰기 일체 제거!)
+					var grantDays = calculateAnnualGrantDaysJS(enterDt, curYy);
+
+					grantGridView.target.addRow({
+						coCd        : "GUN",
+						yy          : curYy,
+						userId      : userId,
+						userNm      : userNm,
+						deptNm      : deptNm,
+						enterDt     : enterDt,
+						leaveDt     : leaveDt,
+						grantDays   : grantDays,
+						usedDays    : 0,
+						balanceDays : grantDays,
+						autoYn      : "Y",
+						rmk         : "연차기준 자동계산",
+						__status    : "C"
+					}, "last");
+
+					existUserMap[userId] = true;
+					addedCount++;
+				}
+			});
+
+			if (addedCount > 0) {
+				markGrantGridDirty(true);
+				alert("현재 근무 중인 미등록 직원 " + addedCount + "명이 연차지급기준으로 자동계산되어 추가되었습니다.");
+			} else {
+				alert("현재 근무 중인 미등록 직원이 없거나 이미 전원 추가되어 있습니다.");
+			}
+		});
+	}
+
+	// 행 추가
+	function addGrantRow() {
+		var curYy = $('#yy').val() || moment().format("YYYY");
+		grantGridView.target.addRow({
+			coCd        : "GUN",
+			yy          : curYy,
+			userId      : "",
+			userNm      : "",
+			deptNm      : "",
+			grantDays   : 15,
+			usedDays    : 0,
+			balanceDays : 15,
+			autoYn      : "N",
+			rmk         : "",
+			__status    : "C"
+		}, "last");
+		markGrantGridDirty(true);
+	}
+
+	// 행 선택 삭제
+	function deleteGrantRow() {
+		var list = grantGridView.target.getList("selected");
+		if (!list || list.length < 1) {
+			alert("삭제할 행을 선택하세요.");
+			return;
+		}
+		$.each(list, function(idx, item) {
+			if (item.userId && item.yy) {
+				deleteGrantList.push({
+					coCd   : item.coCd || "GUN",
+					yy     : item.yy,
+					userId : item.userId
+				});
+			}
+		});
+		grantGridView.target.removeRow("selected");
+		markGrantGridDirty(true);
+	}
+
+	// 상단 돋보기 클릭 시 사용자/사원 검색 팝업(userSearch.html) 오픈
+	function openSearchUserModal() {
+		var paramObj = {
+			"coCd"   : "GUN",
+			"userId" : $('#userId').val(),
+			"userNm" : $('#userNm').val(),
+			"useYn"  : "Y"
+		};
+		openSecondModal("/static/html/cmn/modal/userSearch.html", 450, 650, "사용자 검색", paramObj, function(tree) {
+			var checkedId = tree.get_checked()[0];
+			if (checkedId) {
+				var checkedNode = tree.get_node(checkedId);
+				$('#userId').val(checkedNode.id);
+				$('#userNm').val(checkedNode.text);
+				searchGrantGrid();
+			}
+		});
+	}
+
+	// 그리드 셀 더블클릭 시 사용자/사원 검색 팝업(userSearch.html) 오픈
+	function openGrantGridUserSearch(dindex) {
+		var paramObj = {
+			"coCd"  : "GUN",
+			"useYn" : "Y"
+		};
+		openSecondModal("/static/html/cmn/modal/userSearch.html", 450, 650, "사용자 검색", paramObj, function(tree) {
+			var checkedId = tree.get_checked()[0];
+			if (checkedId) {
+				var checkedNode = tree.get_node(checkedId);
+				var orig = checkedNode.original || {};
+				var userId = checkedNode.id || orig.id;
+				var userNm = checkedNode.text || orig.name || "";
+				var deptNm = orig.deptNm || orig.deptName || "";
+				var enterDt = formatDtStrJS(orig.enterDt || orig.enter_dt || orig.enterDate || orig.enter_date || "");
+				var leaveDt = formatDtStrJS(orig.leaveDt || orig.leave_dt || orig.leaveDate || orig.leave_date || "");
+
+				grantGridView.target.setValue(dindex, "userId", userId);
+				grantGridView.target.setValue(dindex, "userNm", userNm);
+				grantGridView.target.setValue(dindex, "deptNm", deptNm);
+				grantGridView.target.setValue(dindex, "enterDt", enterDt);
+				grantGridView.target.setValue(dindex, "leaveDt", leaveDt);
+
+				// 근속연수 연차지급기준 자동계산 및 부여일수/잔여일수 갱신
+				var curYy = $('#yy').val() || moment().format("YYYY");
+				var calcDays = calculateAnnualGrantDaysJS(enterDt, curYy);
+				if (calcDays > 0) {
+					grantGridView.target.setValue(dindex, "grantDays", calcDays);
+					grantGridView.target.setValue(dindex, "balanceDays", calcDays);
+				}
+			}
+		});
+	}
+
+	// 일괄 저장 (추가/수정/삭제된 변경 자료만 백엔드 전송)
+	function saveGrantList() {
+		var list = grantGridView.target.list || [];
+		var changeSaveList = [];
+
+		$.each(list, function(i, row) {
+			if (row.__status === "C" || row.__status === "U") {
+				changeSaveList.push(row);
+			}
+		});
+
+		if (changeSaveList.length === 0 && deleteGrantList.length === 0) {
+			alert("변경(추가/수정/삭제)된 데이터가 없습니다.");
+			return;
+		}
+
+		// 입력 유효성 검사 (추가/수정된 행 대상)
+		for (var i = 0; i < changeSaveList.length; i++) {
+			var row = changeSaveList[i];
+			if (!row.yy) {
+				alert((i + 1) + "번째 변경 행의 부여연도를 입력하세요.");
+				return;
+			}
+			if (!row.userId) {
+				alert((i + 1) + "번째 변경 행의 사원ID를 입력하세요.");
+				return;
+			}
+			if (typeof row.grantDays === "undefined" || row.grantDays === "") {
+				alert((i + 1) + "번째 변경 행의 부여일수를 입력하세요.");
+				return;
+			}
+		}
+
+		var cCnt = changeSaveList.filter(function(r) { return r.__status === "C"; }).length;
+		var uCnt = changeSaveList.filter(function(r) { return r.__status === "U"; }).length;
+		var dCnt = deleteGrantList.length;
+
+		var msg = "연차부여 변경사항(신규추가 " + cCnt + "건, 수정 " + uCnt + "건, 삭제 " + dCnt + "건)을 저장하시겠습니까?";
+		if (!confirm(msg)) return;
+
+		var paramData = {
+			"saveList"   : changeSaveList,
+			"deleteList" : deleteGrantList
+		};
+
+		postAjax("/user/pm/pm07/saveAnnualGrantList", paramData, null, function(data) {
+			alert(data.resultMessage || "저장되었습니다.");
+			if (data.resultCode == 200) {
+				searchGrantGrid();
+			}
+		});
+	}
+
+	$(document).ready(function() {
+		// FI0202M01.html 스타일 연도 셀렉트박스 동적 생성 및 선택 초기화
+		setGrantYm();
+
+		grantGridView.initView();
+		searchGrantGrid();
+	});
+</script>
