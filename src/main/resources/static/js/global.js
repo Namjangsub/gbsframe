@@ -2780,7 +2780,11 @@ function exportJSONToExcel (_excelJsonData, _excelHeader, _excelFileName = 'exce
 //	let _excelHeader = _grid.target.columns;
 	// 엑셀 워크북 생성
 	let workbook = new ExcelJS.Workbook();
-	let worksheet = workbook.addWorksheet(_excelFileName+"Sheet1");
+	// Excel 워크시트명은 31자를 초과할 수 없으며 \ * ? : / [ ] 문자를 사용할 수 없습니다.
+	let worksheetName = (_excelFileName + "Sheet1")
+		.replace(/[\\*?:/\[\]]/g, "_")
+		.substring(0, 31);
+	let worksheet = workbook.addWorksheet(worksheetName || "Sheet1");
 
 	// 헤더 스타일 설정
 	const headerFill = {
