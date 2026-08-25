@@ -912,4 +912,9 @@ public class PM07SvcImpl implements PM07Svc {
 		return false;
 	}
 
+	@Override
+	public List<Map<String, String>> selectAnnualUseStatusList(Map<String, String> paramMap) {
+		return pm07Mapper.selectAnnualUseStatusList(paramMap);
+	}
+
 }

@@ -1,0 +1,637 @@
+<!-- 
+	========================================================================================
+	[PM0711M01.html] 연차 사용 현황 화면 (PM0701P02.html 팝오버 톤앤매너 계승)
+	----------------------------------------------------------------------------------------
+	1. 직종 구분 (TB_CM06M01.SALES_AREA 기준):
+	   - SALESAREA60 : 생산직
+	   - SALESAREA00 : 임원 (※ 연차 대상 제외: U.SALES_AREA != 'SALESAREA00')
+	   - 기타/NULL   : 사무직 (U.SALES_AREA IS NULL OR U.SALES_AREA != 'SALESAREA60')
+	2. 부서 코드 및 정렬:
+	   - 부서 매핑: VIEW_DEPT_ID (SUBSTR(NVL(U.VIEW_DEPT_ID, U.DEPT_ID), 1, 5)) 상위 5자리
+	   - 제외 부서: GUN95xx (실적관리용/특수부서 제외)
+	   - 정렬 순서: D.SORT_NO ASC, A.DEPT_NM ASC, A.USER_NM ASC (조직도 기본 정렬순)
+	3. 실시간 팝오버 호버 툴팁 기능 (showVacationPopover):
+	   - 1월~12월 수치 셀 마우스 호버/클릭 시 /user/pm/pm07/selectVacationCalendarList 실시간 호출
+	   - PM0701P02.html 의 vacation-info-popover 디자인 및 파란색 돋보기 포맷터 100% 동일 계승
+	   - 연차 (1일), 반차/오전/오후반차 (0.5일) 상세 신청서 사유 [REQ_RMK] 실시간 표시
+	========================================================================================
+-->
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+	<meta charset="utf-8">
+	<meta http-equiv="X-UA-Compatible" content="IE=edge">
+	<meta name="viewport" content="width=device-width, initial-scale=0.6, user-scalable=no">
+	<link rel="icon" href="/static/favicon.ico" type="image/x-icon">
+	<link rel="stylesheet" href="/static/bootstrap/css/bootstrap.min.css">
+	<link rel="stylesheet" href="/static/bootstrap/css/bootstrap-theme.min.css">
+	<link rel="stylesheet" href="/static/bootstrap/css/dashboard.css">
+	<link rel="stylesheet" href="/static/bootstrap/css/bootstrap-datepicker.css">
+	<link rel="stylesheet" href="/static/fontawesome/css/all.css">
+	<link rel="stylesheet" href="/static/css/ax5/ax5grid.css">
+	<link rel="stylesheet" href="/static/css/ax5/ax5mask.css">
+	<link rel="stylesheet" href="/static/css/ax5/ax5modal.css">
+	<link rel="stylesheet" href="/static/css/ax5/ax5toast.css">
+	<link rel="stylesheet" href="/static/css/ax5/ax5calendar.css">
+	<link rel="stylesheet" href="/static/css/gnb.css">
+	<link rel="stylesheet" href="/static/css/main.css">
+	<link rel="stylesheet" href="/static/css/sub.css">
+	<link rel="stylesheet" href="/static/css/common.css">
+
+	<script src="/static/js/jquery-latest.min.js"></script>
+	<script src="/static/js/jquery.serializeObject.js"></script>
+	<script src="/static/bootstrap/js/bootstrap.min.js"></script>
+	<script src="/static/bootstrap/js/bootstrap-datepicker.min.js"></script>
+	<script src="/static/bootstrap/js/bootstrap-datepicker.ko.min.js"></script>
+	<script src="/static/js/moment/moment-with-locales.js"></script>
+	<script src="/static/js/ax5/ax5core.min.js"></script>
+	<script src="/static/js/ax5/ax5grid.min.js"></script>
+	<script src="/static/js/ax5/ax5mask.min.js"></script>
+	<script src="/static/js/ax5/ax5modal.min.js"></script>
+	<script src="/static/js/ax5/ax5toast.min.js"></script>
+	<script src="/static/js/ax5/ax5calendar.min.js"></script>
+	<script src="/static/js/global.js"></script>
+	<script src="/static/js/manualPopup.js"></script>
+	<script src="/static/js/common/GridColumnConfig.js"></script>
+
+	<style>
+		.grid-font-red-strikethrough {
+			color: #d9534f !important;
+			text-decoration: line-through !important;
+		}
+		.grid-font-blue-bold {
+			color: #3182ce !important;
+			font-weight: bold;
+		}
+		.grid-font-bold {
+			font-weight: bold;
+		}
+/* PM0701P02.html 메모 팝오버 디자인 톤앤매너 100% 계승 툴팁 레이어 */
+.vacation-info-popover {
+	position: absolute;
+	z-index: 999999;
+	display: none;
+	background: #ffffff;
+	border: 1px solid #337ab7;
+	border-radius: 5px;
+	box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+	padding: 10px 14px;
+	min-width: 240px;
+	max-width: 360px;
+	font-size: 12px;
+	color: #333333;
+	pointer-events: auto;
+}
+.vacation-info-popover .popover-title {
+	font-weight: bold;
+	color: #337ab7;
+	border-bottom: 1px solid #e9ecef;
+	padding-bottom: 5px;
+	margin-bottom: 6px;
+	font-size: 12px;
+}
+.vacation-info-popover .popover-item {
+	padding: 4px 0;
+	line-height: 1.4;
+	color: #444444;
+	border-bottom: 1px dashed #f0f0f0;
+}
+.vacation-info-popover .popover-item:last-child {
+	border-bottom: none;
+}
+</style>
+</head>
+
+<body>
+	<div id="head_area"></div>
+	<div id="top_area"></div>
+
+	<div id="main_area">
+		<!-- 페이지 상단 버튼 -->
+		<div class="contents no_bg">
+			<ul class="btn_ul">
+				<li class="btn_r">
+					<a onclick="manualPopup('PM0711M01');"><button type="button" class="bg_gray">도움말</button></a>
+					<a onclick="initSearch();"><button type="button" class="bg_gray">초기화</button></a>
+					<a onclick="searchAnnualUseStatusGrid();"><button type="button" class="bg_gray">검 색</button></a>
+				</li>
+			</ul>
+		</div>
+
+		<!-- 검색 조건 -->
+		<div class="contents search">
+			<input type="hidden" id="pgmId" name="pgmId" value="PM0711M01">
+			<div class="">
+				<table class="table_input type04">
+					<colgroup>
+						<col width="9%">
+						<col width="16%">
+						<col width="9%">
+						<col width="16%">
+						<col width="9%">
+						<col width="16%">
+						<col width="9%">
+						<col width="16%">
+					</colgroup>
+					<tr>
+						<th class="hit">회사</th>
+						<td>
+							<select id="coCd_S" name="coCd_S" data-search="coCd" onchange="searchAnnualUseStatusGrid();">
+							</select>
+						</td>
+						<th class="hit">기준연도</th>
+						<td>
+							<input type="text" id="yy_S" name="yy_S" data-search="yy" maxlength="4" placeholder="YYYY" onkeyup="if(event.keyCode==13) searchAnnualUseStatusGrid();" style="text-align: center;">
+						</td>
+						<th>부서</th>
+						<td>
+							<div class="search_form" style="width: 100%;">
+								<input type="hidden" id="deptCd_S" name="deptCd_S" data-search="deptCd">
+								<input type="text" id="deptNm_S" name="deptNm_S" data-search="deptNm" onkeyup="(event.keyCode == 8 || event.keyCode == 46) ? (deptCd_S.value = '', deptNm_S.value = '') : event.keyCode == 13 ? searchAnnualUseStatusGrid() : '';">
+								<a onclick="openReqDeptTree('S');"><i class="i_search_w"></i></a>
+							</div>
+						</td>
+						<th>성명</th>
+						<td>
+							<div class="search_form" style="width: 100%;">
+								<input type="hidden" id="userId_S" name="userId_S" data-search="userId">
+								<input type="text" id="userNm_S" name="userNm_S" data-search="userNm" placeholder="성명 입력" onkeyup="(event.keyCode == 8 || event.keyCode == 46) ? (userId_S.value = '', userNm_S.value = '') : event.keyCode == 13 ? searchAnnualUseStatusGrid() : '';">
+								<a onclick="openReqUserTree('S');"><i class="i_search_w"></i></a>
+							</div>
+						</td>
+					</tr>
+					<tr>
+						<th>재직구분</th>
+						<td>
+							<select id="useYn_S" name="useYn_S" data-search="useYn" onchange="searchAnnualUseStatusGrid();">
+								<option value="">전체</option>
+								<option value="Y" selected>재직</option>
+								<option value="N">퇴직</option>
+							</select>
+						</td>
+						<th>직종구분</th>
+						<td colspan="5">
+							<select id="salesArea_S" name="salesArea_S" data-search="salesArea" onchange="searchAnnualUseStatusGrid();">
+								<option value="">전체</option>
+								<option value="OFFICE">사무직</option>
+								<option value="SALESAREA60">생산직</option>
+							</select>
+						</td>
+					</tr>
+				</table>
+			</div>
+		</div>
+
+		<!-- 콘텐츠 타이틀 -->
+		<div class="contents no_bg">
+			<div class="contents_tit">
+				<span style="height: 30px; line-height: 30px; font-size: 15px;">
+					<span id="displayYyTitle">2025</span>년도 연차 사용 현황 <span style="font-size: 12px; font-weight: normal; color: #666;" id="displayBaseDtSub">(발생일 : <span id="subStDt">2025-01-01</span> ~ <span id="subEdDt">2025-12-31</span>)</span>
+				</span>
+				<div class="add_btn_small pdl10">
+					<a onclick="excelDown();" style="height: 30px; line-height: 28px; width: 95px;"><i class="fas fa-file-excel"></i> 엑셀다운로드</a>
+					<a onclick="openGridColumnConfig();" style="height: 30px; line-height: 28px; width: 90px;"><i class="fas fa-cog"></i> 그리드설정</a>
+				</div>
+			</div>
+		</div>
+
+		<!-- 메인 그리드 콘텐츠 -->
+		<div class="contents" style="padding-bottom: 0px;">
+			<div class="ax5_grid" style="width: 100%">
+				<div data-ax5grid="statusGridView" data-ax5grid-config="{}" style="height: 620px; width: 100%;"></div>
+			</div>
+		</div>
+	</div>
+
+	<script type="text/javascript">
+		var statusGridView = {
+			initView: function() {
+				this.target = new ax5.ui.grid();
+				this.target.setConfig({
+					target: $('[data-ax5grid="statusGridView"]'),
+					showLineNumber: false,
+					showRowSelector: false,
+					multipleSelect: false,
+					sortable: true,
+					header: {
+						align: "center",
+						columnHeight: 28,
+						columns: [
+							{key: "no",           label: "NO",       rowspan: 2, width: 45},
+							{key: "deptNm",       label: "부서",     rowspan: 2, width: 120},
+							{key: "userNm",       label: "이름",     rowspan: 2, width: 90},
+							{label: "근무기간",   colspan: 3},
+							{key: "grantDays",    label: "연차휴가<br>발생일수", rowspan: 2, width: 75},
+							{key: "prevDays",     label: "전년<br>연차",     rowspan: 2, width: 60},
+							{label: "연차휴가사용내역", colspan: 12},
+							{key: "usedDaysSum",  label: "연차휴가<br>사용일수", rowspan: 2, width: 75},
+							{key: "balanceDays",  label: "미사용<br>일수",     rowspan: 2, width: 70},
+							{key: "rmk",          label: "비고",     rowspan: 2, width: 110}
+						]
+					},
+					body: {
+						mergeCells: ['deptNm'],
+						columnHeight: 26,
+						trStyleClass: function() {
+							if (this.item && this.item.useYn === 'N') {
+								return "grid-font-red-strikethrough";
+							}
+							return "";
+						},
+						onClick: function() {
+							this.self.select(this.dindex);
+							if (this.column.key && (this.column.key.indexOf('m') === 0 || this.column.key === 'usedDaysSum')) {
+								var $cell = $(this.element);
+								if ($cell.length === 0 || typeof $cell.offset !== 'function' || !$cell.offset()) {
+									$cell = $('[data-ax5grid="statusGridView"] [data-ax5grid-data-index="' + this.dindex + '"] [data-ax5grid-column-key="' + this.column.key + '"]');
+								}
+								showVacationPopover($cell, this.item, this.column.key);
+							}
+						}
+					},
+					page: {
+						display: false
+					},
+					columns: [
+						 {key: "no",           label: "NO",       width:  45, align: "center", formatter: function() { return this.dindex + 1; }}
+						,{key: "deptNm",       label: "부서",     width: 120, align: "left"}
+						,{key: "userNm",       label: "이름",     width:  90, align: "center"}
+						,{key: "enterDt",      label: "입사일자", width: 100, align: "center"}
+						,{key: "baseDt",       label: "기준일자", width: 100, align: "center"}
+						,{key: "workYears",    label: "근속연수", width: 100, align: "center"}
+						,{key: "grantDays",    label: "발생일수", width:  75, align: "center", formatter: "zeroEmptyFormatter"}
+						,{key: "prevDays",     label: "전년연차", width:  60, align: "center", formatter: "zeroEmptyFormatter"}
+						,{key: "m01",          label: "1월",      width:  50, align: "center", formatter: "monthCellFormatter"}
+						,{key: "m02",          label: "2월",      width:  50, align: "center", formatter: "monthCellFormatter"}
+						,{key: "m03",          label: "3월",      width:  50, align: "center", formatter: "monthCellFormatter"}
+						,{key: "m04",          label: "4월",      width:  50, align: "center", formatter: "monthCellFormatter"}
+						,{key: "m05",          label: "5월",      width:  50, align: "center", formatter: "monthCellFormatter"}
+						,{key: "m06",          label: "6월",      width:  50, align: "center", formatter: "monthCellFormatter"}
+						,{key: "m07",          label: "7월",      width:  50, align: "center", formatter: "monthCellFormatter"}
+						,{key: "m08",          label: "8월",      width:  50, align: "center", formatter: "monthCellFormatter"}
+						,{key: "m09",          label: "9월",      width:  50, align: "center", formatter: "monthCellFormatter"}
+						,{key: "m10",          label: "10월",     width:  50, align: "center", formatter: "monthCellFormatter"}
+						,{key: "m11",          label: "11월",     width:  50, align: "center", formatter: "monthCellFormatter"}
+						,{key: "m12",          label: "12월",     width:  50, align: "center", formatter: "monthCellFormatter"}
+						,{key: "usedDaysSum",  label: "사용일수", width:  75, align: "center", styleClass: "grid-font-bold", formatter: "zeroEmptyFormatter"}
+						,{key: "balanceDays",  label: "미사용일수",width: 70, align: "center", styleClass: "grid-font-blue-bold", formatter: "zeroEmptyFormatter"}
+						,{key: "rmk",          label: "비고",     width: 110, align: "left"}
+					]
+				});
+				return this;
+			},
+			setData: function(list) {
+				var rawList = list || [];
+				this.target.setData({
+					list: rawList,
+					page: { display: false, totalElements: rawList.length }
+				});
+				adjustGridHeightToWindow();
+			}
+		};
+
+		// 0 또는 빈값은 공백("")으로 표기하는 포맷터
+		ax5.ui.grid.formatter["zeroEmptyFormatter"] = function() {
+			var val = Number(this.value);
+			if (isNaN(val) || val === 0) return "";
+			return val % 1 === 0 ? val : val.toFixed(1);
+		};
+
+		// 월별 연차 사용내역 포맷터 (PM0701P02.html usedDaysInfoFormatter 톤앤매너 계승)
+		ax5.ui.grid.formatter["monthCellFormatter"] = function() {
+			var val = Number(this.value);
+			if (isNaN(val) || val === 0) return "";
+			var displayVal = (val % 1 === 0 ? val : val.toFixed(1));
+			return '<span class="used-days-info-trigger" style="cursor: pointer; color: #337ab7; font-weight: bold;" title="마우스 호버/클릭 시 상세 휴가신청 내역 표출">' + displayVal + ' <i class="fas fa-search-plus" style="font-size: 10px; color: #5bc0de;"></i></span>';
+		};
+
+		var VACATION_POPOVER_TIMER = null;
+
+		// 사용일수 마우스 호버 시 백엔드 API("/user/pm/pm07/selectVacationCalendarList") 실시간 호출 팝오버 툴팁 표출 함수
+		function showVacationPopover($el, item, colKey) {
+			if (VACATION_POPOVER_TIMER) {
+				clearTimeout(VACATION_POPOVER_TIMER);
+				VACATION_POPOVER_TIMER = null;
+			}
+
+			if (!$el || $el.length === 0 || typeof $el.offset !== 'function') {
+				return;
+			}
+			var offset = $el.offset();
+			if (!offset || typeof offset.top === 'undefined') {
+				return;
+			}
+
+			var $pop = $('#vacationInfoPopover');
+			if ($pop.length === 0) {
+				$('body').append(
+					'<div id="vacationInfoPopover" class="vacation-info-popover">' +
+						'<div class="popover-title"><i class="fas fa-calendar-check"></i> <span id="popUserNm"></span> 님의 휴가신청 이력</div>' +
+						'<div id="popContent"></div>' +
+					'</div>'
+				);
+				$pop = $('#vacationInfoPopover');
+
+				// 팝오버 창 위에 마우스가 위치했을 때 닫힘 방지
+				$pop.on('mouseenter', function() {
+					if (VACATION_POPOVER_TIMER) {
+						clearTimeout(VACATION_POPOVER_TIMER);
+						VACATION_POPOVER_TIMER = null;
+					}
+				}).on('mouseleave', function() {
+					hideVacationPopoverImmediately();
+				});
+			}
+
+			var userNm = (item ? (item.userNm || item.name) : '') || '사원';
+			var userId = (item ? (item.userId || item.id) : '');
+			$('#popUserNm').text(userNm);
+
+			var curYy = $('#yy_S').val() || moment().format("YYYY");
+			var key = String(colKey || '').toLowerCase();
+			var stDt = curYy + "0101";
+			var edDt = curYy + "1231";
+
+			// 특정 월을 마우스 호버했을 경우 해당 월의 범위만 백엔드에 요청
+			if (key && key.indexOf('m') === 0 && key.length === 3) {
+				var monthNum = key.substring(1); // "01", "02" 등
+				var lastDay = moment(curYy + "-" + monthNum, "YYYY-MM").daysInMonth();
+				stDt = curYy + monthNum + "01";
+				edDt = curYy + monthNum + (lastDay < 10 ? "0" + lastDay : lastDay);
+			}
+
+			$('#popContent').html('<div class="popover-item" style="color: #888888;"><i class="fas fa-spinner fa-spin"></i> 실시간 휴가이력 백엔드 조회 중...</div>');
+			var elHeight = (typeof $el.outerHeight === 'function') ? $el.outerHeight() : 20;
+			$pop.css({
+				top: (offset.top + elHeight + 2) + 'px',
+				left: Math.max(10, offset.left - 20) + 'px'
+			}).show();
+
+			var paramObj = {
+				"coCd": $('#coCd_S').val() || "GUN",
+				"reqId": userId,
+				"userId": userId,
+				"stDt": stDt,
+				"edDt": edDt
+			};
+
+			// 백엔드 API 실시간 조회를 실행하여 최신 휴가 신청서 내역을 가져와 표시 (연차/년차/반차 전용)
+			postAjax("/user/pm/pm07/selectVacationCalendarList", paramObj, null, function(data) {
+				var list = data.result || data.resultList || data.list || [];
+				var htmlStr = '';
+				var validCount = 0;
+
+				if (list && list.length > 0) {
+					$.each(list, function(i, row) {
+						var vNm = row.vacTypeNm || row.vac_type_nm || '연차';
+						
+						// PM0701P02.html 연차/년차/반차 필터링 규칙 적용 (공가/경조사 등 타 휴가 제외)
+						if (vNm.indexOf("연차") >= 0 || vNm.indexOf("년차") >= 0 || vNm.indexOf("반차") >= 0 || vNm.indexOf("오전") >= 0 || vNm.indexOf("오후") >= 0) {
+							var st = row.stDt || row.st_dt || '';
+							var ed = row.edDt || row.ed_dt || '';
+							var dtText = (st && ed && st !== ed) ? (st + " ~ " + ed) : (st || ed);
+							
+							// 반차는 0.5일, 일반 연차는 1일(또는 차감일수)로 계산 표기
+							var vDays = row.deductDays || row.deduct_days || row.vacDays || row.vac_days || '';
+							if (vNm.indexOf("반차") >= 0 || vNm.indexOf("오전") >= 0 || vNm.indexOf("오후") >= 0) {
+								vDays = "0.5";
+							} else if (!vDays || Number(vDays) === 0) {
+								vDays = "1";
+							}
+							
+							var daysText = ' (' + vDays + '일)';
+							var rmk = row.reqRmk || row.req_rmk || row.rmk || '';
+							var rmkText = rmk ? (' [' + $.trim(rmk) + ']') : '';
+
+							htmlStr += '<div class="popover-item"><i class="fas fa-check-circle" style="color: #337ab7; margin-right: 5px;"></i> ' + dtText + ' ' + vNm + daysText + rmkText + '</div>';
+							validCount++;
+						}
+					});
+				}
+
+				if (validCount === 0) {
+					htmlStr = '<div class="popover-item" style="color: #888888;">등록된 연차/반차 상세 신청 이력이 없습니다.</div>';
+				}
+
+				$('#popContent').html(htmlStr);
+			});
+		}
+
+		function hideVacationPopover() {
+			if (VACATION_POPOVER_TIMER) {
+				clearTimeout(VACATION_POPOVER_TIMER);
+			}
+			VACATION_POPOVER_TIMER = setTimeout(function() {
+				$('#vacationInfoPopover').hide();
+				VACATION_POPOVER_TIMER = null;
+			}, 300);
+		}
+
+		function hideVacationPopoverImmediately() {
+			if (VACATION_POPOVER_TIMER) {
+				clearTimeout(VACATION_POPOVER_TIMER);
+				VACATION_POPOVER_TIMER = null;
+			}
+			$('#vacationInfoPopover').hide();
+		}
+
+		// PM0701P02.html 그리드 셀 마우스 호버/클릭 이벤트 바인딩 100% 동일 구현
+		$(document).off('mouseenter mouseleave click', '.used-days-info-trigger, [data-ax5grid="statusGridView"] [data-ax5grid-column-attr]');
+		$(document).on({
+			mouseenter: function(e) {
+				var $el = $(this);
+				var $tr = $el.closest('[data-ax5grid-data-index]');
+				var rowIdx = $tr.attr('data-ax5grid-data-index');
+				var $td = $el.closest('[data-ax5grid-column-key]');
+				var colKey = $td.attr('data-ax5grid-column-key');
+
+				if (rowIdx !== undefined && statusGridView.target.list && statusGridView.target.list[rowIdx]) {
+					var item = statusGridView.target.list[rowIdx];
+					showVacationPopover($el, item, colKey);
+				}
+			},
+			mouseleave: function(e) {
+				hideVacationPopover();
+			},
+			click: function(e) {
+				e.stopPropagation();
+				var $el = $(this);
+				var $tr = $el.closest('[data-ax5grid-data-index]');
+				var rowIdx = $tr.attr('data-ax5grid-data-index');
+				var $td = $el.closest('[data-ax5grid-column-key]');
+				var colKey = $td.attr('data-ax5grid-column-key');
+
+				if (rowIdx !== undefined && statusGridView.target.list && statusGridView.target.list[rowIdx]) {
+					var item = statusGridView.target.list[rowIdx];
+					showVacationPopover($el, item, colKey);
+				}
+			}
+		}, '.used-days-info-trigger');
+
+		// 화면 해상도에 맞춰 그리드 높이를 동적으로 하단 여백 없이 꽉 차게 계산
+		function adjustGridHeightToWindow() {
+			var $gridTarget = $('[data-ax5grid="statusGridView"]');
+			if ($gridTarget.length === 0) return;
+
+			var winHeight = window.innerHeight || $(window).height();
+			try {
+				if (window.top && window.top.innerHeight) {
+					var topWinHeight = window.top.innerHeight;
+					if (topWinHeight > 0) {
+						winHeight = topWinHeight;
+					}
+				}
+			} catch (e) {
+				winHeight = $(window).height();
+			}
+
+			var gridTop = $gridTarget.offset().top;
+			if (!gridTop || gridTop < 50) {
+				gridTop = 220;
+			}
+
+			// 하단 여백 없이 화면 바닥까지 가득 채우기 (20px 오프셋)
+			var calcHeight = winHeight - gridTop - 20;
+			if (calcHeight < 400) {
+				calcHeight = 400;
+			}
+
+			$gridTarget.css('height', calcHeight + 'px');
+			if (statusGridView && statusGridView.target && statusGridView.target.setHeight) {
+				statusGridView.target.setHeight(calcHeight);
+			}
+		}
+
+		// 연차 사용 현황 데이터 조회
+		function searchAnnualUseStatusGrid() {
+			var curYy = $('#yy_S').val() || moment().format("YYYY");
+			$('#yy_S').val(curYy);
+			$('#displayYyTitle').text(curYy);
+			$('#subStDt').text(curYy + "-01-01");
+			$('#subEdDt').text(curYy + "-12-31");
+
+			var rawDeptCd = $('#deptCd_S').val() || "";
+			var deptCd5Val = rawDeptCd.length > 5 ? rawDeptCd.substring(0, 5) : rawDeptCd;
+
+			var paramObj = {
+				"coCd": $('#coCd_S').val() || "GUN",
+				"yy": curYy,
+				"deptCd_S": deptCd5Val,
+				"userId_S": $('#userId_S').val() || "",
+				"userNm_S": $('#userNm_S').val() || "",
+				"useYn_S": $('#useYn_S').val() || "",
+				"salesArea_S": $('#salesArea_S').val() || ""
+			};
+
+			postAjax("/user/pm/pm07/selectAnnualUseStatusList", paramObj, null, function(data) {
+				if (data && data.result) {
+					statusGridView.setData(data.result);
+				} else {
+					statusGridView.setData([]);
+				}
+				setTimeout(function() {
+					adjustGridHeightToWindow();
+				}, 100);
+			});
+		}
+
+		// 초기화
+		function initSearch() {
+			var curYy = moment().format("YYYY");
+			$('#yy_S').val(curYy);
+			$('#deptCd_S').val("");
+			$('#deptNm_S').val("");
+			$('#userId_S').val("");
+			$('#userNm_S').val("");
+			$('#useYn_S').val("Y");
+			$('#salesArea_S').val("");
+			searchAnnualUseStatusGrid();
+		}
+
+		// 사원 검색 트리
+		function openReqUserTree(gbn) {
+			var sfx = (gbn == 'S') ? '_S' : '';
+			var paramObj = {
+				"coCd": $('#coCd' + sfx).val() || "GUN",
+				"userId": $('#userId' + sfx).val(),
+				"userNm": $('#userNm' + sfx).val(),
+				"useYn": "Y"
+			};
+			openModal("/static/html/cmn/modal/userSearch.html", 450, 650, "사원 검색", paramObj, function(tree) {
+				var checkedId = tree.get_checked()[0];
+				var checkedNode = tree.get_node(checkedId);
+				if (!checkedNode || checkedNode.type != 'person') {
+					alert("사원을 선택하세요.");
+					return;
+				}
+				$('#userId' + sfx).val(checkedNode.id);
+				$('#userNm' + sfx).val(checkedNode.text);
+				if (gbn == 'S') searchAnnualUseStatusGrid();
+			});
+		}
+
+		// 부서 검색 트리
+		function openReqDeptTree(gbn) {
+			var sfx = (gbn == 'S') ? '_S' : '';
+			var rawDeptId = $('#deptCd' + sfx).val() || '';
+			var paramObj = {
+				"coCd": $('#coCd' + sfx).val() || "GUN",
+				"deptId": rawDeptId.length > 5 ? rawDeptId.substring(0, 5) : rawDeptId,
+				"deptNm": $('#deptNm' + sfx).val(),
+				"useYn": "Y"
+			};
+			openModal("/static/html/cmn/modal/deptSearch.html", 300, 500, "부서 검색", paramObj, function(tree) {
+				var checkedId = tree.get_checked()[0];
+				var checkedNode = tree.get_node(checkedId);
+				var fullDeptId = (checkedNode && checkedNode.id) ? checkedNode.id : '';
+				var deptId5 = fullDeptId.length > 5 ? fullDeptId.substring(0, 5) : fullDeptId;
+				$('#deptCd' + sfx).val(deptId5);
+				$('#deptNm' + sfx).val(checkedNode.text);
+				if (gbn == 'S') searchAnnualUseStatusGrid();
+			});
+		}
+
+		// 엑셀 내보내기
+		function excelDown() {
+			var curYy = $('#yy_S').val() || moment().format("YYYY");
+			statusGridView.target.exportExcel(curYy + "년도_연차_사용_현황.xls");
+		}
+
+		// 그리드 칼럼 설정 팝업
+		function openGridColumnConfig() {
+			if (typeof GridColumnConfig !== 'undefined') {
+				GridColumnConfig.open(statusGridView.target, "PM0711M01");
+			} else {
+				alert("그리드 설정 모듈이 준비되지 않았습니다.");
+			}
+		}
+
+		$(document).ready(function() {
+			// 기본적인 left(#head_area) 및 top(#top_area) 공통 레이아웃 구조 로드
+			mainDefaultLoad("인사관리", "연차 사용 현황");
+
+			// 회사코드 공통 세팅
+			setCommonSelect($('#coCd_S'));
+
+			// 기준연도 기본값
+			var curYy = moment().format("YYYY");
+			$('#yy_S').val(curYy);
+
+			// 그리드 렌더링
+			statusGridView.initView();
+
+			// 초기 조회
+			searchAnnualUseStatusGrid();
+
+			// 초기 렌더링 완료 후 해상도 수직 맞춤 및 윈도우 리사이즈 이벤트 바인딩
+			setTimeout(function() {
+				adjustGridHeightToWindow();
+			}, 150);
+
+			$(window).on('resize', function() {
+				adjustGridHeightToWindow();
+			});
+		});
+	</script>
+</body>
+</html>

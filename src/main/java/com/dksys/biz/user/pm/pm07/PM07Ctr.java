@@ -153,4 +153,11 @@ public class PM07Ctr {
 		return "jsonView";
 	}
 
+	@PostMapping(value = "/selectAnnualUseStatusList")
+	public String selectAnnualUseStatusList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		List<Map<String, String>> result = pm07Svc.selectAnnualUseStatusList(paramMap);
+		model.addAttribute("result", result);
+		return "jsonView";
+	}
+
 }

@@ -22,6 +22,23 @@
 	color: #333333;
 	pointer-events: auto;
 }
+/* 입사일 기준 자동재계산/수정된 변경 행 분홍색 배경 시각적 극대화 오버라이딩 */
+.grid-cell-pink,
+.grid-cell-pink td,
+.grid-cell-pink .ax5grid-cell-content,
+[data-ax5grid="grantGrid"] .grid-cell-pink,
+[data-ax5grid="grantGrid"] .grid-cell-pink td,
+[data-ax5grid="grantGrid"] .grid-cell-pink .ax5grid-cell-content,
+[data-ax5grid="grantGrid"] tr.grid-cell-pink,
+[data-ax5grid="grantGrid"] tr.grid-cell-pink td,
+[data-ax5grid="grantGrid"] tr.grid-cell-pink .ax5grid-cell-content,
+[data-ax5grid="grantGrid"] td.grid-cell-pink,
+[data-ax5grid="grantGrid"] td.grid-cell-pink .ax5grid-cell-content {
+	background-color: #ffdeeb !important;
+	background: #ffdeeb !important;
+	color: #9b2c2c !important;
+	font-weight: bold !important;
+}
 .vacation-info-popover .popover-title {
 	font-weight: bold;
 	color: #337ab7;
@@ -162,6 +179,17 @@
 				},
 				body : {
 					mergeCells : ['deptNm'],
+					trStyleClass : function() {
+						if (this.item) {
+							var st = this.item.__status;
+							// 최초 DB 로드 상태(st === "")에는 색 변경 없음
+							// 데이터가 수정("U")되거나 신규추가("C")되거나 변경 플래그가 있는 행만 분홍색 적용
+							if (st === "U" || st === "C" || this.item.isAutoCalcModified || this.item.isAutoAdded || this.item.isManualAdded) {
+								return "grid-cell-pink";
+							}
+						}
+						return "";
+					},
 					onClick : function() {
 						this.self.select(this.dindex);
 						if (this.column.key === "usedDays") {
@@ -215,7 +243,10 @@
 		setData : function(list) {
 			var rawList = list || [];
 			$.each(rawList, function(i, row) {
-				row.__status = ""; // 초기 조회 시 변경 상태 없음
+				row.__status = ""; // 초기 DB 로드 시 변경 상태 없음 (색 변경 없음)
+				row.isAutoAdded = false;
+				row.isAutoCalcModified = false;
+				row.isManualAdded = false;
 			});
 			this.target.setData({
 				list : rawList,
@@ -258,15 +289,24 @@
 
 		var infoText = item.vacInfoList || '';
 		var htmlStr = '';
+		var validCount = 0;
+
 		if (infoText) {
 			var items = infoText.split(';');
 			$.each(items, function(i, val) {
-				if ($.trim(val)) {
-					htmlStr += '<div class="popover-item"><i class="fas fa-check-circle" style="color: #337ab7; margin-right: 5px;"></i> ' + $.trim(val) + '</div>';
+				var trimmedVal = $.trim(val);
+				if (trimmedVal) {
+					// 년차, 연차, 반차(오전반차/오후반차 등) 관련 항목만 선택 필터링
+					if (trimmedVal.indexOf("연차") >= 0 || trimmedVal.indexOf("년차") >= 0 || trimmedVal.indexOf("반차") >= 0 || trimmedVal.indexOf("오전") >= 0 || trimmedVal.indexOf("오후") >= 0) {
+						htmlStr += '<div class="popover-item"><i class="fas fa-check-circle" style="color: #337ab7; margin-right: 5px;"></i> ' + trimmedVal + '</div>';
+						validCount++;
+					}
 				}
 			});
-		} else {
-			htmlStr = '<div class="popover-item" style="color: #888888;">등록된 휴가신청 상세 내역이 없습니다.</div>';
+		}
+
+		if (validCount === 0) {
+			htmlStr = '<div class="popover-item" style="color: #888888;">등록된 연차/반차 상세 신청 이력이 없습니다.</div>';
 		}
 
 		$('#popContent').html(htmlStr);
@@ -402,7 +442,7 @@
 		}
 	}
 
-	// 현재 근무 중인 미등록 직원 전체 자동계산 및 행 추가 (백엔드 정통 API 우선 호출)
+	// 개인별 입사일 기준 연차 재계산 (변경이 있는 행만 수정 및 분홍색 마킹)
 	function calcAutoGrantAll() {
 		var curYy = $('#yy').val();
 		if (!curYy) {
@@ -410,25 +450,49 @@
 			return;
 		}
 
-		// 현재 그리드에 존재하는 사원 ID 목록
 		var gridList = grantGridView.target.list || [];
+		var updatedCount = 0;
+		var addedCount = 0;
 		var existUserMap = {};
-		$.each(gridList, function(idx, item) {
+
+		// 1. 현재 그리드에 조회되어 있는 기존 사원들 입사일 기준 재계산하여 변경된 행만 수정
+		$.each(gridList, function(dindex, item) {
 			if (item.userId) {
 				existUserMap[item.userId] = true;
+				var enterDt = item.enterDt || "";
+				if (enterDt) {
+					var calcDays = calculateAnnualGrantDaysJS(enterDt, curYy);
+					var oldGrantDays = Number(item.grantDays || 0);
+
+					// 입사일 기준 재계산된 부여일수가 기존 부여일수와 다른 경우에만 수정 적용
+					if (calcDays !== oldGrantDays) {
+						var usedDays = Number(item.usedDays || 0);
+						var newBal = calcDays - usedDays;
+						
+						// AX5-Grid 정통 API 사용: setValue & 마킹
+						grantGridView.target.setValue(dindex, "grantDays", calcDays);
+						grantGridView.target.setValue(dindex, "balanceDays", newBal);
+						grantGridView.target.setValue(dindex, "autoYn", "Y");
+						grantGridView.target.setValue(dindex, "rmk", "입사일 기준 자동재계산 변경");
+
+						item.__status = (item.creatId || item.creatDttm) ? "U" : "C";
+						item.isAutoAdded = true;
+						item.isAutoCalcModified = true;
+						updatedCount++;
+					}
+				}
 			}
 		});
 
+		// 2. 미등록 근무 사원 백엔드 API 조회 후 추가
 		var paramObj = {
 			"coCd" : "GUN",
 			"yy"   : curYy
 		};
 
-		// 1. 백엔드 정통 연차자동계산 API 호출
 		postAjax("/user/pm/pm07/selectAutoCalcAnnualGrantList", paramObj, null, function(data) {
 			var autoList = data.resultList || [];
 			if (autoList.length > 0) {
-				var addedCount = 0;
 				$.each(autoList, function(idx, item) {
 					if (!existUserMap[item.userId]) {
 						var enterDtFormatted = formatDtStrJS(item.enterDt);
@@ -448,90 +512,22 @@
 							usedDays    : Number(item.usedDays || 0),
 							balanceDays : gDays - Number(item.usedDays || 0),
 							autoYn      : "Y",
-							rmk         : item.rmk || "연차기준 자동계산"
+							rmk         : item.rmk || "입사일 기준 자동계산 신규",
+							__status    : "C",
+							isAutoAdded : true
 						}, "last");
 						existUserMap[item.userId] = true;
 						addedCount++;
 					}
 				});
-				if (addedCount > 0) {
-					alert("현재 근무 중인 미등록 직원 " + addedCount + "명이 연차지급기준으로 자동계산되어 추가되었습니다.");
-				} else {
-					alert("현재 근무 중인 미등록 직원이 없거나 이미 전원 추가되어 있습니다.");
-				}
-			} else {
-				// 서버 미재기동 시 Fallback 처리 (/admin/cm/cm06/selectUserTree)
-				calcAutoGrantAllFallback(curYy, existUserMap);
 			}
-		});
-	}
 
-	// 서버 미재기동 환경 하위호환 Fallback 처리
-	function calcAutoGrantAllFallback(curYy, existUserMap) {
-		var paramObj = {
-			"coCd"  : "GUN",
-			"useYn" : "Y"
-		};
-		postAjax("/admin/cm/cm06/selectUserTree", paramObj, null, function(data) {
-			var treeData = data.deptTree || data.userTree || data;
-			if (!Array.isArray(treeData)) return;
-
-			var addedCount = 0;
-			$.each(treeData, function(idx, node) {
-				if (node.type === "person" || (node.original && node.original.id)) {
-					var orig = node.original || node;
-					var userId = orig.id || node.id;
-					var userNm = node.text || orig.name || "";
-					var deptNm = orig.deptNm || orig.deptName || "";
-					var enterDt = formatDtStrJS(orig.enterDt || orig.enter_dt || orig.enterDate || orig.enter_date || "");
-					var leaveDt = formatDtStrJS(orig.leaveDt || orig.leave_dt || orig.leaveDate || orig.leave_date || "");
-
-					// GUN00, GUN95 부서코드 사원 제외
-					var deptId = String(orig.deptId || orig.dept_id || orig.viewDeptId || orig.view_dept_id || "");
-					if (deptId.indexOf("GUN00") === 0 || deptId.indexOf("GUN95") === 0) {
-						return;
-					}
-
-					if (leaveDt) {
-						var leaveYy = leaveDt.replace(/[^0-9]/g, '').substring(0, 4);
-						if (leaveYy && parseInt(leaveYy, 10) < parseInt(curYy, 10)) {
-							return;
-						}
-					}
-
-					if (existUserMap[userId]) {
-						return;
-					}
-
-					// 정밀 근속연수 연차 산정 수식 호출 (15일 강제 덮어쓰기 일체 제거!)
-					var grantDays = calculateAnnualGrantDaysJS(enterDt, curYy);
-
-					grantGridView.target.addRow({
-						coCd        : "GUN",
-						yy          : curYy,
-						userId      : userId,
-						userNm      : userNm,
-						deptNm      : deptNm,
-						enterDt     : enterDt,
-						leaveDt     : leaveDt,
-						grantDays   : grantDays,
-						usedDays    : 0,
-						balanceDays : grantDays,
-						autoYn      : "Y",
-						rmk         : "연차기준 자동계산",
-						__status    : "C"
-					}, "last");
-
-					existUserMap[userId] = true;
-					addedCount++;
-				}
-			});
-
-			if (addedCount > 0) {
+			if (updatedCount > 0 || addedCount > 0) {
+				grantGridView.target.repaint(); // 분홍색 배경 즉시 렌더링
 				markGrantGridDirty(true);
-				alert("현재 근무 중인 미등록 직원 " + addedCount + "명이 연차지급기준으로 자동계산되어 추가되었습니다.");
+				alert("입사일 기준 재계산 완료: 수정 " + updatedCount + "건, 신규추가 " + addedCount + "건이 반영되었습니다.\n(수정/변경 행은 분홍색 배경으로 표시됩니다.)");
 			} else {
-				alert("현재 근무 중인 미등록 직원이 없거나 이미 전원 추가되어 있습니다.");
+				alert("입사일 기준 재계산 결과, 변경할 사항이 없습니다.");
 			}
 		});
 	}
@@ -549,9 +545,11 @@
 			usedDays    : 0,
 			balanceDays : 15,
 			autoYn      : "N",
-			rmk         : "",
-			__status    : "C"
+			rmk         : "수동 추가",
+			__status    : "C",
+			isManualAdded : true
 		}, "last");
+		grantGridView.target.repaint();
 		markGrantGridDirty(true);
 	}
 
@@ -634,7 +632,10 @@
 		var changeSaveList = [];
 
 		$.each(list, function(i, row) {
-			if (row.__status === "C" || row.__status === "U") {
+			if (row.__status === "C" || row.__status === "U" || row.isAutoAdded || (!row.creatId && !row.creatDttm)) {
+				if (!row.__status) {
+					row.__status = (row.creatId || row.creatDttm) ? "U" : "C";
+				}
 				changeSaveList.push(row);
 			}
 		});

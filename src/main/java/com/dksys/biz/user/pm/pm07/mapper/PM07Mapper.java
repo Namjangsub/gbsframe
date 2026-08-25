@@ -44,6 +44,8 @@ public interface PM07Mapper {
 
 	Map<String, String> selectWorkRptCodeByDept(Map<String, String> paramMap);
 
+	List<Map<String, String>> selectAnnualUseStatusList(Map<String, String> paramMap);
+
 	String selectFileTrgtKeyNext();
 
 	int insertDailyWorkReport(Map<String, String> paramMap);

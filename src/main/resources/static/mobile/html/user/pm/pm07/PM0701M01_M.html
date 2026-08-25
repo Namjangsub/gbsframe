@@ -33,52 +33,240 @@
 	<script src="/static/js/ax5/ax5modal.min.js"></script>
 	<script src="/static/js/global.js"></script>
 	<script src="/static/js/jquery.blockUI.js"></script>
+	<script src="/static/js/korean-lunar-calendar.min.js"></script>
 	<script src="/static/js/workingDayCalc.js"></script>
 
 	<style>
-		.card {
-			display: table;
-			border: 1px solid #EEEEEE;
-			margin-bottom: 10px;
-			width: 100%;
+		/* ── PM0701M01_M 전용 : 휴가신청 목록 (스마트폰 세로보기 최적화) ──
+		   브랜드 톤(.tit_contents 등 기존 팝업/타이틀바에 이미 쓰이는 #304a8a 네이비)에
+		   맞춰 필터 영역과 카드 리스트를 다시 짰다. */
+		:root {
+			--pm07-navy: #304a8a;
+			--pm07-navy-dark: #253a6e;
+			--pm07-bg: #dfe4ec;
+			--pm07-ink: #22262f;
+			--pm07-sub: #6b7280;
+			--pm07-line: #e6e9f0;
 		}
-		.tg { border-collapse: collapse; border-spacing: 0; width: 100%;}
-		.tg td { border-color: black; border-width: 0.5px; font-size: 10px; overflow: hidden; padding: 10px 5px; word-break: normal;}
-		.tg .tg-title { background-color:antiquewhite; text-align: left; vertical-align: middle;}
-		.tg .tg-menu { background-color:#EEEEEE;text-align: right; vertical-align: middle; font-size: 11px;  padding-right: 5px;}
-		.tg .tg-rspn { width: 10px; text-align: left; vertical-align: middle; font-size: 11px;  padding-left: 5px;}
-		.btn-success {
-		}
-		table.search td {
-			border-right : none !important;
-			border-bottom-width: 1px;
-		}
-		button {
-			margin: 1px;
-		}
-		.card-container {
-			display: table;
-			width: 100%;
-			margin-bottom: 1px;
-			height: 10px;
-		}
+
+		html, body { background: var(--pm07-bg); }
+
 		#main_area {
-			padding: 0px 0px;
+			padding: 0;
 			overflow: auto;
 		}
-		.sanctn-badge {
-			display: inline-block;
-			padding: 4px 8px;
-			border-radius: 3px;
-			font-size: 10px;
-			font-weight: bold;
-			color: white;
+
+		.pm07-page {
+			width: 100%;
+			max-width: 480px;
+			margin: 0 auto;
+			padding: 12px 12px 28px;
+			box-sizing: border-box;
 		}
-		.sanctn-badge.temp { background-color: #999; }
-		.sanctn-badge.req { background-color: #ff6b6b; }
-		.sanctn-badge.ing { background-color: #4c6ef5; }
-		.sanctn-badge.end { background-color: #51cf66; }
-		.sanctn-badge.rtn { background-color: #ffa94d; }
+
+		/* ─ 필터 영역 ─ */
+		.pm07-filter {
+			background: #ffffff;
+			border: 1px solid var(--pm07-line);
+			border-radius: 12px;
+			padding: 14px;
+			margin-bottom: 14px;
+			box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04);
+		}
+
+		.pm07-filter-label {
+			font-size: 11px;
+			font-weight: 700;
+			color: var(--pm07-sub);
+			letter-spacing: .02em;
+			margin-bottom: 6px;
+		}
+
+		.pm07-date-row {
+			display: flex;
+			align-items: center;
+			gap: 8px;
+			margin-bottom: 10px;
+		}
+
+		.pm07-date-row .date_input { flex: 1 1 0; min-width: 0; }
+
+		.pm07-date-row input.input_calendar {
+			width: 100% !important;
+			height: 38px;
+			border: 1px solid var(--pm07-line);
+			border-radius: 8px;
+			font-size: 13px;
+			padding: 0 10px;
+			box-sizing: border-box;
+			background-color: #fff;
+			background-position: 95% 50%;
+		}
+
+		.pm07-tilde {
+			color: var(--pm07-sub);
+			font-size: 12px;
+			flex: 0 0 auto;
+		}
+
+		.pm07-filter-row2 {
+			display: flex;
+			gap: 8px;
+		}
+
+		.pm07-status-select {
+			flex: 1 1 auto;
+			min-width: 0 !important; /* mobile.css의 전역 select{min-width:100%} 규칙을 눌러줘야 옆 버튼이 화면 밖으로 밀리지 않는다 */
+			height: 38px !important;
+			border: 1px solid var(--pm07-line) !important;
+			border-radius: 8px !important;
+			font-size: 13px !important;
+			padding: 0 8px !important;
+		}
+
+		.pm07-btn-new {
+			flex: 0 0 auto;
+			height: 38px;
+			padding: 0 16px;
+			border: none;
+			border-radius: 8px;
+			background: var(--pm07-navy);
+			color: #fff;
+			font-size: 13px;
+			font-weight: 700;
+			white-space: nowrap;
+			display: inline-flex;
+			align-items: center;
+			gap: 6px;
+		}
+		.pm07-btn-new:active { background: var(--pm07-navy-dark); }
+		.pm07-btn-new i { font-size: 12px; }
+
+		/* ─ 카드 리스트 ─ */
+		.pm07-card-list {
+			display: flex;
+			flex-direction: column;
+			gap: 14px;
+		}
+
+		/* 카드 사이 경계를 뚜렷하게: 흰 배경 + 진한 테두리 + 상태색 왼쪽 스트라이프로
+		   옅은 배경(--pm07-bg)과의 대비, 카드 간 구분, 상태 스캔 가능성을 한번에 해결 */
+		.pm07-card {
+			background: #ffffff;
+			border: 1px solid #c3cad8;
+			border-left: 5px solid #aab2c2;
+			border-radius: 10px;
+			padding: 15px 16px 13px;
+			box-shadow: 0 2px 6px rgba(16, 24, 40, 0.09);
+			cursor: pointer;
+			transition: box-shadow .12s ease, transform .12s ease;
+		}
+		.pm07-card:active {
+			box-shadow: 0 1px 2px rgba(16, 24, 40, 0.08);
+			transform: scale(0.995);
+		}
+		.pm07-card.temp { border-left-color: #6b7280; }
+		.pm07-card.req  { border-left-color: #d97706; }
+		.pm07-card.ing  { border-left-color: var(--pm07-navy); }
+		.pm07-card.end  { border-left-color: #16a34a; }
+		.pm07-card.rtn  { border-left-color: #dc2626; }
+
+		.pm07-card-head {
+			display: flex;
+			align-items: flex-start;
+			justify-content: space-between;
+			gap: 8px;
+			margin-bottom: 4px;
+		}
+
+		.pm07-card-title {
+			font-size: 16px;
+			font-weight: 800;
+			color: #14161c;
+			line-height: 1.35;
+			word-break: keep-all;
+			letter-spacing: -.01em;
+		}
+
+		.pm07-badge {
+			flex: 0 0 auto;
+			display: inline-flex;
+			align-items: center;
+			gap: 5px;
+			padding: 3px 9px 3px 7px;
+			border-radius: 999px;
+			font-size: 11px;
+			font-weight: 700;
+			white-space: nowrap;
+			background: #f3f4f6;
+			color: var(--pm07-sub);
+		}
+		.pm07-badge .dot {
+			width: 6px;
+			height: 6px;
+			border-radius: 50%;
+			background: currentColor;
+		}
+		.pm07-badge.temp { background: #f1f2f4; color: #5b6472; }
+		.pm07-badge.req  { background: #fef3e2; color: #b45309; }
+		.pm07-badge.ing  { background: #eaf0fb; color: var(--pm07-navy); }
+		.pm07-badge.end  { background: #e8f7ee; color: #15803d; }
+		.pm07-badge.rtn  { background: #fdecec; color: #b91c1c; }
+
+		.pm07-card-sub {
+			font-size: 12px;
+			color: var(--pm07-sub);
+			margin-bottom: 8px;
+		}
+
+		.pm07-card-rmk {
+			font-size: 12.5px;
+			color: #454b57;
+			line-height: 1.5;
+			background: #f9fafb;
+			border-radius: 8px;
+			padding: 8px 10px;
+			margin-bottom: 8px;
+			white-space: pre-wrap;
+			word-break: break-all;
+			display: -webkit-box;
+			-webkit-line-clamp: 2;
+			-webkit-box-orient: vertical;
+			overflow: hidden;
+		}
+
+		.pm07-card-foot {
+			display: flex;
+			align-items: center;
+			justify-content: space-between;
+			padding-top: 8px;
+			border-top: 1px solid var(--pm07-line);
+		}
+
+		.pm07-card-reqdt {
+			font-size: 11px;
+			color: #9aa1ab;
+		}
+
+		.pm07-card-more {
+			font-size: 12px;
+			font-weight: 700;
+			color: var(--pm07-navy);
+			display: inline-flex;
+			align-items: center;
+			gap: 4px;
+		}
+		.pm07-card-more i { font-size: 10px; }
+
+		.pm07-empty {
+			text-align: center;
+			color: var(--pm07-sub);
+			font-size: 13px;
+			padding: 60px 20px;
+			background: #fff;
+			border: 1px dashed var(--pm07-line);
+			border-radius: 12px;
+		}
 	</style>
 </head>
 
@@ -93,42 +281,38 @@
 	</div>
 
 	<div id="main_area">
-		<div id="vacPopup" class="popup_area" >
+		<div id="vacPopup" class="popup_area" style="background: transparent; padding: 0;">
 			<div class="tit_contents">
 				<h4 class="tit">휴가신청</h4>
 			</div>
-			<table class="search">
-				<tr style="width:100%;">
-					<th style="width:10%;">신청일자</th>
-					<td style="width:12%;">
+
+			<div class="pm07-page">
+				<div class="pm07-filter">
+					<div class="pm07-filter-label">신청일자</div>
+					<div class="pm07-date-row">
 						<div class="date_input">
 							<input id="reqDtFrom" name="reqDtFrom" class="input_calendar" autocomplete="off" onkeyup="dateMask(this);">
 						</div>
-					</td>
-					<td style="width:3%;" class="text-center">~</td>
-					<td style="width:12%;">
+						<span class="pm07-tilde">~</span>
 						<div class="date_input">
 							<input id="reqDtTo" name="reqDtTo" class="input_calendar" autocomplete="off" onkeyup="dateMask(this);">
 						</div>
-					</td>
-					<th style="width:8%;">결재상태</th>
-					<td style="width:15%;">
-						<select id="sanctnSts" name="sanctnSts" class="form-control" style="height: 30px;">
-							<option value="">전체</option>
+					</div>
+					<div class="pm07-filter-row2">
+						<select id="sanctnSts" name="sanctnSts" class="pm07-status-select">
+							<option value="">전체 상태</option>
 							<option value="TEMP">임시저장</option>
 							<option value="REQ">신청</option>
 							<option value="ING">진행중</option>
 							<option value="END">완료</option>
 							<option value="RTN">반려</option>
 						</select>
-					</td>
-					<td style="width:13%;">
-						<button class="btn btn-success" style="height: 30px; float: right;" onClick="openCreateModal()">신청등록</button>
-					</td>
-				</tr>
-			</table>
-			<br>
-			<div id="cardContainer" class="card-container"></div>
+						<button type="button" class="pm07-btn-new" onclick="openCreateModal()"><i class="fas fa-plus"></i>신청등록</button>
+					</div>
+				</div>
+
+				<div id="cardContainer" class="pm07-card-list"></div>
+			</div>
 		</div>
 	</div>
 
@@ -137,7 +321,12 @@
 		var userDept = jwt.deptId.substr(0, 5);
 
 		function toDashDate(dateStr) {
-			if (!dateStr || dateStr.length !== 8) return '';
+			// selectVacationList가 이미 TO_CHAR(...,'YYYY-MM-DD')로 변환해서 내려주므로
+			// 'YYYY-MM-DD'(10자, 대시 포함)로 들어오면 그대로 쓰고, 혹시 원시 'YYYYMMDD'(8자)로
+			// 오는 경우에만 대시를 넣어준다.
+			if (!dateStr) return '';
+			if (dateStr.length === 10 && dateStr.indexOf('-') > -1) return dateStr;
+			if (dateStr.length !== 8) return '';
 			return dateStr.substring(0, 4) + '-' + dateStr.substring(4, 6) + '-' + dateStr.substring(6, 8);
 		}
 
@@ -164,9 +353,6 @@
 		}
 
 		$(document).ready(function() {
-			var newScreenWidth = $(window).width();
-			var newScreenHeight = $(window).height();
-
 			const now = moment();
 			const oneMonthAgo = now.clone().add(-1, 'M');
 
@@ -199,8 +385,7 @@
 			$('#sanctnSts').on('change', vacationList);
 
 			vacationList();
-			$('.popup_area').css('min-width', (newScreenWidth - 15) + 'px');
-			authChk();
+// 			authChk();
 		});
 
 		function vacationList() {
@@ -224,11 +409,6 @@
 						if (item.vacTypeNm === undefined) item.vacTypeNm = '';
 						if (item.stDt === undefined) item.stDt = '';
 						if (item.edDt === undefined) item.edDt = '';
-						if (item.ampmCd === undefined) item.ampmCd = '';
-						if (item.stTm === undefined) item.stTm = '';
-						if (item.edTm === undefined) item.edTm = '';
-						if (item.vacDays === undefined) item.vacDays = '';
-						if (item.deductDays === undefined) item.deductDays = '';
 						if (item.reqRmk === undefined) item.reqRmk = '';
 						if (item.reqDt === undefined) item.reqDt = '';
 						if (item.sanctnSts === undefined) item.sanctnSts = '';
@@ -237,63 +417,29 @@
 						var stDtDisplay = toDashDate(item.stDt);
 						var edDtDisplay = toDashDate(item.edDt);
 						var reqDtDisplay = toDashDate(item.reqDt);
+						var vacTypeDisplay = item.vacTypeNm || item.vacTypeCd || '';
+						var titleText = stDtDisplay + (vacTypeDisplay ? (' - ' + vacTypeDisplay) : '');
+						var rangeText = (edDtDisplay && edDtDisplay !== stDtDisplay) ? (stDtDisplay + ' ~ ' + edDtDisplay) : stDtDisplay;
+						var badgeCls = getSanctnBadgeClass(item.sanctnSts);
+						var badgeNm = item.sanctnStsNm || getSanctnStsNm(item.sanctnSts);
 
 						var cardHtml =
-							`<div class="square-box">
-								<div class="card" style="border: 1px solid #EEEEEE; margin-bottom: 10px;">
-									<table class="tg">
-										<tr>
-											<td class="tg-title" colspan="2" style="width:60%; border-right: 0px">
-												<span>
-													${item.reqNo} - ${item.vacTypeNm || item.vacTypeCd || ''}
-												</span>
-											</td>
-											<td class="tg-title" style="text-align: right; vertical-align: middle; border-left: 0px;">
-												<span class="sanctn-badge ${getSanctnBadgeClass(item.sanctnSts)}">
-													${item.sanctnStsNm || getSanctnStsNm(item.sanctnSts)}
-												</span>
-											</td>
-										</tr>
-										<tr>
-											<td class="tg-menu">신청일자</td>
-											<td class="tg-rspn" colspan="2">${reqDtDisplay}</td>
-										</tr>
-										<tr>
-											<td class="tg-menu">시작~종료</td>
-											<td class="tg-rspn" colspan="2">${stDtDisplay} ~ ${edDtDisplay}</td>
-										</tr>
-										<tr>
-											<td class="tg-menu">오전/오후</td>
-											<td class="tg-rspn" colspan="2">${item.ampmCd || '-'}</td>
-										</tr>
-										<tr>
-											<td class="tg-menu">시각</td>
-											<td class="tg-rspn" colspan="2">${item.stTm ? item.stTm.substring(0, 2) + ':' + item.stTm.substring(2, 4) : '-'} ~ ${item.edTm ? item.edTm.substring(0, 2) + ':' + item.edTm.substring(2, 4) : '-'}</td>
-										</tr>
-										<tr>
-											<td class="tg-menu">휴가일수</td>
-											<td class="tg-rspn" colspan="2">${item.vacDays || '-'}</td>
-										</tr>
-										<tr>
-											<td class="tg-menu">차감일수</td>
-											<td class="tg-rspn" colspan="2">${item.deductDays || '-'}</td>
-										</tr>
-										<tr>
-											<td class="tg-menu">사유</td>
-											<td class="tg-rspn" colspan="2"><span style="display: block;white-space: pre-wrap;word-break: break-all;">${item.reqRmk || ''}</span></td>
-										</tr>
-										<tr>
-											<td colspan="3" style="text-align: right; padding: 5px;">
-												<button class="btn btn-primary btn-sm" style="height: 30px;" onclick="openDetailModal(${index})">상세</button>
-											</td>
-										</tr>
-									</table>
+							`<div class="pm07-card ${badgeCls}" onclick="openDetailModal(${index})">
+								<div class="pm07-card-head">
+									<div class="pm07-card-title">${titleText}</div>
+									<span class="pm07-badge ${badgeCls}"><span class="dot"></span>${badgeNm}</span>
+								</div>
+								<div class="pm07-card-sub">${rangeText}</div>
+								${item.reqRmk ? `<div class="pm07-card-rmk">${item.reqRmk}</div>` : ''}
+								<div class="pm07-card-foot">
+									<span class="pm07-card-reqdt">신청일자 ${reqDtDisplay}</span>
+									<span class="pm07-card-more">상세 <i class="fas fa-chevron-right"></i></span>
 								</div>
 							</div>`;
 						cardContainer.append(cardHtml);
 					});
 				} else {
-					cardContainer.append('<h6 style="font-size:16px; padding: 20px;">신청한 휴가가 없습니다.</h6>');
+					cardContainer.append('<div class="pm07-empty">조회 기간에 신청한 휴가가 없습니다.</div>');
 				}
 			});
 		}
