@@ -138,4 +138,12 @@ public class PM07Ctr {
 		return "jsonView";
 	}
 
+	@PostMapping(value = "/selectVacationOverlapCheck")
+	public String selectVacationOverlapCheck(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		List<Map<String, String>> resultList = pm07Svc.selectVacationOverlapCheck(paramMap);
+		model.addAttribute("resultList", resultList);
+		model.addAttribute("resultCode", 200);
+		return "jsonView";
+	}
+
 }

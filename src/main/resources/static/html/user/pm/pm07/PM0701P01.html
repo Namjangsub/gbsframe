@@ -59,6 +59,12 @@
 							<input type="text" id="edDt" name="edDt" class="input_calendar form-control input-sm" autocomplete="off" style="cursor:pointer; width: 100%;" msg="종료일자" onchange="onDateChanged();">
 						</td>
 					</tr>
+					<!-- 겹침 경고 -->
+					<tr id="vacOverlapWarningRow" style="display: none;">
+						<td colspan="4" style="padding: 4px 8px;">
+							<span id="vacOverlapWarning" style="color: #d9534f; font-size: 12px; font-weight: bold;"></span>
+						</td>
+					</tr>
 					<!-- 4행: 휴가일수 / 차감일수 -->
 					<tr>
 						<th>휴가일수</th>
@@ -72,9 +78,9 @@
 					</tr>
 					<!-- 5행: 사유 -->
 					<tr>
-						<th class="hit">사유</th>
+						<th id="reqRmkTh">사유</th>
 						<td colspan="3">
-							<textarea id="reqRmk" name="reqRmk" class="form-control input-sm" style="width: 100%; height: 70px; resize: vertical;" placeholder="사유를 입력하세요 (필수)" maxlength="1000"></textarea>
+							<textarea id="reqRmk" name="reqRmk" class="form-control input-sm" style="width: 100%; height: 70px; resize: vertical;" placeholder="사유를 입력하세요" maxlength="1000"></textarea>
 						</td>
 					</tr>
 				</tbody>
@@ -134,6 +140,19 @@
 		return codeNm.indexOf("조퇴") >= 0 || codeNm.indexOf("외출") >= 0;
 	}
 
+	// 연차, 반차, 조퇴, 외출, 하계휴가(대체), 병가는 사유 필수입력 제외 판정
+	function isRmkOptional(codeNm) {
+		if (!codeNm) return false;
+		var nm = codeNm.trim();
+		return nm.indexOf("연차") >= 0
+			|| nm.indexOf("반차") >= 0
+			|| nm.indexOf("조퇴") >= 0
+			|| nm.indexOf("외출") >= 0
+			|| nm.indexOf("하계") >= 0
+			|| nm.indexOf("대체") >= 0
+			|| nm.indexOf("병가") >= 0;
+	}
+
 	// 구분(오전/오후) 선택 변경 이벤트
 	function onAmPmChanged() {
 		var ampmVal = $('#ampmCd').val();
@@ -160,12 +179,23 @@
 			$('#ampmTh').removeClass("hit");
 			$('#stTm').prop("disabled", true).val("").css("background", "#fafafa !important");
 			$('#edTm').prop("disabled", true).val("").css("background", "#fafafa !important");
+			$('#reqRmkTh').removeClass("hit");
+			$('#reqRmk').attr("placeholder", "사유를 입력하세요");
 			return;
 		}
 
 		// 선택된 옵션의 코드명 취득
 		var selectedOption = $('#vacTypeCd').find('option:selected');
 		var selectedNm = selectedOption.text();
+
+		// 사유 필수 여부 제어 (연차, 반차, 조퇴, 외출, 하계, 대체, 병가는 필수입력 아님)
+		if (isRmkOptional(selectedNm)) {
+			$('#reqRmkTh').removeClass("hit");
+			$('#reqRmk').attr("placeholder", "사유를 입력하세요 (선택)");
+		} else {
+			$('#reqRmkTh').addClass("hit");
+			$('#reqRmk').attr("placeholder", "사유를 입력하세요 (필수)");
+		}
 
 		// 반차류(반차, 포상휴가반차, 대체휴가반차)
 		if (isHalfDayType(selectedNm)) {
@@ -198,6 +228,60 @@
 		}
 
 		onDateChanged();
+	}
+
+	// 겹침 여부 서버 조회. 반환값 true = 겹침 없음(정상), false = 겹침 있음(경고 표시됨).
+	// 신청자는 로그인 사용자 본인(jwt.userId) 기준 — PM07 화면에는 별도 신청자ID 필드가 없다(kakaoTodo() 주석 참고).
+	function checkVacationOverlap(showAlert) {
+		var stDtVal = $('#stDt').val();
+		var edDtVal = $('#edDt').val();
+		if (!stDtVal || !edDtVal || stDtVal.length < 10 || edDtVal.length < 10) {
+			$('#vacOverlapWarningRow').hide();
+			$('#vacOverlapWarning').text('');
+			return true;
+		}
+
+		var stDt = stDtVal.replace(/\-/g, '');
+		var edDt = edDtVal.replace(/\-/g, '');
+		var stTm = ($('#stTm').val() || '').replace(/:/g, '') || '0000';
+		var edTm = ($('#edTm').val() || '').replace(/:/g, '') || '2359';
+
+		var paramObj = {
+			"coCd"  : $('#coCd').val() || "GUN",
+			"reqId" : jwt.userId,
+			"stDt"  : stDt,
+			"edDt"  : edDt,
+			"stTm"  : stTm,
+			"edTm"  : edTm,
+			"reqNo" : $('#reqNo').val() || ""
+		};
+
+		var overlapList = [];
+		postAjaxSync("/user/pm/pm07/selectVacationOverlapCheck", paramObj, null, function(data) {
+			overlapList = (data && data.resultList) ? data.resultList : [];
+		});
+
+		if (overlapList.length > 0) {
+			var msgLines = overlapList.map(function(r) {
+				var dtStr = r.stDt + ((r.edDt && r.edDt !== r.stDt) ? (' ~ ' + r.edDt) : '');
+				var tmInfo = '';
+				if (r.stTm && r.edTm && !(r.stTm === '00:00' && r.edTm === '23:59')) {
+					tmInfo = ', ' + r.stTm + '~' + r.edTm;
+				}
+				return dtStr + ' (' + (r.vacTypeNm || '') + tmInfo + ')';
+			});
+			var warnMsg = '⚠ 이전에 신청한 휴가일자와 겹칩니다: ' + msgLines.join(', ');
+			$('#vacOverlapWarning').text(warnMsg);
+			$('#vacOverlapWarningRow').show();
+			if (showAlert) {
+				alert(warnMsg);
+			}
+			return false;
+		} else {
+			$('#vacOverlapWarningRow').hide();
+			$('#vacOverlapWarning').text('');
+			return true;
+		}
 	}
 
 	// 날짜 변경 이벤트 (휴가일수/차감일수 자동계산)
@@ -251,6 +335,7 @@
 
 		$('#vacDays').val(vacDays.toFixed(1));
 		$('#deductDays').val(deductDays.toFixed(1));
+		checkVacationOverlap(true);
 	}
 
 	// 시작~종료 시간범위 선택 통합 피커 팝업
@@ -628,9 +713,15 @@
 			$('#edTm').focus();
 			return false;
 		}
-		if (!$('#reqRmk').val()) {
+		var selectedOption = $('#vacTypeCd').find('option:selected');
+		var selectedNm = selectedOption.text();
+		if (!isRmkOptional(selectedNm) && !$('#reqRmk').val()) {
 			alert("사유를 입력하세요.");
 			$('#reqRmk').focus();
+			return false;
+		}
+		if (!checkVacationOverlap(true)) {
+			$('#stDt').focus();
 			return false;
 		}
 		return true;
@@ -1003,6 +1094,11 @@
 			if (typeof jwt !== 'undefined' && jwt.userNm) {
 				$('#reqTitl').val(jwt.userNm);
 			}
+			// 신규 등록 시 기본 시작일자, 종료일자는 현재일자로 기본 설정
+			var todayStr = (typeof moment !== 'undefined') ? moment().format('YYYY-MM-DD') : new Date().toISOString().substring(0, 10);
+			$('#stDt').val(todayStr);
+			$('#edDt').val(todayStr);
+
 			// 기본 결재라인 자동 구성 (담당자 -> 담당자팀장 -> 경영지원팀)
 			setDefaultApprovalLine();
 		}

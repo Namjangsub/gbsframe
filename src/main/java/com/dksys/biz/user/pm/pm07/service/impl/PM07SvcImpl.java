@@ -56,8 +56,37 @@ public class PM07SvcImpl implements PM07Svc {
 	}
 
 	@Override
+	public List<Map<String, String>> selectVacationOverlapCheck(Map<String, String> paramMap) {
+		return pm07Mapper.selectVacationOverlapCheck(paramMap);
+	}
+
+	// 저장(등록/수정) 시점 서버측 최종 겹침 검증. 화면의 실시간 조회를 신뢰하지 않고 DB 기준으로 재확인한다.
+	// (동일 신청자 REQ_ID 기준, SANCTN_STS 무관 전 건 대상 - PM0701P01.html checkVacationOverlap() 과 동일 규칙)
+	private List<Map<String, String>> findVacationOverlap(Map<String, String> paramMap, String excludeReqNo) {
+		String stTm = paramMap.get("stTm");
+		String edTm = paramMap.get("edTm");
+		Map<String, String> overlapQuery = new HashMap<String, String>();
+		overlapQuery.put("reqId", paramMap.get("reqId"));
+		overlapQuery.put("stDt", paramMap.get("stDt"));
+		overlapQuery.put("edDt", paramMap.get("edDt"));
+		overlapQuery.put("stTm", (stTm == null || stTm.isEmpty()) ? "0000" : stTm);
+		overlapQuery.put("edTm", (edTm == null || edTm.isEmpty()) ? "2359" : edTm);
+		if (excludeReqNo != null && !excludeReqNo.isEmpty()) {
+			overlapQuery.put("reqNo", excludeReqNo);
+		}
+		return pm07Mapper.selectVacationOverlapCheck(overlapQuery);
+	}
+
+	@Override
 	public Map<String, String> insertVacation(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
 		Map<String, String> result = new HashMap<String, String>();
+
+		List<Map<String, String>> overlapList = findVacationOverlap(paramMap, null);
+		if (overlapList != null && !overlapList.isEmpty()) {
+			result.put("resultCode", "409");
+			result.put("resultMessage", "이전에 신청한 휴가일자(" + overlapList.get(0).get("stDt") + " ~ " + overlapList.get(0).get("edDt") + ")와 겹쳐 등록할 수 없습니다.");
+			return result;
+		}
 
 		String reqNo = pm07Mapper.selectVacationReqNoNext(paramMap);
 		paramMap.put("reqNo", reqNo);
@@ -196,6 +225,13 @@ public class PM07SvcImpl implements PM07Svc {
 		if (!isEditable) {
 			result.put("resultCode", "409");
 			result.put("resultMessage", "이미 결재가 진행 중이거나 완료되어 수정할 수 없습니다. 화면을 새로고침 해주세요.");
+			return result;
+		}
+
+		List<Map<String, String>> overlapList = findVacationOverlap(paramMap, paramMap.get("reqNo"));
+		if (overlapList != null && !overlapList.isEmpty()) {
+			result.put("resultCode", "409");
+			result.put("resultMessage", "이전에 신청한 휴가일자(" + overlapList.get(0).get("stDt") + " ~ " + overlapList.get(0).get("edDt") + ")와 겹쳐 수정할 수 없습니다.");
 			return result;
 		}
 
@@ -554,7 +590,7 @@ public class PM07SvcImpl implements PM07Svc {
 	}
 
 	// 작업일보(TB_PM01M01) 생성만 담당. SANCTN_STS를 건드리지 않는다.
-	// 부서 업무코드(09901) 조회 후 영업일마다 일지 1건씩 INSERT.
+	// CODE_ETC 유무에 따라 휴가(9901) 또는 기타(9903) 업무코드로 일지 INSERT.
 	// 생성된 일지 건수를 반환.
 	private int generateDailyWorkReport(String coCd, String reqNo, Map<String, String> vacationInfo) {
 		if (vacationInfo == null) {
@@ -564,6 +600,32 @@ public class PM07SvcImpl implements PM07Svc {
 		String reqId = vacationInfo.get("reqId");
 		String reqDeptId = vacationInfo.get("reqDeptId");
 		String reqRmk = vacationInfo.get("reqRmk");
+		String codeEtc = vacationInfo.get("codeEtc");
+		String vacTypeNm = vacationInfo.get("vacTypeNm");
+		String ampmNm = vacationInfo.get("ampmNm");
+		String stTm = vacationInfo.get("stTm");
+		String edTm = vacationInfo.get("edTm");
+		String rawStTm = vacationInfo.get("rawStTm");
+		String rawEdTm = vacationInfo.get("rawEdTm");
+
+		// 비고 내용 조립: [휴가유형] [구분] (시각: stTm~edTm) 사유
+		StringBuilder rmkSb = new StringBuilder();
+		if (vacTypeNm != null && !vacTypeNm.trim().isEmpty()) {
+			rmkSb.append("[").append(vacTypeNm.trim()).append("]");
+		}
+		if (ampmNm != null && !ampmNm.trim().isEmpty()) {
+			if (rmkSb.length() > 0) rmkSb.append(" ");
+			rmkSb.append("[").append(ampmNm.trim()).append("]");
+		}
+		if (stTm != null && !stTm.trim().isEmpty() && edTm != null && !edTm.trim().isEmpty()) {
+			if (rmkSb.length() > 0) rmkSb.append(" ");
+			rmkSb.append("(").append(stTm.trim()).append(" ~ ").append(edTm.trim()).append(")");
+		}
+		if (reqRmk != null && !reqRmk.trim().isEmpty()) {
+			if (rmkSb.length() > 0) rmkSb.append(" ");
+			rmkSb.append(reqRmk.trim());
+		}
+		String finalRmk = rmkSb.toString();
 
 		Map<String, String> workCodeMap = new HashMap<>();
 		workCodeMap.put("deptId", reqDeptId);
@@ -577,16 +639,22 @@ public class PM07SvcImpl implements PM07Svc {
 		if (reqDeptId != null && !reqDeptId.trim().isEmpty()) {
 			String cleanDept = reqDeptId.trim();
 			if (cleanDept.length() >= 5) {
-				dept5 = cleanDept.substring(0, 5); // 예: GUN76, GUN30, GUN00 등
+				dept5 = cleanDept.substring(0, 5); // 예: GUN76, GUN30, GUN80 등
 			} else {
 				dept5 = (cleanDept + "00000").substring(0, 5);
 			}
 		}
 
-		// 부서 5자리(예: GUN76) + 개인업무(99) + 휴가(01) 규칙에 따른 업무분류 결합 처리 (예: GUN769901)
-		if (workRptS == null || workRptS.isEmpty()) {
-			workRptS = dept5 + "9901";
+		// CODE_ETC 에 값이 있으면 휴가(9901), CODE_ETC 가 null/빈값이면 부서코드 + 9903
+		boolean isVacationCode = (codeEtc != null && !codeEtc.trim().isEmpty());
+		if (isVacationCode) {
+			if (workRptS == null || workRptS.isEmpty()) {
+				workRptS = dept5 + "9901";
+			}
+		} else {
+			workRptS = dept5 + "9903";
 		}
+
 		if (workRptM == null || workRptM.isEmpty()) {
 			workRptM = dept5 + "99";
 		}
@@ -603,6 +671,12 @@ public class PM07SvcImpl implements PM07Svc {
 			return 0;
 		}
 
+		// CODE_ETC 가 null 인 경우 시간 계산 (시각이 있으면 계산, 없으면 1시간)
+		double calcHours = 0;
+		if (!isVacationCode) {
+			calcHours = calculateTimeDiffInHours(stTm, edTm, rawStTm, rawEdTm);
+		}
+
 		int result = 0;
 		Map<String, String> emptyParamMap = new HashMap<>();
 		for (Map<String, String> vacDate : vacDateList) {
@@ -611,6 +685,14 @@ public class PM07SvcImpl implements PM07Svc {
 			String vacDt = vacDate.get("vacDt");
 			String workHour = vacDate.get("workHour");
 			String vacCoCd = vacDate.get("coCd");
+
+			if (!isVacationCode) {
+				if (calcHours > 0) {
+					workHour = (calcHours == (long) calcHours) ? String.valueOf((long) calcHours) : String.valueOf(calcHours);
+				} else {
+					workHour = "1";
+				}
+			}
 
 			Map<String, String> insertMap = new HashMap<>();
 			insertMap.put("fileTrgtKey", fileTrgtKey);
@@ -622,7 +704,7 @@ public class PM07SvcImpl implements PM07Svc {
 			insertMap.put("workRptM", workRptM);
 			insertMap.put("workRptS", workRptS);
 			insertMap.put("workRptHour", workHour);
-			insertMap.put("workRptRmk", reqRmk);
+			insertMap.put("workRptRmk", finalRmk);
 			insertMap.put("issueYn", "N");
 			insertMap.put("userId", reqId);
 
@@ -638,8 +720,37 @@ public class PM07SvcImpl implements PM07Svc {
 
 			result++;
 		}
-
 		return result;
+	}
+
+	private double calculateTimeDiffInHours(String stTmStr, String edTmStr, String rawStTm, String rawEdTm) {
+		String st = (rawStTm != null && !rawStTm.trim().isEmpty()) ? rawStTm : stTmStr;
+		String ed = (rawEdTm != null && !rawEdTm.trim().isEmpty()) ? rawEdTm : edTmStr;
+		if (st == null || ed == null) return 0;
+
+		st = st.replaceAll("[^0-9]", "");
+		ed = ed.replaceAll("[^0-9]", "");
+
+		if (st.length() >= 4 && ed.length() >= 4) {
+			try {
+				int stH = Integer.parseInt(st.substring(0, 2));
+				int stM = Integer.parseInt(st.substring(2, 4));
+				int edH = Integer.parseInt(ed.substring(0, 2));
+				int edM = Integer.parseInt(ed.substring(2, 4));
+
+				int totalStMins = stH * 60 + stM;
+				int totalEdMins = edH * 60 + edM;
+				int diffMins = totalEdMins - totalStMins;
+
+				if (diffMins > 0) {
+					double hours = diffMins / 60.0;
+					return Math.round(hours * 10.0) / 10.0;
+				}
+			} catch (Exception e) {
+				return 0;
+			}
+		}
+		return 0;
 	}
 
 	// 등록/수정 시 결재자가 있으면 작업일보만 생성/재생성한다. 결재상태는 건드리지 않는다.

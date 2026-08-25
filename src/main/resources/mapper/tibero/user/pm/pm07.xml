@@ -106,13 +106,17 @@
 			NVL((SELECT U.DEPT_ID FROM TB_CM06M01 U WHERE U.ID = M.REQ_ID), M.REQ_DEPT_ID) AS REQ_DEPT_ID,
 			M.VAC_TYPE_CD,
 			(SELECT CODE_NM FROM TB_CM05M01 WHERE CODE_ID = M.VAC_TYPE_CD) AS VAC_TYPE_NM,
+			(SELECT CODE_ETC FROM TB_CM05M01 WHERE CODE_ID = M.VAC_TYPE_CD) AS CODE_ETC,
 			FN_CM06M01_ID_TO_NM(M.REQ_ID) AS REQ_ID_NM,
 			(SELECT DEPT_NM FROM TB_CM04M01 WHERE DEPT_ID = NVL((SELECT U.DEPT_ID FROM TB_CM06M01 U WHERE U.ID = M.REQ_ID), M.REQ_DEPT_ID)) AS REQ_DEPT_NM,
 			M.AMPM_CD,
+			(SELECT CODE_NM FROM TB_CM05M01 WHERE CODE_ID = M.AMPM_CD) AS AMPM_NM,
 			TO_CHAR(TO_DATE(M.ST_DT, 'YYYYMMDD'), 'YYYY-MM-DD') AS ST_DT,
 			TO_CHAR(TO_DATE(M.ED_DT, 'YYYYMMDD'), 'YYYY-MM-DD') AS ED_DT,
 			TO_CHAR(TO_DATE(M.ST_TM, 'HH24MI'), 'HH24:MI')       AS ST_TM,
 			TO_CHAR(TO_DATE(M.ED_TM, 'HH24MI'), 'HH24:MI')       AS ED_TM,
+			M.ST_TM AS RAW_ST_TM,
+			M.ED_TM AS RAW_ED_TM,
 			M.VAC_DAYS,
 			M.DEDUCT_DAYS,
 			M.REQ_RMK,
@@ -499,11 +503,11 @@
 	</insert>
 
 	<delete id="deleteDailyWorkReportByVacation" parameterType="Map">
-		/* 휴가 삭제/수정 시 TB_PM01M01 에 자동 등록된 일일작업일지 휴가 레코드 제거 */
+		/* 휴가/근태 삭제/수정 시 TB_PM01M01 에 자동 등록된 일일작업일지 레코드 제거 */
 		DELETE FROM TB_PM01M01
 		WHERE WORK_RPT_ID = (SELECT REQ_ID FROM TB_PM07M01 WHERE REQ_NO = #{reqNo})
 		  AND WORK_RPT_DT IN (SELECT VAC_DT FROM TB_PM07M03 WHERE REQ_NO = #{reqNo})
-		  AND WORK_RPT_S LIKE '%9901'
+		  AND (WORK_RPT_S LIKE '%9901' OR WORK_RPT_S LIKE '%9903')
 	</delete>
 
 	<delete id="deleteVacationDates" parameterType="Map">
@@ -524,6 +528,29 @@
 		FROM TB_PM07M03
 		WHERE REQ_NO = #{reqNo}
 		ORDER BY VAC_DT ASC
+	</select>
+
+	<select id="selectVacationOverlapCheck" parameterType="Map" resultType="CamelMap">
+		<!-- 동일 신청자의 기존 휴가신청과 일자/시간대가 겹치는 건 조회. 상태(SANCTN_STS) 무관하게 전 건 대상. -->
+		<!-- 종일 유형은 화면에서 ST_TM/ED_TM 이 비어 저장되므로 NVL 로 00:00~23:59 전체를 차지한 것으로 간주한다. -->
+		SELECT
+			REQ_NO,
+			REQ_TITL,
+			TO_CHAR(TO_DATE(ST_DT, 'YYYYMMDD'), 'YYYY-MM-DD') AS ST_DT,
+			TO_CHAR(TO_DATE(ED_DT, 'YYYYMMDD'), 'YYYY-MM-DD') AS ED_DT,
+			TO_CHAR(TO_DATE(NVL(NULLIF(ST_TM, ''), '0000'), 'HH24MI'), 'HH24:MI') AS ST_TM,
+			TO_CHAR(TO_DATE(NVL(NULLIF(ED_TM, ''), '2359'), 'HH24MI'), 'HH24:MI') AS ED_TM,
+			(SELECT CODE_NM FROM TB_CM05M01 WHERE CODE_ID = VAC_TYPE_CD) AS VAC_TYPE_NM
+		FROM TB_PM07M01
+		WHERE REQ_ID = #{reqId}
+		  AND ST_DT &lt;= #{edDt}
+		  AND ED_DT &gt;= #{stDt}
+		  AND NVL(NULLIF(ST_TM, ''), '0000') &lt; #{edTm}
+		  AND NVL(NULLIF(ED_TM, ''), '2359') &gt; #{stTm}
+		<if test="reqNo != null and !reqNo.equals('')">
+		  AND REQ_NO != #{reqNo}
+		</if>
+		ORDER BY ST_DT ASC
 	</select>
 
 </mapper>

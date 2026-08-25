@@ -35,4 +35,6 @@ public interface PM07Svc {
 
 	int ensureDailyWorkReport(Map<String, String> paramMap);
 
+	List<Map<String, String>> selectVacationOverlapCheck(Map<String, String> paramMap);
+
 }

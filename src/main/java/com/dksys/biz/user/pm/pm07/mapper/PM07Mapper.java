@@ -68,4 +68,6 @@ public interface PM07Mapper {
 
 	int updateVacationDateWorkRptNo(Map<String, String> paramMap);
 
+	List<Map<String, String>> selectVacationOverlapCheck(Map<String, String> paramMap);
+
 }
