@@ -1776,8 +1776,17 @@
 			}
 		}
 
+		var barDragIsCopy = false; // Ctrl/Shift 키 드래그 시 복사 여부
+
 		function bindCalendarDragEvents() {
 			var $table = $('#ganttTable');
+
+			// 0. Ctrl 드래그 중 브라우저 우클릭 컨텍스트 메뉴 차단
+			$table.find('.gantt-bar').off('contextmenu.ganttBar').on('contextmenu.ganttBar', function(e) {
+				if (e.ctrlKey || isBarDragging) {
+					e.preventDefault();
+				}
+			});
 
 			// 1. 간트 바 및 좌우 리사이즈 핸들 마우스 다운
 			$table.find('.gantt-bar').off('mousedown').on('mousedown', function(e) {
@@ -1790,6 +1799,7 @@
 				isBarDragging = true;
 				barDragHasMoved = false;
 				barDragStartX = e.clientX;
+				barDragIsCopy = !!(e.ctrlKey || e.metaKey || e.shiftKey); // Ctrl 또는 Shift 키 + 드래그 = 복사
 
 				// 테이블 헤더(일자 행)의 첫 날짜 셀 너비 측정 (1일 셀당 width, 월구분 행 제외)
 				var $firstHeaderCell = $table.find('thead tr').last().find('th.day-col').eq(0);
@@ -1797,7 +1807,6 @@
 					barDragCellWidth = $firstHeaderCell.outerWidth() || dayColWidth;
 				}
 
-				var $bar = $(this);
 				barDragRsvNo = $bar.attr('data-rsv-no');
 				barDragUserId = $bar.attr('data-user-id');
 				barDragTargetUserId = barDragUserId;
@@ -1806,17 +1815,22 @@
 				barDragTargetSt = barDragOrigSt;
 				barDragTargetEd = barDragOrigEd;
 
-				var $target = $(e.target);
-				if ($target.hasClass('handle-left')) {
-					barDragMode = 'resize-left';
-				} else if ($target.hasClass('handle-right')) {
-					barDragMode = 'resize-right';
-				} else {
+				if (barDragIsCopy) {
+					// 복사 모드는 바 전체 이동으로 동작
 					barDragMode = 'move';
+				} else {
+					var $target = $(e.target);
+					if ($target.hasClass('handle-left')) {
+						barDragMode = 'resize-left';
+					} else if ($target.hasClass('handle-right')) {
+						barDragMode = 'resize-right';
+					} else {
+						barDragMode = 'move';
+					}
 				}
 
-				$bar.addClass('bar-dragging');
-				createDragGhostBar($bar, false);
+				$bar.addClass(barDragIsCopy ? 'bar-dragging-copy' : 'bar-dragging');
+				createDragGhostBar($bar, barDragIsCopy);
 				updateBarDragPreview();
 			});
 
@@ -1825,6 +1839,15 @@
 				if (isBarDragging) {
 					var diffX = e.clientX - barDragStartX;
 					var deltaDays = Math.round(diffX / barDragCellWidth);
+
+					// 마우스 이동 중에도 Ctrl / Shift 키 누름 여부를 실시간 갱신
+					var nowCopy = !!(e.ctrlKey || e.metaKey || e.shiftKey);
+					if (barDragIsCopy !== nowCopy) {
+						barDragIsCopy = nowCopy;
+						if (barDragIsCopy) {
+							barDragMode = 'move';
+						}
+					}
 
 					var newSt = barDragOrigSt;
 					var newEd = barDragOrigEd;
@@ -1871,6 +1894,10 @@
 					var edDiffDays = moment(newEd, 'YYYYMMDD').diff(moment(barDragOrigEd, 'YYYYMMDD'), 'days');
 					moveDragGhostBar(stDiffDays * barDragCellWidth, (edDiffDays - stDiffDays) * barDragCellWidth, $rowAtPoint ? $rowAtPoint[0] : null);
 
+					if (Math.abs(diffX) > 3 || (newTargetUserId && newTargetUserId !== barDragUserId)) {
+						barDragHasMoved = true;
+					}
+
 					if (newSt !== barDragTargetSt || newEd !== barDragTargetEd || newTargetUserId !== barDragTargetUserId) {
 						barDragTargetSt = newSt;
 						barDragTargetEd = newEd;
@@ -1913,20 +1940,27 @@
 
 			// 4. 전역 마우스 업
 			$(document).off('mouseup.ganttDrag').on('mouseup.ganttDrag', function() {
-				// A. 간트 바 이동/리사이즈 완료 처리
+				// A. 간트 바 이동/복사/리사이즈 완료 처리
 				if (isBarDragging) {
 					isBarDragging = false;
-					$('#ganttTable td.gantt-cell').removeClass('bar-drag-preview');
+					$('#ganttTable td.gantt-cell').removeClass('bar-drag-preview bar-drag-preview-copy');
 					$('#ganttTable tr.row-drop-target').removeClass('row-drop-target');
-					removeDragGhostBar($('#ganttTable .gantt-bar.bar-dragging').removeClass('bar-dragging'));
+					removeDragGhostBar($('#ganttTable .gantt-bar.bar-dragging, #ganttTable .gantt-bar.bar-dragging-copy').removeClass('bar-dragging bar-dragging-copy'));
 
 					var targetUserId = barDragTargetUserId || barDragUserId;
 					var userChanged = targetUserId !== barDragUserId;
-					if (barDragHasMoved && barDragRsvNo && (barDragTargetSt !== barDragOrigSt || barDragTargetEd !== barDragOrigEd || userChanged)) {
-						updateRsvDates(barDragRsvNo, barDragTargetSt, barDragTargetEd, userChanged ? targetUserId : null);
+					var datesChanged = (barDragTargetSt !== barDragOrigSt || barDragTargetEd !== barDragOrigEd);
+
+					if (barDragRsvNo && (barDragIsCopy || (barDragHasMoved && (datesChanged || userChanged)))) {
+						if (barDragIsCopy) {
+							copyRsvBar(barDragRsvNo, barDragTargetSt, barDragTargetEd, targetUserId);
+						} else {
+							updateRsvDates(barDragRsvNo, barDragTargetSt, barDragTargetEd, userChanged ? targetUserId : null);
+						}
 					} else {
 						barDragHasMoved = false;
 					}
+					barDragIsCopy = false;
 					return;
 				}
 
@@ -1950,9 +1984,9 @@
 		}
 
 		function updateBarDragPreview() {
-			$('#ganttTable td.gantt-cell').removeClass('bar-drag-preview preview-start preview-end');
+			$('#ganttTable td.gantt-cell').removeClass('bar-drag-preview bar-drag-preview-copy preview-start preview-end');
 			$('#ganttTable tr.row-drop-target').removeClass('row-drop-target');
-			$('#ganttTable .gantt-bar').removeClass('bar-dragging');
+			$('#ganttTable .gantt-bar').removeClass('bar-dragging bar-dragging-copy');
 
 			var previewUserId = barDragTargetUserId || barDragUserId;
 			if (!previewUserId || !barDragTargetSt || !barDragTargetEd) return;
@@ -1961,10 +1995,11 @@
 				$('#ganttTable tr[data-user-id="' + previewUserId + '"]:not(.actual-row)').addClass('row-drop-target');
 			}
 
+			var previewClass = barDragIsCopy ? 'bar-drag-preview-copy' : 'bar-drag-preview';
 			$('#ganttTable tr[data-user-id="' + previewUserId + '"]:not(.actual-row) td.gantt-cell').each(function() {
 				var dayStr = $(this).attr('data-day-str');
 				if (dayStr && dayStr >= barDragTargetSt && dayStr <= barDragTargetEd) {
-					$(this).addClass('bar-drag-preview');
+					$(this).addClass(previewClass);
 					if (dayStr === barDragTargetSt) {
 						$(this).addClass('preview-start');
 					}
@@ -1975,8 +2010,48 @@
 			});
 
 			if (barDragRsvNo) {
-				$('#ganttTable .gantt-bar[data-rsv-no="' + barDragRsvNo + '"]').addClass('bar-dragging');
+				var dragCls = barDragIsCopy ? 'bar-dragging-copy' : 'bar-dragging';
+				$('#ganttTable .gantt-bar[data-rsv-no="' + barDragRsvNo + '"]').addClass(dragCls);
 			}
+		}
+
+		function copyRsvBar(srcRsvNo, stDayStr, edDayStr, targetUserId) {
+			postAjax("/user/pm/pm60/selectRsvDtl", { rsvNo: srcRsvNo }, null, function(data) {
+				if (data && data.result) {
+					var rsv = data.result;
+					var stMoment = moment(stDayStr, 'YYYYMMDD');
+					var edMoment = moment(edDayStr, 'YYYYMMDD');
+					var nightCnt = Math.max(0, edMoment.diff(stMoment, 'days'));
+					var dayCnt = nightCnt + 1;
+
+					var reqParam = {
+						coCd: jwt.coCd,
+						userId: targetUserId || rsv.userId,
+						tripDiv: rsv.tripDiv || '',
+						rsvStsCd: rsv.rsvStsCd || '',
+						tripCondCd: rsv.tripCondCd || '',
+						tripTypeCds: rsv.tripTypeCds || '',
+						tripPlace: rsv.tripPlace || '',
+						clntPjtCd: rsv.clntPjtCd || '',
+						clntPjtNm: rsv.clntPjtNm || '',
+						tripStDtm: stDayStr + '000000',
+						tripEdDtm: edDayStr + '235959',
+						nightCnt: nightCnt,
+						dayCnt: dayCnt,
+						etc: rsv.etc || '',
+						creatId: jwt.userId
+					};
+
+					postAjax("/user/pm/pm60/insertRsv", reqParam, null, function(res) {
+						if (res && (res.resultCode === '200' || res.resultCode === 200)) {
+							searchData();
+						} else {
+							alert(res ? res.resultMessage : '출장 예약 복사에 실패했습니다.');
+							searchData();
+						}
+					});
+				}
+			});
 		}
 
 		function updateRsvDates(rsvNo, stDayStr, edDayStr, targetUserId) {
@@ -2674,7 +2749,7 @@
 				}
 			});
 
-			// 1. 외주 바 마우스 다운 (Ctrl+드래그면 이동 대신 복사 모드로 드래그)
+			// 1. 외주 바 마우스 다운 (Ctrl 키 또는 Shift 키 + 드래그 시 복사 모드로 드래그)
 			$table.find('.gantt-bar').off('mousedown.vndrBar').on('mousedown.vndrBar', function(e) {
 				e.stopPropagation();
 				e.preventDefault();
@@ -2683,7 +2758,7 @@
 				isVndrBarDragging = true;
 				vndrBarDragHasMoved = false;
 				vndrBarDragStartX = e.clientX;
-				vndrBarDragIsCopy = !!e.ctrlKey; // Ctrl+드래그 = 복사 (좌/우 클릭 무관)
+				vndrBarDragIsCopy = !!(e.ctrlKey || e.metaKey || e.shiftKey); // Ctrl 또는 Shift 키 + 드래그 = 복사
 
 				var $firstHeaderCell = $table.find('thead tr').last().find('th.day-col').eq(0);
 				if ($firstHeaderCell.length > 0) {
@@ -2706,7 +2781,7 @@
 				vndrBarDragTargetWorkerNm = vndrBarDragWorkerNm;
 
 				if (vndrBarDragIsCopy) {
-					// 복사 모드는 항상 바 전체 이동(드래그 앤 드랍)으로만 동작 - 리사이즈 핸들 클릭도 이동으로 취급
+					// 복사 모드는 항상 바 전체 이동(드래그 앤 드롭)으로만 동작 - 리사이즈 핸들 클릭도 이동으로 취급
 					vndrBarDragMode = 'move';
 				} else {
 					var $target = $(e.target);
@@ -2729,6 +2804,15 @@
 				if (isVndrBarDragging) {
 					var diffX = e.clientX - vndrBarDragStartX;
 					var deltaDays = Math.round(diffX / vndrBarDragCellWidth);
+
+					// 마우스 이동 중에도 Ctrl / Shift 키 누름 여부를 실시간 갱신
+					var nowCopy = !!(e.ctrlKey || e.metaKey || e.shiftKey);
+					if (vndrBarDragIsCopy !== nowCopy) {
+						vndrBarDragIsCopy = nowCopy;
+						if (vndrBarDragIsCopy) {
+							vndrBarDragMode = 'move';
+						}
+					}
 
 					var newSt = vndrBarDragOrigSt;
 					var newEd = vndrBarDragOrigEd;
@@ -2783,6 +2867,10 @@
 					var $targetRowEl = $cellAtPoint ? $cellAtPoint.closest('tr') : null;
 					moveDragGhostBar(stDiffDays * vndrBarDragCellWidth, (edDiffDays - stDiffDays) * vndrBarDragCellWidth, $targetRowEl && $targetRowEl.length ? $targetRowEl[0] : null);
 
+					if (Math.abs(diffX) > 3 || (newTargetRowKey && newTargetRowKey !== vndrBarDragRowKey)) {
+						vndrBarDragHasMoved = true;
+					}
+
 					if (newSt !== vndrBarDragTargetSt || newEd !== vndrBarDragTargetEd || newTargetRowKey !== vndrBarDragTargetRowKey) {
 						vndrBarDragTargetSt = newSt;
 						vndrBarDragTargetEd = newEd;
@@ -2808,7 +2896,7 @@
 					var rowChanged = (vndrBarDragTargetRowKey && vndrBarDragTargetRowKey !== vndrBarDragRowKey);
 					var datesChanged = (vndrBarDragTargetSt !== vndrBarDragOrigSt || vndrBarDragTargetEd !== vndrBarDragOrigEd);
 
-					if (vndrBarDragHasMoved && vndrBarDragRsvNo && (datesChanged || rowChanged)) {
+					if (vndrBarDragRsvNo && (vndrBarDragIsCopy || (vndrBarDragHasMoved && (datesChanged || rowChanged)))) {
 						if (vndrBarDragIsCopy) {
 							copyVndrBar(vndrBarDragRsvNo, vndrBarDragTargetSt, vndrBarDragTargetEd, vndrBarDragTargetVndrNm, vndrBarDragTargetClntCd, vndrBarDragTargetWorkerNm);
 						} else {
