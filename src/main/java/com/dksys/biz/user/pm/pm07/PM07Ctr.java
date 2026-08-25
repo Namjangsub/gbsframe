@@ -37,6 +37,13 @@ public class PM07Ctr {
 		return "jsonView";
 	}
 
+	@PostMapping(value = "/selectVacationCalendarList")
+	public String selectVacationCalendarList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		List<Map<String, String>> result = pm07Svc.selectVacationCalendarList(paramMap);
+		model.addAttribute("result", result);
+		return "jsonView";
+	}
+
 	@PostMapping(value = "/selectVacationDtl")
 	public String selectVacationDtl(@RequestBody Map<String, String> paramMap, ModelMap model) {
 		Map<String, String> result = pm07Svc.selectVacationDtl(paramMap);

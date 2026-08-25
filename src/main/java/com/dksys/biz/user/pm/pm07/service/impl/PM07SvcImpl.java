@@ -46,6 +46,11 @@ public class PM07SvcImpl implements PM07Svc {
 	}
 
 	@Override
+	public List<Map<String, String>> selectVacationCalendarList(Map<String, String> paramMap) {
+		return pm07Mapper.selectVacationCalendarList(paramMap);
+	}
+
+	@Override
 	public Map<String, String> selectVacationDtl(Map<String, String> paramMap) {
 		Map<String, String> result = pm07Mapper.selectVacationDtl(paramMap);
 		if (result != null) {
