@@ -1,0 +1,305 @@
+<div class="popup_area of_a" style="width: 100%; height: 100%;">
+	<div class="tit_contents">
+		<h4 class="tit" id="popTitle">출장 예약 등록</h4>
+	</div>
+
+	<form id="popForm" onSubmit="return false;">
+		<div class="form-group popup_table">
+			<input type="hidden" id="pgmId" name="pgmId" value="PM6001P02">
+			<input type="hidden" id="actionType" name="actionType">
+			<input type="hidden" id="rsvNo" name="rsvNo">
+
+			<table class="table_input">
+				<colgroup>
+					<col width="15%">
+					<col width="35%">
+					<col width="15%">
+					<col width="35%">
+				</colgroup>
+				<tr>
+					<th class="hit">대상자</th>
+					<td>
+						<select id="rsvUserId" name="userId" class="form-control input-sm" required msg="대상자" style="width: 100%;">
+							<option value="">-- 선택 --</option>
+						</select>
+					</td>
+					<th class="hit">국내/해외</th>
+					<td>
+						<select id="rsvTripDiv" name="tripDiv" class="form-control input-sm" data-kind="PM51DIV" required msg="국내/해외" style="width: 100%;"></select>
+					</td>
+				</tr>
+				<tr>
+					<th class="hit">예약상태</th>
+					<td>
+						<select id="rsvRsvStsCd" name="rsvStsCd" class="form-control input-sm" data-kind="PM60STS" required msg="예약상태" style="width: 100%;"></select>
+					</td>
+					<th class="hit">유상/무상</th>
+					<td>
+						<select id="rsvTripCondCd" name="tripCondCd" class="form-control input-sm" data-kind="PM51COND" required msg="유상/무상" style="width: 100%;"></select>
+					</td>
+				</tr>
+				<tr>
+					<th class="hit">출장유형</th>
+					<td>
+						<select id="rsvTripTypeCds" name="tripTypeCds" class="form-control input-sm" data-kind="PM51TYPE" required msg="출장유형" style="width: 100%;"></select>
+					</td>
+					<th>현장명</th>
+					<td>
+						<input type="text" id="rsvTripPlace" name="tripPlace" class="form-control input-sm" placeholder="예: 서울 강남" style="width: 100%;">
+					</td>
+				</tr>
+				<tr>
+					<th class="hit">출장 시작일</th>
+					<td>
+						<input type="text" id="rsvTripStDtm" name="tripStDtm" class="input_calendar form-control input-sm" onkeyup="dateMask(this);" autocomplete="off" style="cursor:pointer; width: 100%;" placeholder="YYYY-MM-DD" required msg="출장 시작일">
+					</td>
+					<th class="hit">출장 종료일</th>
+					<td>
+						<input type="text" id="rsvTripEdDtm" name="tripEdDtm" class="input_calendar form-control input-sm" onkeyup="dateMask(this);" autocomplete="off" style="cursor:pointer; width: 100%;" placeholder="YYYY-MM-DD" required msg="출장 종료일">
+					</td>
+				</tr>
+				<tr>
+					<th>야간 숙박일수</th>
+					<td>
+						<input type="hidden" id="rsvNightCnt" name="nightCnt" value="0">
+						<span id="nightCntDisp" style="font-weight: bold; font-size: 13px; color: #333; line-height: 28px; padding-left: 5px;">0</span>
+					</td>
+					<th>출장 일수</th>
+					<td>
+						<input type="hidden" id="rsvDayCnt" name="dayCnt" value="1">
+						<span id="dayCntDisp" style="font-weight: bold; font-size: 13px; color: #333; line-height: 28px; padding-left: 5px;">1</span>
+					</td>
+				</tr>
+				<tr>
+					<th>비고</th>
+					<td colspan="3">
+						<textarea id="rsvEtc" name="etc" class="form-control input-sm" style="width: 100%; height: 50px;" placeholder="기타 사항 입력"></textarea>
+					</td>
+				</tr>
+			</table>
+		</div>
+	</form>
+
+	<!-- 하단 버튼 (gbsframe 표준 톤앤매너 버튼 적용) -->
+	<div class="popup_bottom_btn">
+		<button type="button" class="btn btn-default btn-sm" id="actionBtn" authchk>등 록</button>
+		<button type="button" class="btn btn-default btn-sm" id="deleteBtn" onclick="deleteRsv();" authchk style="display:none; background-color: #d9534f; color: #fff; border-color: #d43f3a;">삭 제</button>
+		<button type="button" class="btn btn-default btn-sm close_btn" onclick="modalStack.close();">닫 기</button>
+	</div>
+</div>
+
+<script type="text/javascript">
+	(function() {
+		var p = modalStack.last().paramObj || {};
+		var actionType = p.actionType || 'C';
+		$('#actionType').val(actionType);
+
+		// 공통 콤보박스 초기화 (PM51DIV, PM60STS, PM51TYPE, PM51COND)
+		setComboOptions($('#popForm').find('select[data-kind]'));
+
+		// 팀원 대상자 콤보박스 로드
+		loadUserCombo(p.userId);
+
+		var setComboVals = function() {
+			var $f = $('#popForm');
+			if (p.tripTypeCds) $f.find('#rsvTripTypeCds').val(p.tripTypeCds);
+			if (p.tripDiv) $f.find('#rsvTripDiv').val(p.tripDiv);
+			if (p.tripCondCd) $f.find('#rsvTripCondCd').val(p.tripCondCd);
+			if (p.rsvStsCd) $f.find('#rsvRsvStsCd').val(p.rsvStsCd);
+		};
+
+		if (actionType === 'U') {
+			// 수정 모드
+			$('#popTitle').text('출장 예약 수정');
+			$('#rsvNo').val(p.rsvNo || '');
+			$('#rsvTripPlace').val(p.tripPlace || '');
+
+			var stDtm = p.tripStDtm || '';
+			var edDtm = p.tripEdDtm || '';
+			if (stDtm && stDtm.length >= 8) {
+				stDtm = stDtm.substring(0, 4) + '-' + stDtm.substring(4, 6) + '-' + stDtm.substring(6, 8);
+			}
+			if (edDtm && edDtm.length >= 8) {
+				edDtm = edDtm.substring(0, 4) + '-' + edDtm.substring(4, 6) + '-' + edDtm.substring(6, 8);
+			}
+
+			$('#rsvTripStDtm').val(stDtm);
+			$('#rsvTripEdDtm').val(edDtm);
+
+			setComboVals();
+			setTimeout(setComboVals, 100);
+
+			$('#rsvEtc').val(p.etc || '');
+
+			$('#actionBtn').text('수 정');
+			$('#deleteBtn').show();
+		} else {
+			// 신규 등록 모드
+			$('#popTitle').text('출장 예약 등록');
+			$('#rsvNo').val('');
+
+			var stDtm = p.tripStDtm || p.stDt || '';
+			var edDtm = p.tripEdDtm || p.edDt || stDtm;
+			if (stDtm && stDtm.length === 8) {
+				stDtm = stDtm.substring(0, 4) + '-' + stDtm.substring(4, 6) + '-' + stDtm.substring(6, 8);
+			}
+			if (edDtm && edDtm.length === 8) {
+				edDtm = edDtm.substring(0, 4) + '-' + edDtm.substring(4, 6) + '-' + edDtm.substring(6, 8);
+			}
+
+			$('#rsvTripStDtm').val(stDtm);
+			$('#rsvTripEdDtm').val(edDtm);
+
+			setComboVals();
+			setTimeout(setComboVals, 100);
+
+			$('#rsvEtc').val('');
+
+			$('#actionBtn').text('등 록');
+			$('#deleteBtn').hide();
+		}
+
+		$('#actionBtn').off('click').on('click', saveRsv);
+
+		// DateRangePicker 바인딩
+		$('#rsvTripStDtm, #rsvTripEdDtm').off('click.drp').on('click.drp', function () {
+			DateRangePicker.open({
+				title: '출장 기간선택',
+				startLabel: '출장 시작일',
+				endLabel: '출장 종료일',
+				startDt: $('#rsvTripStDtm').val() || null,
+				endDt: $('#rsvTripEdDtm').val() || null,
+				excludeSelectors: ['#rsvTripStDtm', '#rsvTripEdDtm'],
+				onApply: function (sd, ed) {
+					$('#rsvTripStDtm').val(sd);
+					$('#rsvTripEdDtm').val(ed);
+					calculateRsvDays();
+				}
+			});
+		});
+
+		$('#rsvTripStDtm, #rsvTripEdDtm').off('change').on('change', calculateRsvDays);
+		calculateRsvDays();
+	})();
+
+	function loadUserCombo(selectedUserId) {
+		var deptId = $('#deptId_S', parent.document).val() || jwt.deptId;
+		postAjax("/admin/cm/cm06/selectUserList", { "deptId": deptId, "useYn": "Y" }, null, function(data) {
+			if (data && data.userList) {
+				var html = '<option value="">-- 선택 --</option>';
+				$.each(data.userList, function(idx, user) {
+					html += '<option value="' + user.id + '">' + user.name + ' (' + (user.clssNm || '직원') + ')</option>';
+				});
+				$('#rsvUserId').html(html);
+				if (selectedUserId) {
+					$('#rsvUserId').val(selectedUserId);
+				}
+			}
+		});
+	}
+
+	function calculateRsvDays() {
+		var st = $('#rsvTripStDtm').val();
+		var ed = $('#rsvTripEdDtm').val();
+		if (st && ed) {
+			var mSt = moment(st, 'YYYY-MM-DD');
+			var mEd = moment(ed, 'YYYY-MM-DD');
+			if (mSt.isValid() && mEd.isValid() && mEd.isSameOrAfter(mSt)) {
+				var diffDays = mEd.diff(mSt, 'days') + 1;
+				var diffNights = diffDays - 1;
+				$('#nightCntDisp').text(diffNights);
+				$('#dayCntDisp').text(diffDays);
+				$('#rsvNightCnt').val(diffNights);
+				$('#rsvDayCnt').val(diffDays);
+				return;
+			}
+		}
+		$('#nightCntDisp').text('0');
+		$('#dayCntDisp').text('0');
+		$('#rsvNightCnt').val(0);
+		$('#rsvDayCnt').val(0);
+	}
+
+	function saveRsv() {
+		var $f = $('#popForm');
+		var userId = $.trim($f.find('#rsvUserId').val());
+		var tripDiv = $.trim($f.find('#rsvTripDiv').val());
+		var rsvStsCd = $.trim($f.find('#rsvRsvStsCd').val());
+		var tripCondCd = $.trim($f.find('#rsvTripCondCd').val());
+		var tripTypeCds = $.trim($f.find('#rsvTripTypeCds').val());
+		var tripPlace = $.trim($f.find('#rsvTripPlace').val());
+		var stDt = $.trim($f.find('#rsvTripStDtm').val());
+		var edDt = $.trim($f.find('#rsvTripEdDtm').val());
+		var nightCnt = parseInt($f.find('#rsvNightCnt').val(), 10) || 0;
+		var dayCnt = parseInt($f.find('#rsvDayCnt').val(), 10) || 1;
+		var etc = $.trim($f.find('#rsvEtc').val());
+		var rsvNo = $.trim($f.find('#rsvNo').val());
+
+		if (!userId) {
+			alert('대상자를 선택하세요.');
+			$f.find('#rsvUserId').focus();
+			return;
+		}
+		if (!stDt || !edDt) {
+			alert('출장 시작일과 종료일을 입력하세요.');
+			return;
+		}
+		if (edDt < stDt) {
+			alert('종료일이 시작일보다 빠를 수 없습니다.');
+			return;
+		}
+
+		var stDtm = stDt.replace(/-/g, '') + '000000';
+		var edDtm = edDt.replace(/-/g, '') + '235959';
+
+		var endpoint = rsvNo ? '/user/pm/pm60/updateRsv' : '/user/pm/pm60/insertRsv';
+		var payload = {
+			rsvNo: rsvNo || undefined,
+			userId: userId,
+			tripDiv: tripDiv,
+			rsvStsCd: rsvStsCd,
+			tripCondCd: tripCondCd,
+			tripTypeCds: tripTypeCds,
+			tripPlace: tripPlace,
+			tripStDtm: stDtm,
+			tripEdDtm: edDtm,
+			nightCnt: nightCnt,
+			dayCnt: dayCnt,
+			etc: etc,
+			coCd: jwt.coCd,
+			creatId: jwt.userId
+		};
+
+		postAjax(endpoint, payload, null, function(data) {
+			if (data && (data.resultCode === '200' || data.resultCode === 200)) {
+				modalStack.last().callback({resultCode: '200'});
+				modalStack.close();
+			} else {
+				alert('저장에 실패했습니다: ' + (data ? data.resultMessage : '알 수 없는 오류'));
+			}
+		});
+	}
+
+	function deleteRsv() {
+		if (!confirm('정말 삭제하시겠습니까?')) {
+			return;
+		}
+
+		var rsvNo = $.trim($('#rsvNo').val());
+		if (!rsvNo) {
+			alert('삭제할 데이터가 없습니다.');
+			return;
+		}
+
+		putAjax("/user/pm/pm60/deleteRsv", {
+			rsvNo: rsvNo
+		}, null, function(data) {
+			if (data && (data.resultCode === '200' || data.resultCode === 200)) {
+				modalStack.last().callback(data);
+				modalStack.close();
+			} else {
+				alert('삭제에 실패했습니다: ' + (data ? data.resultMessage : ''));
+			}
+		});
+	}
+</script>
