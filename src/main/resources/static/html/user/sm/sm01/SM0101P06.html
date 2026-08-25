@@ -1,6 +1,8 @@
 
 <link rel="stylesheet" href="/static/css/jstree/style.min.css">
 <script src="/static/js/jstree/jstree.min.js"></script>
+<!-- 그리드 컬럼 설정 공통 모듈 -->
+<script src="/static/js/common/GridColumnConfig.js"></script>
 <style>
 	.add_btn_small {
 		display: inline-block;
@@ -197,6 +199,7 @@
 						<a data-onclick="openMatListSearchMulti()" onclick="openMatListSearchMulti()" style="width: 80px;" title="첫번 Row를 기준으로 자재마스터 검색합니다." authchk><i class="fas fa-folder-plus"></i> 자재검색</a>
 						<a data-onclick="updateBomMtrlSecondModal()" onclick="updateBomMtrlSecondModal()" style="width: 80px;" title="선택된 Row의 자래마스터 수정 팝업입니다." authchk><i class="fas fa-money-check"></i> 자재수정 </a>
 						<a data-onclick="delRowMatr()" onclick="delRowMatr()" style="width: 50px;" title="선택된 Row 삭제 처리합니다." authchk><i class="fas fa-trash"></i> 삭제 </a>
+						<a onclick="setCustomGrid();" style="width: 60px;" title="그리드 설정을 편집합니다."><i class="fas fa-cog"></i> 설정</a>
 					</div>
 
 					<div data-ax5grid="matr-grid" data-ax5grid-config="{}" style="height: 720px;  min-height:200px;"></div>
@@ -236,6 +239,10 @@
 
 	let bomData = "";
 
+	var options_07 = typeof options_07 !== 'undefined' ? options_07 : [];
+	var options_08 = typeof options_08 !== 'undefined' ? options_08 : [];
+	var options_09 = typeof options_09 !== 'undefined' ? options_09 : [];
+
 	function gridStyle(row) {
 		if (!row) return "";
 		if (row.dtaChk === "D")  return "grid-cell-orange";
@@ -245,6 +252,188 @@
 		if (pasFloatChk(row.balCnt) > 0)  return "grid-font-red";
 		return "";
 	}
+
+	var defaultMatrColumns = [
+		{key: "text", label: "도번/품명", width: 250, align: "left", treeControl: true, styleClass: function () { return gridStyle(this.item); }},
+		{key: "dtaChk"     , label: " "           , width: 30 , hidden:true},
+		{key: "coCd"       , label: "CO"          , width: 50 , align: "center", hidden:true},
+		{key: "ordrsNo"    , label: "ordrsNo"     , width: 80 , align: "center", hidden:true},
+		{key: "salesCd"    , label: "salesCd"     , width: 120, align: "left"  , hidden:true},
+		{key: "matrSeq"    , label: "자재순번"    , width: 70 , align: "center", hidden:true},
+		{key: "oldUpperCd" , label: "이전상위코드", width: 160, align: "left"  , hidden:true},
+		{key: "oldLowerCd" , label: "이전하위코드", width: 180, align: "left"  , hidden:true},
+		{key: "matrYn"	   , label: "자재"    	  , width: 35, align: "center", styleClass: function () { return gridStyle(this.item); }},
+		{key: "matrMat", label: "소재/Maker", width: 100, align: "left", styleClass: function () { return gridStyle(this.item); }},
+		{key: "matrSpec", label: "형번/규격", width: 180, align: "left", styleClass: function () { return gridStyle(this.item); }},
+		{key: "matrSize"   , label: "크기"        , width: 180, align: "left", styleClass: function () { return gridStyle(this.item); },
+			editor:{type: "text",
+				attributes: {'maxlength': 100,'data-maxlength': 100},
+				disabled : function () {
+					return this.item.matrYn == "true";
+				}
+			}
+		},
+		{key: "pchsClntNm", label: "발주거래처명"    , width: 90, align: "left", styleClass: function () { return gridStyle(this.item); },
+			editor : {
+				type: "text",
+				attributes: {'maxlength': 100,'data-maxlength': 300},
+				disabled : function () {
+					return this.item.matrYn == "true";
+				}
+			}
+		},
+		{key: "mngNm", label: "담당자"    , width: 50, align: "center", styleClass: function () { return gridStyle(this.item); },
+			editor : {
+				type: "text",
+				attributes: {'maxlength': 20,'data-maxlength': 20},
+				disabled : function () {
+					return this.item.matrYn == "true";
+				}
+			}
+		},
+		// {key: "popupGrid1", label: " "     , width: 30 , align: "center", formatter: "popupGrid1"},
+		{key: "dlvplcNm"  , label: "물품배송처", width: 70, align: "center", styleClass: function () { return gridStyle(this.item); },
+			editor : {type: "text",
+				attributes: {'maxlength': 100,'data-maxlength': 300},
+				disabled : function () {
+					return this.item.matrYn == "true";
+				}
+			}
+		},
+		// {key: "popupGrid2", label: " "           , width: 30,	align: "center", formatter: "popupGrid2"},
+		{key: "bomQty"    , label: "발주대상수량", width: 80 , align: "right" , styleClass: function () { return gridStyle(this.item); },
+			editor:{type: "number",
+				disabled : function () {
+					return this.item.matrYn == "true";
+				}
+			}
+		},
+		{key: "posQty"    , label: "소요량"      , width: 60 , align: "right" , styleClass: function () { return gridStyle(this.item); },
+			editor:{type: "number",
+				disabled : function () {
+					return this.item.matrYn == "true";
+				}
+			}
+		},
+		{key: "matrCd"    , label: "자재코드"    , width: 70 , align: "center", styleClass: function () { return gridStyle(this.item); }},
+		{key: "matrRmk"       , label: "설계 비고"          , width: 120, align: "left", styleClass: function () { return gridStyle(this.item);}},
+		{key: "pchsClntNm1", label: "최종구매업체", width: 80 , align: "left", styleClass: function () { return gridStyle(this.item); }},
+		{key: "popupGrid3", label: " "           , width: 30 , align: "center", formatter: "popupGrid3"},
+		{key: "matrSpec"  , label: "비고"    , width: 100, align: "left",
+			editor : {type: "text",
+				attributes: {'maxlength': 300,'data-maxlength': 300},
+				disabled : function () {
+					return this.item.matrYn == "true";
+				}
+			},
+			hidden:true
+		},
+		{key: "matrMakrNm", label: "제조사"  , width: 100, align: "center", styleClass: function () { return gridStyle(this.item); }},
+		{key: "matrWt"    , label: "중량(kg)"    , width: 60, align: "right", formatter:"money",
+			editor:{type: "number",
+				disabled : function () {
+					return this.item.matrYn == "true";
+				}
+			}
+		},
+		{key: "matrUnit"  , label: "단위"    , width: 100, align: "center",
+			editor: {type: "select",
+				config: {
+					columnKeys: {optionValue: 'value',optionText: 'text'},
+					options: options_07
+				},
+				disabled : function () {
+					return this.item.matrYn == "true";
+				}
+			},
+			formatter: function () {
+				var result_text = "";
+				var itemValue = this.item.matrUnit;
+				$.each(options_07, function (idx, elem) {
+					if(itemValue == elem.value) result_text = elem.text;
+				});
+				return result_text;
+			}
+		},
+		{key: "matrNm"    , label: "자재명"      , width: 160, align: "left", styleClass: function () { return gridStyle(this.item); }},
+		{key: "useYn"      , label: "사용여부"    , width: 70 , align: "center", formatter: "useYn"},
+		{key: "matrStockCd", label: "재고관리"    , width: 70 , align: "center", formatter: "useYn"},
+		{key: "originNm"   , label: "원산지"      , width: 100, align: "center", styleClass: function () { return gridStyle(this.item); }},
+		{key: "matrDrwNo"  , label: "대표도면"    , width: 120, align: "center", styleClass: function () { return gridStyle(this.item); }},
+		{key: "matrTestDiv", label: "입고검사구분", width: 100, align: "center",
+			editor: {type: "select",
+				config: {
+					columnKeys: {optionValue: 'value',optionText: 'text'},
+					options: options_08
+				},
+				disabled : function () {
+					return this.item.matrYn == "true";
+				}
+			},
+			formatter: function () {
+				var result_text = "";
+				var itemValue = this.item.matrTestDiv;
+				$.each(options_08, function (idx, elem) {
+					if(itemValue == elem.value) result_text = elem.text;
+				});
+				return result_text;
+			}
+		},
+		{key: "dlvrRqmDay" , label: "납품소요일자" , width: 100, align: "right", formatter:"money"},
+		{key: "matrPurcDiv", label: "구매/외주구분", width: 100, align: "center",
+			editor: {type: "select",
+				config: {
+					columnKeys: {optionValue: 'value',optionText: 'text'},
+					options: options_09
+				},
+				disabled : function () {
+					return this.item.matrYn == "true";
+				}
+			},
+			formatter: function () {
+				var result_text = "";
+				var itemValue = this.item.matrPurcDiv;
+				$.each(options_09, function (idx, elem) {
+					if(itemValue == elem.value) result_text = elem.text;
+				});
+				return result_text;
+			}
+		},
+		{key: "minOrdrgQty"   , label: "최소발주량"    , width: 100, align: "right" , formatter:"money"},
+		{key: "matrSaftQty"   , label: "안전재고"      , width: 100, align: "right" , formatter:"money"},
+		{key: "dsgn2dMd"      , label: "2D설계소요일"  , width: 100, align: "right" , formatter:"money"},
+		{key: "avrg2dMd"      , label: "2D평균소요일"  , width: 100, align: "right" , formatter:"money"},
+		{key: "dsgn3dMd"      , label: "3D설계소요일"  , width: 100, align: "right" , formatter:"money"},
+		{key: "avrg3dMd"      , label: "3D평균소요일"  , width: 100, align: "right" , formatter:"money"},
+		{key: "prdctnRqmMd"   , label: "생산소요일"    , width: 100, align: "right" , formatter:"money"},
+		{key: "prdctnAvrgMd"  , label: "생산평균소요일", width: 100, align: "right" , formatter:"money"},
+		{key: "matrPartNo"    , label: "파트번호"      , width: 100, align: "center"},
+		{key: "pchsClntCd1"   , label: "구매업체1"     , width: 80 , align: "right" , hidden:true},
+		{key: "pchsClntPct1"  , label: "발주비율1"     , width: 80 , align: "right"},
+		{key: "pchsClntCd2"   , label: "구매업체2"     , width: 80 , align: "right" , hidden:true},
+		{key: "pchsClntNm2"   , label: "구매업체1"     , width: 80 , align: "left"},
+		{key: "pchsClntPct2"  , label: "발주비율2"     , width: 80 , align: "right"},
+		{key: "pchsClntCd3"   , label: "구매업체3"     , width: 80 , align: "right" , hidden:true},
+		{key: "pchsClntNm3"   , label: "구매업체1"     , width: 80 , align: "left"},
+		{key: "pchsClntPct3"  , label: "발주비율3"     , width: 80 , align: "right"},
+		{key: "matrUpr"       , label: "최종구매단가"  , width: 100, align: "right" , formatter: "money"},
+		{key: "matrAvrgUpr"   , label: "평균구매단가"  , width: 100, align: "right" , formatter: "money"},
+		{key: "matrLastTrstDt", label: "최종거래일자"  , width: 100, align: "center", styleClass: function () { return gridStyle(this.item);}},
+		{key: "matrAtntCd", label: "대체자재코드", width: 100, align: "center", styleClass: function () { return gridStyle(this.item);}},
+		{key: "matrNo", label: "자재번호", width: 100, align: "center", styleClass: function () { return gridStyle(this.item);}},
+		{key: "upperNm"   , label: "상위"  , width: 80 , align: "left", hidden:true},
+		{key: "lowerNm"   , label: "하위"  , width: 80 , align: "left", hidden:true},
+		{key: "avlbStrtDt", label: "FROM"  , width: 80 , align: "left", hidden:true},
+		{key: "avlbEndDt" , label: "TO"    , width: 80 , align: "left", hidden:true},
+		{key: "partNo"    , label: "PART"  , width: 80 , align: "left", hidden:true},
+		{key: "unitNo"    , label: "UNIT"  , width: 80 , align: "left", hidden:true},
+		{key: "revNo"     , label: "리버전", width: 80 , align: "left", hidden:true},
+		{key: "dsgnNo"    , label: "도번" , width: 160, align: "left", styleClass: function () { return gridStyle(this.item);}},
+		{key: "treeUpperCd", label: "상위코드"    , width: 60, align: "left", hidden:true},
+		{key: "treeLowerCd", label: "하위코드"    , width: 60, align: "left", hidden:true},
+		{key: "upperCd"    , label: "상위코드"    , width: 60, align: "left", hidden:false},
+		{key: "lowerCd"    , label: "하위코드"    , width: 60, align: "left", hidden:false},
+	];
 
 	var matrGridView = {
 		initView: function() {
@@ -308,187 +497,8 @@
 						this.self.repaint();
 					},
 				},
-				columns : [
-					{key: "text", label: "도번/품명", width: 250, align: "left", treeControl: true, styleClass: function () { return gridStyle(this.item); }},
-					{key: "dtaChk"     , label: " "           , width: 30 , hidden:true},
-					{key: "coCd"       , label: "CO"          , width: 50 , align: "center", hidden:true},
-					{key: "ordrsNo"    , label: "ordrsNo"     , width: 80 , align: "center", hidden:true},
-					{key: "salesCd"    , label: "salesCd"     , width: 120, align: "left"  , hidden:true},
-					{key: "matrSeq"    , label: "자재순번"    , width: 70 , align: "center", hidden:true},
-					{key: "oldUpperCd" , label: "이전상위코드", width: 160, align: "left"  , hidden:true},
-					{key: "oldLowerCd" , label: "이전하위코드", width: 180, align: "left"  , hidden:true},
-					{key: "matrYn"	   , label: "자재"    	  , width: 35, align: "center", styleClass: function () { return gridStyle(this.item); }},
-					{key: "matrMat", label: "소재/Maker", width: 100, align: "left", styleClass: function () { return gridStyle(this.item); }},
-					{key: "matrSpec", label: "형번/규격", width: 180, align: "left", styleClass: function () { return gridStyle(this.item); }},
-					{key: "matrSize"   , label: "크기"        , width: 180, align: "left", styleClass: function () { return gridStyle(this.item); },
-						editor:{type: "text",
-							attributes: {'maxlength': 100,'data-maxlength': 100},
-							disabled : function () {
-								return this.item.matrYn == "true";
-							}
-						}
-					},
-					{key: "pchsClntNm", label: "발주거래처명"    , width: 90, align: "left", styleClass: function () { return gridStyle(this.item); },
-						editor : {
-							type: "text",
-							attributes: {'maxlength': 100,'data-maxlength': 300},
-							disabled : function () {
-								return this.item.matrYn == "true";
-							}
-						}
-					},
-					{key: "mngNm", label: "담당자"    , width: 50, align: "center", styleClass: function () { return gridStyle(this.item); },
-						editor : {
-							type: "text",
-							attributes: {'maxlength': 20,'data-maxlength': 20},
-							disabled : function () {
-								return this.item.matrYn == "true";
-							}
-						}
-					},
-					// {key: "popupGrid1", label: " "     , width: 30 , align: "center", formatter: "popupGrid1"},
-					{key: "dlvplcNm"  , label: "물품배송처", width: 70, align: "center", styleClass: function () { return gridStyle(this.item); },
-						editor : {type: "text",
-							attributes: {'maxlength': 100,'data-maxlength': 300},
-							disabled : function () {
-								return this.item.matrYn == "true";
-							}
-						}
-					},
-					// {key: "popupGrid2", label: " "           , width: 30,	align: "center", formatter: "popupGrid2"},
-					{key: "bomQty"    , label: "발주대상수량", width: 80 , align: "right" , styleClass: function () { return gridStyle(this.item); },
-						editor:{type: "number",
-							disabled : function () {
-								return this.item.matrYn == "true";
-							}
-						}
-					},
-					{key: "posQty"    , label: "소요량"      , width: 60 , align: "right" , styleClass: function () { return gridStyle(this.item); },
-						editor:{type: "number",
-							disabled : function () {
-								return this.item.matrYn == "true";
-							}
-						}
-					},
-					{key: "matrCd"    , label: "자재코드"    , width: 70 , align: "center", styleClass: function () { return gridStyle(this.item); }},
-					{key: "matrRmk"       , label: "설계 비고"          , width: 120, align: "left", styleClass: function () { return gridStyle(this.item);}},
-					{key: "pchsClntNm1", label: "최종구매업체", width: 80 , align: "left", styleClass: function () { return gridStyle(this.item); }},
-					{key: "popupGrid3", label: " "           , width: 30 , align: "center", formatter: "popupGrid3"},
-					{key: "matrSpec"  , label: "비고"    , width: 100, align: "left",
-						editor : {type: "text",
-							attributes: {'maxlength': 300,'data-maxlength': 300},
-							disabled : function () {
-								return this.item.matrYn == "true";
-							}
-						},
-						hidden:true
-					},
-					{key: "matrMakrNm", label: "제조사"  , width: 100, align: "center", styleClass: function () { return gridStyle(this.item); }},
-					{key: "matrWt"    , label: "중량(kg)"    , width: 60, align: "right", formatter:"money",
-						editor:{type: "number",
-							disabled : function () {
-								return this.item.matrYn == "true";
-							}
-						}
-					},
-					{key: "matrUnit"  , label: "단위"    , width: 100, align: "center",
-						editor: {type: "select",
-							config: {
-								columnKeys: {optionValue: 'value',optionText: 'text'},
-								options: options_07
-							},
-							disabled : function () {
-								return this.item.matrYn == "true";
-							}
-						},
-						formatter: function () {
-							var result_text = "";
-							var itemValue = this.item.matrUnit;
-							$.each(options_07, function (idx, elem) {
-								if(itemValue == elem.value) result_text = elem.text;
-							});
-							return result_text;
-						}
-					},
-					{key: "matrNm"    , label: "자재명"      , width: 160, align: "left", styleClass: function () { return gridStyle(this.item); }},
-					{key: "useYn"      , label: "사용여부"    , width: 70 , align: "center", formatter: "useYn"},
-					{key: "matrStockCd", label: "재고관리"    , width: 70 , align: "center", formatter: "useYn"},
-					{key: "originNm"   , label: "원산지"      , width: 100, align: "center", styleClass: function () { return gridStyle(this.item); }},
-					{key: "matrDrwNo"  , label: "대표도면"    , width: 120, align: "center", styleClass: function () { return gridStyle(this.item); }},
-					{key: "matrTestDiv", label: "입고검사구분", width: 100, align: "center",
-						editor: {type: "select",
-							config: {
-								columnKeys: {optionValue: 'value',optionText: 'text'},
-								options: options_08
-							},
-							disabled : function () {
-								return this.item.matrYn == "true";
-							}
-						},
-						formatter: function () {
-							var result_text = "";
-							var itemValue = this.item.matrTestDiv;
-							$.each(options_08, function (idx, elem) {
-								if(itemValue == elem.value) result_text = elem.text;
-							});
-							return result_text;
-						}
-					},
-					{key: "dlvrRqmDay" , label: "납품소요일자" , width: 100, align: "right", formatter:"money"},
-					{key: "matrPurcDiv", label: "구매/외주구분", width: 100, align: "center",
-						editor: {type: "select",
-							config: {
-								columnKeys: {optionValue: 'value',optionText: 'text'},
-								options: options_09
-							},
-							disabled : function () {
-								return this.item.matrYn == "true";
-							}
-						},
-						formatter: function () {
-							var result_text = "";
-							var itemValue = this.item.matrPurcDiv;
-							$.each(options_09, function (idx, elem) {
-								if(itemValue == elem.value) result_text = elem.text;
-							});
-							return result_text;
-						}
-					},
-					{key: "minOrdrgQty"   , label: "최소발주량"    , width: 100, align: "right" , formatter:"money"},
-					{key: "matrSaftQty"   , label: "안전재고"      , width: 100, align: "right" , formatter:"money"},
-					{key: "dsgn2dMd"      , label: "2D설계소요일"  , width: 100, align: "right" , formatter:"money"},
-					{key: "avrg2dMd"      , label: "2D평균소요일"  , width: 100, align: "right" , formatter:"money"},
-					{key: "dsgn3dMd"      , label: "3D설계소요일"  , width: 100, align: "right" , formatter:"money"},
-					{key: "avrg3dMd"      , label: "3D평균소요일"  , width: 100, align: "right" , formatter:"money"},
-					{key: "prdctnRqmMd"   , label: "생산소요일"    , width: 100, align: "right" , formatter:"money"},
-					{key: "prdctnAvrgMd"  , label: "생산평균소요일", width: 100, align: "right" , formatter:"money"},
-					{key: "matrPartNo"    , label: "파트번호"      , width: 100, align: "center"},
-					{key: "pchsClntCd1"   , label: "구매업체1"     , width: 80 , align: "right" , hidden:true},
-					{key: "pchsClntPct1"  , label: "발주비율1"     , width: 80 , align: "right"},
-					{key: "pchsClntCd2"   , label: "구매업체2"     , width: 80 , align: "right" , hidden:true},
-					{key: "pchsClntNm2"   , label: "구매업체1"     , width: 80 , align: "left"},
-					{key: "pchsClntPct2"  , label: "발주비율2"     , width: 80 , align: "right"},
-					{key: "pchsClntCd3"   , label: "구매업체3"     , width: 80 , align: "right" , hidden:true},
-					{key: "pchsClntNm3"   , label: "구매업체1"     , width: 80 , align: "left"},
-					{key: "pchsClntPct3"  , label: "발주비율3"     , width: 80 , align: "right"},
-					{key: "matrUpr"       , label: "최종구매단가"  , width: 100, align: "right" , formatter: "money"},
-					{key: "matrAvrgUpr"   , label: "평균구매단가"  , width: 100, align: "right" , formatter: "money"},
-					{key: "matrLastTrstDt", label: "최종거래일자"  , width: 100, align: "center", styleClass: function () { return gridStyle(this.item);}},
-					{key: "matrAtntCd", label: "대체자재코드", width: 100, align: "center", styleClass: function () { return gridStyle(this.item);}},
-					{key: "matrNo", label: "자재번호", width: 100, align: "center", styleClass: function () { return gridStyle(this.item);}},
-					{key: "upperNm"   , label: "상위"  , width: 80 , align: "left", hidden:true},
-					{key: "lowerNm"   , label: "하위"  , width: 80 , align: "left", hidden:true},
-					{key: "avlbStrtDt", label: "FROM"  , width: 80 , align: "left", hidden:true},
-					{key: "avlbEndDt" , label: "TO"    , width: 80 , align: "left", hidden:true},
-					{key: "partNo"    , label: "PART"  , width: 80 , align: "left", hidden:true},
-					{key: "unitNo"    , label: "UNIT"  , width: 80 , align: "left", hidden:true},
-					{key: "revNo"     , label: "리버전", width: 80 , align: "left", hidden:true},
-					{key: "dsgnNo"    , label: "도번" , width: 160, align: "left", styleClass: function () { return gridStyle(this.item);}},
-					{key: "treeUpperCd", label: "상위코드"    , width: 60, align: "left", hidden:true},
-					{key: "treeLowerCd", label: "하위코드"    , width: 60, align: "left", hidden:true},
-					{key: "upperCd"    , label: "상위코드"    , width: 60, align: "left", hidden:false},
-					{key: "lowerCd"    , label: "하위코드"    , width: 60, align: "left", hidden:false},
-				],
+
+				columns : GridColumnConfig.apply("SM0101P06", "matr-grid", defaultMatrColumns),
 				tree: {
 					use: true,
 					indentWidth: 15,
@@ -1166,7 +1176,7 @@
 				+ 'border:1px dashed #cbd5e0;border-radius:4px;font-size:12px;color:#475569;';
 
 		var msg =
-			'<div style="text-align:left;font-size:12.5px;color:#2d3748;line-height:1.5;max-height:70vh;overflow:auto;padding-right:4px;">'
+			'<div style="text-align:left;font-size:12.5px;color:#2d3748;line-height:1.5;padding-right:4px;">'
 			+ '<div style="' + note + '">'
 				+ '<b>적용 범위</b> : 왼쪽 <b>BOM 트리</b>에서만 지원됩니다. (오른쪽 그리드 미지원)<br>'
 				+ '<b>대상</b> : <b>자재코드 노드</b>만 복사/붙여넣기 가능합니다.'
@@ -1777,4 +1787,25 @@
 		return isNaN(cvtValue) ? 0 : cvtValue; //NaN이면 0로 대체 --> minus기호만 있는경우
 	}
 
+	// 그리드 개인 설정 (순서/표시여부/너비) 팝업 열기 (2차 모달로 오픈)
+	function setCustomGrid() {
+		var currList = [];
+		if (matrGridView && matrGridView.target && matrGridView.target.list) {
+			currList = $.extend(true, [], matrGridView.target.list);
+		}
+		GridColumnConfig.openEditor("SM0101P06", "matr-grid", defaultMatrColumns, function() {
+			matrGridView.initView();
+			if (currList && currList.length > 0) {
+				matrGridView.target.setData({
+					list: currList,
+					page: {
+						totalElements: currList.length
+					}
+				});
+				gridHeightResize(matrGridView, 205);
+			} else if (select_lowerCd) {
+				matrGridView.setData(select_lowerCd, select_upperCd);
+			}
+		}, true);
+	}
 </script>

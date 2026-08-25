@@ -156,14 +156,20 @@ var GridColumnConfig = (function() {
 	}
 
 	// 컬럼 편집 팝업 열기. onApplied: 저장/초기화 후 화면에서 그리드를 재구성하는 콜백
-	function openEditor(pgmId, gridId, defaultColumns, onApplied) {
+	// isSecondModal: 모달 팝업 내부에서 2차 모달로 오픈할 경우 true (미지정 시 modalStack 활성 시 자동 openSecondModal)
+	function openEditor(pgmId, gridId, defaultColumns, onApplied, isSecondModal) {
 		var current = apply(pgmId, gridId, defaultColumns);
 		var paramObj = {
 			"pgmId": pgmId,
 			"gridId": gridId,
 			"metaColumns": toMeta(current)
 		};
-		openModal("/static/html/cmn/modal/gridColumnEdit.html", 560, 620, "그리드 컬럼 설정", paramObj, onApplied);
+		var useSecond = (typeof isSecondModal !== 'undefined') ? !!isSecondModal : (typeof modalStack !== 'undefined' && modalStack && modalStack.length > 0);
+		if (useSecond && typeof openSecondModal === 'function') {
+			openSecondModal("/static/html/cmn/modal/gridColumnEdit.html", 560, 620, "그리드 컬럼 설정", paramObj, onApplied);
+		} else {
+			openModal("/static/html/cmn/modal/gridColumnEdit.html", 560, 620, "그리드 컬럼 설정", paramObj, onApplied);
+		}
 	}
 
 	return {
