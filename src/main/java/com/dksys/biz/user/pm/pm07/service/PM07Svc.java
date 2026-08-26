@@ -41,4 +41,6 @@ public interface PM07Svc {
 
 	List<Map<String, String>> selectAnnualUseStatusList(Map<String, String> paramMap);
 
+	int updateMngRmk(Map<String, String> paramMap);
+
 }

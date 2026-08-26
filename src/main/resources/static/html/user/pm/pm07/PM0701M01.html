@@ -224,7 +224,8 @@
 		,{key: "edTm",        label: "종료시각",     width:  70, align: "center"}
 		,{key: "vacDays",     label: "휴가일수",     width:  70, align: "right"}
 		,{key: "deductDays",  label: "차감일수",     width:  70, align: "right"}
-		,{key: "reqRmk",      label: "사유",        width: 200, align: "left"}
+		,{key: "reqRmk",      label: "신청사유",     width: 180, align: "left"}
+		,{key: "mngRmk",      label: "근태담당자사유", width: 220, align: "left", editor: {type: "text"}}
 		,{key: "reqId",       label: "등록사번",   width:  70, align: "center", hidden: true}
 		,{key: "reqIdNm",     label: "등록",       width:  70, align: "center"}
 		,{key: "creatDttm",   label: "등록일시",     width: 130, align: "center"}
@@ -268,9 +269,38 @@
 		});
 	}
 
+	// 근태관리 담당자 전용 권한 체크 함수 (SPECRTS18 공통코드 등록 사번 순수 동적 검증)
+	function isMngUser() {
+		var isMng = false;
+		if (jwt && jwt.userId) {
+			postAjaxSync("/admin/cm/cm05/selectChildCodeList", { "codeId": "SPECRTS18" }, null, function(data) {
+				var list = (data && data.childCodeList) ? data.childCodeList : [];
+				if (list.length > 0) {
+					var codeEtc = list[0].codeEtc || '';
+					if (codeEtc) {
+						var idList = codeEtc.split(',').map(function(id) { return $.trim(id).toLowerCase(); });
+						if (idList.indexOf(String(jwt.userId).toLowerCase()) >= 0) {
+							isMng = true;
+						}
+					}
+				}
+			});
+		}
+		return isMng;
+	}
+
 	var gridView = {
 		initView : function() {
 			adjustGridHeight();
+
+			// 근태담당자 권한이 있는 경우에만 근태담당자사유(mngRmk) 편집 허용
+			var isMng = isMngUser();
+			defaultColumns.forEach(function(col) {
+				if (col.key === "mngRmk") {
+					col.editor = isMng ? {type: "text"} : false;
+				}
+			});
+
 			var cols = GridColumnConfig.apply("PM0701M01", "first-grid", defaultColumns);
 			this.target = new ax5.ui.grid();
 			this.target.setConfig({
@@ -290,6 +320,35 @@
 					},
 					onDBLClick : function() {
 						openVacationModal("U");
+					},
+					onDataChanged : function() {
+						if (this.key === "mngRmk") {
+							if (!isMngUser()) {
+								alert("근태담당자만 근태담당자사유를 수정할 수 있습니다.");
+								return;
+							}
+							var newVal = (this.value !== undefined && this.value !== null) ? String(this.value).trim() : "";
+							var oldVal = (this.oldValue !== undefined && this.oldValue !== null) ? String(this.oldValue).trim() : "";
+							if (newVal === oldVal) {
+								return; // 값이 변경되지 않았으면 DB 저장 스킵
+							}
+							var item = this.item;
+							var paramObj = {
+								 "coCd"   : item.coCd || "GUN"
+								,"reqNo"  : item.reqNo
+								,"mngRmk" : item.mngRmk || ""
+								,"userId" : jwt.userId
+							};
+							postAjax("/user/pm/pm07/updateMngRmk", paramObj, null, function(data) {
+								if (data.resultCode == 200) {
+									if (typeof toast !== "undefined" && toast.push) {
+										toast.push("근태담당자 사유가 자동 저장되었습니다.");
+									}
+								} else {
+									alert("저장 실패: " + data.resultMessage);
+								}
+							});
+						}
 					}
 				},
 				page : {
@@ -313,7 +372,9 @@
 				,"vacTypeCd"  : $('#vacTypeCd_S').val()
 				,"sanctnSts"  : $('#sanctnSts_S').val()
 				,"reqId"      : $('#reqId_S').val()
+				,"reqIdNm"    : $('#reqIdNm_S').val()
 				,"reqDeptId"  : $('#reqDeptId_S').val()
+				,"reqDeptNm"  : $('#reqDeptNm_S').val()
 				,"pageNo"     : pageNo + 1
 				,"recordCnt": 100
 			};
@@ -349,10 +410,13 @@
 		$('#vacTypeCd_S').val("");
 
 		$('#coCd_S').val("GUN");
+		// 처음 화면 로딩 시 로그인한 본인 아이디 기본 설정 (본인 데이터 우선 조회)
+		$('#reqId_S').val(jwt.userId);
+		$('#reqIdNm_S').val(jwt.userNm);
 
-		// 시작일/종료일 셋팅 (당해 연도 1월 1일 ~ 당해 연도 말일)
-		$('#reqDtFrom_S').val(moment().startOf('year').format("YYYY-MM-DD"));
-		$('#reqDtTo_S').val(moment().endOf('year').format("YYYY-MM-DD"));
+		// 시작일/종료일 셋팅 (3개월 전 1일 ~ 당월 말일)
+		$('#reqDtFrom_S').val(moment().subtract(3, 'months').startOf('month').format("YYYY-MM-DD"));
+		$('#reqDtTo_S').val(moment().endOf('month').format("YYYY-MM-DD"));
 
 		// 날짜 범위 선택기
 		$('#reqDtFrom_S, #reqDtTo_S').on('click', function(){
@@ -385,8 +449,8 @@
 		$('#coCd_S').val("GUN");
 		$('#vacTypeCd_S').val("");
 		$('#sanctnSts_S').val("");
-		$('#reqDtFrom_S').val(moment().startOf('month').format("YYYY-MM-DD"));
-		$('#reqDtTo_S').val(moment().format("YYYY-MM-DD"));
+		$('#reqDtFrom_S').val(moment().subtract(3, 'months').startOf('month').format("YYYY-MM-DD"));
+		$('#reqDtTo_S').val(moment().endOf('month').format("YYYY-MM-DD"));
 		gridView.setData(0);
 	}
 

@@ -20,8 +20,14 @@
 		<if test="reqId != null and !reqId.equals('')">
 		AND REQ_ID = #{reqId}
 		</if>
+		<if test="reqIdNm != null and !reqIdNm.equals('')">
+		AND (EXISTS (SELECT 1 FROM TB_CM06M01 U WHERE U.ID = TB_PM07M01.REQ_ID AND U.NAME LIKE '%' || #{reqIdNm} || '%') OR REQ_TITL LIKE '%' || #{reqIdNm} || '%' OR REQ_ID LIKE '%' || #{reqIdNm} || '%')
+		</if>
 		<if test="reqDeptId != null and !reqDeptId.equals('')">
 		AND REQ_DEPT_ID = #{reqDeptId}
+		</if>
+		<if test="reqDeptNm != null and !reqDeptNm.equals('')">
+		AND EXISTS (SELECT 1 FROM TB_CM04M01 D WHERE D.DEPT_ID = TB_PM07M01.REQ_DEPT_ID AND D.DEPT_NM LIKE '%' || #{reqDeptNm} || '%')
 		</if>
 	</select>
 
@@ -77,8 +83,14 @@
 		<if test="reqId != null and !reqId.equals('')">
 		  AND REQ_ID = #{reqId}
 		</if>
+		<if test="reqIdNm != null and !reqIdNm.equals('')">
+		  AND (EXISTS (SELECT 1 FROM TB_CM06M01 U WHERE U.ID = TB_PM07M01.REQ_ID AND U.NAME LIKE '%' || #{reqIdNm} || '%') OR REQ_TITL LIKE '%' || #{reqIdNm} || '%' OR REQ_ID LIKE '%' || #{reqIdNm} || '%')
+		</if>
 		<if test="reqDeptId != null and !reqDeptId.equals('')">
 		  AND REQ_DEPT_ID = #{reqDeptId}
+		</if>
+		<if test="reqDeptNm != null and !reqDeptNm.equals('')">
+		  AND EXISTS (SELECT 1 FROM TB_CM04M01 D WHERE D.DEPT_ID = TB_PM07M01.REQ_DEPT_ID AND D.DEPT_NM LIKE '%' || #{reqDeptNm} || '%')
 		</if>
 		ORDER BY ST_DT ASC, REQ_NO ASC
 	</select>
@@ -86,73 +98,68 @@
 	<select id="selectVacationList" parameterType="Map" resultType="CamelMap">
 		SELECT *
 		FROM (
-			SELECT ROWNUM AS RNUM, A.*
+			SELECT ROWNUM AS RNUM, T.*
 			FROM (
 				SELECT
-					CO_CD,
-					REQ_NO,
-					REQ_DT,
-					REQ_TITL,
-					REQ_ID,
-					REQ_DEPT_ID,
-					VAC_TYPE_CD,
-					(SELECT CODE_NM FROM TB_CM05M01 WHERE CODE_ID = VAC_TYPE_CD) AS VAC_TYPE_NM,
-					FN_CM06M01_ID_TO_NM(REQ_ID) AS REQ_ID_NM,
-					(SELECT DEPT_NM FROM TB_CM04M01 WHERE DEPT_ID = REQ_DEPT_ID) AS REQ_DEPT_NM,
-					AMPM_CD,
-					TO_CHAR(TO_DATE(ST_DT, 'YYYYMMDD'), 'YYYY-MM-DD') AS ST_DT,
-					TO_CHAR(TO_DATE(ED_DT, 'YYYYMMDD'), 'YYYY-MM-DD') AS ED_DT,
-					TO_CHAR(TO_DATE(ST_TM, 'HH24MI'), 'HH24:MI')       AS ST_TM,
-					TO_CHAR(TO_DATE(ED_TM, 'HH24MI'), 'HH24:MI')       AS ED_TM,
-					VAC_DAYS,
-					DEDUCT_DAYS,
-					REQ_RMK,
-					/* 실시간 결재선(TB_WB20M03) 기준 결재상태 정밀 판단 (공유자 TODODIV10 제외, 결재자 TODODIV20 전용) */
-					/* (미확인 결재자의 SANCTN_STTUS = 'N' 초기값으로 인한 반려 오인 방지: TODO_CF_DT IS NOT NULL 조건 수식) */
-					/* 1. 결재자가 없으면: 임시저장(TEMP) */
-					/* 2. 본인 결재만 진행되면: 승인요청(REQ) */
-					/* 3. 본인 외 다른 사람 결재 진행 시: 진행중(ING) */
-					/* 4. 모든 결재자 승인 완료 시: 완료(END) */
-					/* 5. 확인일자(TODO_CF_DT)가 존재하고 반려(N/R)된 경우: 반려(RTN) */
-					NVL((
-						SELECT
-							CASE
-								WHEN SUM(CASE WHEN W.TODO_CF_DT IS NOT NULL AND (W.SANCTN_STTUS = 'N' OR W.SANCTN_STTUS = 'R' OR W.SANCTN_STTUS = '4') THEN 1 ELSE 0 END) > 0 THEN 'RTN'
-								WHEN COUNT(W.TODO_KEY) = 0 THEN 'TEMP'
-								WHEN COUNT(W.TODO_KEY) > 0 AND COUNT(W.TODO_KEY) = SUM(CASE WHEN W.TODO_CF_DT IS NOT NULL AND W.SANCTN_STTUS != 'N' THEN 1 ELSE 0 END) THEN 'END'
-								WHEN SUM(CASE WHEN W.SANCTN_SN > 1 AND W.TODO_CF_DT IS NOT NULL AND W.SANCTN_STTUS != 'N' THEN 1 ELSE 0 END) > 0 THEN 'ING'
-								ELSE 'REQ'
-							END
-						FROM TB_WB20M03 W
-						WHERE W.TODO_NO = TB_PM07M01.REQ_NO
-						  AND W.TODO_DIV1_CODE_ID = 'TODODIV20'
-					), NVL(SANCTN_STS, 'TEMP')) AS SANCTN_STS,
-					WORK_RPT_YN,
-					CREAT_ID,
-					TO_CHAR(CREAT_DTTM, 'YYYY-MM-DD HH24:MI:SS') AS CREAT_DTTM
-				FROM TB_PM07M01
+					M.CO_CD,
+					M.REQ_NO,
+					M.REQ_DT,
+					M.REQ_TITL,
+					M.REQ_ID,
+					M.REQ_DEPT_ID,
+					M.VAC_TYPE_CD,
+					C1.CODE_NM AS VAC_TYPE_NM,
+					NVL(U.NAME, M.REQ_TITL) AS REQ_ID_NM,
+					D.DEPT_NM AS REQ_DEPT_NM,
+					M.AMPM_CD,
+					TO_CHAR(TO_DATE(M.ST_DT, 'YYYYMMDD'), 'YYYY-MM-DD') AS ST_DT,
+					TO_CHAR(TO_DATE(M.ED_DT, 'YYYYMMDD'), 'YYYY-MM-DD') AS ED_DT,
+					TO_CHAR(TO_DATE(M.ST_TM, 'HH24MI'), 'HH24:MI')       AS ST_TM,
+					TO_CHAR(TO_DATE(M.ED_TM, 'HH24MI'), 'HH24:MI')       AS ED_TM,
+					M.VAC_DAYS,
+					M.DEDUCT_DAYS,
+					M.REQ_RMK,
+					M.MNG_RMK,
+					NVL(M.SANCTN_STS, 'TEMP') AS SANCTN_STS,
+					M.WORK_RPT_YN,
+					M.CREAT_ID,
+					TO_CHAR(M.CREAT_DTTM, 'YYYY-MM-DD HH24:MI:SS') AS CREAT_DTTM
+				FROM TB_PM07M01 M
+				LEFT JOIN TB_CM06M01 U  ON U.ID = M.REQ_ID
+				LEFT JOIN TB_CM04M01 D  ON D.DEPT_ID = M.REQ_DEPT_ID
+				LEFT JOIN TB_CM05M01 C1 ON C1.CODE_ID = M.VAC_TYPE_CD
 				WHERE 1=1
 				<if test="reqDtFrom != null and !reqDtFrom.equals('') and reqDtTo != null and !reqDtTo.equals('')">
-				AND ST_DT &lt;= #{reqDtTo}
-				AND ED_DT &gt;= #{reqDtFrom}
+				AND M.ST_DT &lt;= #{reqDtTo}
+				AND M.ED_DT &gt;= #{reqDtFrom}
 				</if>
 				<if test="vacTypeCd != null and !vacTypeCd.equals('')">
-				AND VAC_TYPE_CD = #{vacTypeCd}
+				AND M.VAC_TYPE_CD = #{vacTypeCd}
 				</if>
 				<if test="reqId != null and !reqId.equals('')">
-				AND REQ_ID = #{reqId}
+				AND M.REQ_ID = #{reqId}
+				</if>
+				<if test="reqIdNm != null and !reqIdNm.equals('')">
+				AND (U.NAME LIKE '%' || #{reqIdNm} || '%' OR M.REQ_TITL LIKE '%' || #{reqIdNm} || '%' OR M.REQ_ID LIKE '%' || #{reqIdNm} || '%')
 				</if>
 				<if test="reqDeptId != null and !reqDeptId.equals('')">
-				AND REQ_DEPT_ID = #{reqDeptId}
+				AND M.REQ_DEPT_ID = #{reqDeptId}
 				</if>
-				ORDER BY REQ_DT DESC, REQ_NO DESC
-			) A
-			WHERE 1=1
-			<if test="sanctnSts != null and !sanctnSts.equals('')">
-			AND A.SANCTN_STS = #{sanctnSts}
+				<if test="reqDeptNm != null and !reqDeptNm.equals('')">
+				AND D.DEPT_NM LIKE '%' || #{reqDeptNm} || '%'
+				</if>
+				<if test="sanctnSts != null and !sanctnSts.equals('')">
+				AND M.SANCTN_STS = #{sanctnSts}
+				</if>
+				ORDER BY D.DEPT_NM ASC, U.NAME ASC, M.ST_DT DESC, M.REQ_NO DESC
+			) T
+			<if test="firstIndex != null and lastIndex != null">
+			WHERE ROWNUM &lt;= #{lastIndex}
 			</if>
 		)
-		WHERE RNUM BETWEEN #{firstIndex} AND #{lastIndex}
+		<if test="firstIndex != null and lastIndex != null">
+		WHERE RNUM &gt;= #{firstIndex}
+		</if>
 	</select>
 
 	<select id="selectVacationDtl" parameterType="Map" resultType="CamelMap">
@@ -263,9 +270,9 @@
 			VAC_DAYS = #{vacDays, jdbcType=NUMERIC},
 			DEDUCT_DAYS = #{deductDays, jdbcType=NUMERIC},
 			REQ_RMK = #{reqRmk, jdbcType=VARCHAR},
-			UPDT_ID = #{userId, jdbcType=VARCHAR},
-			UPDT_PGM = 'PM0701P01',
-			UPDT_DTTM = SYSDATE
+			UDT_ID = #{userId, jdbcType=VARCHAR},
+			UDT_PGM = 'PM0701P01',
+			UDT_DTTM = SYSDATE
 		WHERE REQ_NO = #{reqNo, jdbcType=VARCHAR}
 	</update>
 
@@ -322,9 +329,9 @@
 			GRANT_DAYS = #{grantDays, jdbcType=NUMERIC},
 			AUTO_YN = NVL(#{autoYn, jdbcType=VARCHAR}, 'N'),
 			RMK = #{rmk, jdbcType=VARCHAR},
-			UPDT_ID = #{userId, jdbcType=VARCHAR},
-			UPDT_PGM = 'PM0701P02',
-			UPDT_DTTM = SYSDATE
+			UDT_ID = #{userId, jdbcType=VARCHAR},
+			UDT_PGM = 'PM0701P02',
+			UDT_DTTM = SYSDATE
 		WHERE CO_CD = #{coCd, jdbcType=VARCHAR} 
 		  AND YY = #{yy, jdbcType=VARCHAR} 
 		  AND USER_ID = #{userId, jdbcType=VARCHAR}
@@ -734,8 +741,11 @@
 			<if test="deptCd_S != null and !deptCd_S.equals('')">
 			  AND SUBSTR(NVL(U.VIEW_DEPT_ID, U.DEPT_ID), 1, 5) = SUBSTR(#{deptCd_S}, 1, 5)
 			</if>
+			<if test="deptNm_S != null and !deptNm_S.equals('')">
+			  AND D.DEPT_NM LIKE '%' || #{deptNm_S} || '%'
+			</if>
 			<if test="userNm_S != null and !userNm_S.equals('')">
-			  AND U.NAME LIKE '%' || #{userNm_S} || '%'
+			  AND (U.NAME LIKE '%' || #{userNm_S} || '%' OR U.ID LIKE '%' || #{userNm_S} || '%')
 			</if>
 			<if test="userId_S != null and !userId_S.equals('')">
 			  AND U.ID = #{userId_S}
@@ -751,5 +761,16 @@
 		) A
 		ORDER BY A.SORT_NO ASC, A.DEPT_NM ASC, A.USER_NM ASC
 	</select>
+
+	<!-- 근태담당자 사유 수정 -->
+	<update id="updateMngRmk" parameterType="Map">
+		UPDATE TB_PM07M01
+		SET MNG_RMK  = #{mngRmk, jdbcType=VARCHAR},
+		    UDT_ID   = #{userId, jdbcType=VARCHAR},
+		    UDT_PGM  = 'PM0701M01',
+		    UDT_DTTM = SYSDATE
+		WHERE CO_CD  = #{coCd}
+		  AND REQ_NO = #{reqNo}
+	</update>
 
 </mapper>

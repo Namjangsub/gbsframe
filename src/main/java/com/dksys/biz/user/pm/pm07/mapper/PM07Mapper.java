@@ -74,4 +74,6 @@ public interface PM07Mapper {
 
 	List<Map<String, String>> selectVacationOverlapCheck(Map<String, String> paramMap);
 
+	int updateMngRmk(Map<String, String> paramMap);
+
 }

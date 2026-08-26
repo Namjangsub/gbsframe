@@ -271,18 +271,18 @@
 						,{key: "workYears",    label: "근속연수", width: 100, align: "center"}
 						,{key: "grantDays",    label: "발생일수", width:  75, align: "center", formatter: "zeroEmptyFormatter"}
 						,{key: "prevDays",     label: "전년연차", width:  60, align: "center", formatter: "zeroEmptyFormatter"}
-						,{key: "m01",          label: "1월",      width:  50, align: "center", formatter: "monthCellFormatter"}
-						,{key: "m02",          label: "2월",      width:  50, align: "center", formatter: "monthCellFormatter"}
-						,{key: "m03",          label: "3월",      width:  50, align: "center", formatter: "monthCellFormatter"}
-						,{key: "m04",          label: "4월",      width:  50, align: "center", formatter: "monthCellFormatter"}
-						,{key: "m05",          label: "5월",      width:  50, align: "center", formatter: "monthCellFormatter"}
-						,{key: "m06",          label: "6월",      width:  50, align: "center", formatter: "monthCellFormatter"}
-						,{key: "m07",          label: "7월",      width:  50, align: "center", formatter: "monthCellFormatter"}
-						,{key: "m08",          label: "8월",      width:  50, align: "center", formatter: "monthCellFormatter"}
-						,{key: "m09",          label: "9월",      width:  50, align: "center", formatter: "monthCellFormatter"}
-						,{key: "m10",          label: "10월",     width:  50, align: "center", formatter: "monthCellFormatter"}
-						,{key: "m11",          label: "11월",     width:  50, align: "center", formatter: "monthCellFormatter"}
-						,{key: "m12",          label: "12월",     width:  50, align: "center", formatter: "monthCellFormatter"}
+						,{key: "m01",          label: "1월",      width:  50, align: "center", formatter: makeMonthCellFormatter("m01")}
+						,{key: "m02",          label: "2월",      width:  50, align: "center", formatter: makeMonthCellFormatter("m02")}
+						,{key: "m03",          label: "3월",      width:  50, align: "center", formatter: makeMonthCellFormatter("m03")}
+						,{key: "m04",          label: "4월",      width:  50, align: "center", formatter: makeMonthCellFormatter("m04")}
+						,{key: "m05",          label: "5월",      width:  50, align: "center", formatter: makeMonthCellFormatter("m05")}
+						,{key: "m06",          label: "6월",      width:  50, align: "center", formatter: makeMonthCellFormatter("m06")}
+						,{key: "m07",          label: "7월",      width:  50, align: "center", formatter: makeMonthCellFormatter("m07")}
+						,{key: "m08",          label: "8월",      width:  50, align: "center", formatter: makeMonthCellFormatter("m08")}
+						,{key: "m09",          label: "9월",      width:  50, align: "center", formatter: makeMonthCellFormatter("m09")}
+						,{key: "m10",          label: "10월",     width:  50, align: "center", formatter: makeMonthCellFormatter("m10")}
+						,{key: "m11",          label: "11월",     width:  50, align: "center", formatter: makeMonthCellFormatter("m11")}
+						,{key: "m12",          label: "12월",     width:  50, align: "center", formatter: makeMonthCellFormatter("m12")}
 						,{key: "usedDaysSum",  label: "사용일수", width:  75, align: "center", styleClass: "grid-font-bold", formatter: "zeroEmptyFormatter"}
 						,{key: "balanceDays",  label: "미사용일수",width: 70, align: "center", styleClass: "grid-font-blue-bold", formatter: "zeroEmptyFormatter"}
 						,{key: "rmk",          label: "비고",     width: 110, align: "left"}
@@ -308,14 +308,27 @@
 		};
 
 		// 월별 연차 사용내역 포맷터 (PM0701P02.html usedDaysInfoFormatter 톤앤매너 계승)
-		ax5.ui.grid.formatter["monthCellFormatter"] = function() {
-			var val = Number(this.value);
-			if (isNaN(val) || val === 0) return "";
-			var displayVal = (val % 1 === 0 ? val : val.toFixed(1));
-			return '<span class="used-days-info-trigger" style="cursor: pointer; color: #337ab7; font-weight: bold;" title="마우스 호버/클릭 시 상세 휴가신청 내역 표출">' + displayVal + ' <i class="fas fa-search-plus" style="font-size: 10px; color: #5bc0de;"></i></span>';
-		};
+		// 주의: AX5-Grid 포맷터 컨텍스트(this)는 value/item만 보장되고 this.column은 제공되지 않아
+		// (실제로 항상 undefined) 컬럼키를 얻을 수 없었음 -> 컬럼별로 키를 클로저에 고정한 포맷터를 생성해서 해결
+		function makeMonthCellFormatter(monthKey) {
+			return function() {
+				var val = Number(this.value);
+				if (isNaN(val) || val === 0) return "";
+				var displayVal = (val % 1 === 0 ? val : val.toFixed(1));
+				return '<span class="used-days-info-trigger" data-col-key="' + monthKey + '" style="cursor: pointer; color: #337ab7; font-weight: bold;" title="마우스 호버/클릭 시 상세 휴가신청 내역 표출">' + displayVal + ' <i class="fas fa-search-plus" style="font-size: 10px; color: #5bc0de;"></i></span>';
+			};
+		}
 
 		var VACATION_POPOVER_TIMER = null;
+		var VACATION_POPOVER_REQUEST_ID = 0; // 마우스를 빠르게 여러 월 셀로 옮길 때 늦게 도착한 이전 요청의 응답이 현재 팝업을 덮어쓰는 것을 막기 위한 순번
+		var VACATION_POPOVER_SHOW_TIMER = null; // 마우스 호버 후 0.3초 이상 머물렀을 때만 조회하기 위한 지연 타이머
+
+		function cancelVacationPopoverShow() {
+			if (VACATION_POPOVER_SHOW_TIMER) {
+				clearTimeout(VACATION_POPOVER_SHOW_TIMER);
+				VACATION_POPOVER_SHOW_TIMER = null;
+			}
+		}
 
 		// 사용일수 마우스 호버 시 백엔드 API("/user/pm/pm07/selectVacationCalendarList") 실시간 호출 팝오버 툴팁 표출 함수
 		function showVacationPopover($el, item, colKey) {
@@ -323,6 +336,8 @@
 				clearTimeout(VACATION_POPOVER_TIMER);
 				VACATION_POPOVER_TIMER = null;
 			}
+
+			var myRequestId = ++VACATION_POPOVER_REQUEST_ID;
 
 			if (!$el || $el.length === 0 || typeof $el.offset !== 'function') {
 				return;
@@ -353,21 +368,27 @@
 				});
 			}
 
-			var userNm = (item ? (item.userNm || item.name) : '') || '사원';
-			var userId = (item ? (item.userId || item.id) : '');
+			var userNm = (item ? (item.userNm || item.USER_NM || item.name) : '') || '사원';
+			var userId = (item ? (item.userId || item.USER_ID || item.user_id || item.usrNm || item.id) : '');
 			$('#popUserNm').text(userNm);
 
 			var curYy = $('#yy_S').val() || moment().format("YYYY");
 			var key = String(colKey || '').toLowerCase();
 			var stDt = curYy + "0101";
 			var edDt = curYy + "1231";
+			var targetMonthStr = "";
 
-			// 특정 월을 마우스 호버했을 경우 해당 월의 범위만 백엔드에 요청
-			if (key && key.indexOf('m') === 0 && key.length === 3) {
-				var monthNum = key.substring(1); // "01", "02" 등
-				var lastDay = moment(curYy + "-" + monthNum, "YYYY-MM").daysInMonth();
-				stDt = curYy + monthNum + "01";
-				edDt = curYy + monthNum + (lastDay < 10 ? "0" + lastDay : lastDay);
+			// 특정 월(m01~m12, m1~m12)을 마우스 호버했을 경우 해당 월의 범위(YYYYMM01 ~ YYYYMMLastDay) 설정
+			var mMatch = key.match(/^m(\d{1,2})$/i);
+			if (mMatch) {
+				var monthInt = parseInt(mMatch[1], 10);
+				if (monthInt >= 1 && monthInt <= 12) {
+					var monthNum = (monthInt < 10 ? "0" : "") + monthInt; // "01" ~ "12"
+					targetMonthStr = curYy + monthNum; // 예: "202601"
+					var lastDay = moment(curYy + "-" + monthNum, "YYYY-MM").daysInMonth();
+					stDt = curYy + monthNum + "01";
+					edDt = curYy + monthNum + (lastDay < 10 ? "0" + lastDay : lastDay);
+				}
 			}
 
 			$('#popContent').html('<div class="popover-item" style="color: #888888;"><i class="fas fa-spinner fa-spin"></i> 실시간 휴가이력 백엔드 조회 중...</div>');
@@ -381,12 +402,17 @@
 				"coCd": $('#coCd_S').val() || "GUN",
 				"reqId": userId,
 				"userId": userId,
+				"reqDtFrom": stDt,
+				"reqDtTo": edDt,
 				"stDt": stDt,
 				"edDt": edDt
 			};
 
-			// 백엔드 API 실시간 조회를 실행하여 최신 휴가 신청서 내역을 가져와 표시 (연차/년차/반차 전용)
+			// 백엔드 API 실시간 조회를 실행하여 최신 휴가 신청서 내역을 가져와 표시 (해당 월 내역만 엄격 필터링)
 			postAjax("/user/pm/pm07/selectVacationCalendarList", paramObj, null, function(data) {
+				// 이 응답이 도착하기 전에 다른 월 셀로 마우스가 이동해 새 요청이 나갔다면(=이 요청이 더 이상 최신이 아니면) 무시
+				if (myRequestId !== VACATION_POPOVER_REQUEST_ID) return;
+
 				var list = data.result || data.resultList || data.list || [];
 				var htmlStr = '';
 				var validCount = 0;
@@ -395,13 +421,25 @@
 					$.each(list, function(i, row) {
 						var vNm = row.vacTypeNm || row.vac_type_nm || '연차';
 
+						var stVal = row.rawStDt || row.stDt || row.st_dt || '';
+						var edVal = row.rawEdDt || row.edDt || row.ed_dt || '';
+						var stCompact = String(stVal).replace(/[^0-9]/g, "").substring(0, 8);
+						var edCompact = String(edVal).replace(/[^0-9]/g, "").substring(0, 8);
+
+						// 특정 월(m01~m12) 호버 시, 해당 월(targetMonthStr: YYYYMM) 범위에 포함되는 휴가건만 엄격 체크!
+						if (targetMonthStr) {
+							var stMm = stCompact.substring(0, 6);
+							var edMm = edCompact.substring(0, 6);
+							if (!stMm || !edMm) return true;
+							var inMonth = (stMm <= targetMonthStr && edMm >= targetMonthStr);
+							if (!inMonth) return true; // 호버한 해당 월이 아니면 스킵!
+						}
+
 						// PM0701P02.html 연차/년차/반차 필터링 규칙 적용 (공가/경조사 등 타 휴가 제외)
 						if (vNm.indexOf("연차") >= 0 || vNm.indexOf("년차") >= 0 || vNm.indexOf("반차") >= 0 || vNm.indexOf("오전") >= 0 || vNm.indexOf("오후") >= 0) {
-							var st = row.stDt || row.st_dt || '';
-							var ed = row.edDt || row.ed_dt || '';
-							var dtText = (st && ed && st !== ed) ? (st + " ~ " + ed) : (st || ed);
-
-							// 반차는 0.5일, 일반 연차는 1일(또는 차감일수)로 계산 표기
+							var stDisp = row.stDt || row.st_dt || stVal;
+							var edDisp = row.edDt || row.ed_dt || edVal;
+							var dtText = (stDisp && edDisp && stDisp !== edDisp) ? (stDisp + " ~ " + edDisp) : (stDisp || edDisp);
 							var vDays = row.deductDays || row.deduct_days || row.vacDays || row.vac_days || '';
 							if (vNm.indexOf("반차") >= 0 || vNm.indexOf("오전") >= 0 || vNm.indexOf("오후") >= 0) {
 								vDays = "0.5";
@@ -428,6 +466,7 @@
 		}
 
 		function hideVacationPopover() {
+			cancelVacationPopoverShow();
 			if (VACATION_POPOVER_TIMER) {
 				clearTimeout(VACATION_POPOVER_TIMER);
 			}
@@ -438,6 +477,7 @@
 		}
 
 		function hideVacationPopoverImmediately() {
+			cancelVacationPopoverShow();
 			if (VACATION_POPOVER_TIMER) {
 				clearTimeout(VACATION_POPOVER_TIMER);
 				VACATION_POPOVER_TIMER = null;
@@ -452,12 +492,20 @@
 				var $el = $(this);
 				var $tr = $el.closest('[data-ax5grid-data-index]');
 				var rowIdx = $tr.attr('data-ax5grid-data-index');
-				var $td = $el.closest('[data-ax5grid-column-key]');
-				var colKey = $td.attr('data-ax5grid-column-key');
+				var colKey = $el.attr('data-col-key');
+				if (!colKey) {
+					var $td = $el.closest('[data-ax5grid-column-key], [data-ax5grid-column-attr]');
+					colKey = $td.attr('data-ax5grid-column-key') || $td.attr('data-ax5grid-column-attr');
+				}
 
+				cancelVacationPopoverShow();
 				if (rowIdx !== undefined && statusGridView.target.list && statusGridView.target.list[rowIdx]) {
 					var item = statusGridView.target.list[rowIdx];
-					showVacationPopover($el, item, colKey);
+					// 마우스가 0.3초 이상 해당 셀에 머무른 경우에만 조회
+					VACATION_POPOVER_SHOW_TIMER = setTimeout(function() {
+						VACATION_POPOVER_SHOW_TIMER = null;
+						showVacationPopover($el, item, colKey);
+					}, 300);
 				}
 			},
 			mouseleave: function(e) {
@@ -468,8 +516,11 @@
 				var $el = $(this);
 				var $tr = $el.closest('[data-ax5grid-data-index]');
 				var rowIdx = $tr.attr('data-ax5grid-data-index');
-				var $td = $el.closest('[data-ax5grid-column-key]');
-				var colKey = $td.attr('data-ax5grid-column-key');
+				var colKey = $el.attr('data-col-key');
+				if (!colKey) {
+					var $td = $el.closest('[data-ax5grid-column-key], [data-ax5grid-column-attr]');
+					colKey = $td.attr('data-ax5grid-column-key') || $td.attr('data-ax5grid-column-attr');
+				}
 
 				if (rowIdx !== undefined && statusGridView.target.list && statusGridView.target.list[rowIdx]) {
 					var item = statusGridView.target.list[rowIdx];
@@ -527,6 +578,7 @@
 				"coCd": $('#coCd_S').val() || "GUN",
 				"yy": curYy,
 				"deptCd_S": deptCd5Val,
+				"deptNm_S": $('#deptNm_S').val() || "",
 				"userId_S": $('#userId_S').val() || "",
 				"userNm_S": $('#userNm_S').val() || "",
 				"useYn_S": $('#useYn_S').val() || "",

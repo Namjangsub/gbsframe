@@ -160,4 +160,17 @@ public class PM07Ctr {
 		return "jsonView";
 	}
 
+	@PostMapping(value = "/updateMngRmk")
+	public String updateMngRmk(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		try {
+			int count = pm07Svc.updateMngRmk(paramMap);
+			model.addAttribute("resultCode", 200);
+			model.addAttribute("resultMessage", "근태담당자 사유가 저장되었습니다.");
+		} catch (Exception e) {
+			model.addAttribute("resultCode", 500);
+			model.addAttribute("resultMessage", "저장 실패: " + e.getMessage());
+		}
+		return "jsonView";
+	}
+
 }

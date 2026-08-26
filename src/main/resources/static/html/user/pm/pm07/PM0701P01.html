@@ -22,7 +22,13 @@
 					<tr>
 						<th class="hit">휴가신청자</th>
 						<td>
-							<input type="text" id="reqTitl" name="reqTitl" class="form-control input-sm" placeholder="휴가신청자 성명" maxlength="200" style="width: 100%;">
+							<div class="search_form">
+								<input type="hidden" id="reqId" name="reqId">
+								<input type="hidden" id="reqDeptId" name="reqDeptId">
+								<input type="hidden" id="reqDeptNm" name="reqDeptNm">
+								<input type="text" id="reqTitl" name="reqTitl" class="form-control input-sm" placeholder="휴가신청자 성명" readonly style="cursor: default; background: #fafafa !important;" onclick="if (typeof isMngUser === 'function' && isMngUser()) openReqUserTree();">
+								<a id="btnReqUserSearch" onclick="openReqUserTree();" style="display: none;" title="신청자 선택/변경 (근태담당자 전용)"><i class="i_search_w"></i></a>
+							</div>
 						</td>
 						<th class="hit">휴가유형</th>
 						<td>
@@ -31,23 +37,15 @@
 							</select>
 						</td>
 					</tr>
-					<!-- 2행: 구분(오전/오후) / 시각 -->
+					<!-- 2행: 구분(오전/오후) -->
 					<tr>
 						<th></th>
 						<td></td>
 						<th id="ampmTh">구분(오전/오후)</th>
-						<td colspan="1">
+						<td>
 							<select id="ampmCd" name="ampmCd" data-kind="PM07AMPM" class="form-control input-sm" style="width: 100%; background: #fafafa !important;" disabled onchange="onAmPmChanged();">
 								<option value="">선택하세요</option>
 							</select>
-						</td>
-						<th style="display: none;">시각 (시작 ~ 종료)</th>
-						<td style="display: none;">
-							<div style="display: flex; align-items: center; gap: 5px; cursor: pointer;" onclick="openTimeRangePicker();">
-								<input type="text" id="stTm" name="stTm" class="form-control input-sm" style="width: 48%; cursor: pointer; background: #fafafa !important;" placeholder="08:30" maxlength="5" onclick="openTimeRangePicker();" onkeyup="timeMask(this);" onchange="onDateChanged();" disabled>
-								<span>~</span>
-								<input type="text" id="edTm" name="edTm" class="form-control input-sm" style="width: 48%; cursor: pointer; background: #fafafa !important;" placeholder="17:30" maxlength="5" onclick="openTimeRangePicker();" onkeyup="timeMask(this);" onchange="onDateChanged();" disabled>
-							</div>
 						</td>
 					</tr>
 					<!-- 3행: 시작일자 ~ 종료일자 -->
@@ -267,7 +265,7 @@
 
 		var paramObj = {
 			"coCd"  : $('#coCd').val() || "GUN",
-			"reqId" : jwt.userId,
+			"reqId" : $('#popForm').find('#reqId').val() || jwt.userId,
 			"stDt"  : stDt,
 			"edDt"  : edDt,
 			"stTm"  : stTm,
@@ -399,91 +397,6 @@
 		checkVacationOverlap(true);
 	}
 
-	// 시작~종료 시간범위 선택 통합 피커 팝업
-	function openTimeRangePicker() {
-		if ($('#stTm').is(':disabled') || $('#edTm').is(':disabled') || $('#reqRmk').is(':disabled')) return;
-
-		$('#timeRangePickerLayer').remove();
-
-		var timeOptions = [
-			"08:00", "08:30", "09:00", "09:30", "10:00", "10:30",
-			"11:00", "11:30", "12:00", "12:30", "13:00", "13:30",
-			"14:00", "14:30", "15:00", "15:30", "16:00", "16:30",
-			"17:00", "17:30", "18:00", "18:30", "19:00"
-		];
-
-		var curStTm = $('#stTm').val() || "09:00";
-		var curEdTm = $('#edTm').val() || "13:00";
-
-		var html = '<div id="timeRangePickerLayer" style="position: absolute; z-index: 999999; background: #ffffff; border: 1px solid #3b62b1; box-shadow: 0 4px 18px rgba(0,0,0,0.22); border-radius: 6px; padding: 12px; width: 340px;">';
-		html += '<div style="font-weight: bold; font-size: 13px; color: #3b62b1; margin-bottom: 8px; text-align: center; border-bottom: 1px solid #e1e8f5; padding-bottom: 6px;">시작 ~ 종료 시각 선택</div>';
-		html += '<div style="display: flex; gap: 10px;">';
-		
-		// 시작시간 컬럼
-		html += '<div style="flex: 1;">';
-		html += '<div style="font-size: 11px; font-weight: bold; color: #555; text-align: center; margin-bottom: 4px;">시작시각 (From)</div>';
-		html += '<div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 4px; max-height: 180px; overflow-y: auto;">';
-		$.each(timeOptions, function(idx, tm) {
-			var activeStyle = (curStTm === tm) ? 'background: #3b62b1; color: #fff; font-weight: bold; border-color: #3b62b1;' : 'background: #f4f6fa; color: #333;';
-			html += '<button type="button" class="st-time-btn" data-tm="' + tm + '" style="border: 1px solid #ccd5e6; border-radius: 3px; padding: 5px 0; font-size: 11px; cursor: pointer; ' + activeStyle + '" onclick="setRangePickerStTm(\'' + tm + '\');">' + tm + '</button>';
-		});
-		html += '</div></div>';
-
-		// 종료시간 컬럼
-		html += '<div style="flex: 1;">';
-		html += '<div style="font-size: 11px; font-weight: bold; color: #555; text-align: center; margin-bottom: 4px;">종료시각 (To)</div>';
-		html += '<div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 4px; max-height: 180px; overflow-y: auto;">';
-		$.each(timeOptions, function(idx, tm) {
-			var activeStyle = (curEdTm === tm) ? 'background: #28a745; color: #fff; font-weight: bold; border-color: #28a745;' : 'background: #f4f6fa; color: #333;';
-			html += '<button type="button" class="ed-time-btn" data-tm="' + tm + '" style="border: 1px solid #ccd5e6; border-radius: 3px; padding: 5px 0; font-size: 11px; cursor: pointer; ' + activeStyle + '" onclick="setRangePickerEdTm(\'' + tm + '\');">' + tm + '</button>';
-		});
-		html += '</div></div>';
-
-		html += '</div>';
-
-		// 하단 버튼
-		html += '<div style="text-align: right; margin-top: 10px; border-top: 1px solid #e1e8f5; padding-top: 8px;">';
-		html += '<button type="button" class="btn btn-xs btn-primary" onclick="applyTimeRangePicker();">확 인</button> ';
-		html += '<button type="button" class="btn btn-xs btn-default" onclick="$(\'#timeRangePickerLayer\').remove();">취 소</button>';
-		html += '</div>';
-
-		html += '</div>';
-
-		$('body').append(html);
-
-		var $target = $('#stTm');
-		var offset = $target.offset();
-		$('#timeRangePickerLayer').css({
-			top: (offset.top + $target.outerHeight() + 2) + 'px',
-			left: offset.left + 'px'
-		});
-
-		setTimeout(function() {
-			$(document).one('click', function(e) {
-				if (!$(e.target).closest('#timeRangePickerLayer, #stTm, #edTm').length) {
-					$('#timeRangePickerLayer').remove();
-				}
-			});
-		}, 10);
-	}
-
-	function setRangePickerStTm(tm) {
-		$('#stTm').val(tm);
-		$('.st-time-btn').css({ background: '#f4f6fa', color: '#333', 'font-weight': 'normal', 'border-color': '#ccd5e6' });
-		$('.st-time-btn[data-tm="' + tm + '"]').css({ background: '#3b62b1', color: '#fff', 'font-weight': 'bold', 'border-color': '#3b62b1' });
-	}
-
-	function setRangePickerEdTm(tm) {
-		$('#edTm').val(tm);
-		$('.ed-time-btn').css({ background: '#f4f6fa', color: '#333', 'font-weight': 'normal', 'border-color': '#ccd5e6' });
-		$('.ed-time-btn[data-tm="' + tm + '"]').css({ background: '#28a745', color: '#fff', 'font-weight': 'bold', 'border-color': '#28a745' });
-	}
-
-	function applyTimeRangePicker() {
-		$('#timeRangePickerLayer').remove();
-		onDateChanged();
-	}
-
 	// 결재선 그리드
 	var approvalGridView = {
 		initView : function() {
@@ -609,12 +522,61 @@
 		});
 	}
 
-	// 기본 결재라인 자동 구성 : 담당자 -> 담당자팀장 -> 경영지원팀(공통코드 SPECRTS17)
-	// PM5101P01.html 의 setApplicantDefaultApprovalLine / setApplicantDefaultApprovalLineMng 와 동일 방식.
-	// 경영지원팀 결재자는 공통코드 CODE_ID='SPECRTS17' 의 CODE_ETC 에 사번을 콤마로 나열하고,
-	// 그 나열 순서가 곧 결재 순번이 된다. (사용자가 Tibero 에 등록해야 함)
+	// 근태관리 담당자 전용 권한 체크 함수 (SPECRTS18 공통코드 등록 사번 순수 동적 검증)
+	function isMngUser() {
+		var isMng = false;
+		if (jwt && jwt.userId) {
+			postAjaxSync("/admin/cm/cm05/selectChildCodeList", { "codeId": "SPECRTS18" }, null, function(data) {
+				var list = (data && data.childCodeList) ? data.childCodeList : [];
+				if (list.length > 0) {
+					var codeEtc = list[0].codeEtc || '';
+					if (codeEtc) {
+						var idList = codeEtc.split(',').map(function(id) { return $.trim(id).toLowerCase(); });
+						if (idList.indexOf(String(jwt.userId).toLowerCase()) >= 0) {
+							isMng = true;
+						}
+					}
+				}
+			});
+		}
+		return isMng;
+	}
+
+	// 휴가신청자 선택 팝업 열기 (근태관리 담당자 SPECRTS18 전용)
+	function openReqUserTree() {
+		if (!isMngUser()) {
+			return; // 휴가관리담당자(SPECRTS18)가 아니면 동작 차단
+		}
+		var paramObj = {
+			 "coCd"   : $('#coCd').val() || "GUN"
+			,"userId" : $('#popForm').find('#reqId').val()
+			,"userNm" : $('#popForm').find('#reqTitl').val()
+			,"useYn"  : "Y"
+		};
+		openSecondModal("/static/html/cmn/modal/userSearch.html", 450, 650, "휴가신청자 선택", paramObj, function(tree) {
+			var checkedId = tree.get_checked()[0];
+			var checkedNode = tree.get_node(checkedId);
+			if (!checkedNode || checkedNode.type != 'person') {
+				alert("사원을 선택하세요.");
+				return;
+			}
+			$('#popForm').find('#reqId').val(checkedNode.id);
+			$('#popForm').find('#reqTitl').val(checkedNode.text);
+
+			postAjaxSync("/admin/cm/cm06/selectUserInfo", { "userId": checkedNode.id }, null, function(data) {
+				if (data && data.userInfo) {
+					$('#popForm').find('#reqDeptId').val(data.userInfo.deptId || '00000');
+					$('#popForm').find('#reqDeptNm').val(data.userInfo.deptNm || '');
+				}
+			});
+
+			setDefaultApprovalLine();
+		});
+	}
+
+	// 기본 결재라인 자동 구성 : 담당자 -> 담당자팀장 -> 휴가관리 결재라인(공통코드 SPECRTS17)
 	function setDefaultApprovalLine() {
-		var reqId = jwt.userId;
+		var reqId = $('#popForm').find('#reqId').val() || jwt.userId;
 		if (!reqId) return;
 
 		var autoList = [];
@@ -639,11 +601,29 @@
 		}
 
 		// 1) 담당자(신청자) 본인
+		// - 로그인 유저가 자기 휴가를 신청할 때 (reqId === jwt.userId): 1번 결재선에 등록하고 자동 승인(Y)
+		// - 근태/휴가관리담당자가 본인 외 다른 사원을 대리 선택 시 (reqId !== jwt.userId): 신청인 결재라인 스킵
 		var isTeamMgr = false;
 		postAjaxSync("/admin/cm/cm06/selectUserInfo", { "userId": reqId }, null, function(data) {
 			if (data && data.userInfo) {
 				isTeamMgr = (data.userInfo.teamManager === 'TEAM01');
-				pushApprover(data.userInfo);
+				if (reqId === jwt.userId) {
+					var uObj = data.userInfo;
+					var key = String(uObj.id).toLowerCase();
+					addedIds[key] = true;
+					autoList.push({
+						gb            : "결재",
+						usrNm         : uObj.id,
+						todoId        : uObj.id,
+						name          : uObj.name || uObj.id,
+						jik           : uObj.levelNm || '',
+						dtNm          : uObj.deptNm || '',
+						telNo         : uObj.telNo || '',
+						email         : uObj.email || '',
+						sanctnSttus   : 'Y',
+						sanctnSttusNm : '승인'
+					});
+				}
 			}
 		});
 
@@ -656,7 +636,7 @@
 			});
 		}
 
-		// 3) 경영지원팀 (SPECRTS17 의 CODE_ETC 등록 순서대로)
+		// 3) 휴가관리 결재라인 (SPECRTS17 의 CODE_ETC 등록 순서대로)
 		postAjaxSync("/admin/cm/cm05/selectChildCodeList", { "codeId": "SPECRTS17" }, null, function(data) {
 			var list = (data && data.childCodeList) ? data.childCodeList : [];
 			if (list.length === 0) return;
@@ -805,7 +785,7 @@
 				// (CM1601P01 -> fileTrgtKey, PM4001P01 -> workNo, PM07 -> reqNo)
 				salesCd        : $('#reqNo').val(),
 				sanctnSn       : idx + 1,
-				sanctnSttus    : "N",
+				sanctnSttus    : item.sanctnSttus || "N",
 				todoNo         : $('#reqNo').val(),
 				todoTitl       : "휴가신청서",
 				pgPath         : "/user/pm/pm07/PM0701P01.html",
@@ -846,17 +826,16 @@
 		}
 		let clntNm = (jwt.coCd=="GUN") ? "(주)건양ITT" : "트루넷";
 
-		// Kakao 알림톡 보내는사람(userID) 연락처 조회 값 세팅
+		// Kakao 알림톡 신청자(reqId) 연락처 조회 값 세팅
+		var reqUserId = $('#popForm').find('#reqId').val() || jwt.userId;
 		var paramObj1 = {
-			"coCd" 	: $('#coCd').val(),
-			"userId" 	: jwt.userId		// PM07 화면에는 #reqId 엘리먼트가 없다. 신청자 = 로그인 사용자
+			"coCd"   : $('#coCd').val() || "GUN",
+			"userId" : reqUserId
 		};
 		postAjaxSync("/user/wb/wb24/selectMemberTelNo", paramObj1, null, function(data){
-			if (data.result[0] == undefined
-				|| data.result[0].telNo == "") {
+			if (!data || !data.result || !data.result[0] || !data.result[0].telNo) {
 				teleNo = "051-312-2400";
-			}
-			else {
+			} else {
 				teleNo = data.result[0].telNo;
 			}
 		});
@@ -959,12 +938,12 @@
 	function saveVacation() {
 		if (!validateForm()) return;
 
-		var stDtVal = $('#stDt').val();  // YYYY-MM-DD 형식 유지
-		var edDtVal = $('#edDt').val();  // YYYY-MM-DD 형식 유지
-		var stDt = stDtVal.replace(/\-/g, '');  // 서버 전송용 YYYYMMDD
-		var edDt = edDtVal.replace(/\-/g, '');  // 서버 전송용 YYYYMMDD
-		var stTm = $('#stTm').val().replace(/:/g, '');
-		var edTm = $('#edTm').val().replace(/:/g, '');
+		var stDtVal = $('#stDt').val() || "";
+		var edDtVal = $('#edDt').val() || "";
+		var stDt = stDtVal.replace(/-/g, '');
+		var edDt = edDtVal.replace(/-/g, '');
+		var stTm = ($('#stTm').val() || "").replace(/:/g, '');
+		var edTm = ($('#edTm').val() || "").replace(/:/g, '');
 
 		var approvalArr = processApprovalGrid();
 
@@ -985,8 +964,8 @@
 		formData.append("actionType", $('#actionType').val());
 		formData.append("reqNo", $('#reqNo').val());
 		formData.append("reqTitl", $('#reqTitl').val());
-		formData.append("reqId", jwt.userId);
-		formData.append("reqDeptId", jwt.deptId);
+		formData.append("reqId", $('#popForm').find('#reqId').val() || jwt.userId);
+		formData.append("reqDeptId", $('#popForm').find('#reqDeptId').val() || jwt.deptId);
 		formData.append("vacTypeCd", $('#vacTypeCd').val());
 		formData.append("ampmCd", $('#ampmCd').val());
 		formData.append("stDt", stDt);
@@ -1006,25 +985,22 @@
 		var apiUrl = ($('#actionType').val() === "C") ? "/user/pm/pm07/insertVacation" : "/user/pm/pm07/updateVacation";
 
 		filePostAjax(apiUrl, formData, function(data) {
-			if (data.resultCode == 200) {
-				// 신청번호 설정
-				if ($('#reqNo').val() === "") {
-					$('#reqNo').val(data.result.reqNo || "");
+			if (data && (data.resultCode == 200 || data.resultCode == "200")) {
+				var resReqNo = (data.result && data.result.reqNo) ? data.result.reqNo : (data.reqNo || "");
+				if (resReqNo && $('#reqNo').val() === "") {
+					$('#reqNo').val(resReqNo);
 				}
-				// 알림톡 발송 (jwt.kakaoSend 가드는 kakaoTodo 내에서 처리).
-				// 알림톡은 동기(postAjaxSync) 호출이라 내부에서 예외가 나면 그대로 전파되어
-				// 아래 그리드 갱신/모달 닫기까지 도달하지 못한다. 저장은 이미 성공했으므로 격리한다.
 				try {
 					kakaoTodo();
 				} catch (e) {
 					console.error("알림톡 발송 실패 (저장은 정상 처리됨):", e);
 				}
 				alert("저장되었습니다.");
-				// 부모 화면 (PM0701M01, PM0702M01, PM0711M01) 데이터 자동 새로고침(Refresh)
 				refreshParentScreens();
 				modalStack.close();
 			} else {
-				alert(data.resultMessage || "저장 실패");
+				var msg = (data && data.resultMessage) ? data.resultMessage : ((data && data.result && data.result.resultMessage) ? data.result.resultMessage : "저장 실패");
+				alert(msg);
 			}
 		});
 	}
@@ -1073,8 +1049,32 @@
 		var actionType = paramObj.actionType ? paramObj.actionType : "C";
 		$('#actionType').val(actionType);
 
-		if (actionType === "U") {
-			$('#popupTitle').text("휴가신청 - 상세/수정");
+		if (actionType === "C") {
+			$('#popupTitle').text("휴가신청 - 신청등록");
+			var isMng = isMngUser();
+			if (isMng) {
+				$('#btnReqUserSearch').show();
+				$('#reqTitl').css({"cursor": "pointer", "background": "#ffffff !important"}).attr("placeholder", "클릭하여 휴가신청자 선택");
+			} else {
+				$('#btnReqUserSearch').hide();
+				$('#reqTitl').css({"cursor": "default", "background": "#fafafa !important"});
+			}
+			var curUserId = jwt.userId || "";
+			var curUserNm = jwt.userNm || "";
+			var curDeptId = jwt.deptId || "00000";
+			var curDeptNm = jwt.deptNm || "";
+
+			$('#popForm').find('#reqId').val(curUserId);
+			$('#popForm').find('#reqDeptId').val(curDeptId);
+			$('#popForm').find('#reqDeptNm').val(curDeptNm);
+			$('#reqTitl').val(curUserNm);
+
+			var todayStr = (typeof moment !== 'undefined') ? moment().format('YYYY-MM-DD') : new Date().toISOString().substring(0, 10);
+			$('#stDt').val(todayStr);
+			$('#edDt').val(todayStr);
+
+			setDefaultApprovalLine();
+		} else {
 			var reqNoVal = paramObj.reqNo || "";
 			var coCdVal  = paramObj.coCd || "GUN";
 
@@ -1088,7 +1088,9 @@
 
 			$('#coCd').val(dtlData.coCd || coCdVal);
 			$('#reqNo').val(dtlData.reqNo || reqNoVal);
-			$('#reqTitl').val(dtlData.reqTitl || "");
+			$('#popForm').find('#reqId').val(dtlData.reqId || jwt.userId);
+			$('#popForm').find('#reqDeptId').val(dtlData.reqDeptId || jwt.deptId);
+			$('#reqTitl').val(dtlData.reqIdNm || dtlData.reqTitl || "");
 			$('#vacTypeCd').val(dtlData.vacTypeCd || "").change();
 			$('#ampmCd').val(dtlData.ampmCd || "");
 			var formatDtStr = function(dt) {
@@ -1123,6 +1125,15 @@
 			var sanctnSts = dtlData.sanctnSts || paramObj.sanctnSts || "";
 			var isEditable = (!sanctnSts || sanctnSts === "TEMP" || sanctnSts === "SANCTN01" || sanctnSts === "0" || sanctnSts === "REQ");
 
+			if (isMngUser() && isEditable) {
+				$('#btnReqUserSearch').show();
+				$('#reqTitl').css("cursor", "pointer").on('click', function() {
+					openReqUserTree();
+				});
+			} else {
+				$('#btnReqUserSearch').hide();
+			}
+
 			if (!isEditable) {
 				var stsNm = (sanctnSts === "END" || sanctnSts === "SANCTN04" || sanctnSts === "Y") ? "결재완료" : "결재진행중";
 				$('#popupTitle').text("휴가신청 - 상세 (" + stsNm + " - 수정불가)");
@@ -1143,18 +1154,6 @@
 				}).hide();
 				$('.popup_area #fileList_area input[type="file"]').prop("disabled", true);
 			}
-		} else {
-			$('#popupTitle').text("휴가신청 - 신청등록");
-			if (typeof jwt !== 'undefined' && jwt.userNm) {
-				$('#reqTitl').val(jwt.userNm);
-			}
-			// 신규 등록 시 기본 시작일자, 종료일자는 현재일자로 기본 설정
-			var todayStr = (typeof moment !== 'undefined') ? moment().format('YYYY-MM-DD') : new Date().toISOString().substring(0, 10);
-			$('#stDt').val(todayStr);
-			$('#edDt').val(todayStr);
-
-			// 기본 결재라인 자동 구성 (담당자 -> 담당자팀장 -> 경영지원팀)
-			setDefaultApprovalLine();
 		}
 
 		// 날짜 picker 초기화 (연차, 교육훈련, 경조, 포상, 하계, 대체, 병가만 From-Till 기간선택, 그 외 팝업달력 실시간 양방향 동일일자 동기화)

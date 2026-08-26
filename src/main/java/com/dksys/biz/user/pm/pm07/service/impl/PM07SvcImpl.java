@@ -917,4 +917,9 @@ public class PM07SvcImpl implements PM07Svc {
 		return pm07Mapper.selectAnnualUseStatusList(paramMap);
 	}
 
+	@Override
+	public int updateMngRmk(Map<String, String> paramMap) {
+		return pm07Mapper.updateMngRmk(paramMap);
+	}
+
 }
