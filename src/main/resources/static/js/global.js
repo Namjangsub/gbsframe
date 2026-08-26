@@ -4631,3 +4631,26 @@ window.TripScheduleCalendarModal = (function(){
 })();
 // ===== Trip Schedule Calendar Modal End =====
 
+// 입력 그리드 순번(No.) 재정립 전역 공통 함수 (Uncaught TypeError: $.gridNoSet is not a function 예방)
+if (typeof $ !== 'undefined' && !$.gridNoSet) {
+	$.gridNoSet = function(gridObj, key) {
+		if (!gridObj) return;
+		var gridTarget = gridObj.target ? gridObj.target : (gridObj.list ? gridObj : null);
+		if (!gridTarget) return;
+
+		var gridList = (typeof gridTarget.getList === 'function') ? gridTarget.getList() : gridTarget.list;
+		if (gridList && gridList.length > 0) {
+			var keyName = key || "sanctnSn";
+			$.each(gridList, function (idx, elem) {
+				if (typeof gridTarget.setValue === 'function') {
+					gridTarget.setValue(idx, keyName, idx + 1);
+				} else {
+					elem[keyName] = idx + 1;
+				}
+			});
+			if (typeof gridTarget.repaint === 'function') {
+				gridTarget.repaint();
+			}
+		}
+	};
+}

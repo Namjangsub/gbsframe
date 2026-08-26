@@ -76,4 +76,6 @@ public interface PM07Mapper {
 
 	int updateMngRmk(Map<String, String> paramMap);
 
+	List<Map<String, String>> selectMobileVacationFileList(Map<String, String> paramMap);
+
 }

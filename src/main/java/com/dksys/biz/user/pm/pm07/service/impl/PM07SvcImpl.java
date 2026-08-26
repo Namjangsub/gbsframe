@@ -83,6 +83,7 @@ public class PM07SvcImpl implements PM07Svc {
 	}
 
 	@Override
+	@Transactional(rollbackFor = Exception.class)
 	public Map<String, String> insertVacation(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
 		Map<String, String> result = new HashMap<String, String>();
 
@@ -157,45 +158,31 @@ public class PM07SvcImpl implements PM07Svc {
 			if (vacDtArr != null && !vacDtArr.isEmpty()) {
 				Gson gson = new GsonBuilder().disableHtmlEscaping().create();
 				Type vacDtType = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
-				try {
-					List<Map<String, String>> vacDtList = gson.fromJson(vacDtArr, vacDtType);
-					for (Map<String, String> vacDt : vacDtList) {
-						Map<String, String> insertDtMap = new HashMap<>();
-						insertDtMap.put("coCd", paramMap.get("coCd"));
-						insertDtMap.put("reqNo", reqNo);
-						insertDtMap.put("vacDt", vacDt.get("vacDt"));
-						insertDtMap.put("workHour", vacDt.get("workHour"));
-						insertDtMap.put("userId", paramMap.get("userId"));
-						pm07Mapper.insertVacationDates(insertDtMap);
-					}
-				} catch (Exception e) {
-					// vacDtArr 파싱 실패 시 로그만 남기고 신청은 정상 처리.
-					// 단 TB_PM07M03 이 비면 최종승인 시 일일업무일지가 생성되지 않으므로 반드시 로그를 남긴다.
-					e.printStackTrace();
+				List<Map<String, String>> vacDtList = gson.fromJson(vacDtArr, vacDtType);
+				for (Map<String, String> vacDt : vacDtList) {
+					Map<String, String> insertDtMap = new HashMap<>();
+					insertDtMap.put("coCd", paramMap.get("coCd"));
+					insertDtMap.put("reqNo", reqNo);
+					insertDtMap.put("vacDt", vacDt.get("vacDt"));
+					insertDtMap.put("workHour", vacDt.get("workHour"));
+					insertDtMap.put("userId", paramMap.get("userId"));
+					pm07Mapper.insertVacationDates(insertDtMap);
 				}
 			}
 
-			// 첨부파일 처리 (삭제분 먼저 반영 후 업로드)
-			try {
-				deleteAttachedFiles(paramMap.get("deleteFileArr"));
-				cm08Svc.uploadFile("PM0701P01", reqNo, mRequest);
-			} catch (Exception e) {
-				// 첨부파일 처리 실패해도 신청은 정상 처리
-				e.printStackTrace();
-			}
+			// 첨부파일 처리 (삭제분 먼저 반영 후 업로드 - COMON_CD = 'FITR9902' 무조건 고정)
+			deleteAttachedFiles(paramMap.get("deleteFileArr"));
+			paramMap.put("comonCd", "FITR9902");
+			cm08Svc.uploadFile("PM0701P01", reqNo, mRequest);
 
 			// 등록 시 결재자(TODODIV20, gb != '공유')가 존재하면 작업일보(TB_PM01M01)에 휴가 근태 자동 생성
 			// (결재상태는 건드리지 않음 - ensureDailyWorkReport는 일지 생성만)
 			boolean hasApprover = checkHasApprover(reqNo, approvalList);
 			if (hasApprover) {
-				try {
-					Map<String, String> pm07Param = new HashMap<>();
-					pm07Param.put("reqNo", reqNo);
-					pm07Param.put("coCd", paramMap.get("coCd"));
-					ensureDailyWorkReport(pm07Param);
-				} catch (Exception e) {
-					e.printStackTrace();
-				}
+				Map<String, String> pm07Param = new HashMap<>();
+				pm07Param.put("reqNo", reqNo);
+				pm07Param.put("coCd", paramMap.get("coCd"));
+				ensureDailyWorkReport(pm07Param);
 			}
 
 			result.put("resultCode", "200");
@@ -209,25 +196,66 @@ public class PM07SvcImpl implements PM07Svc {
 		return result;
 	}
 
+	/**
+	 * 수정/삭제 가능 여부를 서버에서 재조회해 판정한다.
+	 * 프론트엔드(PC/모바일)에서 화면 로드 시점에 판단한 값은 그 사이 결재가 진행됐을 수 있어 신뢰할 수 없으므로,
+	 * 실제 처리(수정/삭제) 직전에 DB 최신 결재선(TB_WB20M03)을 다시 조회해서 확인한다.
+	 *
+	 * 판정 기준: 결재선에 본인 외 결재자가 "등록"만 되어 있는 것은 무방하다(아직 순서를 기다리는 대기자일
+	 * 뿐이므로). 본인 외 누군가가 "실제로 결재(승인/반려)를 완료"했을 때만 수정/삭제를 막는다.
+	 * (SANCTN_STS 파생 문자열만으로 판단하면 안 된다 - 결재선에 본인 한 명만 있는 경우 COUNT(전체)==
+	 * SUM(확정건)이 우연히 참이 되어 END(완료)로 잘못 계산되는 문제가 있다.)
+	 */
+	private boolean isVacationEditable(String coCd, String reqNo) {
+		Map<String, String> dtlQuery = new HashMap<String, String>();
+		dtlQuery.put("coCd", coCd);
+		dtlQuery.put("reqNo", reqNo);
+		Map<String, String> currentDtl = pm07Mapper.selectVacationDtl(dtlQuery);
+		if (currentDtl == null) {
+			return true; // 신청 본체를 찾을 수 없으면(신규 등록 등) 하위 처리에서 자연 실패하도록 통과
+		}
+
+		String reqId = currentDtl.get("reqId");
+
+		Map<String, String> approvalQuery = new HashMap<String, String>();
+		approvalQuery.put("todoNo", reqNo);
+		List<Map<String, String>> approvalList = wb20Svc.selectGetApprovalList(approvalQuery);
+		if (approvalList == null || approvalList.isEmpty()) {
+			return true; // 결재선이 아직 없으면(임시저장) 편집/삭제 가능
+		}
+
+		for (Map<String, String> approval : approvalList) {
+			String todoId = approval.get("todoId");
+			String todoDiv1CodeId = approval.get("todoDiv1CodeId");
+			boolean isApproverLine = (todoDiv1CodeId == null || todoDiv1CodeId.isEmpty() || "TODODIV20".equals(todoDiv1CodeId));
+			if (!isApproverLine || todoId == null || todoId.equals(reqId)) {
+				continue; // 본인이거나 공유선(TODODIV10)이면 판단 대상 아님
+			}
+
+			String sanctnSttus = approval.get("sanctnSttus");
+			String sanctnSttusNm = approval.get("sanctnSttusNm");
+
+			// 실제 상급 결재자 결재(승인/반려) 완료 여부 정밀 판정:
+			// 1) SANCTN_STTUS 컬럼이 'Y'(승인) 이거나 'R'(반려) 인 경우
+			// 2) SANCTN_STTUS_NM 이 '승인'('미승인' 제외) 이거나 '반려' 인 경우
+			boolean isApprovedOrRejected = "Y".equalsIgnoreCase(sanctnSttus)
+					|| "R".equalsIgnoreCase(sanctnSttus)
+					|| (sanctnSttusNm != null && sanctnSttusNm.contains("승인") && !sanctnSttusNm.contains("미승인"))
+					|| (sanctnSttusNm != null && sanctnSttusNm.contains("반려"));
+
+			if (isApprovedOrRejected) {
+				return false; // 본인 외 결재자가 실제로 결재(승인/반려)를 완료했으므로 수정/삭제 불가
+			}
+		}
+		return true; // 본인 외에는 결재자가 여러 명 지정되어 있어도 아직 결재를 완료하지 않은 대기중 상태 -> 수정/삭제 100% 가능!
+	}
+
 	@Override
+	@Transactional(rollbackFor = Exception.class)
 	public Map<String, String> updateVacation(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
 		Map<String, String> result = new HashMap<String, String>();
 
-		// 저장 버튼 클릭 시 DB 상태를 재확인한다. 화면 진입 후 다른 프로세스(결재선 등록/결재처리 등)로
-		// 상태가 바뀌었을 수 있으므로, 화면 로드 시점의 클라이언트 체크(isEditable)만 믿지 않는다.
-		// selectVacationDtl 은 TB_WB20M03 기준 실시간 SANCTN_STS 를 산출한다.
-		// TEMP(결재선 없음)/REQ(결재선은 있으나 아무도 승인 안 함=결재 진행된 게 없음) 는 수정 가능,
-		// ING(1명 이상 승인)/END(완료)/RTN(반려) 는 이미 결재가 진행된 상태이므로 수정 불가.
-		// 화면(PM0701P01.html)의 isEditable 판정과 동일 기준을 유지할 것.
-		Map<String, String> dtlQuery = new HashMap<String, String>();
-		dtlQuery.put("coCd", paramMap.get("coCd"));
-		dtlQuery.put("reqNo", paramMap.get("reqNo"));
-		Map<String, String> currentDtl = pm07Mapper.selectVacationDtl(dtlQuery);
-		String currentSanctnSts = (currentDtl != null) ? currentDtl.get("sanctnSts") : null;
-		boolean isEditable = (currentSanctnSts == null || currentSanctnSts.isEmpty()
-				|| "TEMP".equals(currentSanctnSts) || "SANCTN01".equals(currentSanctnSts) || "0".equals(currentSanctnSts)
-				|| "REQ".equals(currentSanctnSts));
-		if (!isEditable) {
+		if (!isVacationEditable(paramMap.get("coCd"), paramMap.get("reqNo"))) {
 			result.put("resultCode", "409");
 			result.put("resultMessage", "이미 결재가 진행 중이거나 완료되어 수정할 수 없습니다. 화면을 새로고침 해주세요.");
 			return result;
@@ -293,30 +321,22 @@ public class PM07SvcImpl implements PM07Svc {
 			}
 
 			// 수정 시 기존 작업일지 삭제
-			try {
-				pm07Mapper.deleteDailyWorkReportByVacation(paramMap);
-			} catch (Exception e) {
-				e.printStackTrace();
-			}
+			pm07Mapper.deleteDailyWorkReportByVacation(paramMap);
 
 			pm07Mapper.deleteVacationDates(paramMap);
 			String vacDtArr = paramMap.get("vacDtArr");
 			if (vacDtArr != null && !vacDtArr.isEmpty()) {
 				Gson gson = new GsonBuilder().disableHtmlEscaping().create();
 				Type vacDtType = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
-				try {
-					List<Map<String, String>> vacDtList = gson.fromJson(vacDtArr, vacDtType);
-					for (Map<String, String> vacDt : vacDtList) {
-						Map<String, String> insertDtMap = new HashMap<>();
-						insertDtMap.put("coCd", paramMap.get("coCd"));
-						insertDtMap.put("reqNo", paramMap.get("reqNo"));
-						insertDtMap.put("vacDt", vacDt.get("vacDt"));
-						insertDtMap.put("workHour", vacDt.get("workHour"));
-						insertDtMap.put("userId", paramMap.get("userId"));
-						pm07Mapper.insertVacationDates(insertDtMap);
-					}
-				} catch (Exception e) {
-					e.printStackTrace();
+				List<Map<String, String>> vacDtList = gson.fromJson(vacDtArr, vacDtType);
+				for (Map<String, String> vacDt : vacDtList) {
+					Map<String, String> insertDtMap = new HashMap<>();
+					insertDtMap.put("coCd", paramMap.get("coCd"));
+					insertDtMap.put("reqNo", paramMap.get("reqNo"));
+					insertDtMap.put("vacDt", vacDt.get("vacDt"));
+					insertDtMap.put("workHour", vacDt.get("workHour"));
+					insertDtMap.put("userId", paramMap.get("userId"));
+					pm07Mapper.insertVacationDates(insertDtMap);
 				}
 			}
 
@@ -324,22 +344,15 @@ public class PM07SvcImpl implements PM07Svc {
 			// (결재상태는 건드리지 않음 - ensureDailyWorkReport는 일지 생성만)
 			boolean hasApprover = checkHasApprover(paramMap.get("reqNo"), approvalList);
 			if (hasApprover) {
-				try {
-					Map<String, String> pm07Param = new HashMap<>();
-					pm07Param.put("reqNo", paramMap.get("reqNo"));
-					pm07Param.put("coCd", paramMap.get("coCd"));
-					ensureDailyWorkReport(pm07Param);
-				} catch (Exception e) {
-					e.printStackTrace();
-				}
+				Map<String, String> pm07Param = new HashMap<>();
+				pm07Param.put("reqNo", paramMap.get("reqNo"));
+				pm07Param.put("coCd", paramMap.get("coCd"));
+				ensureDailyWorkReport(pm07Param);
 			}
 
-			// 첨부파일 처리
-			try {
-				cm08Svc.uploadFile("PM0701P01", paramMap.get("reqNo"), mRequest);
-			} catch (Exception e) {
-				e.printStackTrace();
-			}
+			// 첨부파일 처리 (COMON_CD = 'FITR9902' 무조건 고정)
+			paramMap.put("comonCd", "FITR9902");
+			cm08Svc.uploadFile("PM0701P01", paramMap.get("reqNo"), mRequest);
 
 			result.put("resultCode", "200");
 			result.put("resultMessage", "휴가신청이 수정되었습니다.");
@@ -352,35 +365,71 @@ public class PM07SvcImpl implements PM07Svc {
 	}
 
 	@Override
+	@Transactional(rollbackFor = Exception.class)
 	public Map<String, String> deleteVacation(Map<String, String> paramMap) throws Exception {
 		Map<String, String> result = new HashMap<String, String>();
 
-		// 1. 해당 휴가신청건으로 작업일보(TB_PM01M01)에 등록되었던 근태 자료 자동 제거
-		try {
-			pm07Mapper.deleteDailyWorkReportByVacation(paramMap);
-		} catch (Exception e) {
-			e.printStackTrace();
+		// 0. 삭제 시도 대상 자료가 이미 다른 화면에서 삭제되어 DB에 존재하지 않는 경우
+		Map<String, String> dtlQuery = new HashMap<String, String>();
+		dtlQuery.put("coCd", paramMap.get("coCd"));
+		dtlQuery.put("reqNo", paramMap.get("reqNo"));
+		Map<String, String> currentDtl = pm07Mapper.selectVacationDtl(dtlQuery);
+		if (currentDtl == null || currentDtl.isEmpty()) {
+			result.put("resultCode", "200");
+			result.put("resultMessage", "이미 삭제완료된 상태입니다.");
+			return result;
 		}
 
-		// 2. 결재선 Master 삭제 (TODO_NO = REQ_NO 매칭)
-		try {
-			paramMap.put("todoNo", paramMap.get("reqNo"));
-			paramMap.put("todoDiv2CodeId", "TODODIV2300");
-			wb20Svc.deleteTodoMasterByTodoNo(paramMap);
-		} catch (Exception e) {
-			e.printStackTrace();
+		// 프론트엔드(PC 목록화면/모바일 상세화면)에서 화면 로드 시점에 판단한 삭제가능 여부는
+		// 그 사이 다른 결재자가 처리했을 수 있어 신뢰할 수 없으므로, 삭제 직전 서버에서 재검증한다.
+		if (!isVacationEditable(paramMap.get("coCd"), paramMap.get("reqNo"))) {
+			result.put("resultCode", "409");
+			result.put("resultMessage", "이미 결재가 진행 중이거나 완료되어 삭제할 수 없습니다. 화면을 새로고침 해주세요.");
+			return result;
 		}
+
+		// 1. 해당 휴가신청건으로 작업일보(TB_PM01M01)에 등록되었던 근태 자료 자동 제거
+		pm07Mapper.deleteDailyWorkReportByVacation(paramMap);
+
+		// 2. 결재선 Master 및 Detail 삭제 (TODO_NO = REQ_NO 매칭)
+		paramMap.put("todoNo", paramMap.get("reqNo"));
+		paramMap.put("todoDiv2CodeId", "TODODIV2300");
+		wb20Svc.deleteTodoMasterByTodoNo(paramMap);
 
 		// 3. 휴가 일자 디테일 및 휴가 신청 본체 삭제
 		pm07Mapper.deleteVacationDates(paramMap);
 		int deleteResult = pm07Mapper.deleteVacation(paramMap);
 
+		// 4. 첨부파일 DB 레코드 및 서버 물리 파일 연쇄 삭제 (FILE_TRGT_TYP = 'PM0701P01' & FILE_TRGT_KEY = REQ_NO)
+		try {
+			Map<String, String> fileSearchMap = new HashMap<>();
+			fileSearchMap.put("fileTrgtTyp", "PM0701P01");
+			fileSearchMap.put("fileTrgtKey", paramMap.get("reqNo"));
+			List<Map<String, String>> deleteFileList = cm08Svc.selectFileListAll(fileSearchMap);
+			if (deleteFileList != null && !deleteFileList.isEmpty()) {
+				for (Map<String, String> delFile : deleteFileList) {
+					String fKey = delFile.get("fileKey");
+					if (fKey == null || fKey.isEmpty()) {
+						fKey = delFile.get("file_key");
+					}
+					if (fKey == null || fKey.isEmpty()) {
+						fKey = delFile.get("FILE_KEY");
+					}
+					if (fKey != null && !fKey.isEmpty()) {
+						cm08Svc.deleteFile(fKey);
+					}
+				}
+			}
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+
+		// 해당 자료가 이미 삭제되어 없던 상태(deleteResult == 0)이어도 오류 500을 뱉지 않고 200 정상 코드로 종료
+		result.put("resultCode", "200");
 		if (deleteResult > 0) {
-			result.put("resultCode", "200");
 			result.put("resultMessage", "휴가신청이 삭제되었습니다.");
 		} else {
-			result.put("resultCode", "500");
-			result.put("resultMessage", "휴가신청 삭제에 실패했습니다.");
+			result.put("resultMessage", "이미 삭제완료된 상태입니다.");
 		}
 
 		return result;
@@ -920,6 +969,11 @@ public class PM07SvcImpl implements PM07Svc {
 	@Override
 	public int updateMngRmk(Map<String, String> paramMap) {
 		return pm07Mapper.updateMngRmk(paramMap);
+	}
+
+	@Override
+	public List<Map<String, String>> selectMobileVacationFileList(Map<String, String> paramMap) {
+		return pm07Mapper.selectMobileVacationFileList(paramMap);
 	}
 
 }

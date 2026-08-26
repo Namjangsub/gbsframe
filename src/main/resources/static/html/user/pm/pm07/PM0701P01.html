@@ -119,7 +119,8 @@
 
 			<!-- 하단 버튼 영역 -->
 			<div class="col-xs-12 text-right popup_bottom_btn" style="margin-top: 15px; padding-right: 0;">
-				<button type="button" class="btn btn-default btn-sm" onclick="saveVacation();">저 장</button>
+				<button type="button" class="btn btn-primary btn-sm" id="btnSaveVacation" onclick="saveVacation();">저 장</button>
+				<button type="button" class="btn btn-danger btn-sm" id="btnDeleteVacation" onclick="deleteVacationInModal();" style="display: none;">삭 제</button>
 				<button type="button" class="btn btn-default btn-sm" onclick="modalStack.close();">닫 기</button>
 			</div>
 		</div>
@@ -129,10 +130,38 @@
 <script type="text/javascript">
 
 	// 유형 판정 함수 (코드명 기반 — 코드값 확정 시 교체)
-	// TODO: 공통코드 PM07TYPE 코드값 확정 후 아래 함수들의 판정 로직을 코드값 기반으로 변경할 것
+	var editInitialSnapshot = null;
+
 	function isHalfDayType(codeNm) {
-		if (!codeNm) return false;
-		return codeNm.indexOf("반차") >= 0;
+		var code = $('#vacTypeCd').val() || '';
+		return code === 'PM07TYPE02' || code === 'PM07TYPE08' || code === 'PM07TYPE12'
+			|| (!!codeNm && codeNm.indexOf("반차") >= 0);
+	}
+
+	function getVacationEditSnapshot() {
+		var values = {};
+		$.each(['reqTitl', 'reqId', 'reqDeptId', 'vacTypeCd', 'ampmCd', 'stDt', 'edDt', 'reqRmk'], function(i, id) {
+			values[id] = $.trim($('#' + id).val() || '');
+		});
+		var approvalList = (typeof approvalGridView !== 'undefined' && approvalGridView.target && approvalGridView.target.list) ? approvalGridView.target.list : [];
+		values.approval = JSON.stringify(approvalList.map(function(item) {
+			return [item.usrNm, item.name, item.gb, item.sanctnSttus, item.todoCfDt];
+		}));
+		var fileList = [];
+		var deletedFileList = [];
+		if (typeof treeModule !== 'undefined') {
+			if (typeof treeModule.getFileArr === 'function') {
+				fileList = (treeModule.getFileArr() || []).map(function(file) {
+					return [file.fileKey || '', file.fileNm || file.name || '', file.fileSize || file.size || ''];
+				});
+			}
+			if (typeof treeModule.getDeleteFileArr === 'function') {
+				deletedFileList = treeModule.getDeleteFileArr() || [];
+			}
+		}
+		values.files = JSON.stringify(fileList);
+		values.deletedFiles = JSON.stringify(deletedFileList);
+		return JSON.stringify(values);
 	}
 
 	function isTimeType(codeNm) {
@@ -696,6 +725,31 @@
 				});
 		});
 
+		// 본인 외 상급 결재자(gb == '결재', todoId != jwt.userId) 중 실제로 승인/반려(sanctnSttusNm이 '승인' 또는 '반려')를 완료한 건이 있는지 체크
+		var hasOtherApproverActed = rows.some(function(r) {
+			var isApprover = (r.gb === "결재") && r.usrNm && r.usrNm !== jwt.userId;
+			if (!isApprover) return false;
+			var sanctnSttusNm = r.sanctnSttusNm || "";
+			return (sanctnSttusNm.indexOf("승인") > -1 && sanctnSttusNm.indexOf("미승인") === -1)
+				|| (sanctnSttusNm.indexOf("반려") > -1);
+		});
+
+		if (!hasOtherApproverActed) {
+			// 상급 결재자가 아직 결재를 안 함 (본인만 승인되었거나 결재 대기중) -> 삭제/수정 버튼 표출 및 UI 해제
+			$('#btnDeleteVacation').show();
+			$('#btnSaveVacation').show();
+			$('.popup_area #popForm input, .popup_area #popForm select, .popup_area #popForm textarea')
+				.not('#reqId, #reqDeptId, #reqDeptNm, #reqDays, #deductDays').prop("disabled", false).css("background-color", "#ffffff");
+			$('.popup_area .add_btn_small').show();
+		} else {
+			// 상급 결재자가 결재를 완료함 -> 삭제/수정 버튼 숨김 및 UI 잠금
+			$('#btnDeleteVacation').hide();
+			$('#btnSaveVacation').hide();
+			$('.popup_area #popForm input, .popup_area #popForm select, .popup_area #popForm textarea')
+				.prop("disabled", true).css("background-color", "#fafafa");
+			$('.popup_area .add_btn_small').hide();
+		}
+
 		// 결재 -> 공유 순, 각 구분 안에서는 결재순번(순차결재 순서)대로 정렬
 		rows.sort(function(a, b) {
 			if (a.gb !== b.gb) return (a.gb === "결재") ? -1 : 1;
@@ -705,16 +759,91 @@
 		approvalGridView.setData(rows);
 	}
 
-	// 결재자/공유자 선택 삭제
+	// 결재자/공유자 선택 삭제 (AX5 Grid 선택 인덱스 정밀 수집)
 	function deleteShareUser() {
-		var list = approvalGridView.target.getList("selected");
-		if (!list || list.length < 1) {
-			alert("선택된 행이 없습니다.");
+		var gridTarget = approvalGridView.target;
+		if (!gridTarget || !gridTarget.list) return;
+
+		var deleteIndexes = [];
+
+		// 1차: getList("selected") 체크박스 및 선택 상태 행 수집
+		var selectedList = gridTarget.getList("selected");
+		if (selectedList && selectedList.length > 0) {
+			$.each(selectedList, function(i, item) {
+				var idx = gridTarget.list.indexOf(item);
+				if (idx > -1 && deleteIndexes.indexOf(idx) < 0) {
+					deleteIndexes.push(idx);
+				}
+			});
+		}
+
+		// 2차: selectedDataIndexs 객체/배열 탐색 ({ "0": true, "1": true })
+		var selMap = gridTarget.selectedDataIndexs;
+		if (selMap) {
+			if (Array.isArray(selMap)) {
+				$.each(selMap, function(i, idxVal) {
+					var idx = parseInt(idxVal, 10);
+					if (!isNaN(idx) && idx > -1 && deleteIndexes.indexOf(idx) < 0) {
+						deleteIndexes.push(idx);
+					}
+				});
+			} else if (typeof selMap === 'object') {
+				for (var k in selMap) {
+					if (selMap[k]) {
+						var idx = parseInt(k, 10);
+						if (!isNaN(idx) && idx > -1 && deleteIndexes.indexOf(idx) < 0) {
+							deleteIndexes.push(idx);
+						}
+					}
+				}
+			}
+		}
+
+		// 3차: focusedRow 포커스 행 탐색
+		if (deleteIndexes.length === 0 && gridTarget.focusedRow !== undefined && gridTarget.focusedRow !== null) {
+			var fIdx = parseInt(gridTarget.focusedRow, 10);
+			if (!isNaN(fIdx) && fIdx > -1 && deleteIndexes.indexOf(fIdx) < 0) {
+				deleteIndexes.push(fIdx);
+			}
+		}
+
+		if (deleteIndexes.length === 0) {
+			alert("삭제할 결재자 또는 공유자 행을 선택하세요.");
 			return;
 		}
-		$.each(list, function(idx, item) {
-			approvalGridView.target.removeRow(approvalGridView.target.list.indexOf(item));
+
+		// 승인완료 검증
+		var hasApproved = false;
+		$.each(deleteIndexes, function(i, idx) {
+			var item = gridTarget.list[idx];
+			if (item && (item.sanctnSttus === 'Y' || (item.todoCfDt && item.todoCfDt.trim().length > 0))) {
+				hasApproved = true;
+				return false;
+			}
 		});
+
+		if (hasApproved) {
+			alert("이미 승인(확인) 완료된 결재자는 삭제할 수 없습니다.");
+			return;
+		}
+
+		// 역순(내림차순) 정렬하여 removeRow 실행 (배열 인덱스 시프트 꼬임 방지)
+		deleteIndexes.sort(function(a, b) { return b - a; });
+
+		$.each(deleteIndexes, function(i, idx) {
+			gridTarget.removeRow(idx);
+		});
+
+		// 순번(sanctnSn) 재정립
+		if (typeof $.gridNoSet === 'function') {
+			$.gridNoSet(approvalGridView, "sanctnSn");
+		}
+
+		// 그리드 높이 유동 조절 (전역 규칙)
+		if (typeof gridResize === 'function') {
+			var listLen = gridTarget.getList ? gridTarget.getList().length : gridTarget.list.length;
+			gridResize(approvalGridView, listLen);
+		}
 	}
 
 	// 유효성 검사
@@ -729,7 +858,8 @@
 			$('#vacTypeCd').focus();
 			return false;
 		}
-		if (!$('#ampmCd').is(':disabled') && !$('#ampmCd').val()) {
+		var selectedOption = $('#vacTypeCd').find('option:selected');
+		if (isHalfDayType(selectedOption.text()) && !$('#ampmCd').val()) {
 			alert("구분(오전/오후)을 선택하세요.");
 			$('#ampmCd').focus();
 			return false;
@@ -744,7 +874,6 @@
 			$('#edDt').focus();
 			return false;
 		}
-		var selectedOption = $('#vacTypeCd').find('option:selected');
 		var selectedNm = selectedOption.text();
 		if (!isRmkOptional(selectedNm) && !$('#reqRmk').val()) {
 			alert("사유를 입력하세요.");
@@ -936,6 +1065,11 @@
 
 	// 저장
 	function saveVacation() {
+		if ($('#actionType').val() === 'U' && editInitialSnapshot !== null
+			&& editInitialSnapshot === getVacationEditSnapshot()) {
+			modalStack.close();
+			return;
+		}
 		if (!validateForm()) return;
 
 		var stDtVal = $('#stDt').val() || "";
@@ -979,8 +1113,30 @@
 		formData.append("approvalArr", JSON.stringify(approvalArr));
 		formData.append("userId", jwt.userId);
 		formData.append("pgmId", "PM0701P01");
-		// 첨부 삭제분. 이걸 안 보내면 화면에서 첨부를 지워도 서버에 그대로 남는다. (CM1601P01 동일 패턴)
-		formData.append("deleteFileArr", JSON.stringify(treeModule.getDeleteFileArr()));
+		// 파일 첨부 처리 (treeModule 신규 바이너리 파일 append 및 uploadFileArr 전송)
+		if (typeof treeModule !== 'undefined' && typeof treeModule.getFileArr === 'function') {
+			if (typeof treeModule.setFileNodeId === 'function') {
+				treeModule.setFileNodeId("FITR9902");
+			}
+			formData.append("comonCd", "FITR9902");
+
+			var fileUploadArr = [];
+			var totalFileSize = 0;
+			$.each(treeModule.getFileArr(), function (idx, obj) {
+				if (obj.fileKey == 0 || !obj.fileKey) {
+					formData.append('files', obj.file);
+					if (obj.file && obj.file.size) {
+						totalFileSize += obj.file.size;
+					}
+					var cloneObj = $.extend({}, obj);
+					cloneObj.file = '';
+					fileUploadArr.push(cloneObj);
+				}
+			});
+
+			formData.append('uploadFileArr', JSON.stringify(fileUploadArr));
+			formData.append('deleteFileArr', JSON.stringify(treeModule.getDeleteFileArr()));
+		}
 
 		var apiUrl = ($('#actionType').val() === "C") ? "/user/pm/pm07/insertVacation" : "/user/pm/pm07/updateVacation";
 
@@ -1001,6 +1157,32 @@
 			} else {
 				var msg = (data && data.resultMessage) ? data.resultMessage : ((data && data.result && data.result.resultMessage) ? data.result.resultMessage : "저장 실패");
 				alert(msg);
+			}
+		});
+	}
+
+	// PC 모달 팝업 내부 삭제 기능 (단일 트랜잭션 롤백 삭제)
+	function deleteVacationInModal() {
+		var reqNo = $('#reqNo').val();
+		if (!reqNo) {
+			alert("삭제할 자료 정보가 없습니다.");
+			return;
+		}
+
+		if (!confirm("해당 휴가신청건을 삭제하시겠습니까?")) return;
+
+		var formData = {
+			"coCd"   : $('#coCd').val() || "GUN",
+			"reqNo"  : reqNo,
+			"userId" : jwt.userId,
+			"pgmId"  : "PM0701P01"
+		};
+
+		putAjax("/user/pm/pm07/deleteVacation", formData, null, function(data) {
+			alert(data.resultMessage);
+			if (data && (data.resultCode == 200 || data.resultCode == "200")) {
+				refreshParentScreens();
+				modalStack.close();
 			}
 		});
 	}
@@ -1040,9 +1222,18 @@
 			var fileParam = {
 				fileTrgtTyp : "PM0701P01",
 				fileTrgtKey : reqNo,
-				todoNo      : reqNo
+				todoNo      : reqNo,
+				comonCd     : "FITR9902"
 			};
 			treeModule.initAll('deptTreeOrdars', 'file-grid', 'FILETREE', fileParam, 'fileList_area');
+			if (typeof treeModule.setFileNodeId === 'function') {
+				treeModule.setFileNodeId("FITR9902");
+			}
+			setTimeout(function() {
+				if (typeof treeModule.selectDeptTree === 'function') {
+					treeModule.selectDeptTree("FITR9902");
+				}
+			}, 300);
 		}
 
 		// 팝업 제목 및 데이터 설정
@@ -1154,6 +1345,13 @@
 				}).hide();
 				$('.popup_area #fileList_area input[type="file"]').prop("disabled", true);
 			}
+		}
+
+		// 수정 모드의 조회 완료값을 기준으로 변경 여부를 판단한다.
+		if (actionType === 'U') {
+			setTimeout(function() {
+				editInitialSnapshot = getVacationEditSnapshot();
+			}, 700);
 		}
 
 		// 날짜 picker 초기화 (연차, 교육훈련, 경조, 포상, 하계, 대체, 병가만 From-Till 기간선택, 그 외 팝업달력 실시간 양방향 동일일자 동기화)

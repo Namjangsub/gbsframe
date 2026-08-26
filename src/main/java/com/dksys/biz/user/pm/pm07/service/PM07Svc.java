@@ -43,4 +43,6 @@ public interface PM07Svc {
 
 	int updateMngRmk(Map<String, String> paramMap);
 
+	List<Map<String, String>> selectMobileVacationFileList(Map<String, String> paramMap);
+
 }

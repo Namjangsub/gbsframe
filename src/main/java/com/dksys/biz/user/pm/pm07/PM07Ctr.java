@@ -173,4 +173,12 @@ public class PM07Ctr {
 		return "jsonView";
 	}
 
+	@PostMapping(value = "/selectMobileVacationFileList")
+	public String selectMobileVacationFileList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		List<Map<String, String>> fileList = pm07Svc.selectMobileVacationFileList(paramMap);
+		model.addAttribute("fileList", fileList);
+		model.addAttribute("resultCode", 200);
+		return "jsonView";
+	}
+
 }
