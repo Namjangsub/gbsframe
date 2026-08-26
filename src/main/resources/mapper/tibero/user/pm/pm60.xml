@@ -156,49 +156,44 @@
 	</select>
 
 	<!--
-		휴가/출장(작업일보 기반) 월간 리스트 조회 - 일일업무일지(TB_PM01M01)의 WORK_RPT_S 기준
-		- '9901'로 끝나면 휴가 (부서별 공통코드 그룹 XX9901='1.휴가' 패턴, DB 확인 완료)
-		- 'GUN6020'으로 시작하거나(생산팀 출장 세부코드), 'GUN'으로 시작하며 '9902'로 끝나면(각 부서
-		  개인업무 출장코드) 출장으로 판정 (DB 확인 완료, PM0101P01.html toggleIssueGrid()와 동일 규칙)
-		간트에 실적 바로 함께 표시.
+		휴가 월간 리스트 조회 - 휴가신청 관리(TB_PM07M01) 시작일~종료일 기준
 	-->
 	<select id="selectVacationCalendar" parameterType="Map" resultType="CamelMap">
 		SELECT
-			WORK_RPT_ID AS USER_ID,
-			TO_CHAR(WORK_RPT_DT, 'YYYYMMDD') AS WORK_RPT_DT,
-			WORK_RPT_S AS WORK_RPT_S,
-			FN_CM05M01_CD_TO_NM(WORK_RPT_S) AS WORK_RPT_S_NM,
-			WORK_RPT_RMK AS REMARK,
-			CASE WHEN WORK_RPT_S LIKE '%9901' THEN 'VACATION' ELSE 'TRIP' END AS REC_TYPE,
-			FILE_TRGT_KEY AS FILE_TRGT_KEY,
-			CO_CD AS CO_CD,
-			WORK_RPT_HOUR AS WORK_RPT_HOUR
-		FROM TB_PM01M01
-		WHERE 1 = 1
+			M.REQ_ID AS USER_ID,
+			M.ST_DT AS ST_DT,
+			M.ED_DT AS ED_DT,
+			M.ST_DT AS WORK_RPT_DT,
+			M.VAC_TYPE_CD AS WORK_RPT_S,
+			FN_CM05M01_CD_TO_NM(M.VAC_TYPE_CD) AS WORK_RPT_S_NM,
+			M.REQ_RMK AS REMARK,
+			'VACATION' AS REC_TYPE,
+			M.REQ_NO AS FILE_TRGT_KEY,
+			M.CO_CD AS CO_CD,
+			M.VAC_DAYS AS VAC_DAYS,
+			M.DEDUCT_DAYS AS DEDUCT_DAYS
+		FROM TB_PM07M01 M
+		WHERE NVL(M.SANCTN_STS, 'TEMP') NOT IN ('TEMP', 'RTN')
 		<choose>
 			<when test="attYn == 'Y'.toString()">
 				AND 1 = 0
 			</when>
 			<otherwise>
-				AND (
-					WORK_RPT_S LIKE '%9901'
-					OR WORK_RPT_S LIKE 'GUN6020%'
-					OR (WORK_RPT_S LIKE 'GUN%' AND WORK_RPT_S LIKE '%9902')
-				)
 			</otherwise>
 		</choose>
 		<choose>
 			<when test="deptId != null and deptId != ''">
-				AND WORK_RPT_ID IN (SELECT ID FROM TB_CM06M01 WHERE DEPT_ID LIKE #{deptId} || '%' AND USE_YN = 'Y')
+				AND M.REQ_ID IN (SELECT ID FROM TB_CM06M01 WHERE DEPT_ID LIKE #{deptId} || '%' AND USE_YN = 'Y')
 			</when>
 			<otherwise>
-				AND WORK_RPT_ID IN (SELECT ID FROM TB_CM06M01 WHERE DEPT_ID LIKE 'GUN60%' AND USE_YN = 'Y')
+				AND M.REQ_ID IN (SELECT ID FROM TB_CM06M01 WHERE DEPT_ID LIKE 'GUN60%' AND USE_YN = 'Y')
 			</otherwise>
 		</choose>
 		<if test="monthStDt != null and monthStDt != '' and monthEdDt != null and monthEdDt != ''">
-			AND TO_CHAR(WORK_RPT_DT, 'YYYYMMDD') BETWEEN #{monthStDt} AND #{monthEdDt}
+			AND M.ST_DT &lt;= #{monthEdDt}
+			AND M.ED_DT &gt;= #{monthStDt}
 		</if>
-		ORDER BY WORK_RPT_ID ASC, WORK_RPT_DT ASC
+		ORDER BY M.REQ_ID ASC, M.ST_DT ASC
 	</select>
 
 	<!-- 예약 단건 상세 조회 -->

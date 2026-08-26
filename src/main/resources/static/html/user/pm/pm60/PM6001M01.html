@@ -1613,9 +1613,9 @@
 								suffix: actualBarSuffix
 							});
 							var actualTooltipText = matchItem.isVacation
-								? (matchItem.tripPlace + ' (더블클릭 시 작업일보 조회)')
+								? (matchItem.tripPlace + ' (더블클릭 시 휴가신청서 상세보기)')
 								: (actualBarTitle + (matchItem.isWorkRptTrip
-									? ' (더블클릭 시 작업일보 조회)'
+									? ' (더블클릭 시 출장 상세)'
 									: (isFromReport ? ' (더블클릭 시 출장복명서 상세보기)' : ' (더블클릭 시 출장신청서 상세보기)')));
 							var dblClickAttr = isFromWorkRpt
 								? "onWorkRptBarDblClick('" + matchItem.fileTrgtKey + "', '" + matchItem.coCd + "', event)"
@@ -1712,20 +1712,19 @@
 			});
 		}
 
-		// 작업일보 기반 출장(GUN6020%, GUN%9902) 실적 바 더블클릭 시 작업일보 조회 모달(읽기전용) 오픈
+		// 휴가신청 기반 실적 바 더블클릭 시 휴가신청 상세 모달(PM0701P01.html) 오픈
 		function onWorkRptBarDblClick(fileTrgtKey, coCd, event) {
 			if (event) event.stopPropagation();
 			if (!fileTrgtKey || fileTrgtKey === 'undefined') {
 				return;
 			}
-			var paramObj = {
-				"actionType": "I",
-				"fileTrgtKey": fileTrgtKey,
-				"coCd": coCd,
-				"userId": jwt.userId,
-				"pgmId": "PM6001M01"
+			var vacParamObj = {
+				"actionType": "U",
+				"reqNo": fileTrgtKey
 			};
-			openModal("/static/html/user/pm/pm01/PM0101P01.html", 1100, 750, "", paramObj, function (data) {});
+			openModal("/static/html/user/pm/pm07/PM0701P01.html", 1100, 700, "휴가신청 상세", vacParamObj, function (data) {
+				searchData();
+			});
 		}
 
 		// ─ WB0604M01.html 방식의 드래그 고스트 바 (테이블 colspan 제약 없이 마우스를 따라 실시간으로 이동/리사이즈) ─
@@ -2203,58 +2202,48 @@
 				}
 			});
 
-			// 2. vacationList에서 해당 유저의 휴무/출장(작업일보 기반) 내역 추출
-			// 동일 일자에 작업일보가 여러 건이면 작업시간(workRptHour)이 가장 큰 1건만 표시
-			var vacByDay = {};
+			// 2. vacationList에서 해당 유저의 휴무 내역 추출 및 동일 신청서/연속 휴가 1개의 바(Bar)로 병합
+			var vacItemsMap = {};
 			$.each(vacationList, function(idx, vac) {
 				var vUserId = vac.userId || vac.workRptId || vac.USER_ID || vac.WORK_RPT_ID;
-				var vWorkDt = vac.workRptDt || vac.WORK_RPT_DT;
-				var vWorkDtStr = String(vWorkDt);
+				if (String(vUserId) !== String(userId)) return;
 
-				if (String(vUserId) === String(userId) && vWorkDtStr >= monthStDt && vWorkDtStr <= monthEdDt) {
-					var vHour = parseFloat(vac.workRptHour || vac.WORK_RPT_HOUR || 0) || 0;
-					if (!vacByDay[vWorkDtStr] || vHour > vacByDay[vWorkDtStr].hour) {
-						vacByDay[vWorkDtStr] = { vac: vac, hour: vHour };
+				var stDate = String(vac.stDt || vac.ST_DT || vac.workRptDt || vac.WORK_RPT_DT || '');
+				var edDate = String(vac.edDt || vac.ED_DT || stDate);
+
+				if (!stDate) return;
+				if (!edDate) edDate = stDate;
+
+				if (edDate >= monthStDt && stDate <= monthEdDt) {
+					var label = getVacationLabel(vac);
+					var reqNoKey = vac.fileTrgtKey || vac.FILE_TRGT_KEY || vac.reqNo || vac.REQ_NO || (label + '_' + vUserId);
+
+					if (!vacItemsMap[reqNoKey]) {
+						vacItemsMap[reqNoKey] = {
+							type: 'bar',
+							isVacation: true,
+							tripReqNo: 'VAC_' + vUserId + '_' + reqNoKey,
+							tripStDtm: stDate + '000000',
+							tripEdDtm: edDate + '235959',
+							stDate: stDate,
+							edDate: edDate,
+							tripPlace: label,
+							tripTypeName: '휴무',
+							statusName: '휴무',
+							fileTrgtKey: reqNoKey,
+							coCd: vac.coCd || vac.CO_CD
+						};
+					} else {
+						if (stDate < vacItemsMap[reqNoKey].stDate) vacItemsMap[reqNoKey].stDate = stDate;
+						if (edDate > vacItemsMap[reqNoKey].edDate) vacItemsMap[reqNoKey].edDate = edDate;
+						vacItemsMap[reqNoKey].tripStDtm = vacItemsMap[reqNoKey].stDate + '000000';
+						vacItemsMap[reqNoKey].tripEdDtm = vacItemsMap[reqNoKey].edDate + '235959';
 					}
 				}
 			});
-			$.each(vacByDay, function(vWorkDtStr, entry) {
-				var vac = entry.vac;
-				var vUserId = vac.userId || vac.workRptId || vac.USER_ID || vac.WORK_RPT_ID;
-				var recType = vac.recType || vac.REC_TYPE || 'VACATION';
 
-				if (recType === 'TRIP') {
-					items.push({
-						type: 'bar',
-						isVacation: false,
-						isWorkRptTrip: true,
-						tripReqNo: 'WRPT_' + vUserId + '_' + vWorkDtStr,
-						tripStDtm: vWorkDtStr + '000000',
-						tripEdDtm: vWorkDtStr + '235959',
-						stDate: vWorkDtStr,
-						edDate: vWorkDtStr,
-						tripPlace: getWorkRptTripLabel(vac),
-						tripTypeName: '작업일보',
-						fileTrgtKey: vac.fileTrgtKey || vac.FILE_TRGT_KEY,
-						coCd: vac.coCd || vac.CO_CD
-					});
-				} else {
-					var label = getVacationLabel(vac);
-					items.push({
-						type: 'bar',
-						isVacation: true,
-						tripReqNo: 'VAC_' + vUserId + '_' + vWorkDtStr,
-						tripStDtm: vWorkDtStr + '000000',
-						tripEdDtm: vWorkDtStr + '235959',
-						stDate: vWorkDtStr,
-						edDate: vWorkDtStr,
-						tripPlace: label,
-						tripTypeName: '휴무',
-						statusName: '휴무',
-						fileTrgtKey: vac.fileTrgtKey || vac.FILE_TRGT_KEY,
-						coCd: vac.coCd || vac.CO_CD
-					});
-				}
+			$.each(vacItemsMap, function(k, item) {
+				items.push(item);
 			});
 
 			// 시작일 오름차순, 종료일 내림차순 정렬
