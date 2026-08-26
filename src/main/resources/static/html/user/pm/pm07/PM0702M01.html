@@ -19,6 +19,7 @@
 	<link rel="stylesheet" href="/static/css/main.css" />
 	<link rel="stylesheet" href="/static/css/sub.css" />
 	<link rel="stylesheet" href="/static/css/common.css" />
+	<link rel="stylesheet" href="/static/css/vacationColorConfig.css" />
 
 	<script src="/static/js/jquery-latest.min.js"></script>
 	<script src="/static/js/jquery.serializeObject.js"></script>
@@ -42,8 +43,13 @@
 	<script src="/static/js/commApproval.js"></script>
 	<!-- 파일첨부 -->
 	<script src="/static/js/fileTree.js"></script>
+	<!-- PM07 휴가 유형 공통 색상/패턴 설정 -->
+	<script src="/static/js/vacationColorConfig.js"></script>
 
 	<style>
+		html, body {
+			overflow-y: hidden;
+		}
 		/* Google Calendar 멀티데이 트랙 캘린더 스타일 */
 		.gcal-container {
 			width: 100%;
@@ -71,7 +77,7 @@
 			position: relative;
 			display: grid;
 			grid-template-columns: repeat(7, 1fr);
-			min-height: 125px;
+			min-height: 90px;
 			border-bottom: 1px solid #dadce0;
 		}
 		.gcal-week-row:last-child {
@@ -169,6 +175,36 @@
 			color: #555;
 			margin-left: 15px;
 			font-weight: normal;
+		}
+
+		/* 마우스 호버 시 표시되는 근태 상세 팝오버 툴팁 레이어 */
+		.vacation-info-popover {
+			position: fixed;
+			z-index: 999999;
+			display: none;
+			background: #ffffff;
+			border: 1px solid #3b62b1;
+			border-radius: 6px;
+			box-shadow: 0 4px 18px rgba(0, 0, 0, 0.22);
+			padding: 10px 14px;
+			min-width: 220px;
+			max-width: 340px;
+			font-size: 12px;
+			color: #333333;
+			pointer-events: none;
+		}
+		.vacation-info-popover .popover-title {
+			font-weight: bold;
+			color: #3b62b1;
+			border-bottom: 1px solid #e9ecef;
+			padding-bottom: 5px;
+			margin-bottom: 6px;
+			font-size: 12px;
+		}
+		.vacation-info-popover .popover-item {
+			padding: 3px 0;
+			line-height: 1.4;
+			color: #444444;
 		}
 	</style>
 </head>
@@ -297,33 +333,40 @@
 <script type="text/javascript">
 	var currentCalendarData = [];
 
-	// 사람별 고유 파스텔/비비드 14색 팔레트 (구글 캘린더 톤앤매너)
-	var USER_COLOR_PALETTE = [
-		{ bg: "#1a73e8", text: "#ffffff" }, // 구글 블루
-		{ bg: "#e37400", text: "#ffffff" }, // 구글 오렌지
-		{ bg: "#1e8e3e", text: "#ffffff" }, // 구글 그린
-		{ bg: "#a142f4", text: "#ffffff" }, // 구글 퍼플
-		{ bg: "#d93025", text: "#ffffff" }, // 구글 레드
-		{ bg: "#f9ab00", text: "#ffffff" }, // 구글 옐로우
-		{ bg: "#129eaf", text: "#ffffff" }, // 구글 시안
-		{ bg: "#e52592", text: "#ffffff" }, // 구글 핑크
-		{ bg: "#616161", text: "#ffffff" }, // 구글 그레이
-		{ bg: "#185abc", text: "#ffffff" }, // 딥 블루
-		{ bg: "#b06000", text: "#ffffff" }, // 딥 오렌지
-		{ bg: "#0d652d", text: "#ffffff" }, // 딥 그린
-		{ bg: "#681da8", text: "#ffffff" }, // 딥 퍼플
-		{ bg: "#a50e0e", text: "#ffffff" }  // 딥 레드
-	];
+	// 화면 해상도 및 캘린더 주(Week) 행 수에 맞춰 수직 스크롤 생성을 철저히 방지하는 동적 높이 계산 함수
+	function adjustCalendarHeightToWindow() {
+		var $gcalBody = $('#gcalBody');
+		if ($gcalBody.length === 0) return;
 
-	// 사람 이름 기반 해시 색상 할당 함수
-	function getUserColorStyle(userName) {
-		if (!userName) return USER_COLOR_PALETTE[0];
-		var hash = 0;
-		for (var i = 0; i < userName.length; i++) {
-			hash = userName.charCodeAt(i) + ((hash << 5) - hash);
+		var winHeight = window.innerHeight || $(window).height();
+		try {
+			if (window.top && window.top.innerHeight) {
+				var topWinHeight = window.top.innerHeight;
+				if (topWinHeight > 0) winHeight = topWinHeight;
+			}
+		} catch (e) {
+			winHeight = $(window).height();
 		}
-		var index = Math.abs(hash) % USER_COLOR_PALETTE.length;
-		return USER_COLOR_PALETTE[index];
+
+		var bodyTop = $gcalBody.offset() ? $gcalBody.offset().top : 220;
+		if (!bodyTop || bodyTop < 50) bodyTop = 220;
+
+		var calcBodyHeight = winHeight - bodyTop - 25;
+		if (calcBodyHeight < 350) calcBodyHeight = 350;
+
+		$gcalBody.css({
+			'height': calcBodyHeight + 'px',
+			'overflow-y': 'auto'
+		});
+
+		var $weekRows = $gcalBody.find('.gcal-week-row');
+		var weekCount = $weekRows.length;
+		if (weekCount > 0) {
+			var eachRowHeight = Math.floor(calcBodyHeight / weekCount);
+			if (eachRowHeight >= 70) {
+				$weekRows.css('height', eachRowHeight + 'px').css('min-height', 'auto');
+			}
+		}
 	}
 
 	$(document).ready(function() {
@@ -339,6 +382,15 @@
 
 		// 초기조회
 		DataSearch();
+
+		// 초기 렌더링 완료 후 해상도 수직 맞춤 및 윈도우 리사이즈 이벤트 바인딩
+		setTimeout(function() {
+			adjustCalendarHeightToWindow();
+		}, 150);
+
+		$(window).on('resize', function() {
+			adjustCalendarHeightToWindow();
+		});
 
 		// authChk("PM0702M01");
 	});
@@ -445,8 +497,12 @@
 				var cellClass = "gcal-day-cell";
 				if (!isCurrentMonth) cellClass += " other-month";
 				if (dateStr === todayStr) cellClass += " today";
-				if (dow === 0) cellClass += " sun";
-				if (dow === 6) cellClass += " sat";
+
+				// 일요일 또는 법정/대체 공휴일인 경우 날짜 숫자를 붉은색(#d93025)으로 표출
+				var ymdCompact = currentDayMoment.format("YYYYMMDD");
+				var isRedHoliday = (typeof isRedHolidayYmd === 'function') ? isRedHolidayYmd(ymdCompact) : false;
+				if (dow === 0 || isRedHoliday) cellClass += " sun";
+				if (dow === 6 && !isRedHoliday) cellClass += " sat";
 
 				var cellHtml = '<div class="' + cellClass + '">';
 				cellHtml += '<span class="gcal-day-num">' + dayNum + '</span>';
@@ -543,7 +599,7 @@
 					var reqIdNm = item.reqIdNm || item.userNm || "신청자";
 					var vacTypeNm = item.vacTypeNm || "휴가";
 					var ampmLabel = (item.ampmNm) ? (" (" + item.ampmNm + ")") : "";
-					var userColor = getUserColorStyle(reqIdNm);
+					var typeColor = getVacationStyle(item.vacTypeCd, vacTypeNm);
 
 					var colSpan = ev.endCol - ev.startCol + 1;
 					var startGridCol = ev.startCol + 1; // 1-indexed
@@ -552,13 +608,22 @@
 					if (ev.contLeft) barCls += " cont-left";
 					if (ev.contRight) barCls += " cont-right";
 
+					var borderCss = typeColor.border ? (' border-left: 3px solid ' + typeColor.border + ';') : '';
 					var gridStyleStr = 'grid-column: ' + startGridCol + ' / span ' + colSpan + '; '
 					                 + 'grid-row: ' + (ev.level + 1) + '; '
-					                 + 'background-color: ' + userColor.bg + '; color: ' + userColor.text + ';';
+					                 + 'background-color: ' + typeColor.bg + '; color: ' + typeColor.text + ';' + borderCss;
+					if (typeColor.pattern) {
+						gridStyleStr += ' background-image: ' + typeColor.pattern + ';';
+					}
 
 					var titleText = "신청자: " + reqIdNm + "\n유형: " + vacTypeNm + ampmLabel + "\n기간: " + ev.st + " ~ " + ev.ed + "\n사유: " + (item.reqRmk || "없음");
 
-					var barHtml = '<a class="' + barCls + '" style="' + gridStyleStr + '" title="' + titleText + '" onclick="openVacationDetailModal(\'' + item.reqNo + '\');">';
+					var deptNm = item.deptNm || item.reqDeptNm || "부서미지정";
+					var barHtml = '<a class="' + barCls + '" style="' + gridStyleStr + '" title="' + titleText + '" '
+					            + 'onmouseenter="showGcalEventPopover(event, \'' + reqIdNm.replace(/'/g, "\\'") + '\', \'' + vacTypeNm.replace(/'/g, "\\'") + '\', \'' + ampmLabel.replace(/'/g, "\\'") + '\', \'' + ev.st + '\', \'' + ev.ed + '\', \'' + (item.reqRmk || '').replace(/'/g, "\\'") + '\', \'' + deptNm.replace(/'/g, "\\'") + '\');" '
+					            + 'onmousemove="moveGcalEventPopover(event);" '
+					            + 'onmouseleave="hideGcalEventPopover();" '
+					            + 'onclick="openVacationDetailModal(\'' + item.reqNo + '\');">';
 					barHtml += '<i class="fas fa-user-clock"></i> ' + reqIdNm + ' ' + vacTypeNm + ampmLabel;
 					barHtml += '</a>';
 
@@ -572,6 +637,47 @@
 				$gcalBody.append($weekRow);
 			}
 		}
+
+		adjustCalendarHeightToWindow();
+	}
+
+	// 구글 캘린더 수평 이벤트 바 마우스 호버 근태 팝오버 툴팁 함수
+	function showGcalEventPopover(e, reqIdNm, vacTypeNm, ampmLabel, st, ed, reqRmk, deptNm) {
+		var $pop = $('#vacationInfoPopover');
+		if ($pop.length === 0) {
+			$pop = $('<div id="vacationInfoPopover" class="vacation-info-popover"></div>');
+			$('body').append($pop);
+		}
+		var html = '<div class="popover-title"><i class="fas fa-user-clock" style="margin-right: 5px;"></i>' + reqIdNm + ' (' + (deptNm || "부서미지정") + ')</div>';
+		html += '<div class="popover-item"><b>휴가유형:</b> ' + vacTypeNm + ampmLabel + '</div>';
+		html += '<div class="popover-item"><b>휴가기간:</b> ' + st + ' ~ ' + ed + '</div>';
+		html += '<div class="popover-item"><b>휴가사유:</b> ' + (reqRmk || '없음') + '</div>';
+		$pop.html(html);
+
+		var mouseX = e.clientX || (e.originalEvent ? e.originalEvent.clientX : 0);
+		var mouseY = e.clientY || (e.originalEvent ? e.originalEvent.clientY : 0);
+
+		$pop.css({
+			'top': (mouseY + 15) + 'px',
+			'left': (mouseX + 15) + 'px',
+			'display': 'block'
+		});
+	}
+
+	function moveGcalEventPopover(e) {
+		var $pop = $('#vacationInfoPopover');
+		if ($pop.is(':visible')) {
+			var mouseX = e.clientX || (e.originalEvent ? e.originalEvent.clientX : 0);
+			var mouseY = e.clientY || (e.originalEvent ? e.originalEvent.clientY : 0);
+			$pop.css({
+				'top': (mouseY + 15) + 'px',
+				'left': (mouseX + 15) + 'px'
+			});
+		}
+	}
+
+	function hideGcalEventPopover() {
+		$('#vacationInfoPopover').hide();
 	}
 
 	// 검색조건 초기화

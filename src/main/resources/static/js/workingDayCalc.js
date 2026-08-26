@@ -23,6 +23,31 @@
  ********************************************
  */
 
+/**
+ * YYYYMMDD 또는 YYYY-MM-DD 날짜가 일요일이거나 법정/음력/대체 공휴일인지 판별하는 공통 헬퍼
+ */
+function isRedHolidayYmd(ymdStr) {
+	if (!ymdStr) return false;
+	var s = String(ymdStr).replace(/[^0-9]/g, '');
+	if (s.length !== 8) return false;
+
+	var y = parseInt(s.substring(0, 4), 10);
+	var m = parseInt(s.substring(4, 6), 10);
+	var d = parseInt(s.substring(6, 8), 10);
+
+	var dt = new Date(y, m - 1, d);
+	// 0: 일요일 -> 붉은색
+	if (dt.getDay() === 0) return true;
+
+	if (typeof yearHolidayTable === 'function') {
+		var hList = yearHolidayTable(y);
+		if (hList && hList.indexOf(s) >= 0) {
+			return true;
+		}
+	}
+	return false;
+}
+
 function calculateHoliday(startDate, duration=1) {
 	const endDate = "2050-12-31"				//변환가능 최대 날자
 	const chkDuration = pasIntChk(duration);	//숫자만 추출

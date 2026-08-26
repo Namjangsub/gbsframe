@@ -4189,7 +4189,7 @@ window.DateRangePicker = (function(){
     var _mx = 0, _my = 0;
     $(document).on('mousemove.globalDRP', function(e){ _mx=e.clientX; _my=e.clientY; });
 
-    var s = { startDt:null, endDt:null, minDt:null, maxDt:null,
+    var s = { startDt:null, endDt:null, minDt:null, maxDt:null, singleMode:false,
               inited:false, justOpened:false,
               onApply:null, onCancel:null, excludeSelectors:[] };
 
@@ -4214,15 +4214,43 @@ window.DateRangePicker = (function(){
         if(!$('#globalDRP').length){ $('body').append(HTML); }
     }
 
+    var _drpUpdating = false;
+
     function init(){
         if(s.inited) return;
         s.inited = true;
 
         $('#gDrpStartCal').datepicker({ format:'yyyy-mm-dd', language:'ko', todayHighlight:true })
-            .on('changeDate', function(e){ s.startDt = fmtDate(e.date); $('#gDrpStartVal').text(s.startDt||''); });
+            .on('changeDate', function(e){
+                s.startDt = fmtDate(e.date);
+                $('#gDrpStartVal').text(s.startDt||'');
+                if(!_drpUpdating && s.startDt){
+                    _drpUpdating = true;
+                    // singleMode이거나 시작일이 기존 종료일보다 이후로 변경된 경우 종료일을 시작일과 동일하게 자동 변경
+                    if(s.singleMode || (s.endDt && s.startDt > s.endDt)){
+                        s.endDt = s.startDt;
+                        $('#gDrpEndCal').datepicker('setDate', s.startDt);
+                        $('#gDrpEndVal').text(s.endDt||'');
+                    }
+                    _drpUpdating = false;
+                }
+            });
 
         $('#gDrpEndCal').datepicker({ format:'yyyy-mm-dd', language:'ko', todayHighlight:true })
-            .on('changeDate', function(e){ s.endDt = fmtDate(e.date); $('#gDrpEndVal').text(s.endDt||''); });
+            .on('changeDate', function(e){
+                s.endDt = fmtDate(e.date);
+                $('#gDrpEndVal').text(s.endDt||'');
+                if(!_drpUpdating && s.endDt){
+                    _drpUpdating = true;
+                    // singleMode이거나 종료일이 기존 시작일보다 이전으로 변경된 경우 시작일을 종료일과 동일하게 자동 변경
+                    if(s.singleMode || (s.startDt && s.endDt < s.startDt)){
+                        s.startDt = s.endDt;
+                        $('#gDrpStartCal').datepicker('setDate', s.endDt);
+                        $('#gDrpStartVal').text(s.startDt||'');
+                    }
+                    _drpUpdating = false;
+                }
+            });
 
         $('#gDrpApply').on('click', function(){
             if(!s.startDt){ alert('시작일자를 선택하세요.'); return; }
@@ -4261,6 +4289,7 @@ window.DateRangePicker = (function(){
      *   opts.endDt         {string}   initial end date
      *   opts.minDt         {string}   minimum selectable date
      *   opts.maxDt         {string}   maximum selectable date
+     *   opts.singleMode    {boolean}  if true, selecting start or end date syncs both calendars to the same date
      *   opts.px            {number}   left position (pixels); defaults to mouse X
      *   opts.py            {number}   top  position (pixels); defaults to mouse Y
      *   opts.onApply       {function} callback(startDt, endDt) on 선택완료
@@ -4276,6 +4305,7 @@ window.DateRangePicker = (function(){
         s.endDt   = opts.endDt   || null;
         s.minDt   = opts.minDt   || null;
         s.maxDt   = opts.maxDt   || null;
+        s.singleMode = !!opts.singleMode || !!opts.isSingleMode;
         s.onApply  = opts.onApply  || null;
         s.onCancel = opts.onCancel || null;
         s.excludeSelectors = opts.excludeSelectors || [];
