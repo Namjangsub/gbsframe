@@ -175,7 +175,8 @@ public class BM05SvcImpl implements BM05Svc {
 		List<Map<String, String>> uploadFileList = gsonDtl.fromJson(paramMap.get("uploadFileArr"), dtlMap);
 		if (uploadFileList != null && uploadFileList.size() > 0) {
 			param.put("jobType", "fileUp");
-			param.put("coCd", paramMap.get("coCd") != null ? paramMap.get("coCd") : "TRN");
+			// param.put("coCd", paramMap.get("coCd") != null ? paramMap.get("coCd") : "TRN");
+			param.put("coCd", "TRN");
 			cm15Svc.selectFileAuthCheck(param);
 		}
 		//---------------------------------------------------------------
@@ -192,6 +193,7 @@ public class BM05SvcImpl implements BM05Svc {
 		if (uploadFileList != null && uploadFileList.size() > 0) {
 			paramMap.put("fileTrgtTyp", paramMap.get("pgmId"));
 			paramMap.put("fileTrgtKey", paramMap.get("fileTrgtKey"));
+			paramMap.put("coCd", "TRN");  	// 자재마스터 파일첨부는 coCd TRN 고정 2026-08-27 최지상 수정
 			cm08Svc.uploadFile(paramMap, mRequest);
 		}
 		//---------------------------------------------------------------
