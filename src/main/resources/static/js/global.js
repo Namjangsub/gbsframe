@@ -1073,7 +1073,204 @@ function putAjax(url, data, contentType, callback, blockProc=true, retryCount = 
 	});
 }
 
+var heic2AnyLoader = null;
+
+function loadHeic2AnyForUpload() {
+	if (typeof window.heic2any === "function") {
+		return Promise.resolve(window.heic2any);
+	}
+	if (heic2AnyLoader) {
+		return heic2AnyLoader;
+	}
+
+	heic2AnyLoader = new Promise(function(resolve, reject) {
+		var script = document.createElement("script");
+		script.src = "/static/js/heic2any.min.js";
+		script.onload = function() {
+			if (typeof window.heic2any === "function") {
+				resolve(window.heic2any);
+			} else {
+				reject(new Error("heic2any library was loaded but is unavailable."));
+			}
+		};
+		script.onerror = function() {
+			reject(new Error("Failed to load heic2any library."));
+		};
+		document.head.appendChild(script);
+	});
+	return heic2AnyLoader;
+}
+
+function resizeHeicCompanionPng(pngBlob, maxSide, targetBytes) {
+	maxSide = maxSide || 1000;
+	targetBytes = targetBytes || (950 * 1024);
+
+	return new Promise(function(resolve, reject) {
+		var imageUrl = URL.createObjectURL(pngBlob);
+		var image = new Image();
+
+		image.onload = function() {
+			URL.revokeObjectURL(imageUrl);
+
+			var sourceWidth = image.naturalWidth || image.width;
+			var sourceHeight = image.naturalHeight || image.height;
+			var sourceLongSide = Math.max(sourceWidth, sourceHeight);
+			if (!sourceWidth || !sourceHeight) {
+				reject(new Error("Converted PNG has invalid dimensions."));
+				return;
+			}
+
+			if (sourceLongSide <= maxSide && pngBlob.size <= targetBytes) {
+				resolve(pngBlob);
+				return;
+			}
+
+			var initialScale = Math.min(1, maxSide / sourceLongSide);
+			var initialWidth = Math.max(1, Math.round(sourceWidth * initialScale));
+			var initialHeight = Math.max(1, Math.round(sourceHeight * initialScale));
+
+			function renderPng(width, height) {
+				var canvas = document.createElement("canvas");
+				canvas.width = width;
+				canvas.height = height;
+
+				var context = canvas.getContext("2d");
+				if (!context) {
+					reject(new Error("Canvas is unavailable for HEIC resize."));
+					return;
+				}
+
+				context.fillStyle = "#ffffff";
+				context.fillRect(0, 0, width, height);
+				context.drawImage(image, 0, 0, width, height);
+
+				canvas.toBlob(function(resizedBlob) {
+					if (!resizedBlob || resizedBlob.size === 0) {
+						reject(new Error("HEIC companion PNG resize returned an empty result."));
+						return;
+					}
+
+					var longSide = Math.max(width, height);
+					if (resizedBlob.size <= targetBytes || longSide <= 400) {
+						resolve(resizedBlob);
+						return;
+					}
+
+					var estimatedScale = Math.sqrt(targetBytes / resizedBlob.size) * 0.95;
+					var nextScale = Math.min(0.9, Math.max(0.7, estimatedScale));
+					var nextWidth = Math.max(1, Math.floor(width * nextScale));
+					var nextHeight = Math.max(1, Math.floor(height * nextScale));
+
+					if (nextWidth === width && nextHeight === height) {
+						resolve(resizedBlob);
+						return;
+					}
+					renderPng(nextWidth, nextHeight);
+				}, "image/png");
+			}
+
+			renderPng(initialWidth, initialHeight);
+		};
+
+		image.onerror = function() {
+			URL.revokeObjectURL(imageUrl);
+			reject(new Error("Converted PNG could not be loaded for resize."));
+		};
+
+		image.src = imageUrl;
+	});
+}
+
+function prepareHeicCompanionFiles(formData) {
+	if (typeof FormData === "undefined" || !(formData instanceof FormData)) {
+		return Promise.resolve(formData);
+	}
+	if (typeof formData.forEach !== "function") {
+		return Promise.reject(new Error("This browser does not support HEIC multipart preprocessing."));
+	}
+
+	var heicFiles = [];
+	var existingPngCounts = {};
+	formData.forEach(function(value, fieldName) {
+		if (typeof File === "undefined" || !(value instanceof File) || !value.name) {
+			return;
+		}
+		if (fieldName === "heicPngFiles") {
+			var existingName = value.name.toLowerCase();
+			existingPngCounts[existingName] = (existingPngCounts[existingName] || 0) + 1;
+			return;
+		}
+		if (/\.(heic|heif)$/i.test(value.name)) {
+			heicFiles.push(value);
+		}
+	});
+
+	if (heicFiles.length === 0) {
+		return Promise.resolve(formData);
+	}
+
+	return loadHeic2AnyForUpload().then(function(convert) {
+		var sequence = Promise.resolve();
+		heicFiles.forEach(function(heicFile) {
+			sequence = sequence.then(function() {
+				var pngName = heicFile.name.replace(/\.(heic|heif)$/i, ".png");
+				var key = pngName.toLowerCase();
+				if (existingPngCounts[key] > 0) {
+					existingPngCounts[key]--;
+					return;
+				}
+				return convert({ blob: heicFile, toType: "image/png" }).then(function(result) {
+					var pngBlob = Array.isArray(result) ? result[0] : result;
+					if (!(pngBlob instanceof Blob) || pngBlob.size === 0) {
+						throw new Error("HEIC to PNG conversion returned an empty result: " + heicFile.name);
+					}
+					// 보고서 출력용 PNG는 긴 변 1000px, 약 950KB 이하로 축소한다.
+					return resizeHeicCompanionPng(pngBlob, 1000, 950 * 1024);
+				}).then(function(resizedPngBlob) {
+					formData.append("heicPngFiles", resizedPngBlob, pngName);
+				});
+			});
+		});
+		return sequence.then(function() { return formData; });
+	});
+}
+
+function handleHeicUploadFailure(error, blockProc) {
+	if (typeof $.blockUI === "function" && blockProc) openProgress(false);
+	console.error("HEIC conversion failed:", error);
+	var message = "HEIC 파일을 PNG로 변환하지 못했습니다. 파일을 확인한 후 다시 시도해 주세요.";
+	if (typeof customAlert === "function") {
+		customAlert(message);
+	} else {
+		alert(message);
+	}
+}
+
 function filePostAjax(url, data, callback, blockProc=true, retryCount = 0) {
+	prepareHeicCompanionFiles(data).then(function(preparedData) {
+		_filePostAjaxPrepared(url, preparedData, callback, blockProc, retryCount);
+	}).catch(function(error) {
+		handleHeicUploadFailure(error, blockProc);
+	});
+}
+
+function filePostAjaxButton(url, data, callback, blockProc=true, retryCount = 0) {
+	prepareHeicCompanionFiles(data).then(function(preparedData) {
+		_filePostAjaxButtonPrepared(url, preparedData, callback, blockProc, retryCount);
+	}).catch(function(error) {
+		handleHeicUploadFailure(error, blockProc);
+	});
+}
+
+function filePutAjax(url, data, callback, blockProc=true, retryCount = 0) {
+	prepareHeicCompanionFiles(data).then(function(preparedData) {
+		_filePutAjaxPrepared(url, preparedData, callback, blockProc, retryCount);
+	}).catch(function(error) {
+		handleHeicUploadFailure(error, blockProc);
+	});
+}
+
+function _filePostAjaxPrepared(url, data, callback, blockProc=true, retryCount = 0) {
 	if (typeof $.blockUI === 'function' && blockProc) openProgress(true);
 	$.ajax({
 //		enctype: 'multipart/form-data',
@@ -1112,7 +1309,7 @@ function filePostAjax(url, data, callback, blockProc=true, retryCount = 0) {
 	});
 }
 
-function filePostAjaxButton(url, data, callback, blockProc=true, retryCount = 0) {
+function _filePostAjaxButtonPrepared(url, data, callback, blockProc=true, retryCount = 0) {
 	if (typeof $.blockUI === 'function' && blockProc) openProgress(true);
 
 	$.ajax({
@@ -1152,7 +1349,7 @@ function filePostAjaxButton(url, data, callback, blockProc=true, retryCount = 0)
 	});
 }
 
-function filePutAjax(url, data, callback, blockProc=true, retryCount = 0) {
+function _filePutAjaxPrepared(url, data, callback, blockProc=true, retryCount = 0) {
 	if (typeof $.blockUI === 'function' && blockProc) openProgress(true);
 	$.ajax({
 //		enctype: 'multipart/form-data',

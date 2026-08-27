@@ -159,6 +159,7 @@ public class CM08SvcImpl implements CM08Svc {
         int savedCount = 0;
         List<File> written = new ArrayList<>();
         List<String> insertedFileKeys = new ArrayList<>();
+        List<MultipartFile> heicPngFiles = new ArrayList<>(mRequest.getFiles("heicPngFiles"));
         try {
             Files.createDirectories(dir);
 
@@ -204,6 +205,12 @@ public class CM08SvcImpl implements CM08Svc {
                 File target = new File(dirForDb, saveFile);
                 mf.transferTo(target);
                 written.add(target);
+
+                if (isHeicFile(safeFileName)) {
+                    String pngFileName = saveFile.replaceAll("(?i)\\.(heic|heif)$", ".png");
+                    File pngTarget = new File(dirForDb, pngFileName);
+                    saveRequiredCompanionPng(safeFileName, pngTarget, heicPngFiles, written);
+                }
                 savedCount++;
             }
         } catch (Exception e) {
@@ -254,6 +261,7 @@ public class CM08SvcImpl implements CM08Svc {
 	        int savedCount = 0;
 	        List<File> written = new ArrayList<>();
 	        List<String> insertedFileKeys = new ArrayList<>();
+	        List<MultipartFile> heicPngFiles = new ArrayList<>(mRequest.getFiles("heicPngFiles"));
 	        try {
 	            Files.createDirectories(dir);
 	            for (MultipartFile mf : fileList) {
@@ -299,6 +307,12 @@ public class CM08SvcImpl implements CM08Svc {
 	                File target = new File(dirForDb, saveFile);
 	                mf.transferTo(target);
 	                written.add(target);
+
+	                if (isHeicFile(safeFileName)) {
+	                    String pngFileName = saveFile.replaceAll("(?i)\\.(heic|heif)$", ".png");
+	                    File pngTarget = new File(dirForDb, pngFileName);
+	                    saveRequiredCompanionPng(safeFileName, pngTarget, heicPngFiles, written);
+	                }
 	                savedCount++;
 	                paramMap.put("fileKey", fileKey);
 	            }
@@ -347,6 +361,7 @@ public class CM08SvcImpl implements CM08Svc {
 
         int savedCount = 0;
         List<File> written = new ArrayList<>();
+        List<MultipartFile> heicPngFiles = new ArrayList<>(mRequest.getFiles("heicPngFiles"));
         try {
             Files.createDirectories(dir);
             for (int i = 0; i < fileList.size(); i++) {
@@ -381,6 +396,11 @@ public class CM08SvcImpl implements CM08Svc {
                 File target = new File(dirForDb, saveFile);
                 mf.transferTo(target);
                 written.add(target);
+                if (isHeicFile(safeFileName)) {
+                    File pngTarget = new File(dirForDb,
+                            saveFile.replaceAll("(?i)\\.(heic|heif)$", ".png"));
+                    saveRequiredCompanionPng(safeFileName, pngTarget, heicPngFiles, written);
+                }
                 savedCount++;
             }
         } catch (Exception e) {
@@ -472,6 +492,18 @@ public class CM08SvcImpl implements CM08Svc {
             File targetFile = new File(destDirForDb, saveFile);
             Files.copy(sourceFile.toPath(), targetFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
             written.add(targetFile);
+            if (isHeicFile(safeFileName)) {
+                String sourcePngName = safeSourceFileKey + "_"
+                        + safeFileName.replaceAll("(?i)\\.(heic|heif)$", ".png");
+                Path sourcePngPath = sourceDir.resolve(sourcePngName).normalize();
+                if (!sourcePngPath.startsWith(sourceDir) || !Files.isRegularFile(sourcePngPath)) {
+                    throw new FileStorageException("Companion PNG file not found for HEIC: " + safeFileName);
+                }
+                File targetPng = new File(destDirForDb,
+                        nowFileKey + "_" + safeFileName.replaceAll("(?i)\\.(heic|heif)$", ".png"));
+                Files.copy(sourcePngPath, targetPng.toPath(), StandardCopyOption.REPLACE_EXISTING);
+                written.add(targetPng);
+            }
             copiedCount++;
             i++;
         }
@@ -572,6 +604,13 @@ public class CM08SvcImpl implements CM08Svc {
         try {
             File f = new File(filePath);
             f.delete();
+            if (fileInfo.get("fileName") != null && isHeicFile(fileInfo.get("fileName"))) {
+                String pngFilePath = filePath.replaceAll("(?i)\\.(heic|heif)$", ".png");
+                File pngFile = new File(pngFilePath);
+                if (pngFile.exists()) {
+                    pngFile.delete();
+                }
+            }
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -637,6 +676,13 @@ public class CM08SvcImpl implements CM08Svc {
         try {
             File f = new File(filePath);
             f.delete();
+            if (fileInfo.get("fileName") != null && isHeicFile(fileInfo.get("fileName"))) {
+                String pngFilePath = filePath.replaceAll("(?i)\\.(heic|heif)$", ".png");
+                File pngFile = new File(pngFilePath);
+                if (pngFile.exists()) {
+                    pngFile.delete();
+                }
+            }
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -975,6 +1021,55 @@ public class CM08SvcImpl implements CM08Svc {
 	        s = s.substring(0, 180);
 	    }
 	    return s;
+	}
+
+	private static boolean isHeicFile(String fileName) {
+	    if (fileName == null) return false;
+	    String lower = fileName.trim().toLowerCase();
+	    return lower.endsWith(".heic") || lower.endsWith(".heif");
+	}
+
+	private static void saveRequiredCompanionPng(String heicFileName,
+	                                             File pngTarget,
+	                                             List<MultipartFile> heicPngFiles,
+	                                             List<File> written) throws IOException {
+	    String expectedPngName = heicFileName.replaceAll("(?i)\\.(heic|heif)$", ".png");
+	    for (int i = 0; i < heicPngFiles.size(); i++) {
+	        MultipartFile pngFile = heicPngFiles.get(i);
+	        if (pngFile == null || pngFile.isEmpty()) {
+	            continue;
+	        }
+	        String uploadedName = sanitizeFilename(pngFile.getOriginalFilename());
+	        if (!expectedPngName.equalsIgnoreCase(uploadedName)) {
+	            continue;
+	        }
+	        if (!hasPngSignature(pngFile)) {
+	            throw new FileStorageException("Invalid companion PNG for HEIC: " + heicFileName);
+	        }
+
+	        heicPngFiles.remove(i);
+	        written.add(pngTarget);
+	        pngFile.transferTo(pngTarget);
+	        logger.info("[HEIC Upload] Companion PNG saved: {}", pngTarget.getAbsolutePath());
+	        return;
+	    }
+	    throw new FileStorageException("Companion PNG is required for HEIC: " + heicFileName);
+	}
+
+	private static boolean hasPngSignature(MultipartFile file) throws IOException {
+	    final byte[] expected = new byte[] {
+	            (byte) 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A
+	    };
+	    byte[] actual = new byte[expected.length];
+	    int offset = 0;
+	    try (java.io.InputStream in = file.getInputStream()) {
+	        while (offset < actual.length) {
+	            int count = in.read(actual, offset, actual.length - offset);
+	            if (count < 0) break;
+	            offset += count;
+	        }
+	    }
+	    return offset == expected.length && Arrays.equals(expected, actual);
 	}
 
 	private static String extractFileExtension(String fileName) {
