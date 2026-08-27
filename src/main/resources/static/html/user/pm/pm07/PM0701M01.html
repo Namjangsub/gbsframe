@@ -142,7 +142,7 @@
 					<a onclick="openVacationModal();" style="height: 30px; line-height: 28px; width: 85px;" authchk><i class="fas fa-pen"></i> 신청등록</a>
 					<a onclick="deleteVacation();" style="height: 30px; line-height: 28px; width: 65px;" authchk><i class="fas fa-trash"></i> 삭 제</a>
 					<a onclick="excelDown();" style="height: 30px; line-height: 28px; width: 90px;"><i class="fas fa-file-excel"></i> 엑셀다운로드</a>
-					<a onclick="openAnnualGrantModal();" style="height: 30px; line-height: 28px; width: 105px;" authchk><i class="fas fa-user-cog"></i> 연차현황</a>
+					<a id="btnAnnualGrant" onclick="openAnnualGrantModal();" style="height: 30px; line-height: 28px; width: 105px;" authchk><i class="fas fa-user-cog"></i> 연차현황</a>
 					<a href="/static/html/user/pm/pm07/PM0702M01.html" style="height: 30px; line-height: 28px; width: 85px; background:#3182ce; color:#fff;" title="달력 화면으로 이동"><i class="fas fa-calendar-alt"></i> 달력보기</a>
 					<a onclick="openGridColumnConfig();" style="height: 30px; line-height: 28px; width: 90px;"><i class="fas fa-cog"></i> 그리드설정</a>
 				</div>
@@ -269,17 +269,22 @@
 		});
 	}
 
-	// 근태관리 담당자 전용 권한 체크 함수 (SPECRTS18 공통코드 등록 사번 순수 동적 검증)
+	// 근태관리 담당자 및 시스템 관리자(AUTH999) 전용 권한 체크 함수 (SPECRTS18 공통코드 등록 사번 + AUTH999 시스템 관리자 검증)
 	function isMngUser() {
 		var isMng = false;
 		if (jwt && jwt.userId) {
+			var curId = String(jwt.userId).toLowerCase();
+			// 시스템 관리자(AUTH999 또는 admin 계정) 우대
+			if (curId === 'admin' || (jwt.authCd && jwt.authCd === 'AUTH999')) {
+				return true;
+			}
 			postAjaxSync("/admin/cm/cm05/selectChildCodeList", { "codeId": "SPECRTS18" }, null, function(data) {
 				var list = (data && data.childCodeList) ? data.childCodeList : [];
 				if (list.length > 0) {
 					var codeEtc = list[0].codeEtc || '';
 					if (codeEtc) {
 						var idList = codeEtc.split(',').map(function(id) { return $.trim(id).toLowerCase(); });
-						if (idList.indexOf(String(jwt.userId).toLowerCase()) >= 0) {
+						if (idList.indexOf(curId) >= 0) {
 							isMng = true;
 						}
 					}
@@ -293,8 +298,13 @@
 		initView : function() {
 			adjustGridHeight();
 
-			// 근태담당자 권한이 있는 경우에만 근태담당자사유(mngRmk) 편집 허용
+			// 근태담당자 권한이 있는 경우에만 연차현황 버튼 및 근태담당자사유(mngRmk) 편집 허용
 			var isMng = isMngUser();
+			if (!isMng) {
+				$('#btnAnnualGrant').hide();
+			} else {
+				$('#btnAnnualGrant').show();
+			}
 			defaultColumns.forEach(function(col) {
 				if (col.key === "mngRmk") {
 					col.editor = isMng ? {type: "text"} : false;
@@ -563,8 +573,12 @@
 		});
 	}
 
-	// 연차부여 (사원·연도별) 내역 전체 입력/수정/조회 관리 모달 오픈
+	// 연차부여 (사원·연도별) 내역 전체 입력/수정/조회 관리 모달 오픈 (SPECRTS18 근태업무 담당자 및 시스템 관리자 AUTH999 전용)
 	function openAnnualGrantModal() {
+		if (!isMngUser()) {
+			alert("근태업무 담당자(SPECRTS18)만 실행할 수 있습니다.");
+			return;
+		}
 		var paramObj = {
 			"coCd": "GUN",
 			"yy": moment().format("YYYY")

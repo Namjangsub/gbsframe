@@ -22,6 +22,24 @@
 	color: #333333;
 	pointer-events: auto;
 }
+/* 연차부여 내역 3개 휴가 그룹별 구분을 위한 그리드 수직 경계 테두리선 강화 */
+[data-ax5grid="grantGrid"] .ax5grid-panel-scroll-col[data-ax5grid-column-attr="col-grantDays"],
+[data-ax5grid="grantGrid"] .ax5grid-header-column[data-ax5grid-column-attr="col-grantDays"] {
+	border-left: 2px solid #337ab7 !important;
+}
+[data-ax5grid="grantGrid"] .ax5grid-panel-scroll-col[data-ax5grid-column-attr="col-workSubstDays"],
+[data-ax5grid="grantGrid"] .ax5grid-header-column[data-ax5grid-column-attr="col-workSubstDays"] {
+	border-left: 2px solid #5cb85c !important;
+}
+[data-ax5grid="grantGrid"] .ax5grid-panel-scroll-col[data-ax5grid-column-attr="col-summerVacDays"],
+[data-ax5grid="grantGrid"] .ax5grid-header-column[data-ax5grid-column-attr="col-summerVacDays"] {
+	border-left: 2px solid #f0ad4e !important;
+}
+[data-ax5grid="grantGrid"] .ax5grid-panel-scroll-col[data-ax5grid-column-attr="col-rmk"],
+[data-ax5grid="grantGrid"] .ax5grid-header-column[data-ax5grid-column-attr="col-rmk"] {
+	border-left: 2px solid #bbb !important;
+}
+
 /* 입사일 기준 자동재계산/수정된 변경 행 분홍색 배경 시각적 극대화 오버라이딩 */
 .grid-cell-pink,
 .grid-cell-pink td,
@@ -65,11 +83,10 @@
 
 	<!-- 연차지급 산정기준 안내 박스 -->
 	<div style="background-color: #f8f9fa; border: 1px solid #e9ecef; border-left: 4px solid #337ab7; padding: 8px 12px; margin: 5px 0 10px 0; font-size: 12px; line-height: 1.5; color: #333;">
-		<span style="font-weight: bold; color: #337ab7;"><i class="fas fa-info-circle"></i> 연차지급 산정기준 안내 (매년 1월 1일 회계연도 산정기준)</span>
+		<span style="font-weight: bold; color: #337ab7;"><i class="fas fa-info-circle"></i> 연차지급 산정기준 안내 (고용노동부 근로기준법 제60조 회계연도 부여 지침)</span>
 		<ul style="margin: 3px 0 0 15px; padding: 0; list-style-type: disc; color: #555;">
-			<li><strong>당해연도 입사자:</strong> 비례 산정 (15일 × 잔여근무월수 / 12) &nbsp;/&nbsp; <strong>1년 이상 ~ 3년 미만:</strong> 기본 15일 부여</li>
-			<li><strong>3년 이상 근무자:</strong> 최초 1년 초과 매 2년에 1일 가산 (15일 + Math.floor((근속년수 - 1) / 2), 최대 25일)</li>
-			<li style="color: #d9534f; font-weight: bold; list-style-type: none; margin-left: -15px; margin-top: 2px;">※ 임원실, 실적관리용 부서는 자동계산 대상에서 제외됨</li>
+			<li><strong>입사 첫해 (1년차):</strong> 1개월 개근 시 다음달 1일 1개씩 개별 생성 (최대 11개) , <strong>입사 2년차 1월 1일:</strong> 노동부 회계연도 비례 부여 [ 15일 × (전년도 재직일수 / 365), 0.5일 단위 정밀산정 ]</li>
+			<li><strong>2년~3년차 1월 1일:</strong> 매년 1월 1일 기본 15일 일괄 부여 , <strong>4년차 이상 1월 1일:</strong> 최초 1년 초과 매 2년마다 1일 가산 [ 15일 + Math.floor((근속년수 - 1) / 2), 한도 25일 ]</li>
 		</ul>
 	</div>
 
@@ -77,10 +94,12 @@
 	<div class="popup_table">
 		<table class="table_input">
 			<colgroup>
-				<col width="12%">
-				<col width="30%">
-				<col width="12%">
-				<col width="46%">
+				<col width="10%">
+				<col width="22%">
+				<col width="10%">
+				<col width="34%">
+				<col width="10%">
+				<col width="14%">
 			</colgroup>
 			<tr>
 				<th>부여연도</th>
@@ -96,6 +115,13 @@
 						<input type="text" id="userNm" name="userNm" class="form-control input-sm" placeholder="사원 검색" onkeyup="(event.keyCode == 8 || event.keyCode == 46) ? userId.value = '' : event.keyCode == 13 ? searchGrantGrid() : '';">
 						<a onclick="openSearchUserModal();"><i class="i_search_w"></i></a>
 					</div>
+				</td>
+				<th>퇴사자구분</th>
+				<td>
+					<select id="includeLeaveYn" name="includeLeaveYn" class="form-control input-sm" style="width: 110px;" onchange="searchGrantGrid();">
+						<option value="N" selected>퇴사자제외</option>
+						<option value="Y">퇴사자포함</option>
+					</select>
 				</td>
 			</tr>
 		</table>
@@ -140,13 +166,47 @@
 		return val;
 	};
 
-	// 사용일수 시각적 포맷터 (0일 때 공백, 사용일수가 있을 때 파란색+돋보기 아이콘 표출)
+	// 1. 년차휴가 사용일수 전용 포맷터
 	ax5.ui.grid.formatter["usedDaysInfoFormatter"] = function () {
 		var val = this.value;
 		if (val === null || val === undefined || val === "" || Number(val) === 0) {
 			return "";
 		}
-		return '<span class="used-days-info-trigger" style="cursor: pointer; color: #337ab7; font-weight: bold;" title="마우스 호버/클릭 시 상세 휴가신청 내역 표출">' + val + ' <i class="fas fa-search-plus" style="font-size: 10px; color: #5bc0de;"></i></span>';
+		return '<span class="used-days-info-trigger" data-colkey="usedDays" style="cursor: pointer; color: #337ab7; font-weight: bold;">' + val + ' <i class="fas fa-search-plus" style="font-size: 10px; color: #5bc0de;"></i></span>';
+	};
+
+	// 2. 근무대체 사용일수 전용 포맷터
+	ax5.ui.grid.formatter["workSubstUsedDaysInfoFormatter"] = function () {
+		var val = this.value;
+		if (val === null || val === undefined || val === "" || Number(val) === 0) {
+			return "";
+		}
+		return '<span class="used-days-info-trigger" data-colkey="workSubstUsedDays" style="cursor: pointer; color: #337ab7; font-weight: bold;">' + val + ' <i class="fas fa-search-plus" style="font-size: 10px; color: #5bc0de;"></i></span>';
+	};
+
+	// 3. 하계휴가대체 사용일수 전용 포맷터
+	ax5.ui.grid.formatter["summerVacUsedDaysInfoFormatter"] = function () {
+		var val = this.value;
+		if (val === null || val === undefined || val === "" || Number(val) === 0) {
+			return "";
+		}
+		return '<span class="used-days-info-trigger" data-colkey="summerVacUsedDays" style="cursor: pointer; color: #337ab7; font-weight: bold;">' + val + ' <i class="fas fa-search-plus" style="font-size: 10px; color: #5bc0de;"></i></span>';
+	};
+
+	// 잔여일수 시각적 포맷터 (0일 때 공백, 음수(마이너스)일 때 붉은색 강조 표출)
+	ax5.ui.grid.formatter["balanceDaysFormatter"] = function () {
+		var val = this.value;
+		if (val === null || val === undefined || val === "") {
+			return "";
+		}
+		var num = Number(val);
+		if (isNaN(num) || num === 0) {
+			return "";
+		}
+		if (num < 0) {
+			return '<span style="color: #d9534f; font-weight: bold;">' + val + '</span>';
+		}
+		return val;
 	};
 
 	// 조회연도 셀렉트박스 동적 옵션 생성 (기준연도 : 2025년 ~ 현재+1년)
@@ -192,8 +252,8 @@
 					},
 					onClick : function() {
 						this.self.select(this.dindex);
-						if (this.column.key === "usedDays") {
-							showVacationPopover($(this.element), this.item);
+						if (this.column.key === "usedDays" || this.column.key === "workSubstUsedDays" || this.column.key === "summerVacUsedDays") {
+							showVacationPopover($(this.element), this.item, this.column.key);
 						}
 					},
 					onDBLClick : function() {
@@ -211,31 +271,77 @@
 						// 데이터가 하나라도 수정되면 저장 버튼을 시인성 높게 주황색(#f0ad4e)으로 강조 표시
 						markGrantGridDirty(true);
 
-						// 부여일수(grantDays)가 수정되면 잔여일수(balanceDays = grantDays - usedDays) 자동 재계산 및 포커스 이탈 스타일 정리
+						// 년차휴가, 근무대체, 하계휴가대체 각각의 발생일수 수정 시 독립 잔여일수 자동 재계산
 						if (this.key === "grantDays" || this.key === "usedDays") {
-							var numVal = Number(String(this.item.grantDays || 0).replace(/[^0-9.]/g, ''));
-							if (isNaN(numVal)) numVal = 0;
+							var g = Number(String(this.item.grantDays || 0).replace(/[^0-9.]/g, ''));
+							if (isNaN(g)) g = 0;
 							var u = Number(this.item.usedDays || 0);
-							this.self.setValue(this.dindex, "grantDays", numVal);
-							this.self.setValue(this.dindex, "balanceDays", numVal - u);
+							this.self.setValue(this.dindex, "grantDays", g);
+							this.self.setValue(this.dindex, "balanceDays", g - u);
+						}
+						if (this.key === "workSubstDays" || this.key === "workSubstUsedDays") {
+							var ws = Number(String(this.item.workSubstDays || 0).replace(/[^0-9.]/g, ''));
+							if (isNaN(ws)) ws = 0;
+							var wsu = Number(this.item.workSubstUsedDays || 0);
+							this.self.setValue(this.dindex, "workSubstDays", ws);
+							this.self.setValue(this.dindex, "workSubstBalanceDays", ws - wsu);
+						}
+						if (this.key === "summerVacDays" || this.key === "summerVacUsedDays") {
+							var sv = Number(String(this.item.summerVacDays || 0).replace(/[^0-9.]/g, ''));
+							if (isNaN(sv)) sv = 0;
+							var svu = Number(this.item.summerVacUsedDays || 0);
+							this.self.setValue(this.dindex, "summerVacDays", sv);
+							this.self.setValue(this.dindex, "summerVacBalanceDays", sv - svu);
 						}
 					}
 				},
 				page : {
 					display : false
 				},
+				header: {
+					align : "center",
+					columnHeight: 28
+				},
 				columns : [
-					 {key: "coCd",        label: "회사코드", width:  50, align: "center", hidden: true}
-					,{key: "yy",          label: "부여연도", width:  90, align: "center", hidden: true}
-					,{key: "userId",      label: "사원ID(더블클릭)", width: 110, align: "center", hidden: true}
-					,{key: "deptNm",      label: "부서",     width: 140, align: "left"}
-					,{key: "userNm",      label: "성명",     width: 110, align: "center"}
-					,{key: "enterDt",     label: "입사일자", width: 110, align: "center"}
-					,{key: "leaveDt",     label: "퇴사일자", width: 110, align: "center"}
-					,{key: "grantDays",   label: "부여일수", width: 100, align: "center", editor: {type: "text"}, formatter: "zeroEmptyFormatter"}
-					,{key: "usedDays",    label: "사용일수", width: 100, align: "center", formatter: "usedDaysInfoFormatter"}
-					,{key: "balanceDays", label: "잔여일수", width: 100, align: "center", formatter: "zeroEmptyFormatter"}
-					,{key: "rmk",         label: "비고",     width: 320, align: "left", editor: {type: "text"}}
+					 {key: "coCd",                 label: "회사코드", width:  50, align: "center", hidden: true}
+					,{key: "yy",                   label: "부여연도", width:  90, align: "center", hidden: true}
+					,{key: "userId",               label: "사원ID(더블클릭)", width: 110, align: "center", hidden: true}
+					,{key: "deptNm",               label: "부서",     width: 100, align: "left"}
+					,{key: "userNm",               label: "성명",     width:  70, align: "center"}
+					,{key: "enterDt",              label: "입사일자", width:  95, align: "center"}
+					,{key: "leaveDt",              label: "퇴사일자", width:  95, align: "center"}
+
+					/* 년차휴가 그룹 */
+					,{
+						label: "년차휴가 일수",
+						columns: [
+							 {key: "grantDays",            label: "발생", width:  65, align: "center", editor: {type: "text"}, formatter: "zeroEmptyFormatter"}
+							,{key: "usedDays",             label: "사용", width:  65, align: "center", formatter: "usedDaysInfoFormatter"}
+							,{key: "balanceDays",          label: "잔여", width:  65, align: "center", formatter: "balanceDaysFormatter"}
+						]
+					}
+
+					/* 근무대체휴가 그룹 */
+					,{
+						label: "근무대체 일수",
+						columns: [
+							 {key: "workSubstDays",        label: "발생", width:  65, align: "center", editor: {type: "text"}, formatter: "zeroEmptyFormatter"}
+							,{key: "workSubstUsedDays",    label: "사용", width:  65, align: "center", formatter: "workSubstUsedDaysInfoFormatter"}
+							,{key: "workSubstBalanceDays", label: "잔여", width:  65, align: "center", formatter: "balanceDaysFormatter"}
+						]
+					}
+
+					/* 하계휴가대체 그룹 */
+					,{
+						label: "하계휴가대체 일수",
+						columns: [
+							 {key: "summerVacDays",        label: "발생", width:  65, align: "center", editor: {type: "text"}, formatter: "zeroEmptyFormatter"}
+							,{key: "summerVacUsedDays",    label: "사용", width:  65, align: "center", formatter: "summerVacUsedDaysInfoFormatter"}
+							,{key: "summerVacBalanceDays", label: "잔여", width:  65, align: "center", formatter: "balanceDaysFormatter"}
+						]
+					}
+
+					,{key: "rmk",                  label: "비고",     width: "*", align: "left", editor: {type: "text"}}
 				]
 			});
 			return this;
@@ -257,8 +363,25 @@
 
 	var VACATION_POPOVER_TIMER = null;
 
+	// 사용일수 마우스 호버 이벤트 바인딩 (그리드 셀 내 호버 시 colKey 기반 즉시 표출)
+	$(document).off('mouseenter', '.used-days-info-trigger').on('mouseenter', '.used-days-info-trigger', function() {
+		var $el = $(this);
+		var colKey = $el.attr('data-colkey') || "";
+		var $row = $el.closest('[data-ax5grid-tr-index], [data-ax5grid-data-index], [data-ax5grid-index]');
+		var dindex = $row.attr('data-ax5grid-tr-index') || $row.attr('data-ax5grid-data-index') || $row.attr('data-ax5grid-index');
+
+		if (typeof dindex !== 'undefined' && grantGridView && grantGridView.target) {
+			var item = grantGridView.target.list[dindex];
+			if (item) {
+				showVacationPopover($el, item, colKey);
+			}
+		}
+	}).off('mouseleave', '.used-days-info-trigger').on('mouseleave', '.used-days-info-trigger', function() {
+		hideVacationPopover();
+	});
+
 	// 사용일수 마우스 호버 시 휴가신청일자 및 유형 팝오버 툴팁 표출 함수 (WB0701M01 메모 팝오버 패턴)
-	function showVacationPopover($el, item) {
+	function showVacationPopover($el, item, colKey) {
 		if (VACATION_POPOVER_TIMER) {
 			clearTimeout(VACATION_POPOVER_TIMER);
 			VACATION_POPOVER_TIMER = null;
@@ -287,26 +410,47 @@
 
 		$('#popUserNm').text(item.userNm || '사원');
 
-		var infoText = item.vacInfoList || '';
+		var infoText = "";
+		if (colKey === "workSubstUsedDays") {
+			infoText = item.vacWorkSubstInfoList || "";
+		} else if (colKey === "summerVacUsedDays") {
+			infoText = item.vacSummerInfoList || "";
+		} else if (colKey === "usedDays") {
+			// 연차 사용 칸은 연차/반차 전용 목록만 표시하고 전체 휴가 목록은 사용하지 않는다.
+			infoText = item.vacAnnualInfoList || "";
+		} else {
+			infoText = item.vacInfoList || "";
+		}
+
 		var htmlStr = '';
 		var validCount = 0;
 
 		if (infoText) {
 			var items = infoText.split(';');
 			$.each(items, function(i, val) {
-				var trimmedVal = $.trim(val);
-				if (trimmedVal) {
-					// 년차, 연차, 반차(오전반차/오후반차 등) 관련 항목만 선택 필터링
-					if (trimmedVal.indexOf("연차") >= 0 || trimmedVal.indexOf("년차") >= 0 || trimmedVal.indexOf("반차") >= 0 || trimmedVal.indexOf("오전") >= 0 || trimmedVal.indexOf("오후") >= 0) {
-						htmlStr += '<div class="popover-item"><i class="fas fa-check-circle" style="color: #337ab7; margin-right: 5px;"></i> ' + trimmedVal + '</div>';
-						validCount++;
-					}
+				var rawVal = $.trim(val);
+				// 데이터 형식: "YYYY-MM-DD[~MM-DD] (휴가종류 N일)" - 휴가종류는 괄호 안에 있음
+				var dateMatch = rawVal.match(/^([0-9]{4}-[0-9]{2}-[0-9]{2}(?:~[0-9]{2}-[0-9]{2})?)/);
+				var dateText = dateMatch ? dateMatch[1] : '';
+				var typeMatch = rawVal.match(/\(([^)]*)\)/);
+				var typeText = typeMatch ? $.trim(typeMatch[1].replace(/\s+[0-9]+(?:\.5)?일\s*$/, '')) : '';
+				var trimmedVal = $.trim(typeText + ' ' + dateText);
+				// 연차 사용 칸에는 연차/반차만 표시하고 조퇴 등 근태 항목은 제외한다.
+				var isAnnualItem = colKey !== "usedDays" || /연차|반차/.test(trimmedVal);
+				if (trimmedVal && isAnnualItem) {
+					htmlStr += '<div class="popover-item"><i class="fas fa-check-circle" style="color: #337ab7; margin-right: 5px;"></i> ' + trimmedVal + '</div>';
+					validCount++;
 				}
 			});
 		}
 
 		if (validCount === 0) {
-			htmlStr = '<div class="popover-item" style="color: #888888;">등록된 연차/반차 상세 신청 이력이 없습니다.</div>';
+			var emptyMsg = "등록된 상세 신청 이력이 없습니다.";
+			if (colKey === "workSubstUsedDays") emptyMsg = "등록된 근무대체 신청 이력이 없습니다.";
+			else if (colKey === "summerVacUsedDays") emptyMsg = "등록된 하계휴가대체 신청 이력이 없습니다.";
+			else if (colKey === "usedDays") emptyMsg = "등록된 연차/반차 상세 신청 이력이 없습니다.";
+
+			htmlStr = '<div class="popover-item" style="color: #888888;">' + emptyMsg + '</div>';
 		}
 
 		$('#popContent').html(htmlStr);
@@ -336,16 +480,18 @@
 		$('#vacationInfoPopover').hide();
 	}
 
-	// 그리드 셀 마우스 호버/클릭 이벤트 바인딩 (사용일수 usedDays 호버 팝오버)
-	$(document).off('mouseenter mouseleave click', '.used-days-info-trigger, [data-ax5grid="grantGrid"] [data-ax5grid-column-key="usedDays"]');
+	// 그리드 사용일수 글자 마우스 호버/클릭 이벤트 (used-days-info-trigger 전용 복원)
+	$(document).off('mouseenter mouseleave click', '.used-days-info-trigger');
 	$(document).on({
 		mouseenter: function(e) {
 			var $el = $(this);
-			var $tr = $el.closest('[data-ax5grid-data-index]');
-			var rowIdx = $tr.attr('data-ax5grid-data-index');
-			if (rowIdx !== undefined && grantGridView.target.list && grantGridView.target.list[rowIdx]) {
+			var colKey = $el.attr('data-colkey') || '';
+			var $row = $el.closest('[data-ax5grid-tr-index], [data-ax5grid-data-index], [data-ax5grid-index]');
+			var rowIdx = $row.attr('data-ax5grid-tr-index') || $row.attr('data-ax5grid-data-index') || $row.attr('data-ax5grid-index');
+
+			if (rowIdx !== undefined && grantGridView && grantGridView.target && grantGridView.target.list && grantGridView.target.list[rowIdx]) {
 				var item = grantGridView.target.list[rowIdx];
-				showVacationPopover($el, item);
+				showVacationPopover($el, item, colKey);
 			}
 		},
 		mouseleave: function(e) {
@@ -354,14 +500,16 @@
 		click: function(e) {
 			e.stopPropagation();
 			var $el = $(this);
-			var $tr = $el.closest('[data-ax5grid-data-index]');
-			var rowIdx = $tr.attr('data-ax5grid-data-index');
-			if (rowIdx !== undefined && grantGridView.target.list && grantGridView.target.list[rowIdx]) {
+			var colKey = $el.attr('data-colkey') || '';
+			var $row = $el.closest('[data-ax5grid-tr-index], [data-ax5grid-data-index], [data-ax5grid-index]');
+			var rowIdx = $row.attr('data-ax5grid-tr-index') || $row.attr('data-ax5grid-data-index') || $row.attr('data-ax5grid-index');
+
+			if (rowIdx !== undefined && grantGridView && grantGridView.target && grantGridView.target.list && grantGridView.target.list[rowIdx]) {
 				var item = grantGridView.target.list[rowIdx];
-				showVacationPopover($el, item);
+				showVacationPopover($el, item, colKey);
 			}
 		}
-	}, '.used-days-info-trigger, [data-ax5grid="grantGrid"] [data-ax5grid-column-key="usedDays"]');
+	}, '.used-days-info-trigger');
 
 	// 그리드 데이터 수정/추가/삭제 감지 시 저장 버튼 주황색(#f0ad4e) 강조 스타일 제어 함수
 	function markGrantGridDirty(isDirty) {
@@ -390,10 +538,11 @@
 	// 연차부여 내역 조회
 	function searchGrantGrid() {
 		var formData = {
-			"coCd"        : "GUN",
-			"yy"          : $('#yy').val(),
-			"userId"      : $('#userId').val(),
-			"searchValue" : $('#userNm').val()
+			"coCd"           : "GUN",
+			"yy"             : $('#yy').val(),
+			"userId"         : $('#userId').val(),
+			"searchValue"    : $('#userNm').val(),
+			"includeLeaveYn" : $('#includeLeaveYn').val() || "N"
 		};
 		postAjax("/user/pm/pm07/selectAnnualGrantList", formData, null, function(data) {
 			deleteGrantList = [];
@@ -412,7 +561,7 @@
 		return str;
 	}
 
-	// 매년 1월 1일 기준 회계연도 연차지급 산정 수식
+	// 고용노동부 근로기준법 제60조 회계연도 연차유급휴가 산정 수식 (매년 1월 1일 일괄 부여)
 	function calculateAnnualGrantDaysJS(enterDtStr, targetYy) {
 		if (!enterDtStr) return 15;
 		var cleanDt = String(enterDtStr).replace(/[^0-9]/g, '');
@@ -426,23 +575,36 @@
 			return 0; // 미래 입사자
 		}
 
-		var diffYears = targetYear - enterYear;
+		var diffYears = targetYear - enterYear; // 회계연도 기준 근속년수
+
 		if (diffYears === 0) {
-			// 당해연도 입사자: 매년 1월 1일 회계연도 비례 산정 (15일 * 잔여근무월수 / 12)
-			var workMonths = 12 - enterMonth + 1;
-			var propDays = Math.round((15 * workMonths) / 12);
-			return Math.max(propDays, 1);
+			// 당해연도 입사자: 해당 연도 중에는 1개월 개근 시 1일씩 생성 (최대 11일)
+			return 0;
+		} else if (diffYears === 1) {
+			// 입사 2년차 (1년 미만 근무 후 맞이하는 첫 1월 1일): 고용노동부 회계연도 비례 산정 (15일 * 전년도 근무일수 / 365)
+			var prevYearEndMom = moment([enterYear, 11, 31]);
+			var enterMom = moment(cleanDt, "YYYYMMDD");
+			if (!enterMom.isValid()) {
+				var workMonths = 12 - enterMonth + 1;
+				return Math.round((15 * workMonths) / 12 * 2) / 2;
+			}
+			var workDays = prevYearEndMom.diff(enterMom, 'days') + 1;
+			workDays = Math.max(workDays, 1);
+			// 노동부 행정해석: 15일 * (근무일수 / 365일) ➔ 0.5일 단위 정밀 반올림 산정
+			var propDays = (15 * workDays) / 365;
+			var roundedDays = Math.round(propDays * 2) / 2;
+			return Math.max(roundedDays, 0.5);
 		} else if (diffYears < 3) {
-			// 1년 이상 ~ 3년 미만: 기본 15일
+			// 1년 이상 ~ 3년 미만 (2~3년차 1월 1일): 기본 15일 부여
 			return 15;
 		} else {
-			// 3년 이상: 2년마다 1일 가산 (15 + Math.floor((diffYears - 1) / 2)), 최대 25일
+			// 3년 이상 근속자 (4년차 이상 1월 1일): 고용노동부 가산연차 (15일 + Math.floor((근속년수 - 1) / 2), 최대 25일)
 			var addDays = Math.floor((diffYears - 1) / 2);
 			return Math.min(15 + addDays, 25);
 		}
 	}
 
-	// 개인별 입사일 기준 연차 재계산 (변경이 있는 행만 수정 및 분홍색 마킹)
+	// 개인별 1월 1일 회계연도 기준 연차 재계산 (변경이 있는 행만 수정 및 분홍색 마킹)
 	function calcAutoGrantAll() {
 		var curYy = $('#yy').val();
 		if (!curYy) {
@@ -455,7 +617,7 @@
 		var addedCount = 0;
 		var existUserMap = {};
 
-		// 1. 현재 그리드에 조회되어 있는 기존 사원들 입사일 기준 재계산하여 변경된 행만 수정
+		// 1. 현재 그리드에 조회되어 있는 기존 사원들 1월 1일 회계연도 기준 재계산하여 변경된 행만 수정
 		$.each(gridList, function(dindex, item) {
 			if (item.userId) {
 				existUserMap[item.userId] = true;
@@ -464,7 +626,7 @@
 					var calcDays = calculateAnnualGrantDaysJS(enterDt, curYy);
 					var oldGrantDays = Number(item.grantDays || 0);
 
-					// 입사일 기준 재계산된 부여일수가 기존 부여일수와 다른 경우에만 수정 적용
+					// 1월 1일 회계연도 기준 재계산된 부여일수가 기존 부여일수와 다른 경우에만 수정 적용
 					if (calcDays !== oldGrantDays) {
 						var usedDays = Number(item.usedDays || 0);
 						var newBal = calcDays - usedDays;
@@ -473,7 +635,7 @@
 						grantGridView.target.setValue(dindex, "grantDays", calcDays);
 						grantGridView.target.setValue(dindex, "balanceDays", newBal);
 						grantGridView.target.setValue(dindex, "autoYn", "Y");
-						grantGridView.target.setValue(dindex, "rmk", "입사일 기준 자동재계산 변경");
+						grantGridView.target.setValue(dindex, "rmk", "1월 1일 기준 자동재계산 변경");
 
 						item.__status = (item.creatId || item.creatDttm) ? "U" : "C";
 						item.isAutoAdded = true;
@@ -486,8 +648,9 @@
 
 		// 2. 미등록 근무 사원 백엔드 API 조회 후 추가
 		var paramObj = {
-			"coCd" : "GUN",
-			"yy"   : curYy
+			"coCd"           : "GUN",
+			"yy"             : curYy,
+			"includeLeaveYn" : $('#includeLeaveYn').val() || "N"
 		};
 
 		postAjax("/user/pm/pm07/selectAutoCalcAnnualGrantList", paramObj, null, function(data) {
@@ -512,7 +675,7 @@
 							usedDays    : Number(item.usedDays || 0),
 							balanceDays : gDays - Number(item.usedDays || 0),
 							autoYn      : "Y",
-							rmk         : item.rmk || "입사일 기준 자동계산 신규",
+							rmk         : item.rmk || "1월 1일 기준 자동계산 신규",
 							__status    : "C",
 							isAutoAdded : true
 						}, "last");
@@ -525,9 +688,9 @@
 			if (updatedCount > 0 || addedCount > 0) {
 				grantGridView.target.repaint(); // 분홍색 배경 즉시 렌더링
 				markGrantGridDirty(true);
-				alert("입사일 기준 재계산 완료: 수정 " + updatedCount + "건, 신규추가 " + addedCount + "건이 반영되었습니다.\n(수정/변경 행은 분홍색 배경으로 표시됩니다.)");
+				alert("1월 1일 회계연도 기준 재계산 완료: 수정 " + updatedCount + "건, 신규추가 " + addedCount + "건이 반영되었습니다.\n(수정/변경 행은 분홍색 배경으로 표시됩니다.)");
 			} else {
-				alert("입사일 기준 재계산 결과, 변경할 사항이 없습니다.");
+				alert("1월 1일 회계연도 기준 재계산 결과, 변경할 사항이 없습니다.");
 			}
 		});
 	}
@@ -536,18 +699,24 @@
 	function addGrantRow() {
 		var curYy = $('#yy').val() || moment().format("YYYY");
 		grantGridView.target.addRow({
-			coCd        : "GUN",
-			yy          : curYy,
-			userId      : "",
-			userNm      : "",
-			deptNm      : "",
-			grantDays   : 15,
-			usedDays    : 0,
-			balanceDays : 15,
-			autoYn      : "N",
-			rmk         : "수동 추가",
-			__status    : "C",
-			isManualAdded : true
+			coCd                  : "GUN",
+			yy                    : curYy,
+			userId                : "",
+			userNm                : "",
+			deptNm                : "",
+			grantDays             : 15,
+			usedDays              : 0,
+			balanceDays           : 15,
+			workSubstDays         : 0,
+			workSubstUsedDays     : 0,
+			workSubstBalanceDays  : 0,
+			summerVacDays         : 0,
+			summerVacUsedDays     : 0,
+			summerVacBalanceDays  : 0,
+			autoYn                : "N",
+			rmk                   : "수동 추가",
+			__status              : "C",
+			isManualAdded         : true
 		}, "last");
 		grantGridView.target.repaint();
 		markGrantGridDirty(true);
