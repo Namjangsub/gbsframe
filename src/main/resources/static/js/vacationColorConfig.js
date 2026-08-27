@@ -19,7 +19,8 @@ var VACATION_TYPE_STYLE_MAP = {
 	"PM07TYPE10": { cd: "PM07TYPE10", nm: "재택근무",     bg: "#ccfbf1", text: "#0f766e", border: "#2dd4bf", pattern: "", cls: "card-PM07TYPE10" }, // 재택근무: 은은한 민트 세이지 + 다크 세이지
 	"PM07TYPE11": { cd: "PM07TYPE11", nm: "대체휴가",     bg: "#fee2e2", text: "#991b1b", border: "#f87171", pattern: "repeating-linear-gradient(135deg, rgba(153,27,27,0.15) 0 4px, transparent 4px 10px)", cls: "card-PM07TYPE11" }, // 대체휴가: 버건디 틴트 + 줄무늬
 	"PM07TYPE12": { cd: "PM07TYPE12", nm: "대체휴가반차", bg: "#ffe4e6", text: "#9f1239", border: "#fb7185", pattern: "", cls: "card-PM07TYPE12" }, // 대체휴가반차: 부드러운 페일 코랄 틴트 + 다크 코랄
-	"PM07TYPE13": { cd: "PM07TYPE13", nm: "병가무급",     bg: "#f3f4f6", text: "#374151", border: "#9ca3af", pattern: "", cls: "card-PM07TYPE13" }  // 병가무급: 은은한 쿨그레이 + 다크 그레이
+	"PM07TYPE13": { cd: "PM07TYPE13", nm: "병가무급",     bg: "#f3f4f6", text: "#374151", border: "#9ca3af", pattern: "", cls: "card-PM07TYPE13" }, // 병가무급: 은은한 쿨그레이 + 다크 그레이
+	"PM07TYPE14": { cd: "PM07TYPE14", nm: "지각",         bg: "#e0e7ff", text: "#3730a3", border: "#6366f1", pattern: "", cls: "card-PM07TYPE14" }  // 지각: 소프트 인디고 틴트 + 다크 인디고
 };
 
 /**
@@ -42,5 +43,6 @@ function getVacationStyle(vacTypeCd, vacTypeNm) {
 	if (name.indexOf("재택") >= 0) return VACATION_TYPE_STYLE_MAP["PM07TYPE10"];
 	if (name.indexOf("대체") >= 0) return VACATION_TYPE_STYLE_MAP["PM07TYPE11"];
 	if (name.indexOf("병가") >= 0) return VACATION_TYPE_STYLE_MAP["PM07TYPE13"];
+	if (name.indexOf("지각") >= 0) return VACATION_TYPE_STYLE_MAP["PM07TYPE14"];
 	return VACATION_TYPE_STYLE_MAP["PM07TYPE01"]; // 기본 연차
 }

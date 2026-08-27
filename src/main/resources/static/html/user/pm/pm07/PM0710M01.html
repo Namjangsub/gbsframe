@@ -460,11 +460,11 @@
 						<div class="desc" id="desc-PM07TYPE02">/2</div>
 					</div>
 
-					<!-- b6: 조퇴(생산) -->
+					<!-- b6: 조퇴(생산직) -->
 					<div class="stat-tile card-PM07TYPE03">
 						<div class="stat-tile-header">
 							<div class="stat-tile-color color-PM07TYPE03"></div>
-							<div class="label">조퇴(생산)</div>
+							<div class="label">조퇴(생산직)</div>
 						</div>
 						<div class="value" id="stat-PM07TYPE03-prod">0</div>
 						<div class="desc">건</div>
@@ -480,11 +480,11 @@
 						<div class="desc">건</div>
 					</div>
 
-					<!-- b8: 외출(생산) -->
+					<!-- b8: 외출(생산직) -->
 					<div class="stat-tile card-PM07TYPE04">
 						<div class="stat-tile-header">
 							<div class="stat-tile-color color-PM07TYPE04"></div>
-							<div class="label">외출(생산)</div>
+							<div class="label">외출(생산직)</div>
 						</div>
 						<div class="value" id="stat-PM07TYPE04-prod">0</div>
 						<div class="desc">건</div>
@@ -550,16 +550,6 @@
 						<div class="desc">건</div>
 					</div>
 
-					<!-- b15: 재택근무 -->
-					<div class="stat-tile card-PM07TYPE10">
-						<div class="stat-tile-header">
-							<div class="stat-tile-color color-PM07TYPE10"></div>
-							<div class="label">재택근무</div>
-						</div>
-						<div class="value" id="stat-PM07TYPE10">0</div>
-						<div class="desc">건</div>
-					</div>
-
 					<!-- b16: 대체휴가 -->
 					<div class="stat-tile card-PM07TYPE11">
 						<div class="stat-tile-header">
@@ -590,13 +580,23 @@
 						<div class="desc">건</div>
 					</div>
 
-					<!-- b19: 지연출근(생산) - 플레이스홀더, 향후 데이터소스 추가 예정 -->
-					<div class="stat-tile card-delayed">
+					<!-- b19: 지각(생산직) -->
+					<div class="stat-tile card-PM07TYPE14">
 						<div class="stat-tile-header">
-							<div class="stat-tile-color" style="background:#cccccc;"></div>
-							<div class="label">지연출근(생산)</div>
+							<div class="stat-tile-color color-PM07TYPE14"></div>
+							<div class="label">지각(생산직)</div>
 						</div>
-						<div class="value" id="stat-delayed">0</div>
+						<div class="value" id="stat-PM07TYPE14-prod">0</div>
+						<div class="desc">건</div>
+					</div>
+
+					<!-- b20: 지각(사무직) -->
+					<div class="stat-tile card-PM07TYPE14">
+						<div class="stat-tile-header">
+							<div class="stat-tile-color color-PM07TYPE14"></div>
+							<div class="label">지각(사무직)</div>
+						</div>
+						<div class="value" id="stat-PM07TYPE14-office">0</div>
 						<div class="desc">건</div>
 					</div>
 				</div>
@@ -816,10 +816,11 @@
 			"PM07TYPE07": 0,   // 포상휴가 - 건수
 			"PM07TYPE08": 0,   // 포상휴가반차 - 건수
 			"PM07TYPE09": 0,   // 하계휴가 - 건수
-			"PM07TYPE10": 0,   // 재택근무 - 건수
 			"PM07TYPE11": 0,   // 대체휴가 - 건수
 			"PM07TYPE12": 0,   // 대체휴가반차 - 건수
-			"PM07TYPE13": 0    // 병가 - 건수
+			"PM07TYPE13": 0,   // 병가 - 건수
+			"PM07TYPE14-prod": 0, // 지각(생산) - 건수
+			"PM07TYPE14-office": 0 // 지각(사무) - 건수
 		};
 
 		// 통계 타일 호버 팝업용: 각 타일 키에 해당하는 원본 레코드 목록
@@ -874,9 +875,6 @@
 			} else if (typeCode === "PM07TYPE09") {
 				stats.PM07TYPE09 += 1;
 				recordsByKey.PM07TYPE09.push(vac);
-			} else if (typeCode === "PM07TYPE10") {
-				stats.PM07TYPE10 += 1;
-				recordsByKey.PM07TYPE10.push(vac);
 			} else if (typeCode === "PM07TYPE11") {
 				stats.PM07TYPE11 += 1;
 				recordsByKey.PM07TYPE11.push(vac);
@@ -886,16 +884,23 @@
 			} else if (typeCode === "PM07TYPE13") {
 				stats.PM07TYPE13 += 1;
 				recordsByKey.PM07TYPE13.push(vac);
+			} else if (typeCode === "PM07TYPE14") {
+				// 지각: 생산/사무 구분
+				if (isProduction) {
+					stats["PM07TYPE14-prod"] += 1;
+					recordsByKey["PM07TYPE14-prod"].push(vac);
+				} else {
+					stats["PM07TYPE14-office"] += 1;
+					recordsByKey["PM07TYPE14-office"].push(vac);
+				}
 			}
 		});
 
 		// 근무일수 계산용 비근무 합계(일수)
-		// 대상 유형(11개, 사용자 확정): 연차(01)/반차(02)/교육훈련(05)/경조휴가(06)/포상휴가(07)/포상휴가반차(08)/
-		//   하계휴가(09)/재택근무(10)/대체휴가(11)/대체휴가반차(12)/병가(13) - 조퇴(03)/외출(04)은 시간단위라 제외
-		// 일수 필드: 반차계열(02,08,12)은 VAC_DAYS가 항상 1.0(달력상 하루)으로 저장되고 실제 반차 0.5는 DEDUCT_DAYS에만
-		//   있으므로 DEDUCT_DAYS 사용, 나머지 8개 유형은 VAC_DAYS(신청일수) 사용 (PM0701P01.html:368-397 저장 로직 참고)
+		// 대상 유형: 연차(01)/반차(02)/교육훈련(05)/경조휴가(06)/포상휴가(07)/포상휴가반차(08)/
+		//   하계휴가(09)/대체휴가(11)/대체휴가반차(12)/병가(13) - 조퇴(03)/외출(04)/지각(14)은 시간단위라 제외
 		var HALF_DAY_TYPE_CODES = ["PM07TYPE02", "PM07TYPE08", "PM07TYPE12"];
-		var VAC_DAYS_TYPE_CODES = ["PM07TYPE01", "PM07TYPE05", "PM07TYPE06", "PM07TYPE07", "PM07TYPE09", "PM07TYPE10", "PM07TYPE11", "PM07TYPE13"];
+		var VAC_DAYS_TYPE_CODES = ["PM07TYPE01", "PM07TYPE05", "PM07TYPE06", "PM07TYPE07", "PM07TYPE09", "PM07TYPE11", "PM07TYPE13"];
 		var totalDeductDays = 0;
 		vacationList.forEach(function(vac) {
 			if (HALF_DAY_TYPE_CODES.indexOf(vac.vacTypeCd) !== -1) {
@@ -905,10 +910,10 @@
 			}
 		});
 
-		// 휴가합계 타일 표시값 = 휴가신청서 전체 건수(유형/일수 무관하게 신청서 건수 그대로 카운트)
+		// 휴가합계 타일 표시값 = 휴가신청서 전체 건수
 		var totalVacCount = vacationList.length;
 
-		// 근무 일수 계산 (비근무 합계 기준으로 산정, 휴가합계 타일 표시값과는 별개)
+		// 근무 일수 계산 (비근무 합계 기준으로 산정)
 		var result = calculateHolidayCnt(
 			moment(year + "-01-01", "YYYY-MM-DD"),
 			moment(year + "-12-31", "YYYY-MM-DD")
@@ -934,23 +939,24 @@
 		var stats = result.stats;
 		var recordsByKey = result.recordsByKey;
 
-		// { 값 표시할 엘리먼트 id, 팝업 제목, recordsByKey 키 } 목록으로 값 표시 + 호버 팝업 바인딩을 한 번에 처리
+		// { 값 표시할 엘리먼트 id, 팝업 제목, recordsByKey 키 } 목록으로 값 표시 + 호버 팝업 바인딩
 		var tileDefs = [
 			{ id: 'stat-PM07TYPE01', title: '연차휴가', key: 'PM07TYPE01' },
 			{ id: 'stat-PM07TYPE02', title: '연차휴가(반)', key: 'PM07TYPE02' },
-			{ id: 'stat-PM07TYPE03-prod', title: '조퇴(생산)', key: 'PM07TYPE03-prod' },
+			{ id: 'stat-PM07TYPE03-prod', title: '조퇴(생산직)', key: 'PM07TYPE03-prod' },
 			{ id: 'stat-PM07TYPE03-office', title: '조퇴(사무직)', key: 'PM07TYPE03-office' },
-			{ id: 'stat-PM07TYPE04-prod', title: '외출(생산)', key: 'PM07TYPE04-prod' },
+			{ id: 'stat-PM07TYPE04-prod', title: '외출(생산직)', key: 'PM07TYPE04-prod' },
 			{ id: 'stat-PM07TYPE04-office', title: '외출(사무직)', key: 'PM07TYPE04-office' },
 			{ id: 'stat-PM07TYPE05', title: '교육훈련', key: 'PM07TYPE05' },
 			{ id: 'stat-PM07TYPE06', title: '경조휴가', key: 'PM07TYPE06' },
 			{ id: 'stat-PM07TYPE07', title: '포상휴가', key: 'PM07TYPE07' },
 			{ id: 'stat-PM07TYPE08', title: '포상휴가(반)', key: 'PM07TYPE08' },
 			{ id: 'stat-PM07TYPE09', title: '하계휴가(대체)', key: 'PM07TYPE09' },
-			{ id: 'stat-PM07TYPE10', title: '재택근무', key: 'PM07TYPE10' },
 			{ id: 'stat-PM07TYPE11', title: '대체휴가', key: 'PM07TYPE11' },
 			{ id: 'stat-PM07TYPE12', title: '대체휴가(반차)', key: 'PM07TYPE12' },
-			{ id: 'stat-PM07TYPE13', title: '병가(무급)', key: 'PM07TYPE13' }
+			{ id: 'stat-PM07TYPE13', title: '병가(무급)', key: 'PM07TYPE13' },
+			{ id: 'stat-PM07TYPE14-prod', title: '지각(생산직)', key: 'PM07TYPE14-prod' },
+			{ id: 'stat-PM07TYPE14-office', title: '지각(사무직)', key: 'PM07TYPE14-office' }
 		];
 
 		tileDefs.forEach(function(def) {
@@ -961,10 +967,6 @@
 		});
 
 		$('#desc-PM07TYPE01').text('일');
-
-		// 지연출근: 플레이스홀더 (항상 0, 대응 코드/데이터 없음)
-		$('#stat-delayed').text('0');
-		bindStatTileHover($('#stat-delayed').closest('.stat-tile'), '지연출근(생산)', [], '대응하는 근태 코드/데이터가 아직 없어 항상 0으로 표시됩니다.');
 	}
 
 	/**
