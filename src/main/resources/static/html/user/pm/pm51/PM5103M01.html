@@ -135,7 +135,7 @@
 		/* 수평 이벤트 트랙 레이어 (구글 캘린더 핵심) */
 		.gcal-events-layer {
 			position: absolute;
-			top: 32px;
+			top: 24px;
 			left: 0;
 			right: 0;
 			bottom: 4px;
@@ -143,13 +143,17 @@
 			grid-template-columns: repeat(7, 1fr);
 			grid-auto-rows: 22px;
 			row-gap: 3px;
+			column-gap: 0px;
+			padding: 0 2px;
 			pointer-events: none;
+			box-sizing: border-box;
 		}
 		.gcal-event-bar {
 			pointer-events: auto;
 			height: 22px;
 			line-height: 20px;
-			padding: 0 8px;
+			padding: 0 6px;
+			margin: 0 2px;
 			font-size: 11px;
 			font-weight: 600;
 			border-radius: 4px;
@@ -164,8 +168,8 @@
 			box-sizing: border-box;
 			display: flex;
 			align-items: center;
-			justify-content: center;
-			text-align: center;
+			justify-content: flex-start;
+			text-align: left;
 			gap: 4px;
 		}
 		.gcal-event-bar:hover {
@@ -181,6 +185,81 @@
 		.gcal-event-bar.cont-right {
 			border-top-right-radius: 0;
 			border-bottom-right-radius: 0;
+		}
+
+		/* 맨 앞으로 가져오기 (Bring to Front) 하이라이트 스타일 */
+		.gcal-event-bar.active-front {
+			z-index: 50 !important;
+			box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45) !important;
+			transform: scale(1.02);
+			filter: brightness(1.08);
+			border: 2px solid #1a73e8 !important;
+		}
+
+		/* 겹치는 간트바/출장바 선택 팝오버 (WB0701M01 100% 동일 디자인) */
+		#ganttOverlapPicker {
+			position: fixed;
+			z-index: 10000;
+			background: #ffffff;
+			border: 1px solid #d1d5db;
+			border-radius: 12px;
+			box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.2), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+			padding: 12px 14px;
+			width: 320px;
+			max-height: 360px;
+			overflow-y: auto;
+			display: none;
+			font-family: inherit;
+		}
+		#ganttOverlapPicker .title {
+			font-size: 13px;
+			font-weight: 800;
+			color: #111827;
+			margin-bottom: 10px;
+			display: flex;
+			justify-content: space-between;
+			align-items: center;
+		}
+		#ganttOverlapPicker .title .hint {
+			font-size: 11px;
+			font-weight: 600;
+			color: #6b7280;
+		}
+		#ganttOverlapPicker .list .item {
+			display: flex;
+			align-items: flex-start;
+			gap: 10px;
+			padding: 8px 10px;
+			border-radius: 8px;
+			margin-bottom: 6px;
+			cursor: pointer;
+			transition: background-color 0.15s ease;
+		}
+		#ganttOverlapPicker .list .item:hover {
+			background-color: #f3f4f6;
+		}
+		#ganttOverlapPicker .list .swatch {
+			width: 14px;
+			height: 14px;
+			border-radius: 4px;
+			flex-shrink: 0;
+			margin-top: 2px;
+		}
+		#ganttOverlapPicker .list .meta {
+			display: flex;
+			flex-direction: column;
+		}
+		#ganttOverlapPicker .list .nm {
+			font-weight: 800;
+			font-size: 12px;
+			color: #111827;
+			line-height: 1.3;
+		}
+		#ganttOverlapPicker .list .dt {
+			font-size: 11px;
+			color: #4b5563;
+			font-weight: 600;
+			margin-top: 2px;
 		}
 
 		/* 범주 (Legend) */
@@ -216,12 +295,12 @@
 			<div class="">
 				<table class="table_input type04">
 					<tr>
-						<th class="hit">신청기간</th>
+						<th class="hit">조회년월</th>
 						<td>
-							<div class="date_input" style="display:flex;align-items:center;gap:0px;">
-								<input id="srchStDt_S" name="srchStDt_S" class="input_calendar" onkeyup="dateMask(this);" autocomplete="off" msg="시작일자" data-search="srchStDt" placeholder="시작일자">
-								<span>~</span>
-								<input id="srchEdDt_S" name="srchEdDt_S" class="input_calendar" onkeyup="dateMask(this);" autocomplete="off" msg="종료일자" data-search="srchEdDt" placeholder="종료일자">
+							<div style="display:flex;align-items:center;gap:3px;">
+								<select id="yy_S" name="yy_S" data-search="yy" style="width:75px; height:24px; padding:0 2px;" onchange="DataSearch();"></select>
+								<select id="mm_S" name="mm_S" data-search="mm" style="width:58px; height:24px; padding:0 2px;" onchange="DataSearch();"></select>
+								<button type="button" class="btn btn-primary btn-xs" onclick="goToday();">오늘</button>
 							</div>
 						</td>
 
@@ -305,6 +384,15 @@
 			</div>
 		</div>
 	</div>
+
+	<!-- 겹치는 출장바 선택 팝오버 툴팁 (WB0701M01 동일) -->
+	<div id="ganttOverlapPicker">
+		<div class="title">
+			<span>겹치는 출장바 선택</span>
+			<span class="hint">(클릭하여 선택)</span>
+		</div>
+		<div class="list"></div>
+	</div>
 </body>
 </html>
 
@@ -348,28 +436,8 @@
 
 		$('#coCd_S').val(jwt.coCd || "GUN");
 
-		// 시작일/종료일 셋팅 (기본 1개월: 당월 초일부터 당월 말일까지)
-		$('#srchStDt_S').val(moment(new Date()).startOf("month").format("YYYY-MM-DD"));
-		$('#srchEdDt_S').val(moment(new Date()).endOf("month").format("YYYY-MM-DD"));
-
-		// 날짜 범위 선택기
-		$('#srchStDt_S, #srchEdDt_S').on('click', function () {
-			DateRangePicker.open({
-				startDt: $('#srchStDt_S').val() || null,
-				endDt: $('#srchEdDt_S').val() || null,
-				excludeSelectors: ['#srchStDt_S', '#srchEdDt_S'],
-				onApply: function (sd, ed) {
-					$('#srchStDt_S').val(sd);
-					$('#srchEdDt_S').val(ed);
-					DataSearch();
-				}
-			});
-		});
-
-		// 검색조건 변경 시 자동 검색
-		$('[data-search]').on("change", function () {
-			DataSearch();
-		});
+		// 년/월 셀렉트박스 옵션 생성
+		initYearMonthCombo();
 
 		// 초기조회
 		DataSearch();
@@ -393,31 +461,153 @@
 			}, 350); // 350ms 동안 연속 휠 요청 폭주 방지
 		});
 
-		// authChk("PM5103M01");
+		authChk("PM5103M01");
+
+		// 팝오버 외 바깥 영역 클릭 시 팝오버 툴팁 닫기
+		$(document).on('click mousedown', function(e) {
+			if (!$(e.target).closest('#ganttOverlapPicker, .gcal-event-bar, .gcal-more-btn').length) {
+				hideOverlapPicker();
+			}
+		});
 	});
+
+	// 특정 출장 바를 맨 앞으로 가져오기 (Bring to Front: z-index: 50 하이라이트)
+	function bringTripBarToFront(targetReqNo) {
+		$('.gcal-event-bar').removeClass('active-front').css('z-index', '');
+		if (!targetReqNo) return;
+
+		var $targetBar = $('.gcal-event-bar[data-reqno="' + targetReqNo + '"]');
+		if ($targetBar.length > 0) {
+			$targetBar.addClass('active-front').css('z-index', 50);
+		}
+	}
+
+	// 겹치는 출장바 선택 팝오버 툴팁 닫기
+	function hideOverlapPicker() {
+		$('#ganttOverlapPicker').hide();
+	}
+
+	// 클릭한 일자(YMD) 기준 겹치는 모든 출장 목록 정밀 추출
+	function getOverlappedTripsAtDate(targetYmd, tripList) {
+		if (!targetYmd || !tripList || tripList.length === 0) return [];
+		var ymdStr = String(targetYmd).replace(/[^0-9]/g, "").substring(0, 8);
+		var matched = [];
+		$.each(tripList, function(idx, item) {
+			var st = String(item.tripStDtm || item.stDt || "").replace(/[^0-9]/g, "").substring(0, 8);
+			var ed = String(item.tripEdDtm || item.edDt || "").replace(/[^0-9]/g, "").substring(0, 8);
+			if (st && ed && st <= ymdStr && ed >= ymdStr) {
+				matched.push(item);
+			}
+		});
+		return matched;
+	}
+
+	// 겹치는 출장바 선택 팝오버 툴팁 열기 (WB0701M01 100% 동일 구조)
+	function openOverlapPopover(e, tripItems) {
+		if (e) e.stopPropagation();
+		if (!tripItems || tripItems.length === 0) return;
+
+		var $p = $('#ganttOverlapPicker');
+		var $list = $p.find('.list').empty();
+
+		$.each(tripItems, function(idx, item) {
+			var travelerStr = item.travelerList || item.userNm || item.creatNm || "출장자";
+			var placeStr = item.tripPlace || item.clntPjtNm || item.salesCd || "출장지";
+			var periodStr = item.tripPeriod || ((item.tripStDtm || item.stDt) + " ~ " + (item.tripEdDtm || item.edDt));
+			var userColor = getUserColorStyle(travelerStr);
+
+			var $item = $('<div class="item"></div>');
+			$item.append('<div class="swatch" style="background-color: ' + (userColor.text || '#1a73e8') + ';"></div>');
+			
+			var $meta = $('<div class="meta"></div>');
+			$meta.append('<div class="nm">' + travelerStr + ' (' + placeStr + ')</div>');
+			$meta.append('<div class="dt">' + periodStr + '</div>');
+			$item.append($meta);
+
+			$item.on('click', function(ev) {
+				ev.stopPropagation();
+				hideOverlapPicker();
+				bringTripBarToFront(item.tripReqNo);
+			});
+
+			$item.on('dblclick', function(ev) {
+				ev.stopPropagation();
+				hideOverlapPicker();
+				bringTripBarToFront(item.tripReqNo);
+				updateTripReqModal(item.tripReqNo);
+			});
+
+			$list.append($item);
+		});
+
+		// 마우스/버튼 위치 기반 스마트 포지셔닝 (실제 높이 기준으로 viewport 안에 고정)
+		var clientX = e ? (e.clientX || e.pageX) : 10;
+		var clientY = e ? (e.clientY || e.pageY) : 10;
+		var winWidth = $(window).width();
+		var winHeight = $(window).height();
+		var margin = 0;
+
+		$p.css({ top: margin + 'px', left: margin + 'px' }).show();
+		var popWidth = $p.outerWidth();
+		var popHeight = $p.outerHeight();
+		// 기본 위치는 마우스 포인터의 좌상단에서 시작
+		var posX = clientX;
+		var posY = clientY;
+
+		if (posX + popWidth > winWidth - margin) posX = clientX - popWidth - margin;
+		if (posY + popHeight > winHeight - margin) posY = clientY - popHeight - margin;
+
+		$p.css({
+			top: Math.max(margin, Math.min(posY, winHeight - popHeight - margin)) + 'px',
+			left: Math.max(margin, Math.min(posX, winWidth - popWidth - margin)) + 'px'
+		});
+	}
+
+	// 연월 콤보박스 데이터 초기화
+	function initYearMonthCombo() {
+		var curYy = moment().format("YYYY");
+		var curMm = moment().format("MM");
+
+		var $yy = $('#yy_S');
+		$yy.empty();
+		for (var y = Number(curYy) - 3; y <= Number(curYy) + 3; y++) {
+			$yy.append('<option value="' + y + '">' + y + '년</option>');
+		}
+		$yy.val(curYy);
+
+		var $mm = $('#mm_S');
+		$mm.empty();
+		for (var m = 1; m <= 12; m++) {
+			var mmStr = (m < 10 ? '0' : '') + m;
+			$mm.append('<option value="' + mmStr + '">' + m + '월</option>');
+		}
+		$mm.val(curMm);
+	}
 
 	// 달 이동 함수 (-1: 이전달, 1: 다음달)
 	function moveMonth(diff) {
-		var stDt = $('#srchStDt_S').val() || moment().format("YYYY-MM-DD");
-		var targetDate = moment(stDt, "YYYY-MM-DD").add(diff, 'months');
-		$('#srchStDt_S').val(targetDate.startOf('month').format("YYYY-MM-DD"));
-		$('#srchEdDt_S').val(targetDate.endOf('month').format("YYYY-MM-DD"));
+		var yy = parseInt($('#yy_S').val(), 10);
+		var mm = parseInt($('#mm_S').val(), 10);
+
+		var targetDate = moment([yy, mm - 1, 1]).add(diff, 'months');
+		$('#yy_S').val(targetDate.format("YYYY"));
+		$('#mm_S').val(targetDate.format("MM"));
 		DataSearch();
 	}
 
-	// 오늘 날짜 달력으로 이동
+	// 오늘 년월로 이동
 	function goToday() {
-		$('#srchStDt_S').val(moment().startOf('month').format("YYYY-MM-DD"));
-		$('#srchEdDt_S').val(moment().endOf('month').format("YYYY-MM-DD"));
+		$('#yy_S').val(moment().format("YYYY"));
+		$('#mm_S').val(moment().format("MM"));
 		DataSearch();
 	}
 
 	// 데이터 검색 및 캘린더 바인딩
 	function DataSearch() {
-		var stVal = $('#srchStDt_S').val();
-		var edVal = $('#srchEdDt_S').val();
+		var yy = $('#yy_S').val();
+		var mm = $('#mm_S').val();
 
-		if (!stVal || !edVal) return;
+		if (!yy || !mm) return;
 
 		var formData = {};
 		$.each($('#main_area [data-search]'), function (idx, elem) {
@@ -429,14 +619,17 @@
 		});
 		formData["coCd"] = $('#coCd_S').val() || "GUN";
 
+		var viewMoment = moment(yy + "-" + mm + "-01", "YYYY-MM-DD");
+		formData["srchStDt"] = viewMoment.startOf("month").format("YYYYMMDD");
+		formData["srchEdDt"] = viewMoment.endOf("month").format("YYYYMMDD");
+
 		// 현재 표시 년월 타이틀 업데이트
-		var viewMoment = moment(stVal, "YYYY-MM-DD");
 		$('#calCurrentYm').text(viewMoment.format("YYYY년 MM월"));
 
 		postAjax("/user/pm/pm51/selectTripReqList", formData, null, function(data) {
 			try {
 				currentTripCalendarData = data.result || [];
-				renderGoogleCalendar(viewMoment.format("YYYY"), viewMoment.format("MM"), currentTripCalendarData);
+				renderGoogleCalendar(yy, mm, currentTripCalendarData);
 			} catch (error) {
 				alert("오류 발생!! 전산실 연락 바랍니다: " + error.message);
 			}
@@ -568,12 +761,23 @@
 				ev.level = (assignedLevel !== -1) ? assignedLevel : 3;
 			});
 
-			// 4. 수평 이벤트 레이어 렌더링 (구글 캘린더 멀티데이 바)
+			// 4. 수평 이벤트 레이어 렌더링 (구글 캘린더 멀티데이 바 및 중복 선택 팝오버 연동)
 			if (weekEvents.length > 0) {
 				var $eventsLayer = $('<div class="gcal-events-layer"></div>');
 
+				// 일자별(0~6컬럼) 중복 출장목록 수집
+				var colTripMap = {};
+				for (var col = 0; col < 7; col++) colTripMap[col] = [];
+				$.each(weekEvents, function(i, ev) {
+					for (var col = ev.startCol; col <= ev.endCol; col++) {
+						colTripMap[col].push(ev.item);
+					}
+				});
+
 				$.each(weekEvents, function(i, ev) {
 					var item = ev.item;
+					// 이벤트 핸들러가 렌더링 루프 종료 후에도 해당 주를 참조하도록 고정
+					var eventWeekStartMoment = moment(weekStartMoment);
 					var travelerStr = item.travelerList || item.userNm || item.creatNm || "출장자";
 					var placeStr = item.tripPlace || item.clntPjtNm || item.salesCd || "출장지";
 					var userColor = getUserColorStyle(travelerStr);
@@ -590,14 +794,85 @@
 					                 + 'background-color: ' + userColor.bg + '; color: ' + userColor.text + '; '
 					                 + 'border: 1px solid ' + userColor.border + '; border-left: 4px solid ' + userColor.text + ';';
 
+					// 당해 이벤트 컬럼에서의 중복 출장건 수집
 					var titleText = "출장자: " + travelerStr + "\n출장지: " + placeStr + "\n기간: " + (item.tripPeriod || (ev.st + "~" + ev.ed)) + "\n구분: " + (item.tripDivNm || item.tripDiv);
 
-					var barHtml = '<a class="' + barCls + '" style="' + gridStyleStr + '" title="' + titleText + '" onclick="updateTripReqModal(\'' + item.tripReqNo + '\');">';
-					barHtml += '<i class="fas fa-plane-departure"></i> ' + travelerStr + ' (' + placeStr + ')';
-					barHtml += '</a>';
+					var $bar = $('<a class="' + barCls + '" data-reqno="' + item.tripReqNo + '" style="' + gridStyleStr + '" title="' + titleText + '"></a>');
+					$bar.html('<i class="fas fa-plane-departure"></i> ' + travelerStr + ' (' + placeStr + ')');
 
-					$eventsLayer.append(barHtml);
+					// 호버: 커서가 위치한 날짜에 출장건이 겹치면 선택 팝오버 표시
+					$bar.on('mouseenter', function(e) {
+						var barOffset = $(this).offset();
+						var barWidth = $(this).outerWidth() || 1;
+						var hoverRelX = (e.pageX || e.clientX) - barOffset.left;
+						var ratio = Math.max(0, Math.min(0.999, hoverRelX / barWidth));
+						var totalCols = ev.endCol - ev.startCol + 1;
+						var hoveredColOffset = Math.floor(ratio * totalCols);
+						var hoveredCol = Math.min(ev.endCol, ev.startCol + hoveredColOffset);
+						var hoveredYmd = moment(eventWeekStartMoment).add(hoveredCol, 'days').format("YYYYMMDD");
+						var overlappedTrips = getOverlappedTripsAtDate(hoveredYmd, currentTripCalendarData);
+
+						if (overlappedTrips.length > 1) {
+							openOverlapPopover(e, overlappedTrips);
+						}
+					});
+
+					// 단일 클릭: 바 맨 앞으로 가져오기 (공간 부족으로 3번째 줄 Level 2 이상에 겹쳐진 바만 팝오버 오픈)
+					$bar.on('click', function(e) {
+						e.stopPropagation();
+						bringTripBarToFront(item.tripReqNo);
+
+						// 마우스 클릭 위치의 실시간 날짜(YMD) 계산
+						var barOffset = $(this).offset();
+						var barWidth = $(this).outerWidth() || 1;
+						var clickRelX = (e.pageX || e.clientX) - barOffset.left;
+						var ratio = Math.max(0, Math.min(0.999, clickRelX / barWidth));
+
+						var totalCols = ev.endCol - ev.startCol + 1;
+						var clickedColOffset = Math.floor(ratio * totalCols);
+						var clickedCol = Math.min(ev.endCol, ev.startCol + clickedColOffset);
+
+						var clickedYmd = moment(eventWeekStartMoment).add(clickedCol, 'days').format("YYYYMMDD");
+						var overlappedTrips = getOverlappedTripsAtDate(clickedYmd, currentTripCalendarData);
+
+						// 위에 독립 배치된 1, 2번째 바(Level 0, 1)는 겹치지 않음 처리. 3번째 줄(Level 2 이상) 공간 부족 겹침 시만 팝오버 오픈
+						var isSpaceShortageOverlap = (ev.level >= 2) || (overlappedTrips.length >= 3);
+
+						if (isSpaceShortageOverlap && overlappedTrips.length > 1) {
+							openOverlapPopover(e, overlappedTrips);
+						} else {
+							hideOverlapPicker();
+						}
+					});
+
+					// 더블 클릭: 상세 수정 모달 오픈
+					$bar.on('dblclick', function(e) {
+						e.stopPropagation();
+						hideOverlapPicker();
+						bringTripBarToFront(item.tripReqNo);
+						updateTripReqModal(item.tripReqNo);
+					});
+
+					$eventsLayer.append($bar);
 				});
+
+				// 4번째 슬롯 이상 넘치는 일자별 `+N개` 더보기 뱃지버튼 렌더링
+				for (var col = 0; col < 7; col++) {
+					var colItems = colTripMap[col];
+					if (colItems && colItems.length > 3) {
+						var moreCount = colItems.length - 3;
+						var startGridCol = col + 1;
+
+						var $moreBtn = $('<a class="gcal-more-btn" style="grid-column: ' + startGridCol + ' / span 1; grid-row: 4;">+' + moreCount + '개 더보기</a>');
+						$moreBtn.data('items', colItems);
+						$moreBtn.on('click', function(e) {
+							e.stopPropagation();
+							openOverlapPopover(e, $(this).data('items'));
+						});
+
+						$eventsLayer.append($moreBtn);
+					}
+				}
 
 				$weekRow.append($eventsLayer);
 			}
