@@ -1247,6 +1247,8 @@ function handleHeicUploadFailure(error, blockProc) {
 }
 
 function filePostAjax(url, data, callback, blockProc=true, retryCount = 0) {
+	// HEIC 변환이 시작되는 시점부터 화면을 막아 중복 저장 클릭을 방지한다.
+	if (typeof $.blockUI === 'function' && blockProc) openProgress(true);
 	prepareHeicCompanionFiles(data).then(function(preparedData) {
 		_filePostAjaxPrepared(url, preparedData, callback, blockProc, retryCount);
 	}).catch(function(error) {
@@ -1255,6 +1257,7 @@ function filePostAjax(url, data, callback, blockProc=true, retryCount = 0) {
 }
 
 function filePostAjaxButton(url, data, callback, blockProc=true, retryCount = 0) {
+	if (typeof $.blockUI === 'function' && blockProc) openProgress(true);
 	prepareHeicCompanionFiles(data).then(function(preparedData) {
 		_filePostAjaxButtonPrepared(url, preparedData, callback, blockProc, retryCount);
 	}).catch(function(error) {
@@ -1263,6 +1266,7 @@ function filePostAjaxButton(url, data, callback, blockProc=true, retryCount = 0)
 }
 
 function filePutAjax(url, data, callback, blockProc=true, retryCount = 0) {
+	if (typeof $.blockUI === 'function' && blockProc) openProgress(true);
 	prepareHeicCompanionFiles(data).then(function(preparedData) {
 		_filePutAjaxPrepared(url, preparedData, callback, blockProc, retryCount);
 	}).catch(function(error) {
@@ -1344,7 +1348,7 @@ function _filePostAjaxButtonPrepared(url, data, callback, blockProc=true, retryC
             callback(xhr);
 	    },
         complete: function() {
-        	if (typeof $.blockUI === 'function' && blockProc) openProgress(true);
+			if (typeof $.blockUI === 'function' && blockProc) openProgress(false);
         }
 	});
 }
