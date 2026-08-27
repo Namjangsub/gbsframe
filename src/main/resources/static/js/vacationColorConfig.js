@@ -46,3 +46,29 @@ function getVacationStyle(vacTypeCd, vacTypeNm) {
 	if (name.indexOf("지각") >= 0) return VACATION_TYPE_STYLE_MAP["PM07TYPE14"];
 	return VACATION_TYPE_STYLE_MAP["PM07TYPE01"]; // 기본 연차
 }
+
+/**
+ * 공통코드(TB_CM05M01.CODE_NM) 표시용 정제 함수.
+ * 코드명 자체에 "반차 (오전, 오후 여부. 시간 기록)"처럼 괄호로 부연설명이
+ * 섞여 들어오는 경우가 있어, 첫 "(" 이후는 잘라내고 순수 휴가종류명만 반환한다.
+ * 휴가 관련 툴팁(PM0701P02/PM0710M01/PM0711M01)이 전부 이 함수를 공유해서 쓴다 —
+ * 이 로직을 각 파일에 따로 복붙하지 말 것 (2026-08 사고: 3개 화면에 동일 버그가
+ * 각각 따로 존재했음).
+ */
+function cleanVacationTypeNm(codeNm) {
+	if (!codeNm) return "";
+	return $.trim(String(codeNm).replace(/\s*\(.*$/, ""));
+}
+
+/**
+ * 시작일/종료일을 캘린더 툴팁 표시용 텍스트로 변환.
+ * 동일 날짜면 단일 날짜로, 다르면 "시작 ~ 종료" 형태.
+ * PM0710M01 buildTooltipRowsHtml() 및 PM0711M01 showVacationPopover()가
+ * 동일한 로직을 각각 구현하고 있었으므로 공용화함 (2026-08).
+ */
+function formatVacationDateRange(stDt, edDt) {
+	if (stDt && edDt) {
+		return stDt === edDt ? stDt : (stDt + " ~ " + edDt);
+	}
+	return stDt || edDt || "";
+}

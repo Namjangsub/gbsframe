@@ -429,11 +429,17 @@
 			var items = infoText.split(';');
 			$.each(items, function(i, val) {
 				var rawVal = $.trim(val);
-				// 데이터 형식: "YYYY-MM-DD[~MM-DD] (휴가종류 N일)" - 휴가종류는 괄호 안에 있음
+				// 데이터 형식: "YYYY-MM-DD[~MM-DD] (휴가종류 N일)" - 휴가종류(공통코드 CODE_NM) 자체에
+				// "반차 (오전, 오후 여부. 시간 기록)"처럼 괄호 부연설명이 섞여 들어올 수 있어(중첩 괄호),
+				// 끝의 "N일)"을 먼저 떼어낸 뒤 첫 "(" 다음부터를 휴가종류로 보고, 그 안에 또 괄호가 있으면 버린다.
 				var dateMatch = rawVal.match(/^([0-9]{4}-[0-9]{2}-[0-9]{2}(?:~[0-9]{2}-[0-9]{2})?)/);
 				var dateText = dateMatch ? dateMatch[1] : '';
-				var typeMatch = rawVal.match(/\(([^)]*)\)/);
-				var typeText = typeMatch ? $.trim(typeMatch[1].replace(/\s+[0-9]+(?:\.5)?일\s*$/, '')) : '';
+				var withoutDays = rawVal.replace(/\s*[0-9]+(?:\.5)?일\)\s*$/, '');
+				var typeStart = withoutDays.indexOf('(');
+				var typeText = '';
+				if (typeStart >= 0) {
+					typeText = cleanVacationTypeNm(withoutDays.substring(typeStart + 1));
+				}
 				var trimmedVal = $.trim(typeText + ' ' + dateText);
 				// 연차 사용 칸에는 연차/반차만 표시하고 조퇴 등 근태 항목은 제외한다.
 				var isAnnualItem = colKey !== "usedDays" || /연차|반차/.test(trimmedVal);
