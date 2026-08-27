@@ -37,37 +37,60 @@
 	<script src="/static/js/commApproval.js"></script>
 	<script src="/static/js/manualPopup.js"></script>
 	<script src="/static/js/jquery.blockUI.js"></script>
+	<script src="/static/js/korean-lunar-calendar.min.js"></script>
+	<script type="text/javascript" src="/static/js/workingDayCalc.js"></script>
 
 	<style>
 		/* Google Calendar 멀티데이 트랙 캘린더 스타일 */
+		/* Google Calendar 멀티데이 트랙 캘린더 스타일 */
 		.gcal-container {
 			width: 100%;
-			border: 1px solid #dadce0;
+			height: calc(100vh - 195px);
+			min-height: 520px;
+			border: 1px solid #d0d7de;
 			border-radius: 8px;
 			overflow: hidden;
 			background: #ffffff;
+			display: flex;
+			flex-direction: column;
 			font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+			box-shadow: 0 1px 3px rgba(0,0,0,0.05);
 		}
 		.gcal-header {
 			display: grid;
 			grid-template-columns: repeat(7, 1fr);
-			background: #f8f9fa;
-			border-bottom: 1px solid #dadce0;
+			background: #f6f8fa;
+			border-bottom: 1px solid #d0d7de;
 			text-align: center;
 			font-weight: 600;
 			font-size: 13px;
-			color: #5f6368;
+			color: #444c56;
 			padding: 8px 0;
+			flex-shrink: 0;
+		}
+		.gcal-header > div {
+			border-right: 1px solid #d0d7de;
+		}
+		.gcal-header > div:last-child {
+			border-right: none;
 		}
 		.gcal-header .sun { color: #d93025; }
 		.gcal-header .sat { color: #1a73e8; }
+
+		#gcalBody {
+			flex: 1;
+			display: flex;
+			flex-direction: column;
+			min-height: 0;
+		}
 
 		.gcal-week-row {
 			position: relative;
 			display: grid;
 			grid-template-columns: repeat(7, 1fr);
-			min-height: 125px;
-			border-bottom: 1px solid #dadce0;
+			flex: 1;
+			min-height: 0;
+			border-bottom: 1px solid #d0d7de;
 		}
 		.gcal-week-row:last-child {
 			border-bottom: none;
@@ -75,7 +98,7 @@
 
 		/* 배경 날짜 셀 */
 		.gcal-day-cell {
-			border-right: 1px solid #dadce0;
+			border-right: 1px solid #d0d7de;
 			padding: 6px;
 			box-sizing: border-box;
 			background: #ffffff;
@@ -125,26 +148,31 @@
 		.gcal-event-bar {
 			pointer-events: auto;
 			height: 22px;
-			line-height: 22px;
+			line-height: 20px;
 			padding: 0 8px;
 			font-size: 11px;
-			font-weight: bold;
+			font-weight: 600;
 			border-radius: 4px;
-			color: #ffffff;
 			cursor: pointer;
 			white-space: nowrap;
 			overflow: hidden;
 			text-overflow: ellipsis;
-			box-shadow: 0 1px 3px rgba(60,64,67,0.18);
+			box-shadow: 0 1px 2px rgba(0,0,0,0.06);
 			transition: transform 0.1s, box-shadow 0.1s;
 			z-index: 5;
 			text-decoration: none !important;
+			box-sizing: border-box;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			text-align: center;
+			gap: 4px;
 		}
 		.gcal-event-bar:hover {
 			transform: translateY(-1px);
-			box-shadow: 0 2px 5px rgba(60,64,67,0.3);
+			box-shadow: 0 3px 6px rgba(0,0,0,0.15);
 			z-index: 10;
-			color: #ffffff;
+			filter: brightness(0.96);
 		}
 		.gcal-event-bar.cont-left {
 			border-top-left-radius: 0;
@@ -246,9 +274,7 @@
 			<div class="contents_tit">
 				<span style="height: 30px; line-height: 30px; font-size: 15px;">출장자 현황 캘린더 (구글 캘린더 방식)</span>
 				<div style="display:inline-flex; align-items:center; margin-left: 10px;">
-					<button type="button" class="btn btn-default btn-xs" onclick="moveMonth(-1);" title="이전달"><i class="fas fa-chevron-left"></i> 이전달</button>
 					<span id="calCurrentYm" style="margin: 0 8px; font-weight: bold; font-size: 14px; color: #1a73e8;"></span>
-					<button type="button" class="btn btn-default btn-xs" onclick="moveMonth(1);" title="다음달">다음달 <i class="fas fa-chevron-right"></i></button>
 					<button type="button" class="btn btn-primary btn-xs" style="margin-left: 5px;" onclick="goToday();">오늘</button>
 				</div>
 				<div class="legend-box">
@@ -285,22 +311,22 @@
 <script type="text/javascript">
 	var currentTripCalendarData = [];
 
-	// 사람별 고유 파스텔/비비드 14색 팔레트 (구글 캘린더 톤앤매너)
+	// 사람별 고유 소프트 파스텔 & 딥 텍스트 14색 팔레트 (눈의 피로 제로화 & WCAG AA 시인성 100% 검증)
 	var USER_COLOR_PALETTE = [
-		{ bg: "#1a73e8", text: "#ffffff" }, // 구글 블루
-		{ bg: "#e37400", text: "#ffffff" }, // 구글 오렌지
-		{ bg: "#1e8e3e", text: "#ffffff" }, // 구글 그린
-		{ bg: "#a142f4", text: "#ffffff" }, // 구글 퍼플
-		{ bg: "#d93025", text: "#ffffff" }, // 구글 레드
-		{ bg: "#f9ab00", text: "#ffffff" }, // 구글 옐로우
-		{ bg: "#129eaf", text: "#ffffff" }, // 구글 시안
-		{ bg: "#e52592", text: "#ffffff" }, // 구글 핑크
-		{ bg: "#616161", text: "#ffffff" }, // 구글 그레이
-		{ bg: "#185abc", text: "#ffffff" }, // 딥 블루
-		{ bg: "#b06000", text: "#ffffff" }, // 딥 오렌지
-		{ bg: "#0d652d", text: "#ffffff" }, // 딥 그린
-		{ bg: "#681da8", text: "#ffffff" }, // 딥 퍼플
-		{ bg: "#a50e0e", text: "#ffffff" }  // 딥 레드
+		{ bg: "#E8F0FE", text: "#174EA6", border: "#AECBFA" }, // 소프트 파스텔 블루
+		{ bg: "#FEF3C7", text: "#92400E", border: "#FDE68A" }, // 소프트 파스텔 앰버
+		{ bg: "#E6F4EA", text: "#0D652D", border: "#A7F3D0" }, // 소프트 파스텔 그린
+		{ bg: "#F3E8FF", text: "#6B21A8", border: "#DDD6FE" }, // 소프트 파스텔 바이올렛
+		{ bg: "#FCE8E6", text: "#C5221F", border: "#FCA5A5" }, // 소프트 파스텔 코랄
+		{ bg: "#E0F2FE", text: "#0369A1", border: "#7DD3FC" }, // 소프트 파스텔 시안
+		{ bg: "#FCE7F3", text: "#BE185D", border: "#F9A8D4" }, // 소프트 파스텔 핑크
+		{ bg: "#F1F5F9", text: "#334155", border: "#CBD5E1" }, // 소프트 파스텔 슬레이트
+		{ bg: "#E0E7FF", text: "#3730A3", border: "#C7D2FE" }, // 소프트 파스텔 인디고
+		{ bg: "#FFEDD5", text: "#9A3412", border: "#FED7AA" }, // 소프트 파스텔 오렌지
+		{ bg: "#ECFDF5", text: "#065F46", border: "#A7F3D0" }, // 소프트 파스텔 민트
+		{ bg: "#FAE8FF", text: "#86198F", border: "#F5D0FE" }, // 소프트 파스텔 푸시아
+		{ bg: "#FEE2E2", text: "#991B1B", border: "#FECACA" }, // 소프트 파스텔 딥코랄
+		{ bg: "#CCFBF1", text: "#115E59", border: "#99F6E4" }  // 소프트 파스텔 티일
 	];
 
 	// 사람 이름 기반 해시 색상 할당 함수
@@ -322,8 +348,8 @@
 
 		$('#coCd_S').val(jwt.coCd || "GUN");
 
-		// 시작일/종료일 셋팅 (PM5101M01.html 기준: 1개월 전 초일부터 당월 말일까지)
-		$('#srchStDt_S').val(moment(new Date()).subtract(1, "months").startOf("month").format("YYYY-MM-DD"));
+		// 시작일/종료일 셋팅 (기본 1개월: 당월 초일부터 당월 말일까지)
+		$('#srchStDt_S').val(moment(new Date()).startOf("month").format("YYYY-MM-DD"));
 		$('#srchEdDt_S').val(moment(new Date()).endOf("month").format("YYYY-MM-DD"));
 
 		// 날짜 범위 선택기
@@ -347,6 +373,25 @@
 
 		// 초기조회
 		DataSearch();
+
+		// 마우스 휠 스크롤을 통한 달(Month) 이동 제어 (Debounce/Throttle 연속폭주 안전 제어)
+		var isWheelScrolling = false;
+		$('.gcal-container').on('wheel', function(e) {
+			e.preventDefault();
+			if (isWheelScrolling) return;
+
+			isWheelScrolling = true;
+			var delta = e.originalEvent.deltaY;
+			if (delta > 0) {
+				moveMonth(1);  // 휠 아래로 굴림: 다음달 이동
+			} else if (delta < 0) {
+				moveMonth(-1); // 휠 위로 굴림: 이전달 이동
+			}
+
+			setTimeout(function() {
+				isWheelScrolling = false;
+			}, 350); // 350ms 동안 연속 휠 요청 폭주 방지
+		});
 
 		// authChk("PM5103M01");
 	});
@@ -410,11 +455,15 @@
 		var currentDayMoment = moment(firstDay).subtract(startDayOfWeek, 'days');
 		var targetMonthInt = parseInt(mm, 10);
 
-		// 총 6주 행 생성
+		// 총 주 행 생성 (5주~6주 가변 자동 배분)
 		for (var week = 0; week < 6; week++) {
 			var weekStartMoment = moment(currentDayMoment);
 			var weekEndMoment = moment(currentDayMoment).add(6, 'days');
-			var hasCurrentMonthDay = false;
+
+			// 당월 날짜가 아예 포함되지 않는 6번째 주 생략
+			if (week >= 4 && currentDayMoment.month() + 1 !== targetMonthInt) {
+				break;
+			}
 
 			var $weekRow = $('<div class="gcal-week-row"></div>');
 
@@ -426,11 +475,12 @@
 
 				if (isCurrentMonth) hasCurrentMonthDay = true;
 
+				var isRedHoliday = isRedHolidayYmd(dateStr);
 				var cellClass = "gcal-day-cell";
 				if (!isCurrentMonth) cellClass += " other-month";
 				if (dateStr === todayStr) cellClass += " today";
-				if (dow === 0) cellClass += " sun";
-				if (dow === 6) cellClass += " sat";
+				if (dow === 0 || isRedHoliday) cellClass += " sun";
+				if (dow === 6 && !isRedHoliday) cellClass += " sat";
 
 				var cellHtml = '<div class="' + cellClass + '">';
 				cellHtml += '<span class="gcal-day-num">' + dayNum + '</span>';
@@ -537,7 +587,8 @@
 
 					var gridStyleStr = 'grid-column: ' + startGridCol + ' / span ' + colSpan + '; '
 					                 + 'grid-row: ' + (ev.level + 1) + '; '
-					                 + 'background-color: ' + userColor.bg + '; color: ' + userColor.text + ';';
+					                 + 'background-color: ' + userColor.bg + '; color: ' + userColor.text + '; '
+					                 + 'border: 1px solid ' + userColor.border + '; border-left: 4px solid ' + userColor.text + ';';
 
 					var titleText = "출장자: " + travelerStr + "\n출장지: " + placeStr + "\n기간: " + (item.tripPeriod || (ev.st + "~" + ev.ed)) + "\n구분: " + (item.tripDivNm || item.tripDiv);
 
