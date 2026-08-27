@@ -99,15 +99,14 @@
 		, role_menu AS (
 				SELECT ROLE_MENU_NAME
 					 , MAX(SAVE_YN) SAVE_YN
-				FROM (SELECT LV
-							, REGEXP_SUBSTR(ROLE_MENU,  '[^\,]+',1, LV) AS ROLE_MENU_NAME
-							, SAVE_YN
-						FROM (SELECT ROLE_MENU, SAVE_YN 
+				FROM (SELECT REGEXP_SUBSTR(S.ROLE_MENU, '[^,]+', 1, LEVEL) AS ROLE_MENU_NAME
+							, S.SAVE_YN
+						FROM (SELECT ROLE_MENU, SAVE_YN, ROW_NUMBER() OVER (ORDER BY SORT_NO) AS RN
 						        FROM TB_CM02M01
-						        		INNER JOIN auth_role ON auth_role.AUTH_ROLE_NAME = TB_CM02M01.ROLE_ID
-								ORDER BY SORT_NO ASC) S
-							, (SELECT LEVEL AS LV FROM DUAL CONNECT BY LEVEL <![CDATA[ <= ]]> 1000)
-						WHERE REGEXP_SUBSTR(ROLE_MENU,  '[^\,]+',1, LV) IS NOT NULL) 
+						        		INNER JOIN auth_role ON auth_role.AUTH_ROLE_NAME = TB_CM02M01.ROLE_ID) S
+						CONNECT BY LEVEL <![CDATA[ <= ]]> REGEXP_COUNT(S.ROLE_MENU, ',') + 1
+						   AND PRIOR S.RN = S.RN
+						   AND PRIOR DBMS_RANDOM.VALUE IS NOT NULL)
 				GROUP BY ROLE_MENU_NAME
 		)
 		, menu_info AS (
@@ -127,13 +126,13 @@
 		SELECT menu_info.*
 		  FROM menu_info
 		 WHERE 1 = 1
-		UNION
+		UNION ALL
 		SELECT C.*, MENU_ID	AS ORIGIN_ID, upmenu_info.SAVE_YN
-		  FROM upmenu_info 
+		  FROM upmenu_info
 		  				inner JOIN TB_CM03M01 AS C ON C.MENU_ID = upmenu_info.UP_MENU_ID
 		 WHERE C.MENU_TYPE = 'FOLDER'
 		   AND C.USE_YN = 'Y'
-		ORDER BY UP_MENU_ID, SORT_NO ASC, MENU_ID 
+		ORDER BY UP_MENU_ID, SORT_NO ASC, MENU_ID
 	</select>
 	
 	

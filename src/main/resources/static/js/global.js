@@ -1449,8 +1449,11 @@ function checkMenuAuth(accessList) {
 		var imgIdx = 1;
 		$.each(accessList, function(idx, item){
 			if(item.upMenuId != "MENU100" && item.menuType == "FOLDER" && item.useYn == 'Y') {
+				var iconId = 'icon-menu-0' + imgIdx;
+				if (imgIdx >= 10) iconId = 'icon-menu-0' + imgIdx;
+				
 				html += '<li>';
-				html += '  <img src="/static/img/svg/menu_0'+imgIdx+'.svg">';
+				html += '  <svg class="menu-icon" style="width: 20px; height: 20px; vertical-align: middle; fill: currentColor;"><use href="#' + iconId + '"></use></svg>';
 				html += '	<a>'+item.menuNm+'</a> <!-- 서브메뉴 -->';
 				html += '	<div class="sub_menu">';
 				html += '		<dl id="'+item.menuId+'"></dl>';

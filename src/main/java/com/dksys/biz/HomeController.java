@@ -59,6 +59,15 @@ public class HomeController {
     	return "jsonView";
     }
 
+    @GetMapping(value = {"/favicon.ico", "/static/favicon.ico"})
+    public org.springframework.http.ResponseEntity<org.springframework.core.io.Resource> favicon() {
+        org.springframework.core.io.Resource resource = new org.springframework.core.io.ClassPathResource("static/favicon.ico");
+        return org.springframework.http.ResponseEntity.ok()
+                .cacheControl(org.springframework.http.CacheControl.maxAge(30, java.util.concurrent.TimeUnit.DAYS).cachePublic())
+                .contentType(org.springframework.http.MediaType.valueOf("image/x-icon"))
+                .body(resource);
+    }
+
 	// 단축URL처리
 	@PostMapping("/s/redirectChkCode")
 	public String redirectChkCode(HttpServletRequest request,  Model model){
