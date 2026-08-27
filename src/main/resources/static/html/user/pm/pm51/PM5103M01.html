@@ -107,7 +107,12 @@
 			border-right: none;
 		}
 		.gcal-day-cell.other-month {
-			background: #f8f9fa;
+			background-color: #fafafa;
+			opacity: 0.5;
+		}
+		.gcal-day-cell.other-month .gcal-day-num {
+			color: #9ca3af !important;
+			font-weight: 500;
 		}
 		.gcal-day-cell.today {
 			background: #e8f0fe;
@@ -619,12 +624,16 @@
 		});
 		formData["coCd"] = $('#coCd_S').val() || "GUN";
 
-		var viewMoment = moment(yy + "-" + mm + "-01", "YYYY-MM-DD");
-		formData["srchStDt"] = viewMoment.startOf("month").format("YYYYMMDD");
-		formData["srchEdDt"] = viewMoment.endOf("month").format("YYYYMMDD");
+		var year = parseInt(yy, 10);
+		var month = parseInt(mm, 10);
+		var calendarStart = moment([year, month - 1, 1]).startOf('month').startOf('week');
+		var calendarEnd = moment([year, month - 1, 1]).endOf('month').endOf('week');
+
+		formData["srchStDt"] = calendarStart.format("YYYYMMDD");
+		formData["srchEdDt"] = calendarEnd.format("YYYYMMDD");
 
 		// 현재 표시 년월 타이틀 업데이트
-		$('#calCurrentYm').text(viewMoment.format("YYYY년 MM월"));
+		$('#calCurrentYm').text(moment(yy + "-" + mm + "-01", "YYYY-MM-DD").format("YYYY년 MM월"));
 
 		postAjax("/user/pm/pm51/selectTripReqList", formData, null, function(data) {
 			try {
@@ -774,13 +783,25 @@
 					}
 				});
 
+				var year = parseInt(yy, 10);
+				var month = parseInt(mm, 10);
+				var monthStartStr = moment([year, month - 1, 1]).startOf('month').format("YYYYMMDD");
+				var monthEndStr = moment([year, month - 1, 1]).endOf('month').format("YYYYMMDD");
+
 				$.each(weekEvents, function(i, ev) {
 					var item = ev.item;
 					// 이벤트 핸들러가 렌더링 루프 종료 후에도 해당 주를 참조하도록 고정
 					var eventWeekStartMoment = moment(weekStartMoment);
 					var travelerStr = item.travelerList || item.userNm || item.creatNm || "출장자";
 					var placeStr = item.tripPlace || item.clntPjtNm || item.salesCd || "출장지";
-					var userColor = getUserColorStyle(travelerStr);
+
+					// 당월이 아닌 기간의 이벤트 여부 판단 (완전 전월/익월 또는 해당월 밖 일정)
+					var isCurrentMonthEvent = !(ev.st > monthEndStr || ev.ed < monthStartStr);
+					var userColor = isCurrentMonthEvent ? getUserColorStyle(travelerStr) : {
+						bg: "#f3f4f6",
+						text: "#8c959f",
+						border: "#d0d7de"
+					};
 
 					var colSpan = ev.endCol - ev.startCol + 1;
 					var startGridCol = ev.startCol + 1; // 1-indexed
@@ -788,11 +809,13 @@
 					var barCls = "gcal-event-bar";
 					if (ev.contLeft) barCls += " cont-left";
 					if (ev.contRight) barCls += " cont-right";
+					if (!isCurrentMonthEvent) barCls += " other-month-bar";
 
+					var opacityStyle = !isCurrentMonthEvent ? ' opacity: 0.7;' : '';
 					var gridStyleStr = 'grid-column: ' + startGridCol + ' / span ' + colSpan + '; '
 					                 + 'grid-row: ' + (ev.level + 1) + '; '
 					                 + 'background-color: ' + userColor.bg + '; color: ' + userColor.text + '; '
-					                 + 'border: 1px solid ' + userColor.border + '; border-left: 4px solid ' + userColor.text + ';';
+					                 + 'border: 1px solid ' + userColor.border + '; border-left: 4px solid ' + userColor.text + ';' + opacityStyle;
 
 					var $bar = $('<a class="' + barCls + '" data-reqno="' + item.tripReqNo + '" style="' + gridStyleStr + '"></a>');
 					$bar.html('<i class="fas fa-plane-departure"></i> ' + travelerStr + ' (' + placeStr + ')');

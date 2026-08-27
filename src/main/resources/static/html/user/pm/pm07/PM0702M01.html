@@ -95,7 +95,12 @@
 			border-right: none;
 		}
 		.gcal-day-cell.other-month {
-			background: #f8f9fa;
+			background-color: #fafafa;
+			opacity: 0.5;
+		}
+		.gcal-day-cell.other-month .gcal-day-num {
+			color: #9ca3af !important;
+			font-weight: 500;
 		}
 		.gcal-day-cell.today {
 			background: #e8f0fe;
@@ -451,28 +456,26 @@
 		DataSearch();
 	}
 
-	// 데이터 검색 및 캘린더 바인딩
+	// 데이터 검색 및 캘린더 바인딩 (캘린더 표출 전체 날짜 범위 조회)
 	function DataSearch() {
-		var yy = $('#yy_S').val();
-		var mm = $('#mm_S').val();
+		var yy = $('#yy_S').val() || moment().format("YYYY");
+		var mm = $('#mm_S').val() || moment().format("MM");
 
-		if (!yy || !mm) return;
-
-		// 당월 시작/끝 날짜 계산
-		var monthStart = moment(yy + "-" + mm + "-01", "YYYY-MM-DD");
-		var reqDtFrom = monthStart.startOf('month').format("YYYYMMDD");
-		var reqDtTo   = monthStart.endOf('month').format("YYYYMMDD");
+		var year = parseInt(yy, 10);
+		var month = parseInt(mm, 10);
+		var calendarStart = moment([year, month - 1, 1]).startOf('month').startOf('week');
+		var calendarEnd = moment([year, month - 1, 1]).endOf('month').endOf('week');
 
 		var formData = {
 			 "coCd"       : "GUN"
-			,"reqDtFrom"  : reqDtFrom
-			,"reqDtTo"    : reqDtTo
-			,"vacTypeCd"  : $('#vacTypeCd_S').val()
-			,"sanctnSts"  : $('#sanctnSts_S').val()
-			,"reqId"      : $('#reqId_S').val()
-			,"reqIdNm"    : $('#reqIdNm_S').val()
-			,"reqDeptId"  : $('#reqDeptId_S').val()
-			,"reqDeptNm"  : $('#reqDeptNm_S').val()
+			,"reqDtFrom"  : calendarStart.format("YYYYMMDD")
+			,"reqDtTo"    : calendarEnd.format("YYYYMMDD")
+			,"vacTypeCd"  : $('#vacTypeCd_S').val() || ""
+			,"sanctnSts"  : $('#sanctnSts_S').val() || ""
+			,"reqId"      : $('#reqId_S').val() || ""
+			,"reqIdNm"    : $('#reqIdNm_S').val() || ""
+			,"reqDeptId"  : $('#reqDeptId_S').val() || ""
+			,"reqDeptNm"  : $('#reqDeptNm_S').val() || ""
 		};
 
 		postAjax("/user/pm/pm07/selectVacationCalendarList", formData, null, function(data) {
@@ -480,6 +483,7 @@
 				currentCalendarData = data.result || [];
 				renderGoogleCalendar(yy, mm, currentCalendarData);
 			} catch (error) {
+				console.error("휴가 캘린더 렌더링 오류:", error);
 				alert("오류 발생!! 전산실 연락 바랍니다");
 			}
 		});
@@ -613,12 +617,24 @@
 			if (weekEvents.length > 0) {
 				var $eventsLayer = $('<div class="gcal-events-layer"></div>');
 
+				var year = parseInt(yy, 10);
+				var month = parseInt(mm, 10);
+				var monthStartStr = moment([year, month - 1, 1]).startOf('month').format("YYYYMMDD");
+				var monthEndStr = moment([year, month - 1, 1]).endOf('month').format("YYYYMMDD");
+
 				$.each(weekEvents, function(i, ev) {
 					var item = ev.item;
 					var reqIdNm = item.reqIdNm || item.userNm || "신청자";
 					var vacTypeNm = item.vacTypeNm || "휴가";
 					var ampmLabel = (item.ampmNm) ? (" (" + item.ampmNm + ")") : "";
-					var typeColor = getVacationStyle(item.vacTypeCd, vacTypeNm);
+
+					// 당월이 아닌 기간의 이벤트 여부 판단 (완전 전월/익월 또는 해당월 밖 일정)
+					var isCurrentMonthEvent = !(ev.st > monthEndStr || ev.ed < monthStartStr);
+					var typeColor = isCurrentMonthEvent ? getVacationStyle(item.vacTypeCd, vacTypeNm) : {
+						bg: "#f3f4f6",
+						text: "#8c959f",
+						border: "#d0d7de"
+					};
 
 					var colSpan = ev.endCol - ev.startCol + 1;
 					var startGridCol = ev.startCol + 1; // 1-indexed
@@ -626,12 +642,14 @@
 					var barCls = "gcal-event-bar";
 					if (ev.contLeft) barCls += " cont-left";
 					if (ev.contRight) barCls += " cont-right";
+					if (!isCurrentMonthEvent) barCls += " other-month-bar";
 
 					var borderCss = typeColor.border ? (' border-left: 3px solid ' + typeColor.border + ';') : '';
+					var opacityStyle = !isCurrentMonthEvent ? ' opacity: 0.7;' : '';
 					var gridStyleStr = 'grid-column: ' + startGridCol + ' / span ' + colSpan + '; '
 					                 + 'grid-row: ' + (ev.level + 1) + '; '
-					                 + 'background-color: ' + typeColor.bg + '; color: ' + typeColor.text + ';' + borderCss;
-					if (typeColor.pattern) {
+					                 + 'background-color: ' + typeColor.bg + '; color: ' + typeColor.text + ';' + borderCss + opacityStyle;
+					if (isCurrentMonthEvent && typeColor.pattern) {
 						gridStyleStr += ' background-image: ' + typeColor.pattern + ';';
 					}
 

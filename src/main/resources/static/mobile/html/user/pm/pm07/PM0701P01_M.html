@@ -39,6 +39,7 @@
 	<script src="/static/js/workingDayCalc.js"></script>
 	<script src="/static/js/fileTreeMobile.js"></script>
 	<script src="/static/js/heic2any.min.js"></script>
+	<script src="/static/js/commApprovalMobile.js"></script>
 
 	<style>
 		/* ── 모바일 전용 DateRangePicker (#globalDRP) 레이아웃 및 팝업 정밀 보정 ── */
@@ -428,14 +429,21 @@
 						</div>
 						<div id="mobileFileListArea" style="margin-top: 10px; display: flex; flex-direction: column; gap: 8px;"></div>
 					</div>
+
+					<!-- 결재 처리 위젯 (M08 결재 대기목록 등 결재 진입 시 생성 - 하단 버튼 바로 위에 위치) -->
+					<div class="pm07p-section" id="approvalActionSection" style="display: none;">
+						<div class="pm07p-section-title">결재 처리</div>
+						<div id="approval_area"></div>
+					</div>
 				</div>
 			</form>
 		</div>
 
-		<div class="pm07p-bottom-bar">
-			<button type="button" class="close_btn" onclick="goBack()">목록</button>
-			<button type="button" id="deleteBtn" style="display: none;" onclick="deleteMobileVacation();">삭제</button>
-			<button type="button" id="actionBtn">저장</button>
+		<div class="pm07p-bottom-bar" id="bottomBar">
+			<button type="button" class="close_btn" id="closeBtn" onclick="goBack()">닫기</button>
+			<button type="button" id="deleteBtn" style="display: none !important;" onclick="deleteMobileVacation();">삭제</button>
+			<button type="button" id="approvalBtn" style="display: none !important; background: #007bff; color: #ffffff; font-weight: bold;" onclick="doMobileVacationApproval();">승인</button>
+			<button type="button" id="actionBtn" style="display: none !important;">저장</button>
 		</div>
 	</div>
 
@@ -611,17 +619,150 @@
 					});
 
 					selectVacationDtl(reqNo);
+				} else if (actionType == "A") { // [결재자 결재/조회 모드 독립 분리]
+					isReadonly = true;
+					var reqNo = paramObj.reqNo || paramObj.todoNo || paramObj.todoFileTrgtKey;
+					$("#reqNo").val(reqNo);
+					selectVacationDtl(reqNo);
 				}
 
 				// 모바일 첨부파일 목록 초기화 및 기존 파일 조회
-				var fileReqNo = (actionType == "U") ? paramObj.reqNo : "";
+				var fileReqNo = (actionType == "U" || actionType == "A") ? (paramObj.reqNo || paramObj.todoNo || paramObj.todoFileTrgtKey) : "";
 				loadMobileFileList(fileReqNo);
+
+				renderFinalModeUI();
 			} else {
 				goBack();
 			}
 
 			setCommonSelect($(".popup_area select[data-kind]"));
 		});
+
+		// 모드별 화면/버튼 전담 제어 함수 (결재모드, 신규등록, 작성자수정, 읽기전용 완전 단절)
+		function renderFinalModeUI() {
+			if (!paramObj) return;
+
+			var isApprovalMode = (actionType === "A" || (paramObj && (
+				paramObj.pgmId === "M08" 
+				|| paramObj.todoDiv1CodeId === "TODODIV20" 
+				|| paramObj.todoDiv1CodeId === "TODODIV10"
+				|| paramObj.todoDiv1Code === "TODODIV20"
+				|| paramObj.todoDiv1Code === "TODODIV10"
+				|| (paramObj.sanctnSn !== undefined && paramObj.sanctnSn !== null && paramObj.sanctnSn !== "")
+				|| (paramObj.todoNo !== undefined && paramObj.todoNo !== null && paramObj.todoNo !== "")
+			)));
+
+			// 1) 전 화면 컴포넌트 및 버튼 상태 완전 초기 리셋 (상태 혼선 방지)
+			$("#closeBtn").text("닫기").show();
+			$("#actionBtn").attr("style", "display: none !important;").hide();
+			$("#deleteBtn").attr("style", "display: none !important;").hide();
+			$("#approvalBtn").attr("style", "display: none !important;").hide();
+			$("#approvalSection").hide();
+			$("#approvalActionSection").hide();
+			$("#btnMobileFileAdd").hide();
+
+			if (isApprovalMode) {
+				// [모드 1] 결재자 진입 모드 (오직 닫기 / 승인 2개 버튼만 노출!)
+				isReadonly = true;
+				$("#popForm").find("input, select, textarea").not("#appLine textarea").prop("readonly", true).prop("disabled", true);
+				$(".toggle-group select").prop("disabled", true);
+
+				$("#closeBtn").show();
+				$("#approvalBtn").attr("style", "display: inline-block !important; background: #007bff; color: #ffffff; font-weight: bold;").text("승인").show();
+				
+				$("#approvalActionSection").show();
+				initApprovalWidget();
+
+			} else if (actionType === "C") {
+				// [모드 2] 신규 작성 모드 (오직 닫기 / 저장 2개만!)
+				isReadonly = false;
+				$("#btnMobileFileAdd").show();
+				$("#actionBtn").attr("style", "display: inline-block !important;").text("저장").show();
+
+			} else {
+				// [모드 3] 작성자 본인 상세조회/수정 모드
+				$("#approvalSection").show(); // 상단 결재정보 카드 노출
+
+				if (isReadonly) {
+					// 읽기 전용 (결재 진행 중/완료): 오직 [닫기] 1개만!
+				} else {
+					// 결재 전 수정 가능: [닫기], [삭제], [저장]
+					$("#btnMobileFileAdd").show();
+					$("#deleteBtn").attr("style", "display: inline-block !important;").text("삭제").show();
+					$("#actionBtn").attr("style", "display: inline-block !important;").text("저장").show();
+				}
+			}
+		}
+
+		var commApproval = null;
+		function initApprovalWidget() {
+			if (!paramObj) return;
+
+			var htmlParam = { htmlArea: 'approval_area' };
+			var approvalParam = {
+				coCd: paramObj.coCd || jwt.coCd,
+				todoDiv1CodeId: paramObj.todoDiv1CodeId || 'TODODIV20',
+				todoDiv2CodeId: paramObj.todoDiv2CodeId || 'TODODIV2300',
+				pgmId: paramObj.pgmId || 'M08'
+			};
+			var popParam = Object.assign({}, paramObj);
+			delete popParam.sanctnSn;
+			delete popParam.pgmId;
+
+			$('#approvalActionSection').show();
+			commApproval = new Approval(htmlParam, approvalParam, popParam);
+			// 공통 결재 파일은 변경하지 않고, 이 화면에서만 승인 완료 후 복귀 처리
+			var originalMyTodoStatusRtv = window.myTodoStatusRtv;
+			window.myTodoStatusRtv = function(isForce) {
+				if (typeof originalMyTodoStatusRtv === 'function') originalMyTodoStatusRtv(isForce);
+				if (isForce) setTimeout(function() { goBack(); }, 0);
+			};
+			commApproval.makeHtml();
+
+			// ── 휴가 결재 처리 테이블 정밀 보정 ──
+			// 1) 휴가에는 '투입공수'가 없으므로 공수(3번째 컬럼) 숨김 처리
+			$('#appLine th:nth-child(3), #appLine td:nth-child(3), #appLine colgroup col:nth-child(3)').hide();
+			
+			// 2) 공용 위젯 내부 자체 버튼바(#appBtnDiv) 중복 숨김 처리 (상위 #bottomBar의 [닫기]/[승인] 사용)
+			$('#approval_area .mobile_mid_btn, #appBtnDiv').hide();
+
+			// 3) 본인 결재자(jwt.userId)가 아닌 다른 행의 결재의견 textarea 입력 차단 (disabled & readonly & 배경색)
+			$('#appLine tr[data-dept-id]').each(function() {
+				var rowUser = $(this).attr('data-dept-id');
+				var $txt = $(this).find('textarea[name="todoCfOpn"]');
+				if (rowUser !== jwt.userId) {
+					$txt.prop('disabled', true).prop('readonly', true).css({
+						'background-color': '#f4f4f4',
+						'color': '#888888',
+						'cursor': 'not-allowed'
+					});
+				} else {
+					$txt.prop('disabled', false).prop('readonly', false).css({
+						'background-color': '#ffffff',
+						'color': '#333333'
+					});
+				}
+			});
+		}
+
+		// 모바일 휴가 결재 승인 실행 함수
+		function doMobileVacationApproval() {
+			if (commApproval && typeof commApproval.confirmApproval === 'function') {
+				var res = commApproval.confirmApproval();
+				if (res !== false) {
+					alert("결재 승인이 정상 처리되었습니다.");
+					goBack();
+				}
+			} else if (typeof approvalConfirm === 'function') {
+				var res = approvalConfirm();
+				if (res !== false) {
+					alert("결재 승인이 정상 처리되었습니다.");
+					goBack();
+				}
+			} else {
+				alert("결재 승인 처리 모듈이 준비되지 않았습니다.");
+			}
+		}
 
 		// PC 화면과 100% 동일한 DateRangePicker 한번에 시작일~종료일 동시 선택 피커 함수
 		function openDateRangePicker() {
@@ -709,6 +850,7 @@
 
 					loadApprovalLine(reqNo);
 					loadMobileFileList(reqNo);
+					renderFinalModeUI();
 				}
 			});
 		}
@@ -1036,6 +1178,10 @@
 
 			postAjax("/user/wb/wb20/selectGetApprovalList", { "todoNo": reqNo }, null, function(data) {
 				var rows = data.resultList || data.result || [];
+				var isApprovalMode = (actionType === "A" || (paramObj && (
+					paramObj.pgmId === "M08" || paramObj.todoDiv1CodeId === "TODODIV20" ||
+					paramObj.todoDiv1CodeId === "TODODIV10" || paramObj.sanctnSn
+				)));
 
 				// 본인 외 상급 결재자(TODODIV20, todoId != jwt.userId) 중 실제로 결재(승인/반려)를 처리한 건이 있는지 동적 판단한다.
 				// (결재선에 상급 결재자가 여러 명 등록되어 있더라도, 아직 아무도 결재를 진행하지 않았다면
@@ -1054,7 +1200,7 @@
 						|| (sanctnSttusNm.indexOf('반려') > -1);
 				});
 
-				if (!hasOtherApproverActed) {
+				if (!isApprovalMode && !hasOtherApproverActed) {
 					// 본인 외에는 아직 아무도 결재하지 않음 -> 수정/삭제 100% 가능하도록 UI 잠금 해제 및 버튼 표시
 					isReadonly = false;
 					$("#popForm").find("input, select, textarea").not("#actionBtn, #deleteBtn").prop("readonly", false).prop("disabled", false);
@@ -1064,7 +1210,7 @@
 					$("#readonlyNotice").hide();
 					$("#btnMobileFileAdd").show();
 					$("#mobileFileListArea").css({ "opacity": "1" });
-				} else {
+				} else if (!isApprovalMode) {
 					// 상급 결재자가 이미 결재(승인/반려)를 진행함 -> 수정/삭제 불가 (Readonly 잠금)
 					isReadonly = true;
 					$("#popForm").find("input, select, textarea").not("#actionBtn, #deleteBtn").prop("readonly", true).prop("disabled", true);
@@ -1107,7 +1253,13 @@
 				});
 
 				$("#approvalList").html(html);
-				$("#approvalSection").css("display", "block");
+				// 결재자 진입 모드에서는 상단 결재정보 요약 카드를 숨기고,
+				// 하단 결재 처리 위젯만 표시한다.
+				if (isApprovalMode) {
+					$("#approvalSection").hide();
+				} else {
+					$("#approvalSection").css("display", "block");
+				}
 			});
 		}
 
@@ -1534,7 +1686,16 @@
 		}
 
 		function goBack() {
-			var nextUrl = '/static/mobile/html/user/pm/pm07/PM0701M01_M.html';
+			if (typeof modalStack !== 'undefined' && modalStack && typeof modalStack.close === 'function' && modalStack.length > 0) {
+				modalStack.close();
+				return;
+			}
+			if (window.parent && typeof window.parent.closeModal === 'function') {
+				window.parent.closeModal();
+				return;
+			}
+			var isApprovalMode = (actionType === "A" || (paramObj && (paramObj.pgmId === "M08" || paramObj.todoDiv1CodeId === "TODODIV20" || paramObj.sanctnSn)));
+			var nextUrl = isApprovalMode ? '/static/mobile/admin/cm/cm11/M08.html' : '/static/mobile/html/user/pm/pm07/PM0701M01_M.html';
 			insertPgmHistory(nextUrl);
 			location.href = nextUrl;
 		}

@@ -1206,9 +1206,21 @@
 
 	// 초기화
 	$(document).ready(function() {
-		// 부모 화면(PM0701M01)이 openModal 로 넘긴 파라미터. 이 선언이 없으면 paramObj 가
-		// undefined 라 항상 신규등록(C) 모드로 떨어져 더블클릭 조회가 동작하지 않는다.
-		var paramObj = modalStack.last().paramObj || {};
+		// 파라미터 다중 수신 보장 (modalStack, window.paramObj, sessionStorage)
+		var paramObj = {};
+		if (typeof modalStack !== 'undefined' && modalStack && typeof modalStack.last === 'function' && modalStack.last() && modalStack.last().paramObj && Object.keys(modalStack.last().paramObj).length > 0) {
+			paramObj = modalStack.last().paramObj;
+		} else if (typeof window.paramObj !== 'undefined' && window.paramObj && Object.keys(window.paramObj).length > 0) {
+			paramObj = window.paramObj;
+		} else {
+			try {
+				paramObj = JSON.parse(sessionStorage.getItem('paramObj') || '{}');
+			} catch(e) {
+				paramObj = {};
+			}
+		}
+
+		var reqNoVal = paramObj.reqNo || paramObj.todoNo || paramObj.todoKey || paramObj.todoFileTrgtKey || (paramObj.gridObj ? (paramObj.gridObj.todoNo || paramObj.gridObj.todoKey || paramObj.gridObj.todoFileTrgtKey) : "") || "";
 
 		// 공통코드 set
 		setCommonSelect($('.popup_area select[data-kind]'));
@@ -1218,11 +1230,11 @@
 
 		// 파일첨부 초기화 (treeModule은 전역, 부모 PM0701M01이 fileTree.js 로드)
 		if (typeof treeModule !== 'undefined') {
-			var reqNo = paramObj.reqNo ? paramObj.reqNo : "";
+			var fileReqNo = reqNoVal || "";
 			var fileParam = {
 				fileTrgtTyp : "PM0701P01",
-				fileTrgtKey : reqNo,
-				todoNo      : reqNo,
+				fileTrgtKey : fileReqNo,
+				todoNo      : fileReqNo,
 				comonCd     : "FITR9902"
 			};
 			treeModule.initAll('deptTreeOrdars', 'file-grid', 'FILETREE', fileParam, 'fileList_area');
@@ -1237,10 +1249,13 @@
 		}
 
 		// 팝업 제목 및 데이터 설정
-		var actionType = paramObj.actionType ? paramObj.actionType : "C";
+		var actionType = paramObj.actionType;
+		if (!actionType || (actionType === "C" && reqNoVal)) {
+			actionType = reqNoVal ? (paramObj.todoDiv1CodeId === "TODODIV20" || paramObj.pgmId === "M08" ? "A" : "U") : "C";
+		}
 		$('#actionType').val(actionType);
 
-		if (actionType === "C") {
+		if (actionType === "C" && !reqNoVal) {
 			$('#popupTitle').text("휴가신청 - 신청등록");
 			var isMng = isMngUser();
 			if (isMng) {
@@ -1266,8 +1281,8 @@
 
 			setDefaultApprovalLine();
 		} else {
-			var reqNoVal = paramObj.reqNo || "";
-			var coCdVal  = paramObj.coCd || "GUN";
+			var reqNoVal = paramObj.reqNo || paramObj.todoNo || paramObj.todoKey || paramObj.todoFileTrgtKey || (paramObj.gridObj ? (paramObj.gridObj.todoNo || paramObj.gridObj.todoKey || paramObj.gridObj.todoFileTrgtKey) : "") || "";
+			var coCdVal  = paramObj.coCd || (paramObj.gridObj ? paramObj.gridObj.coCd : "") || "GUN";
 
 			// 처리 시점에 DB 상세 자료를 직접 검색하여 폼에 출력
 			var dtlData = {};
@@ -1279,11 +1294,10 @@
 
 			$('#coCd').val(dtlData.coCd || coCdVal);
 			$('#reqNo').val(dtlData.reqNo || reqNoVal);
-			$('#popForm').find('#reqId').val(dtlData.reqId || jwt.userId);
+			$('#popForm').find('#reqId').val(dtlData.reqId || dtlData.userId || jwt.userId);
 			$('#popForm').find('#reqDeptId').val(dtlData.reqDeptId || jwt.deptId);
-			$('#reqTitl').val(dtlData.reqIdNm || dtlData.reqTitl || "");
-			$('#vacTypeCd').val(dtlData.vacTypeCd || "").change();
-			$('#ampmCd').val(dtlData.ampmCd || "");
+			$('#reqTitl').val(dtlData.reqIdNm || dtlData.reqTitl || dtlData.userNm || "");
+
 			var formatDtStr = function(dt) {
 				if (!dt) return "";
 				var s = String(dt).replace(/[^0-9]/g, '');
@@ -1304,6 +1318,13 @@
 			$('#vacDays').val(dtlData.vacDays || "");
 			$('#deductDays').val(dtlData.deductDays || "");
 			$('#reqRmk').val(dtlData.reqRmk || "");
+
+			// 공통코드 비동기 채움 완료 후 vacTypeCd/ampmCd 안전 동기화
+			setTimeout(function() {
+				if (dtlData.vacTypeCd) $('#vacTypeCd').val(dtlData.vacTypeCd);
+				if (dtlData.ampmCd) $('#ampmCd').val(dtlData.ampmCd);
+				onVacTypeChanged();
+			}, 50);
 
 			// 기존 결재선/공유선 표시
 			loadApprovalLine(dtlData.reqNo || reqNoVal);

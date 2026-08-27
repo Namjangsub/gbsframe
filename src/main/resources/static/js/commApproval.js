@@ -285,7 +285,7 @@ function Approval(htmlParam, param, popParam) {
 							let editable = false; // 투입공수 입력여부 플래그
 							// 본인결재건이면서 팀장일때
 							if (applyBtn && (data.deptTeamManager === 'TEAM01' || data.teamManager === '평가' || data.teamManager === 'Y') && jwt.userId === data.todoId && ['GUN30', 'GUN40', 'TRN50', 'GUN60', 'GUN70'].includes(jwt.deptId.slice(0, 5))) {
-								if  ((data.todoDiv2CodeId === 'TODODIV2020' && (sameTimeResultChk === 'Y' || data.sameTimeResult == 'Y') && !['COBTP01','COBTP04','COBTP06','COBTP08','COBTP09'].includes(data.partCd)) 
+								if  ((data.todoDiv2CodeId === 'TODODIV2020' && (sameTimeResultChk === 'Y' || data.sameTimeResult == 'Y') && !['COBTP01','COBTP04','COBTP06','COBTP08','COBTP09'].includes(data.partCd))
 									|| (data.todoDiv2CodeId === 'TODODIV2090') || (data.todoDiv2CodeId === 'TODODIV2030' && !['COBTP01','COBTP04','COBTP06','COBTP08','COBTP09'].includes(data.partCd))){
 									editable = true;
 								}
@@ -305,7 +305,7 @@ function Approval(htmlParam, param, popParam) {
 									`<input type="text" name="actMh" readonly value="${gPasFloatChk((data.actMh)) || ''}" style='text-align:center; padding-right:5px; height:40px;' comma>`
 								);
 							}
-							
+
 							// ==============================================================================================
 							html = html.replace(/@@item5@@/gi, data.sanctnSttusNm);		//상태명
 							html = html.replace(/@@item6@@/gi, data.todoCfDt);		//확인(결재)일자
@@ -344,7 +344,7 @@ function Approval(htmlParam, param, popParam) {
 		if( this.applyBtn ) {
 			$("#appBtnDiv").show();
 			$("#appConfirmAnchor").attr("onclick", "approvalConfirm()");
-			
+
 			const $tr = $("#appLine tr").find("font").closest("tr");
 			//본인 결재의견
 			const todoCfOpn = ($tr.find('textarea[name="todoCfOpn"]').val() ?? '').trim();
@@ -389,7 +389,7 @@ function Approval(htmlParam, param, popParam) {
 
 		// dept-id 기준으로 대상 tr 선택
 		var $tr = $('tr[data-dept-id="'+ jwt.userId+'"]');
-		
+
 		// 각 항목 추출
 		var actMh = gPasFloatChk($tr.find('input[name="actMh"]').val());
 		var requiredMh = $tr.find('input[name="requiredMh"]').val();
@@ -398,7 +398,7 @@ function Approval(htmlParam, param, popParam) {
 		var todoCfOpn = ($tr.find('textarea[name="todoCfOpn"]').val() ?? '').trim();
 
         //부서코드 영업, 기술연구소, 구매, 생산팀의 팀장이면 결과 등록시 해당팀의 소요공수 입력 필수임
-        // $('#requiredMh').val() == 'YES'   담당팀 투입공수 필수입력 대상임 
+        // $('#requiredMh').val() == 'YES'   담당팀 투입공수 필수입력 대상임
         if (requiredMh == 'YES') {
 			// 투입공수 150이하 입력만 가능하게 제약
 			if (actMh > 150) {
@@ -406,7 +406,7 @@ function Approval(htmlParam, param, popParam) {
 				return false;
 			}
         }
-		
+
 		if (!inputValidation($('.popup_area [required]'))) {
 			return false;
 		}
@@ -479,7 +479,7 @@ function Approval(htmlParam, param, popParam) {
 	this.approvalMemoComment = function(param) {
 
 		// dept-id 기준으로 대상 tr 선택
-		var $tr = $('tr[data-dept-id="'+ jwt.userId+'"]').first();	
+		var $tr = $('tr[data-dept-id="'+ jwt.userId+'"]').first();
 		var todoCfOpn = ($tr.find('textarea[name="todoCfOpn"]').val() ?? '').trim();
 			// 조건에 맞는 첫 번째 tr의 data-todokey 값
 		const todoKey = $tr.attr('data-todokey');
@@ -496,20 +496,20 @@ function Approval(htmlParam, param, popParam) {
 		postAjaxSync("/user/wb/wb20/insertApprovalMemoComment", paramMap, null, function(data){
 			var list = data.result;
 			if (list != undefined) {
-//			    $.each(list, function (key, val) {  
-//			        if ($('#mForm #' + key)[0]) { 	                        	   
+//			    $.each(list, function (key, val) {
+//			        if ($('#mForm #' + key)[0]) {
 //			            if (key == "todoDiv2CodeNm"){
-//			                $('.tit').text(val +' 보기');                             
+//			                $('.tit').text(val +' 보기');
 //			            }
 //			            $('#mForm #' + key).val(val);
 //			         }
-//			    });  
+//			    });
 			}
 			if(data.resultCode == 200){
 				list.creatPgm = "WB2001P01";
 				list.pgmId = "WB2001P01";
 				list.bigo = "보완요청";
-				
+
 				sendTodoFinal(list);
 			} else {
 				customAlert("보완요청 처리중 오류가 있습니다.  전산실 확인 바랍니다.");
