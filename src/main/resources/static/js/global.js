@@ -4480,6 +4480,14 @@ window.DateRangePicker = (function(){
             });
             if(!excluded) hide();
         });
+
+        $(document).on('keydown.globalDRP', function(e){
+            if(!$('#globalDRP').is(':visible')) return;
+            if(e.keyCode === 27 || e.key === 'Escape'){
+                hide();
+                if(s.onCancel) s.onCancel();
+            }
+        });
     }
 
     function hide(){
@@ -4620,6 +4628,14 @@ window.SingleDatePicker = (function(){
                 if($(e.target).closest(sel).length){ excluded = true; return false; }
             });
             if(!excluded) hide();
+        });
+
+        $(document).on('keydown.globalSDP', function(e){
+            if(!$('#globalSDP').is(':visible')) return;
+            if(e.keyCode === 27 || e.key === 'Escape'){
+                hide();
+                if(s.onCancel) s.onCancel();
+            }
         });
     }
 
