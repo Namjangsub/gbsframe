@@ -251,7 +251,7 @@ public class WB20Ctr {
 	    	model.addAttribute("resultMessage", messageUtils.getMessage("cancel"));
 		}catch(Exception e) {
 			model.addAttribute("resultCode", 500);
-			model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+			model.addAttribute("resultMessage", e.getMessage() != null ? e.getMessage() : messageUtils.getMessage("fail"));
 		}
 
 		return "jsonView";

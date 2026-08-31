@@ -382,9 +382,72 @@ public class WB20SvcImpl implements WB20Svc {
 	// 신청부서(일반) 결재코드 -> 관리부서 결재코드 매핑 (순차결재: 신청부서 결재가 모두 완료되어야 관리부서 결재 진행 가능)
 	// PM51(출장신청서): TODODIV2190 -> TODODIV2191, PM52(출장복명서): TODODIV2200 -> TODODIV2201
 	private static final Map<String, String> GENERAL_TO_MNG_TODODIV2 = new HashMap<>();
+	private static final Map<String, String> GENERAL_TO_MNG_TODODIV2_REVERSE = new HashMap<>();
 	static {
 		GENERAL_TO_MNG_TODODIV2.put("TODODIV2191", "TODODIV2190");
 		GENERAL_TO_MNG_TODODIV2.put("TODODIV2201", "TODODIV2200");
+
+		GENERAL_TO_MNG_TODODIV2_REVERSE.put("TODODIV2190", "TODODIV2191");
+		GENERAL_TO_MNG_TODODIV2_REVERSE.put("TODODIV2200", "TODODIV2201");
+	}
+
+	// 순차결재 취소 검증: 다음 차례 결재자가 이미 승인한 상태에서는 이전 결재자가 결재를 취소할 수 없다 (역순 취소 원칙)
+	private void validatePm51SequentialCancel(Map<String, String> paramMap) {
+		String todoDiv1CodeId = paramMap.get("todoDiv1CodeId");
+		String todoDiv2CodeId = paramMap.get("todoDiv2CodeId");
+		if (!"TODODIV20".equals(todoDiv1CodeId)) {
+			return;
+		}
+		boolean isGeneralLine = "TODODIV2190".equals(todoDiv2CodeId) || "TODODIV2200".equals(todoDiv2CodeId)
+			|| "TODODIV2300".equals(todoDiv2CodeId);
+		boolean isMngLine = GENERAL_TO_MNG_TODODIV2.containsKey(todoDiv2CodeId);
+		if (!isGeneralLine && !isMngLine) {
+			return;
+		}
+		String todoNo = paramMap.get("todoNo");
+		if (!hasText(todoNo)) {
+			return;
+		}
+		int currentSn;
+		try {
+			currentSn = Integer.parseInt(String.valueOf(paramMap.get("sanctnSn")));
+		} catch (Exception e) {
+			return;
+		}
+
+		// 1. 현재 결재선 내에서 나보다 뒷 순번(sn > currentSn)의 결재자가 이미 결재(sanctnSttus == 'Y')했는지 검사
+		Map<String, String> selfParam = new HashMap<>();
+		selfParam.put("todoNo", todoNo);
+		selfParam.put("todoDiv1CodeId", "TODODIV20");
+		selfParam.put("todoDiv2CodeId", todoDiv2CodeId);
+		List<Map<String, String>> lines = wb20Mapper.selectApprovalLineOrder(selfParam);
+		for (Map<String, String> line : lines) {
+			int sn;
+			try {
+				sn = Integer.parseInt(String.valueOf(line.get("sanctnSn")));
+			} catch (Exception e) {
+				continue;
+			}
+			if (sn > currentSn && "Y".equals(line.get("sanctnSttus"))) {
+				String nextName = pm51ApproverNameWithJik(line);
+				throw new RuntimeException("다음 결재자 " + (hasText(nextName) ? nextName + "님이 " : "") + "이미 결재를 완료하여 결재 취소할 수 없습니다.\n다음 결재자의 결재를 먼저 취소해야 합니다.");
+			}
+		}
+
+		// 2. 신청부서 결재선 취소 시, 관리부서 결재선에서 이미 결재가 진행된 건이 있는지 검사
+		if (isGeneralLine && GENERAL_TO_MNG_TODODIV2_REVERSE.containsKey(todoDiv2CodeId)) {
+			Map<String, String> mngParam = new HashMap<>();
+			mngParam.put("todoNo", todoNo);
+			mngParam.put("todoDiv1CodeId", "TODODIV20");
+			mngParam.put("todoDiv2CodeId", GENERAL_TO_MNG_TODODIV2_REVERSE.get(todoDiv2CodeId));
+			List<Map<String, String>> mngLines = wb20Mapper.selectApprovalLineOrder(mngParam);
+			for (Map<String, String> line : mngLines) {
+				if ("Y".equals(line.get("sanctnSttus"))) {
+					String mngName = pm51ApproverNameWithJik(line);
+					throw new RuntimeException("관리부서 결재자 " + (hasText(mngName) ? mngName + "님이 " : "") + "이미 결재를 진행하여 결재 취소할 수 없습니다.\n관리부서 결재를 먼저 취소해야 합니다.");
+				}
+			}
+		}
 	}
 
 	private void validatePm51SequentialApproval(Map<String, String> paramMap) {
@@ -616,6 +679,7 @@ public class WB20SvcImpl implements WB20Svc {
 
 	@Override
 	public int updateApprovalCancle(Map<String, String> paramMap) {
+		validatePm51SequentialCancel(paramMap);
 		int result = wb20Mapper.updateApprovalCancle(paramMap);
 
 		
@@ -669,7 +733,33 @@ public class WB20SvcImpl implements WB20Svc {
 		/***************************************************************************************
 		 * 결재 취소 처리시 팀장인경우에만 투입공수 Clear 처리 가능함 -- 처리종료
 		 ***************************************************************************************/
-		
+
+		// 출장신청 관리부서 결재(TODODIV2191) 취소 시: 지급을 집행한 담당자(PAY_ID) 본인이 취소할 때만 지급완료 정보 롤백 (팀장/임원 결재취소는 본인 승인만 취소)
+		if ("TODODIV2191".equals(paramMap.get("todoDiv2CodeId"))) {
+			Map<String, String> payParam = new HashMap<>();
+			payParam.put("tripReqNo", paramMap.get("todoNo"));
+			payParam.put("userId", paramMap.get("userId"));
+			payParam.put("pgmId", paramMap.get("pgmId") != null ? paramMap.get("pgmId") : "WB2001M01");
+			Map<String, String> m01 = pm51Mapper.selectTripReqM01(payParam);
+			if (m01 != null && paramMap.get("userId") != null && paramMap.get("userId").equals(m01.get("payId"))) {
+				pm51Mapper.updateTripReqPayCancel(payParam);
+			}
+		}
+
+		// 출장복명서 관리부서 결재(TODODIV2201) 취소 시: 지급/정산을 집행한 담당자(PAY_ID) 본인이 취소할 때만 경비정산/지급완료 롤백 (팀장/임원 결재취소는 본인 승인만 취소)
+		if ("TODODIV2201".equals(paramMap.get("todoDiv2CodeId"))) {
+			Map<String, String> payParam = new HashMap<>();
+			payParam.put("tripRptNo", paramMap.get("todoNo"));
+			payParam.put("userId", paramMap.get("userId"));
+			payParam.put("pgmId", paramMap.get("pgmId") != null ? paramMap.get("pgmId") : "WB2001M01");
+			Map<String, String> m02 = pm51Mapper.selectTripRptM01(payParam);
+			if (m02 != null && paramMap.get("userId") != null && paramMap.get("userId").equals(m02.get("payId"))) {
+				pm51Mapper.deleteTripRptD01(payParam);
+				pm51Mapper.clearTripExpenseStatusByRptNo(payParam);
+				pm51Mapper.updateTripRptPayCancel(payParam);
+			}
+		}
+
 		return result;
 	}
 
