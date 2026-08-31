@@ -5,6 +5,9 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -54,6 +57,9 @@ public class CM08Ctr {
 	
 	@Value("${spring.servlet.multipart.max-file-size:2000MB}")
 	private String maxFileSize;
+
+	@Value("${file.uploadDir}")
+	private String uploadDir;
 
 	@PostMapping(value = "/getMaxFileSize")
 	public String getMaxFileSize(ModelMap model) {
@@ -272,6 +278,63 @@ public class CM08Ctr {
                 if (sos != null) { try { sos.close(); } catch (Exception e) { } }
             }
         }       
+    }
+
+    /**
+     * UbiReport HTML5 뷰어에서 영수증 이미지를 렌더링할 때 사용하는 스트리밍 엔드포인트.
+     * WAS가 DB서버의 공유 스토리지(D:/gunyang/upload)에서 파일을 읽어 브라우저로 스트리밍한다.
+     */
+    @GetMapping(value = "/ubiReportImage")
+    public void ubiReportImage(@RequestParam String fileKey,
+                               HttpServletRequest request,
+                               HttpServletResponse response) throws Exception {
+        Map<String, String> fileInfo = cm08Svc.selectFileInfo(fileKey);
+        if (fileInfo == null
+                || fileInfo.get("fileName") == null
+                || fileInfo.get("filePath") == null
+                || !"Y".equalsIgnoreCase(fileInfo.get("useYn"))) {
+            response.sendError(HttpServletResponse.SC_NOT_FOUND);
+            return;
+        }
+
+        Path baseDir = Paths.get(uploadDir).toAbsolutePath().normalize();
+        Path storedDir = Paths.get(fileInfo.get("filePath")).toAbsolutePath().normalize();
+        if (!storedDir.startsWith(baseDir)) {
+            response.sendError(HttpServletResponse.SC_FORBIDDEN);
+            return;
+        }
+
+        String fileName = fileInfo.get("fileName");
+        String reportFileName = fileName;
+        if (fileName.matches("(?i).*\\.(heic|heif)$")) {
+            reportFileName = fileName.replaceFirst("(?i)\\.(heic|heif)$", ".png");
+        }
+
+        Path imagePath = storedDir.resolve(fileKey + "_" + reportFileName).normalize();
+        if (!imagePath.startsWith(baseDir) || !Files.isRegularFile(imagePath)) {
+            response.sendError(HttpServletResponse.SC_NOT_FOUND);
+            return;
+        }
+
+        String contentType = Files.probeContentType(imagePath);
+        if (contentType == null) {
+            String lowerName = reportFileName.toLowerCase();
+            if (lowerName.endsWith(".png")) {
+                contentType = "image/png";
+            } else if (lowerName.endsWith(".jpg") || lowerName.endsWith(".jpeg")) {
+                contentType = "image/jpeg";
+            } else if (lowerName.endsWith(".gif")) {
+                contentType = "image/gif";
+            } else {
+                contentType = "application/octet-stream";
+            }
+        }
+
+        response.setContentType(contentType);
+        response.setContentLengthLong(Files.size(imagePath));
+        response.setHeader("Content-Disposition", "inline");
+        response.setHeader("Cache-Control", "no-store");
+        Files.copy(imagePath, response.getOutputStream());
     }
     
 	@GetMapping(value="/excelDownload")

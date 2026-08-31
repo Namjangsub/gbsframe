@@ -190,6 +190,12 @@ public class AccessTokenValidationFilter extends OncePerRequestFilter {
          * CLIENT_CERT_SUBJECT_MISMATCH : Subject DN 불일치
          * ============================== */
         if (!mtlsExcluded) {
+            // UbiReport 서버(동일 서버 톰캣)가 PDF/인쇄 생성 시 서버 로컬에서 이미지 요청하는 경우 허용
+            if (isUbiImageRequest(request) && isLocalOrLoopback(request)) {
+                chain.doFilter(request, response);
+                return;
+            }
+
 	        X509Certificate[] certs =
 	            (X509Certificate[]) request.getAttribute("javax.servlet.request.X509Certificate");
 	
@@ -616,5 +622,18 @@ public class AccessTokenValidationFilter extends OncePerRequestFilter {
 	        }
 	    }
 	    return false;
+	}
+
+	private boolean isUbiImageRequest(HttpServletRequest request) {
+	    String path = normalizedPath(request);
+	    return pathMatcher.match("/admin/cm/cm08/ubiReportImage", path);
+	}
+
+	private boolean isLocalOrLoopback(HttpServletRequest request) {
+	    String remoteAddr = request.getRemoteAddr();
+	    return "127.0.0.1".equals(remoteAddr)
+	            || "0:0:0:0:0:0:0:1".equals(remoteAddr)
+	            || "::1".equals(remoteAddr)
+	            || remoteAddr.equals(request.getLocalAddr());
 	}
 }

@@ -500,7 +500,7 @@ if(jwt){
         ubiprefix = "http://localhost:8090/ubi4";
         break;
     case "local" :
-        ubiprefix = "https://localhost:8443/ubi4";
+        ubiprefix = window.location.protocol + "//" + window.location.hostname + ":8443/ubi4";
         break;
     default :
         ubiprefix = "https://gbs.gunyangitt.co.kr:8443/ubi4";
@@ -2012,6 +2012,9 @@ function insertPgmHistory(url) {
 }
 
 function callReport(fileName, arg, width, height, reporttitle){
+	if (arg && arg.indexOf("wasUrl#") === -1) {
+		arg += "wasUrl#" + window.location.origin + "#";
+	}
 	var url = ubiprefix + "/ubihtml.jsp";
 	url += "?file="+fileName;
 	url += "&arg="+encodeURIComponent(arg);
