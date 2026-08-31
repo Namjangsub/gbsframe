@@ -2,8 +2,8 @@ package com.dksys.biz.user.pm.pm51.service.impl;
 
 import java.lang.reflect.Type;
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -1030,8 +1030,9 @@ public class PM51SvcImpl implements PM51Svc {
 		if (m01 == null) {
 			throw new RuntimeException("출장신청서 정보를 찾을 수 없습니다.");
 		}
-		if (hasText(m01.get("payDt"))) {
-			throw new RuntimeException("지급완료된 출장신청서는 수정할 수 없습니다.");
+		// 출장복명서는 출장신청서가 지급완료된 후 진행되는 서식이므로, 복명서(m02)의 지급완료 여부 검사
+		if (hasText(m02.get("payDt"))) {
+			throw new RuntimeException("지급완료된 출장복명서는 수정할 수 없습니다.");
 		}
 
 		String applicantId = m01.get("userId");

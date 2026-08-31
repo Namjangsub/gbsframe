@@ -813,7 +813,7 @@ var approvalWorkingGrid; //팝업화면에서 결재정보 저장용
 		
 		//코칭수정 버튼이 활성화 상태이면 결과 Update 처리 선행
 		//필요시 프로그램 에 따라 분기 처리
-		if (row.teamManager == '평가') { // 팀장 결재시
+		if (row.teamManager == '평가' || callPgm == 'PM5102P01') { // 팀장 결재시
 			let chkFlag = false;
 			if (callPgm =='QM0101P01') {
 				chkFlag = ModalApp.updateQualityResultComment('결과수정');
@@ -821,6 +821,11 @@ var approvalWorkingGrid; //팝업화면에서 결재정보 저장용
 				chkFlag = updateQualityResultComment('결과수정');
 			} else  if (callPgm == 'WB2401P01' || callPgm == 'WB2401P11') {
 				chkFlag = updateIssueComment('결과수정');
+			} else if (callPgm == 'PM5102P01') {
+				if (typeof saveTripRptMngEval === 'function') {
+					saveTripRptMngEval(true);
+				}
+				return false; // saveTripRptMngEval 내부에서 부서장평가 저장 및 결재 승인이 완결 처리되므로 추가 진행 차단
 			}
 			if (!chkFlag) {return false;}
 		}

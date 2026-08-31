@@ -580,6 +580,7 @@
 	<!-- 하단 버튼 -->
 	<div class="popup_bottom_btn">
 		<button type="button" id="saveBtn" onclick="saveTripReq();" authchk>저장</button>
+		<button type="button" id="printBtn" onclick="printTripReqP01();" style="display:none; background-color: #337ab7; color: white; border-color: #2e6da4;">출력</button>
 		<button type="button" id="payBtn" onclick="payTripReq();" authchk style="display:none; background-color: #5cb85c; color: white; border-color: #5cb85c;">지급완료처리</button>
 		<button type="button" id="deleteBtn" onclick="deleteTripReqModal();" authchk style="display:none;">삭제</button>
 		<button type="button" id="fileSaveBtn" onclick="saveFileOnly();" authchk style="display:none; background-color: #5cb85c; color: white; border-color: #5cb85c;">첨부파일저장</button>
@@ -2210,6 +2211,14 @@
 			// 편집정책 적용 과정의 자동계산 덮어쓰기 방지: DB 경비값을 최종 반영
 			bindExpenseTableData(expenseList);
 
+			// 결재완료(APRVSTS03) 시 출력 버튼 노출
+			var currentAprvStsCd = master.aprvStsCd || master.APRV_STS_CD || '';
+			if (currentAprvStsCd === 'APRVSTS03') {
+				$('#printBtn').show();
+			} else {
+				$('#printBtn').hide();
+			}
+
 			$('#fileTrgtKey').val(master.fileTrgtKey); //첨부파일
 			initFileTree(); //첨부파일
 
@@ -2843,6 +2852,9 @@
 		putAjax("/user/pm/pm51/deleteTripReq", { tripReqNo: tripReqNo, userId: jwt.userId }, null, function (data) {
 			if (data.resultCode === 200) {
 				alert(data.resultMessage);
+				if (modalStack.last() && typeof modalStack.last().callback === 'function') {
+					modalStack.last().callback(data);
+				}
 				modalStack.close();
 			} else if (data.resultCode === 900) {
 				alert(data.resultMessage);
@@ -3156,6 +3168,36 @@
 		return hasCompletedApproval() || hasCompletedApprovalMng();
 	}
 
+	// 출장신청서 결재 완료(APRVSTS03) 여부 확인
+	function isTripReqApproved() {
+		var tripReqNo = $('#tripReqNo').val();
+		if (!tripReqNo || (popParam && popParam.actionType === 'C')) {
+			return false;
+		}
+		return !!(currentTripReqMaster && currentTripReqMaster.aprvStsCd === 'APRVSTS03');
+	}
+
+	// 출장신청서 출력 (팝업)
+	function printTripReqP01() {
+		var tripReqNo = $('#tripReqNo').val();
+		if (!tripReqNo) {
+			alert("저장된 출장신청서만 출력할 수 있습니다.");
+			return;
+		}
+
+		if (!isTripReqApproved()) {
+			alert("결재 완료 후 출력할 수 있습니다.");
+			return;
+		}
+
+		var fileName = "PM5101R01.jrf";
+		var arg = "coCd#" + (jwt.coCd || $('#coCd').val() || "GUN")
+				+ "#tripReqNo#" + tripReqNo
+				+ "#";
+
+		callReport(fileName, arg, 1150, 720, '출장신청서');
+	}
+
 	function reapplyEditPolicyAfterApprovalLoad() {
 		if (currentTripReqMaster) {
 			applyEditPolicy(currentTripReqMaster);
@@ -3208,6 +3250,9 @@
 				kakaoTodo(param.tripReqNo);
 				if (typeof myTodoStatusRtv === 'function') { myTodoStatusRtv(); }
 				alert(data.resultMessage);
+				if (modalStack.last() && typeof modalStack.last().callback === 'function') {
+					modalStack.last().callback(data);
+				}
 				modalStack.close();
 			} else if (data.resultCode === 900) {
 				alert(data.resultMessage);
@@ -3345,9 +3390,16 @@
 		}
 		var $editButtons = $popArea.find('#autoCalcBtn, .add_btn_small a, #salesCdBtn, #reqNmBtn, #pmNmBtn');
 		var $actionButtons = $popArea.find('#saveBtn, #payBtn, #deleteBtn, #fileSaveBtn');
-		var aprvStsCd = master.aprvStsCd || '';
+		var aprvStsCd = master ? (master.aprvStsCd || master.APRV_STS_CD || '') : '';
 		var paid = !!master.payDt;
 		var actionType = popParam.actionType;
+
+		// 결재완료(APRVSTS03) 시 출력 버튼 노출
+		if ($('#tripReqNo').val() && aprvStsCd === 'APRVSTS03') {
+			$('#printBtn').show();
+		} else {
+			$('#printBtn').hide();
+		}
 
 		// PAY 모드: 그리드 편집 완전 차단
 		if (actionType === 'PAY') {
@@ -3589,6 +3641,13 @@
 		var isFileSaveVisible = $popArea.find('#fileSaveBtn').is(':visible');
 		if (!isSaveVisible && !isPayVisible && !isFileSaveVisible) {
 			$('#popTitle').text('출장신청서 조회만가능');
+		}
+
+		// 결재 완료(APRVSTS03) 시 출력 버튼 노출
+		if ($('#tripReqNo').val() && isTripReqApproved()) {
+			$popArea.find('#printBtn').show();
+		} else {
+			$popArea.find('#printBtn').hide();
 		}
 	}
 

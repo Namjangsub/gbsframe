@@ -669,7 +669,27 @@ public class WB20SvcImpl implements WB20Svc {
 		/***************************************************************************************
 		 * 결재 취소 처리시 팀장인경우에만 투입공수 Clear 처리 가능함 -- 처리종료
 		 ***************************************************************************************/
-		
+
+		// 출장신청 관리부서 결재(TODODIV2191) 취소 시 지급완료 정보(PAY_DT, PAY_ID) 롤백
+		if ("TODODIV2191".equals(paramMap.get("todoDiv2CodeId"))) {
+			Map<String, String> payParam = new HashMap<>();
+			payParam.put("tripReqNo", paramMap.get("todoNo"));
+			payParam.put("userId", paramMap.get("userId"));
+			payParam.put("pgmId", paramMap.get("pgmId") != null ? paramMap.get("pgmId") : "WB2001M01");
+			pm51Mapper.updateTripReqPayCancel(payParam);
+		}
+
+		// 출장복명서 관리부서 결재(TODODIV2201) 취소 시 경비정산 및 지급완료 정보(PAY_DT, PAY_ID, TB_PM01D01 점유) 롤백
+		if ("TODODIV2201".equals(paramMap.get("todoDiv2CodeId"))) {
+			Map<String, String> payParam = new HashMap<>();
+			payParam.put("tripRptNo", paramMap.get("todoNo"));
+			payParam.put("userId", paramMap.get("userId"));
+			payParam.put("pgmId", paramMap.get("pgmId") != null ? paramMap.get("pgmId") : "WB2001M01");
+			pm51Mapper.deleteTripRptD01(payParam);
+			pm51Mapper.clearTripExpenseStatusByRptNo(payParam);
+			pm51Mapper.updateTripRptPayCancel(payParam);
+		}
+
 		return result;
 	}
 

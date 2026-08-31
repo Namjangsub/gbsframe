@@ -3773,18 +3773,18 @@
 	}
 
 	// 부서장평가/결재자판단만 저장 (결재 진행중인 문서에 대한 팀장 전용 경량 저장)
-	function saveTripRptMngEval() {
+	function saveTripRptMngEval(isCalledBeforeApproval) {
 		if (!$('#deptEvalCd').val()) {
 			setErrorStyle($('#deptEvalCd'));
 			alert('부서장평가를 선택해주세요.');
 			$('#deptEvalCd').focus();
-			return;
+			return false;
 		}
 		if ($('input[name="aprvEvalCd"]:checked').length === 0) {
 			setErrorStyle($('input[name="aprvEvalCd"]'));
 			alert('결재자판단을 선택해주세요.');
 			$('input[name="aprvEvalCd"]').eq(0).focus();
-			return;
+			return false;
 		}
 		var param = {
 			tripRptNo: $('#tripRptNo').val(),
@@ -3793,12 +3793,14 @@
 			userId: jwt.userId,
 			pgmId: $('#pgmId').val()
 		};
-		postAjax("/user/pm/pm51/updateTripRptMngEval", param, null, function (data) {
+		var isSuccess = false;
+		postAjaxSync("/user/pm/pm51/updateTripRptMngEval", param, null, function (data) {
 			if (data.resultCode === 200) {
+				isSuccess = true;
 				// 결재처리(승인완료)와 1 set: 남은 결재자에게 결재요청 알림톡 재발송(기발송자는 자동 제외됨)
-				kakaoTodo(param.tripRptNo);
+				try { kakaoTodo(param.tripRptNo); } catch(e) {}
 				if (typeof myTodoStatusRtv === 'function') { myTodoStatusRtv(); }
-				alert(data.resultMessage);
+				alert("부서장 평가 및 결재 처리가 완료되었습니다.");
 				if (modalStack.last() && typeof modalStack.last().callback === 'function') {
 					modalStack.last().callback(data);
 				}
@@ -3809,6 +3811,7 @@
 				alert("저장 중 오류 발생: " + data.resultMessage);
 			}
 		});
+		return isSuccess;
 	}
 
 	// 외화2 사용 여부 판정: 사용 시 통화코드2, 미사용 시 '' 반환
@@ -4376,8 +4379,8 @@
 				$('input[name="aprvEvalCd"]').closest('td').prev('th').addClass('hit');
 				$('input[name="aprvEvalCd"]').removeClass('readonly-check').prop('disabled', false).css('pointer-events', 'auto');
 
-				// 저장 버튼 활성화 (보여줌)
-				$popArea.find('#saveBtn').show();
+				// 팀장이 결재 진행 시에는 저장 버튼을 숨기고 '결재처리' 버튼으로 일원화
+				$popArea.find('#saveBtn').hide();
 			}
 		}
 	}
