@@ -813,7 +813,7 @@ var approvalWorkingGrid; //팝업화면에서 결재정보 저장용
 		
 		//코칭수정 버튼이 활성화 상태이면 결과 Update 처리 선행
 		//필요시 프로그램 에 따라 분기 처리
-		if (row.teamManager == '평가' || callPgm == 'PM5102P01') { // 팀장 결재시
+		if (row.teamManager == '평가' || (callPgm == 'PM5102P01' && row.todoDiv2CodeId == 'TODODIV2200')) { // 팀장 결재시
 			let chkFlag = false;
 			if (callPgm =='QM0101P01') {
 				chkFlag = ModalApp.updateQualityResultComment('결과수정');
@@ -821,7 +821,7 @@ var approvalWorkingGrid; //팝업화면에서 결재정보 저장용
 				chkFlag = updateQualityResultComment('결과수정');
 			} else  if (callPgm == 'WB2401P01' || callPgm == 'WB2401P11') {
 				chkFlag = updateIssueComment('결과수정');
-			} else if (callPgm == 'PM5102P01') {
+			} else if (callPgm == 'PM5102P01' && row.todoDiv2CodeId == 'TODODIV2200') {
 				if (typeof saveTripRptMngEval === 'function') {
 					saveTripRptMngEval(true);
 				}

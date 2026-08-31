@@ -3168,11 +3168,30 @@
 		return hasCompletedApproval() || hasCompletedApprovalMng();
 	}
 
-	// 출장신청서 결재 완료(APRVSTS03) 여부 확인
+	// 출장신청서 결재 완료(파란색 신호등: appTotCnt > 0 && appDoneCnt === appTotCnt) 여부 확인
 	function isTripReqApproved() {
 		var tripReqNo = $('#tripReqNo').val();
 		if (!tripReqNo || (popParam && popParam.actionType === 'C')) {
 			return false;
+		}
+		if (popParam && popParam.appTotCnt != null && popParam.appDoneCnt != null) {
+			var pTot = Number(popParam.appTotCnt || 0);
+			var pDone = Number(popParam.appDoneCnt || 0);
+			if (pTot > 0 && pTot === pDone) return true;
+		}
+		if (gridViewApproval && gridViewApproval.target && gridViewApproval.target.getList) {
+			var list = gridViewApproval.target.getList() || [];
+			var tot = 0;
+			var done = 0;
+			$.each(list, function(idx, elem) {
+				if (elem.gb === '결재') {
+					tot++;
+					if ($.trim(elem.todoCfDt || '') || elem.sanctnSttus === 'Y') {
+						done++;
+					}
+				}
+			});
+			if (tot > 0 && tot === done) return true;
 		}
 		return !!(currentTripReqMaster && currentTripReqMaster.aprvStsCd === 'APRVSTS03');
 	}
@@ -4632,22 +4651,41 @@
 		});
 	}
 
-	// gb='결재' 행 중 아직 미완료(확인일자 없음 && sanctnSttus!=='Y')인 행 중 실제 순번(sanctnSn)이 가장 작은 값을 반환. 모두 완료/행없음이면 null.
-	// 그리드 로드 순서(ORDER BY SANCTN_SN DESC)와 배열 인덱스는 실제 순번과 일치하지 않으므로 반드시 row.sanctnSn 값을 기준으로 판단한다.
-	function getFirstPendingApprovalSn(gridView) {
-		if (!gridView || !gridView.target || !gridView.target.getList) return null;
-		var rows = $.grep(gridView.target.getList() || [], function(r) { return r.gb === '결재'; });
+	// 지정된 todoNo/todoDiv2CodeId 결재선에서 아직 미완료(sanctnSttus!=='Y' && 확인일자 없음)인 최소 순번(sanctnSn) 결재자 순번을 DB에서 조회.
+	// DB 기준으로 판단하므로 저장 직후 자체승인(1번=작성자)이 서버에서 처리된 상태도 완벽하게 반영된다.
+	function getPm51ActivePendingSnFromDb(docNo, todoDiv2CodeId) {
+		if (!docNo || !todoDiv2CodeId) return null;
+		var rows = [];
+		postAjaxSync("/user/wb/wb20/selectGetApprovalList", { todoNo: docNo, todoDiv2CodeId: todoDiv2CodeId }, null, function(data) {
+			rows = data.resultList || [];
+		});
 		var minPendingSn = null;
 		$.each(rows, function(idx, row) {
-			var isDone = $.trim(row.todoCfDt || '') || row.sanctnSttus === 'Y';
-			if (!isDone) {
-				var sn = Number(row.sanctnSn);
-				if (!isNaN(sn) && (minPendingSn === null || sn < minPendingSn)) {
-					minPendingSn = sn;
-				}
+			if (row.sanctnSttus === 'Y' || (row.todoCfDt && $.trim(row.todoCfDt))) return;
+			var sn = Number(row.sanctnSn || 0);
+			if (!sn) return;
+			if (minPendingSn === null || sn < minPendingSn) {
+				minPendingSn = sn;
 			}
 		});
 		return minPendingSn;
+	}
+
+	// DB 기준으로 지정된 결재선(todoDiv2CodeId)의 결재(gb='결재')가 모두 완료되었는지 확인
+	function isPm51ApprovalFullyCompletedFromDb(docNo, todoDiv2CodeId) {
+		if (!docNo || !todoDiv2CodeId) return false;
+		var rows = [];
+		postAjaxSync("/user/wb/wb20/selectGetApprovalList", { todoNo: docNo, todoDiv2CodeId: todoDiv2CodeId }, null, function(data) {
+			rows = data.resultList || [];
+		});
+		var approvalRows = $.grep(rows, function(r) { return r.gb === '결재' || r.todoDiv1CodeId === 'TODODIV20'; });
+		if (approvalRows.length === 0) return false;
+		var allDone = true;
+		$.each(approvalRows, function(idx, row) {
+			var isDone = $.trim(row.todoCfDt || '') || row.sanctnSttus === 'Y';
+			if (!isDone) { allDone = false; return false; }
+		});
+		return allDone;
 	}
 
 	// 일반결재(신청부서) 완료 여부. 지급완료처리 버튼 노출/실행의 전제조건이다.
@@ -4709,16 +4747,16 @@
 			}
 		});
 
-		// 순차결재: 신청부서(TODODIV2190) 결재는 현재 차례(첫 미결 순번)인 사람에게만 발송
-		var reqActiveSn = getFirstPendingApprovalSn(gridViewApproval);
+		// 순차결재: 신청부서(TODODIV2190) 결재는 DB 기준 현재 차례(첫 미결 순번)인 사람에게만 발송
+		var reqActiveSn = getPm51ActivePendingSnFromDb(docNo, 'TODODIV2190');
 		if (reqActiveSn) {
 			kakaoSendBody(docNo, 'TODODIV20', 'TODODIV2190', '결재', clntNm, teleNo, reqActiveSn);	// 개인 결재
 		}
 		kakaoSendBody(docNo, 'TODODIV10', 'TODODIV1190', '공유', clntNm, teleNo);	// 개인 공유 (순서 무관, 전체 발송)
 
 		// 관리부서 결재/공유는 신청부서 결재가 모두 완료된 이후에만 시작 (관리부서 내에서도 SPECRTS14 등록순 순차결재)
-		if (isApprovalFullyCompleted(gridViewApproval)) {
-			var mngActiveSn = getFirstPendingApprovalSn(gridViewApprovalMng);
+		if (isPm51ApprovalFullyCompletedFromDb(docNo, 'TODODIV2190')) {
+			var mngActiveSn = getPm51ActivePendingSnFromDb(docNo, 'TODODIV2191');
 			if (mngActiveSn) {
 				kakaoSendBody(docNo, 'TODODIV20', 'TODODIV2191', '결재', clntNm, teleNo, mngActiveSn);	// 관리부서 결재
 			}

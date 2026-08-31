@@ -434,7 +434,9 @@ function Approval(htmlParam, param, popParam) {
 			postAjaxSync("/user/wb/wb20/insertApprovalLine", paramMap, null, function(data){
 				if(data.resultCode == 200){
 					confirmYn = true;
-					let todoYn = data.result.todoYn;
+					let todoYn = (data.result && data.result.todoYn) ? data.result.todoYn : '';
+					var isPm51Seq = paramMap.todoDiv2CodeId === 'TODODIV2190' || paramMap.todoDiv2CodeId === 'TODODIV2191'
+					             || paramMap.todoDiv2CodeId === 'TODODIV2200' || paramMap.todoDiv2CodeId === 'TODODIV2201';
 					if( todoYn == "Y" || todoCfOpn != '') {		//모든 결재요청이 완료되면 카톡 전송
 						paramMap.bigo = "";		//보완요청일경우만 자료가 있음.
 						// PFU 공유 등록 결과는 insertApprovalLine 응답으로 함께 처리
@@ -443,13 +445,11 @@ function Approval(htmlParam, param, popParam) {
 
 						}
 						sendTodoFinal(paramMap);
-					} else if (typeof notifyPm51NextApprover === 'function'
-							&& typeof PM51_SEQUENTIAL_DIV_MAP !== 'undefined'
-							&& PM51_SEQUENTIAL_DIV_MAP.hasOwnProperty(paramMap.todoDiv2CodeId)) {
+					} else if (typeof notifyPm51NextApprover === 'function' && isPm51Seq) {
 						// PM51 순차결재: 중간 결재자가 결재의견 없이 승인하면 sendTodoFinal()이 호출되지 않아
 						// 다음 차례 결재자에게 결재요청 알림톡이 발송되지 않던 문제 보완.
 						var pm51HasNext = notifyPm51NextApprover(paramMap.todoNo, paramMap.todoDiv2CodeId, paramMap.pgmId);
-						if (!pm51HasNext) {
+						if (!pm51HasNext && typeof PM51_SEQUENTIAL_DIV_MAP !== 'undefined' && PM51_SEQUENTIAL_DIV_MAP.hasOwnProperty(paramMap.todoDiv2CodeId)) {
 							// 신청부서(개인) 결재가 모두 완료됨 -> 관리부서 결재 1번 순번에게 시작 알림
 							notifyPm51NextApprover(paramMap.todoNo, PM51_SEQUENTIAL_DIV_MAP[paramMap.todoDiv2CodeId], paramMap.pgmId);
 						}

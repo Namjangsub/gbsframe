@@ -1030,9 +1030,9 @@ public class PM51SvcImpl implements PM51Svc {
 		if (m01 == null) {
 			throw new RuntimeException("출장신청서 정보를 찾을 수 없습니다.");
 		}
-		// 출장복명서는 출장신청서가 지급완료된 후 진행되는 서식이므로, 복명서(m02)의 지급완료 여부 검사
-		if (hasText(m02.get("payDt"))) {
-			throw new RuntimeException("지급완료된 출장복명서는 수정할 수 없습니다.");
+		// 관리부서 결재까지 최종 완료된 출장복명서는 수정 불가
+		if (hasCompletedApproval(paramMap, true)) {
+			throw new RuntimeException("최종 결재 완료된 출장복명서는 수정할 수 없습니다.");
 		}
 
 		String applicantId = m01.get("userId");
@@ -1475,8 +1475,10 @@ public class PM51SvcImpl implements PM51Svc {
 		if (m01 == null) {
 			throw new RuntimeException("출장신청서 정보를 찾을 수 없습니다.");
 		}
-		if (hasText(m02.get("payDt"))) {
-			throw new RuntimeException("지급완료된 출장복명서는 수정할 수 없습니다.");
+		Map<String, String> chkParam = new HashMap<>();
+		chkParam.put("tripRptNo", tripRptNo);
+		if (hasCompletedApproval(chkParam, true)) {
+			throw new RuntimeException("최종 결재 완료된 출장복명서는 수정할 수 없습니다.");
 		}
 
 		// 회계담당자 권한 검증

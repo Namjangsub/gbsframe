@@ -79,6 +79,14 @@
 			padding: 6px;
 			margin-bottom: 15px;
 		}
+		.readonly-grid-selector [data-ax5grid-panel="aside-header"],
+		.readonly-grid-selector [data-ax5grid-panel="aside-body"],
+		.readonly-grid-selector td[data-ax5grid-column-row="selector"],
+		.readonly-grid-selector td[data-ax5grid-column-key="__checkbox_header__"] {
+			pointer-events: none !important;
+			opacity: 0.45 !important;
+			cursor: default !important;
+		}
 	</style>
 	<div class="tit_contents">
 		<h4 class="tit" id="popTitle">출장복명서</h4>
@@ -621,6 +629,7 @@
 	<!-- 하단 버튼 -->
 	<div class="popup_bottom_btn">
 		<button type="button" id="saveBtn" onclick="saveTripRpt();" authchk>저장</button>
+		<button type="button" id="printBtn" onclick="printTripRptP01();" style="display:none; background-color: #337ab7; color: white; border-color: #2e6da4;">출력</button>
 		<button type="button" id="deleteBtn" onclick="deleteTripRpt();" authchk style="display:none;">삭제</button>
 		<button type="button" class="close_btn" onclick="modalStack.close();">닫기</button>
 	</div>
@@ -1028,6 +1037,13 @@
 		});
 	}
 
+	// 출장 경비 신청 현황: 회계팀 자금담당자 처리 가능 상태인지 판정
+	function isExpenseStatusSelectionAllowed() {
+		var actionType = $('#actionType').val();
+		if (actionType === 'C') return false;
+		return isAccountingUser() && !isRptPaid() && !hasCompletedMngApproval();
+	}
+
 	// 출장 경비 신청 현황: 식비/식대/숙박비 항목 여부 판정 (선택 원천 차단 + 자동선택 제외 + 안내 alert에서 공용으로 사용)
 	function isExcludedTripRptType(item) {
 		var expTypNm = String((item && (item.tripRptTypNm || item.tripRptTyp)) || '').trim();
@@ -1121,7 +1137,7 @@
 				{ key: 'tripRptRound', label: '결정회차', width: 60, align: 'center',
 					editor: {
 						type: 'select',
-						disabled: function() { return !isAccountingUser() || isRptPaid() || hasCompletedMngApproval(); },
+						disabled: function() { return !isExpenseStatusSelectionAllowed(); },
 						config: {
 							columnKeys: { optionValue: 'CD', optionText: 'NM' },
 							options: [...comboTripRptRound]
@@ -1134,7 +1150,7 @@
 				{ key: 'tripRptRsvDiv', label: '예비비/일반', width: 80, align: 'center',
 					editor: {
 						type: 'select',
-						disabled: function() { return !isAccountingUser() || isRptPaid() || hasCompletedMngApproval(); },
+						disabled: function() { return !isExpenseStatusSelectionAllowed(); },
 						config: {
 							columnKeys: { optionValue: 'CD', optionText: 'NM' },
 							options: [...comboTripRptRsvDiv]
@@ -1147,7 +1163,7 @@
 				{ key: 'tripRptCardExrate', label: '카드사환율', width: 80, align: 'right',
 					editor: {
 						type: 'number',
-						disabled: function() { return !isAccountingUser() || isRptPaid() || hasCompletedMngApproval(); }
+						disabled: function() { return !isExpenseStatusSelectionAllowed(); }
 					},
 					formatter: "money", hidden:true
 				},
@@ -1158,9 +1174,22 @@
 			]
 		});
 
-		// ax5grid 헤더 전체선택 후 합계 재계산
+		// 행/전체선택 권한 제어: 회계 자금담당자가 결재 단계로 진입한 경우가 아니면 선택 조작 불가
+		var originalSelect = tripExpenseStatusGridView.target.select;
+		tripExpenseStatusGridView.target.select = function(dindex, options) {
+			if (options && options.__internal__) {
+				return originalSelect.call(this, dindex, options);
+			}
+			if (!isExpenseStatusSelectionAllowed()) return this;
+			return originalSelect.apply(this, arguments);
+		};
+
 		var originalSelectAll = tripExpenseStatusGridView.target.selectAll;
 		tripExpenseStatusGridView.target.selectAll = function(options) {
+			if (options && options.__internal__) {
+				return originalSelectAll.call(this, options);
+			}
+			if (!isExpenseStatusSelectionAllowed()) return this;
 			var result = originalSelectAll.apply(this, arguments);
 			setTimeout(function() {
 				refreshSettlementSummaryGrids();
@@ -1892,7 +1921,7 @@
 			var mappedD03 = $.map(currentTripRptD03, function(row) { return mapTripRptD03ToGridRow(row); });
 			tripExpenseStatusGridView.target.setData({ list: mappedD03, page: { totalElements: mappedD03.length } });
 			$.each(mappedD03, function(didx, rowItem) {
-				tripExpenseStatusGridView.target.select(didx, { selected: true });
+				tripExpenseStatusGridView.target.select(didx, { selected: true, __internal__: true });
 			});
 			calculateTripExpenseStatusKrw();
 			resizeTripExpenseStatusGrid(mappedD03.length);
@@ -1966,10 +1995,10 @@
 			}
 
 			tripExpenseStatusGridView.target.setData({ list: rows, page: { totalElements: rows.length } });
-			// 자동 선택: 신규 작성은 전체 항목 선택, 조회/수정은 마지막 저장 시 확정된 항목(acctRegId 존재 = TB_PM52D01에 있었음)만 선택
+			// 자동 선택: 기존 문서의 확정 항목(acctRegId 존재)만 선택
 			$.each(rows, function(didx, rowItem) {
-				if (isExistingDoc ? !!rowItem.acctRegId : true) {
-					tripExpenseStatusGridView.target.select(didx, { selected: true });
+				if (isExistingDoc && rowItem.acctRegId) {
+					tripExpenseStatusGridView.target.select(didx, { selected: true, __internal__: true });
 				}
 			});
 			calculateTripExpenseStatusKrw();
@@ -2796,6 +2825,13 @@
 			$('#actionType').val('U');
 			currentTripRptMaster = m02;
 
+			// 결재 완료(APRVSTS03) 시 출력 버튼 노출
+			if (m02.aprvStsCd === 'APRVSTS03') {
+				$('#printBtn').show();
+			} else {
+				$('#printBtn').hide();
+			}
+
 			// 회계지급용 박/일 (수기 입력 또는 실제일정 자동계산값)
 			if (m02.acctNightCnt != null && m02.acctNightCnt !== '') {
 				$('#acctNightCnt').val(m02.acctNightCnt).data('autoCalculated', false);
@@ -3538,6 +3574,48 @@
 	}
 
 
+
+	// 일반결재(신청부서 결재)가 모두 완료되었는지(파란색 신호등: appTotCnt > 0 && appDoneCnt === appTotCnt)
+	function isRptGeneralApprovalFullyDone() {
+		if (popParam && popParam.appTotCnt != null && popParam.appDoneCnt != null) {
+			var pTot = Number(popParam.appTotCnt || 0);
+			var pDone = Number(popParam.appDoneCnt || 0);
+			if (pTot > 0 && pTot === pDone) return true;
+		}
+		if (gridViewApproval && gridViewApproval.target && gridViewApproval.target.getList) {
+			var list = gridViewApproval.target.getList() || [];
+			var tot = 0;
+			var done = 0;
+			$.each(list, function(idx, elem) {
+				if (elem.gb === '결재') {
+					tot++;
+					if ($.trim(elem.todoCfDt || '') || elem.sanctnSttus === 'Y') {
+						done++;
+					}
+				}
+			});
+			if (tot > 0 && tot === done) return true;
+		}
+		return false;
+	}
+
+	// 출장복명서 출력
+	function printTripRptP01() {
+		var tripRptNo = $('#tripRptNo').val();
+		if (!tripRptNo) {
+			alert("출력할 복명서 번호가 없습니다.");
+			return;
+		}
+		if (!isRptGeneralApprovalFullyDone()) {
+			alert("결재 완료 후 출력할 수 있습니다.");
+			return;
+		}
+		var fileName = "PM5102R01.jrf";
+		var arg = "coCd#" + jwt.coCd
+				+ "#tripRptNo#" + tripRptNo
+				+ "#";
+		callReport(fileName, arg, 1150, 720, '출장복명서');
+	}
 
 	// 저장
 	function saveTripRpt() {
@@ -4383,6 +4461,13 @@
 				$popArea.find('#saveBtn').hide();
 			}
 		}
+
+		// 일반결재 완료(파란색 신호등: appTotCnt > 0 && appDoneCnt === appTotCnt) 시 출력 버튼 노출
+		if ($('#tripRptNo').val() && isRptGeneralApprovalFullyDone()) {
+			$popArea.find('#printBtn').show();
+		} else {
+			$popArea.find('#printBtn').hide();
+		}
 	}
 
 	function setArea1Disabled(disabled) {
@@ -4409,6 +4494,7 @@
 			$('#rptCardArea').find('.add_btn_small, .add_btn_small a').show();
 			// 그리드 편집 가능 여부는 각 컬럼의 editor.disabled(isAccountingUser/isRptPaid 기준)가 실시간으로 반영
 			$('#advRcvAmtKrw, #advRcvAmtUsd, #advRcvAmtUsd2, #acctNightCnt, #acctDayCnt, #acctEatCnt').prop('disabled', false);
+			$('[data-ax5grid="tripExpenseStatusGrid"]').removeClass('readonly-grid-selector');
 			// 원화 정산 건이면 활성화 이후에도 우측(외화) 정산 입력은 계속 차단
 			applyUsdSettleBlockPolicy();
 		} else {
@@ -4422,6 +4508,7 @@
 			$('#rptCardArea').find('.add_btn_small, .add_btn_small a').hide();
 			// 그리드 편집 가능 여부는 각 컬럼의 editor.disabled(isAccountingUser/isRptPaid 기준)가 실시간으로 반영
 			$('#advRcvAmtKrw, #advRcvAmtUsd, #advRcvAmtUsd2, #acctNightCnt, #acctDayCnt, #acctEatCnt').prop('disabled', true);
+			$('[data-ax5grid="tripExpenseStatusGrid"]').addClass('readonly-grid-selector');
 		}
 	}
 
@@ -4686,22 +4773,41 @@
 		});
 	}
 
-	// gb='결재' 행 중 아직 미완료(확인일자 없음 && sanctnSttus!=='Y')인 행 중 실제 순번(sanctnSn)이 가장 작은 값을 반환. 모두 완료/행없음이면 null.
-	// 그리드 로드 순서(ORDER BY SANCTN_SN DESC)와 배열 인덱스는 실제 순번과 일치하지 않으므로 반드시 row.sanctnSn 값을 기준으로 판단한다.
-	function getFirstPendingApprovalSn(gridView) {
-		if (!gridView || !gridView.target || !gridView.target.getList) return null;
-		var rows = $.grep(gridView.target.getList() || [], function(r) { return r.gb === '결재'; });
+	// 지정된 todoNo/todoDiv2CodeId 결재선에서 아직 미완료(sanctnSttus!=='Y' && 확인일자 없음)인 최소 순번(sanctnSn) 결재자 순번을 DB에서 조회.
+	// DB 기준으로 판단하므로 저장 직후 자체승인(1번=작성자)이 서버에서 처리된 상태도 완벽하게 반영된다.
+	function getPm51ActivePendingSnFromDb(docNo, todoDiv2CodeId) {
+		if (!docNo || !todoDiv2CodeId) return null;
+		var rows = [];
+		postAjaxSync("/user/wb/wb20/selectGetApprovalList", { todoNo: docNo, todoDiv2CodeId: todoDiv2CodeId }, null, function(data) {
+			rows = data.resultList || [];
+		});
 		var minPendingSn = null;
 		$.each(rows, function(idx, row) {
-			var isDone = $.trim(row.todoCfDt || '') || row.sanctnSttus === 'Y';
-			if (!isDone) {
-				var sn = Number(row.sanctnSn);
-				if (!isNaN(sn) && (minPendingSn === null || sn < minPendingSn)) {
-					minPendingSn = sn;
-				}
+			if (row.sanctnSttus === 'Y' || (row.todoCfDt && $.trim(row.todoCfDt))) return;
+			var sn = Number(row.sanctnSn || 0);
+			if (!sn) return;
+			if (minPendingSn === null || sn < minPendingSn) {
+				minPendingSn = sn;
 			}
 		});
 		return minPendingSn;
+	}
+
+	// DB 기준으로 지정된 결재선(todoDiv2CodeId)의 결재(gb='결재')가 모두 완료되었는지 확인
+	function isPm51ApprovalFullyCompletedFromDb(docNo, todoDiv2CodeId) {
+		if (!docNo || !todoDiv2CodeId) return false;
+		var rows = [];
+		postAjaxSync("/user/wb/wb20/selectGetApprovalList", { todoNo: docNo, todoDiv2CodeId: todoDiv2CodeId }, null, function(data) {
+			rows = data.resultList || [];
+		});
+		var approvalRows = $.grep(rows, function(r) { return r.gb === '결재' || r.todoDiv1CodeId === 'TODODIV20'; });
+		if (approvalRows.length === 0) return false;
+		var allDone = true;
+		$.each(approvalRows, function(idx, row) {
+			var isDone = $.trim(row.todoCfDt || '') || row.sanctnSttus === 'Y';
+			if (!isDone) { allDone = false; return false; }
+		});
+		return allDone;
 	}
 
 	// gb='결재' 행이 (1개 이상 존재하며) 모두 완료되었는지 확인
@@ -4747,16 +4853,16 @@
 			}
 		});
 
-		// 결재선 구분코드별 결재요청 알림톡 발송 (수신자는 DB에 등록된 미결 결재선 기준 - 자동추가 결재자 포함)
-		var reqActiveSn = getFirstPendingApprovalSn(gridViewApproval);
+		// 순차결재: 신청부서(TODODIV2200) 결재는 DB 기준 현재 차례(첫 미결 순번)인 사람에게만 발송
+		var reqActiveSn = getPm51ActivePendingSnFromDb(docNo, 'TODODIV2200');
 		if (reqActiveSn) {
 			kakaoSendBody(docNo, 'TODODIV20', 'TODODIV2200', '결재', clntNm, teleNo, reqActiveSn);	// 복명서 결재
 		}
 		kakaoSendBody(docNo, 'TODODIV10', 'TODODIV1200', '공유', clntNm, teleNo);	// 복명서 공유
 
 		// 관리부서 결재/공유는 신청부서 결재가 모두 완료된 이후에만 시작 (관리부서 내에서도 순차결재)
-		if (isApprovalFullyCompleted(gridViewApproval)) {
-			var mngActiveSn = getFirstPendingApprovalSn(gridViewApprovalMng);
+		if (isPm51ApprovalFullyCompletedFromDb(docNo, 'TODODIV2200')) {
+			var mngActiveSn = getPm51ActivePendingSnFromDb(docNo, 'TODODIV2201');
 			if (mngActiveSn) {
 				kakaoSendBody(docNo, 'TODODIV20', 'TODODIV2201', '결재', clntNm, teleNo, mngActiveSn);	// 관리부서 결재
 			}
