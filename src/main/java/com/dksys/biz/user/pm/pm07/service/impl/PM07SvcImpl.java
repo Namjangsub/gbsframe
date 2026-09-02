@@ -82,10 +82,86 @@ public class PM07SvcImpl implements PM07Svc {
 		return pm07Mapper.selectVacationOverlapCheck(overlapQuery);
 	}
 
+	/**
+	 * DB 저장(등록/수정) 직전 백엔드에서 휴가일수(vacDays) 및 차감일수(deductDays)를 최종 재산정/평가한다.
+	 * 프론트엔드의 전달값에만 의존하지 않고 휴가구분(vacTypeCd) 및 일자 데이터(vacDtArr 또는 stDt~edDt)를 기준으로 백엔드 최종 검증을 수행한다.
+	 */
+	private void evaluateVacationAndDeductDays(Map<String, String> paramMap) {
+		String stDtStr = paramMap.get("stDt");
+		String edDtStr = paramMap.get("edDt");
+		String vacTypeCd = paramMap.get("vacTypeCd");
+		String vacDtArr = paramMap.get("vacDtArr"); // 프론트엔드에서 주말/공휴일/음력휴일이 제외된 휴가일자별 상세 목록 JSON (vacDt, workHour)
+
+		// 1. vacDays (휴가일수/영업일수) 산정
+		double vacDays = 0.0;
+		if (vacDtArr != null && !vacDtArr.trim().isEmpty() && !"[]".equals(vacDtArr.trim())) {
+			try {
+				Gson gson = new GsonBuilder().disableHtmlEscaping().create();
+				Type vacDtType = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
+				List<Map<String, String>> vacDtList = gson.fromJson(vacDtArr, vacDtType);
+				if (vacDtList != null && !vacDtList.isEmpty()) {
+					vacDays = vacDtList.size();
+				}
+			} catch (Exception e) {
+				// parsing fallback
+			}
+		}
+
+		if (vacDays == 0.0 && stDtStr != null && edDtStr != null) {
+			String rawStDt = stDtStr.replaceAll("[^0-9]", "");
+			String rawEdDt = edDtStr.replaceAll("[^0-9]", "");
+			if (rawStDt.length() == 8 && rawEdDt.length() == 8) {
+				try {
+					LocalDate stDt = LocalDate.parse(rawStDt, DateTimeFormatter.ofPattern("yyyyMMdd"));
+					LocalDate edDt = LocalDate.parse(rawEdDt, DateTimeFormatter.ofPattern("yyyyMMdd"));
+					vacDays = ChronoUnit.DAYS.between(stDt, edDt) + 1.0;
+				} catch (Exception e) {
+					vacDays = 1.0;
+				}
+			}
+		}
+
+		if (vacDays <= 0.0) {
+			vacDays = 1.0;
+		}
+
+		// 2. deductDays (차감일수) 백엔드 최종 평가
+		// - 반차류: 반차(PM07TYPE02), 포상휴가반차(PM07TYPE08), 대체휴가반차(PM07TYPE12) -> 0.5일
+		// - 비차감류: 교육/훈련(PM07TYPE05), 병가(PM07TYPE13), 조퇴(PM07TYPE03), 외출(PM07TYPE04), 재택근무(PM07TYPE10), 지각(PM07TYPE14) -> 0.0일
+		// - 그 외 모든 휴가(연차, 대체휴가, 경조휴가, 포상휴가, 하계휴가 등): 영업일수(vacDays)만큼 차감
+		double deductDays = 0.0;
+
+		String vacTypeNm = paramMap.get("vacTypeNm") == null ? "" : paramMap.get("vacTypeNm").trim();
+
+		// 반차류 여부
+		boolean isHalfDay = "PM07TYPE02".equals(vacTypeCd) || "PM07TYPE08".equals(vacTypeCd) || "PM07TYPE12".equals(vacTypeCd) || vacTypeNm.contains("반차");
+		
+		// 비차감류 여부 (교육/훈련, 병가, 조퇴, 외출, 재택, 지각)
+		boolean isNonDeduct = "PM07TYPE03".equals(vacTypeCd) || "PM07TYPE04".equals(vacTypeCd) || "PM07TYPE05".equals(vacTypeCd)
+				|| "PM07TYPE10".equals(vacTypeCd) || "PM07TYPE13".equals(vacTypeCd) || "PM07TYPE14".equals(vacTypeCd)
+				|| vacTypeNm.contains("교육") || vacTypeNm.contains("훈련") || vacTypeNm.contains("병가")
+				|| vacTypeNm.contains("조퇴") || vacTypeNm.contains("외출") || vacTypeNm.contains("재택") || vacTypeNm.contains("지각");
+
+		if (isHalfDay) {
+			deductDays = 0.5;
+		} else if (isNonDeduct) {
+			deductDays = 0.0;
+		} else {
+			// 그 외 모든 휴가(연차, 대체휴가, 경조휴가, 포상휴가, 하계휴가 등)는 영업일수(vacDays)만큼 차감
+			deductDays = vacDays;
+		}
+
+		paramMap.put("vacDays", String.format("%.1f", vacDays));
+		paramMap.put("deductDays", String.format("%.1f", deductDays));
+	}
+
 	@Override
 	@Transactional(rollbackFor = Exception.class)
 	public Map<String, String> insertVacation(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
 		Map<String, String> result = new HashMap<String, String>();
+
+		// 백엔드 DB 저장 직전에 차감일수 및 휴가일수 최종 평가/산정
+		evaluateVacationAndDeductDays(paramMap);
 
 		List<Map<String, String>> overlapList = findVacationOverlap(paramMap, null);
 		if (overlapList != null && !overlapList.isEmpty()) {
@@ -254,6 +330,9 @@ public class PM07SvcImpl implements PM07Svc {
 	@Transactional(rollbackFor = Exception.class)
 	public Map<String, String> updateVacation(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
 		Map<String, String> result = new HashMap<String, String>();
+
+		// 백엔드 DB 저장 직전에 차감일수 및 휴가일수 최종 평가/산정
+		evaluateVacationAndDeductDays(paramMap);
 
 		if (!isVacationEditable(paramMap.get("coCd"), paramMap.get("reqNo"))) {
 			result.put("resultCode", "409");
