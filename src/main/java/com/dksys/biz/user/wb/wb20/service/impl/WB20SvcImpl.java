@@ -13,6 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.dksys.biz.admin.cm.cm16.mapper.CM16Mapper;
 import com.dksys.biz.user.im.im01.mapper.IM01Mapper;
 import com.dksys.biz.user.pm.pm07.service.PM07Svc;
+import com.dksys.biz.user.pm.pm08.service.PM08Svc;
 import com.dksys.biz.user.pm.pm51.mapper.PM51Mapper;
 import com.dksys.biz.user.qm.qm01.mapper.QM01Mapper;
 import com.dksys.biz.user.wb.wb20.mapper.WB20Mapper;
@@ -47,6 +48,9 @@ public class WB20SvcImpl implements WB20Svc {
 
 	@Autowired
 	PM07Svc pm07Svc;
+
+	@Autowired
+	PM08Svc pm08Svc;
 
 	@Autowired
 	ExceptionThrower thrower;
@@ -318,7 +322,7 @@ public class WB20SvcImpl implements WB20Svc {
 		// 최종결재 완료시 알림톡 발송 대상인지 확인
 		Map<String, String> resultMap = wb20Mapper.selectTodoFinalYn(paramMap);
 		if ("TODODIV2190".equals(todoDiv2CodeId)) {
-			updatePm51AprvSts(paramMap, "Y".equals(resultMap.get("todoYn")) ? "APRVSTS03" : "APRVSTS02");
+			updatePm51AprvSts(paramMap, (resultMap != null && "Y".equals(resultMap.get("todoYn"))) ? "APRVSTS03" : "APRVSTS02");
 		}
 
 		// PM07 휴가신청서: 결재 상태 갱신 + 최종승인 시 일일업무일지(TB_PM01M01) 반영
@@ -327,12 +331,46 @@ public class WB20SvcImpl implements WB20Svc {
 				Map<String, String> pm07Param = new HashMap<>();
 				pm07Param.put("todoNo", paramMap.get("todoNo"));
 				pm07Param.put("coCd", paramMap.get("coCd"));
-				pm07Param.put("todoYn", resultMap.get("todoYn"));
+				pm07Param.put("todoYn", (resultMap != null && resultMap.get("todoYn") != null) ? resultMap.get("todoYn") : "N");
 				pm07Svc.applyVacationApproved(pm07Param);
 			} catch (Exception e) {
 				// 후처리 실패 시 결재는 정상 처리 (로그만 남김).
 				// applyVacationApproved 는 바깥(이) 트랜잭션 안에서 실행되며(PM51 updatePm51AprvSts 와 동일),
 				// 내부에서 예외를 자체 흡수하므로 여기까지 전파되지 않는다. 이 catch 는 방어용이다.
+				e.printStackTrace();
+			}
+		}
+
+		// PM08 휴일대체근무: 신청결재(TODODIV2410) 완료 후처리
+		if ("TODODIV2410".equals(todoDiv2CodeId)) {
+			try {
+				Map<String, String> pm08Param = new HashMap<>();
+				pm08Param.put("todoNo", paramMap.get("todoNo"));
+				pm08Param.put("reqNo", paramMap.get("todoNo"));
+				pm08Param.put("coCd", paramMap.get("coCd"));
+				pm08Param.put("userId", paramMap.get("userId"));
+				pm08Param.put("todoId", paramMap.get("todoId"));
+				pm08Param.put("todoCfOpn", todoCfOpn);
+				pm08Param.put("todoYn", (resultMap != null && resultMap.get("todoYn") != null) ? resultMap.get("todoYn") : "N");
+				pm08Svc.applySubstituteWorkApproved(pm08Param);
+			} catch (Exception e) {
+				e.printStackTrace();
+			}
+		}
+
+		// PM08 휴일대체근무: 결과결재(TODODIV2420) 완료 후처리
+		if ("TODODIV2420".equals(todoDiv2CodeId)) {
+			try {
+				Map<String, String> pm08Param = new HashMap<>();
+				pm08Param.put("todoNo", paramMap.get("todoNo"));
+				pm08Param.put("reqNo", paramMap.get("todoNo"));
+				pm08Param.put("coCd", paramMap.get("coCd"));
+				pm08Param.put("userId", paramMap.get("userId"));
+				pm08Param.put("todoId", paramMap.get("todoId"));
+				pm08Param.put("todoCfOpn", todoCfOpn);
+				pm08Param.put("todoYn", (resultMap != null && resultMap.get("todoYn") != null) ? resultMap.get("todoYn") : "N");
+				pm08Svc.applySubstituteWorkResultApproved(pm08Param);
+			} catch (Exception e) {
 				e.printStackTrace();
 			}
 		}
@@ -637,6 +675,25 @@ public class WB20SvcImpl implements WB20Svc {
 					dtl.put("todoKey", maxTodoKey);
 				}
 				dtl.put("createDttm", sysCreateDttm);
+				if (dtl.get("userId") == null || dtl.get("userId").equals("")) {
+					dtl.put("userId", paramMap.get("userId"));
+				}
+				if (dtl.get("pgmId") == null || dtl.get("pgmId").equals("")) {
+					dtl.put("pgmId", paramMap.get("pgmId"));
+				}
+				if (dtl.get("todoNo") == null || dtl.get("todoNo").equals("")) {
+					dtl.put("todoNo", paramMap.get("todoNo"));
+				}
+				if (dtl.get("coCd") == null || dtl.get("coCd").equals("")) {
+					dtl.put("coCd", paramMap.get("coCd"));
+				}
+				if (dtl.get("todoCoCd") == null || dtl.get("todoCoCd").equals("")) {
+					dtl.put("todoCoCd", paramMap.get("todoCoCd"));
+				}
+				if (dtl.get("salesCd") == null || dtl.get("salesCd").equals("")) {
+					dtl.put("salesCd", paramMap.get("salesCd"));
+				}
+
 				result += wb20Mapper.insertTodoMaster(dtl);
 
                 // 조치자가 팀장일경우 insertWbsApprovalList 에서 결재완료처리로 등록되므로 상태코드를 진행으로 변경하기 위해 아래 쿼리 실행함

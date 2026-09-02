@@ -1,0 +1,686 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.dksys.biz.user.pm.pm08.mapper.PM08Mapper">
+
+	<!-- 신청결재(TODODIV2410) 상태 산출 공용 서브쿼리. 반드시 별칭 M(TB_PM08M01)을 사용하는 SELECT/WHERE 안에서만 <include>할 것 -->
+	<sql id="calcReqStatusExpr">
+		(
+			SELECT
+				CASE
+					WHEN COUNT(W.TODO_KEY) = 0 THEN NULL
+					WHEN COUNT(W.TODO_KEY) &gt; 0 AND COUNT(W.TODO_KEY) = SUM(CASE WHEN W.TODO_CF_DT IS NOT NULL AND W.SANCTN_STTUS != 'N' THEN 1 ELSE 0 END) THEN 'END'
+					WHEN SUM(CASE WHEN W.SANCTN_SN &gt; 1 AND W.TODO_CF_DT IS NOT NULL AND W.SANCTN_STTUS != 'N' THEN 1 ELSE 0 END) &gt; 0 THEN 'ING'
+					ELSE 'REQ'
+				END
+			FROM TB_WB20M03 W
+			WHERE W.TODO_NO = M.REQ_NO
+			  AND W.TODO_DIV1_CODE_ID = 'TODODIV20'
+			  AND W.TODO_DIV2_CODE_ID = 'TODODIV2410'
+		)
+	</sql>
+
+	<!-- 결과결재(TODODIV2420) 상태 산출 공용 서브쿼리. 반드시 별칭 M(TB_PM08M01)을 사용하는 SELECT/WHERE 안에서만 <include>할 것 -->
+	<sql id="calcResultStatusExpr">
+		(
+			SELECT
+				CASE
+					WHEN COUNT(W.TODO_KEY) = 0 THEN NULL
+					WHEN COUNT(W.TODO_KEY) &gt; 0 AND COUNT(W.TODO_KEY) = SUM(CASE WHEN W.TODO_CF_DT IS NOT NULL AND W.SANCTN_STTUS != 'N' THEN 1 ELSE 0 END) THEN 'END'
+					WHEN SUM(CASE WHEN W.SANCTN_SN &gt; 1 AND W.TODO_CF_DT IS NOT NULL AND W.SANCTN_STTUS != 'N' THEN 1 ELSE 0 END) &gt; 0 THEN 'ING'
+					ELSE 'REQ'
+				END
+			FROM TB_WB20M03 W
+			WHERE W.TODO_NO = M.REQ_NO
+			  AND W.TODO_DIV1_CODE_ID = 'TODODIV20'
+			  AND W.TODO_DIV2_CODE_ID = 'TODODIV2420'
+		)
+	</sql>
+
+	<select id="selectSubstituteWorkCount" parameterType="Map" resultType="int">
+		SELECT COUNT(*)
+		FROM TB_PM08M01 M
+		WHERE 1=1
+		<if test="holidayDtFrom != null and !holidayDtFrom.equals('') and holidayDtTo != null and !holidayDtTo.equals('')">
+		AND M.HOLIDAY_DT &lt;= #{holidayDtTo}
+		AND M.HOLIDAY_DT &gt;= #{holidayDtFrom}
+		</if>
+		<if test="reqStatus != null and !reqStatus.equals('')">
+		AND <include refid="calcReqStatusExpr"/> = #{reqStatus}
+		</if>
+		<if test="resultStatus != null and !resultStatus.equals('')">
+		AND <include refid="calcResultStatusExpr"/> = #{resultStatus}
+		</if>
+		<if test="reqId != null and !reqId.equals('')">
+		AND M.REQ_ID = #{reqId}
+		</if>
+		<if test="reqNm != null and !reqNm.equals('')">
+		AND (EXISTS (SELECT 1 FROM TB_CM06M01 U WHERE U.ID = M.REQ_ID AND U.NAME LIKE '%' || #{reqNm} || '%') OR M.REQ_NM LIKE '%' || #{reqNm} || '%')
+		</if>
+		<if test="deptId != null and !deptId.equals('')">
+		AND M.DEPT_ID = #{deptId}
+		</if>
+		<if test="deptNm != null and !deptNm.equals('')">
+		AND EXISTS (SELECT 1 FROM TB_CM04M01 D WHERE D.DEPT_ID = M.DEPT_ID AND D.DEPT_NM LIKE '%' || #{deptNm} || '%')
+		</if>
+	</select>
+
+	<select id="selectSubstituteWorkList" parameterType="Map" resultType="CamelMap">
+		SELECT *
+		FROM (
+			SELECT ROWNUM AS RNUM, T.*
+			FROM (
+				SELECT
+					M.CO_CD,
+					M.REQ_NO,
+					M.REQ_ID,
+					U.NAME AS REQ_NM,
+					M.DEPT_ID,
+					D.DEPT_NM,
+					TO_CHAR(TO_DATE(M.HOLIDAY_DT, 'YYYYMMDD'), 'YYYY-MM-DD') AS HOLIDAY_DT,
+					M.HOLIDAY_DT AS SUBSTITUTE_DT,
+					M.ST_TM,
+					M.ED_TM,
+					NULL AS TOTAL_TM,
+					(SELECT LISTAGG(SALES_CD, ', ') WITHIN GROUP (ORDER BY SEQ) FROM TB_PM08D01 WHERE REQ_NO = M.REQ_NO) AS SALES_CD,
+					(SELECT LISTAGG(CLNT_NM, ', ') WITHIN GROUP (ORDER BY SEQ) FROM TB_PM08D01 WHERE REQ_NO = M.REQ_NO) AS CLNT_NM,
+					(SELECT LISTAGG(PJT_NM, ', ') WITHIN GROUP (ORDER BY SEQ) FROM TB_PM08D01 WHERE REQ_NO = M.REQ_NO) AS PJT_NM,
+					M.SPECIAL_REASON,
+					M.REAL_ST_TM,
+					M.REAL_ED_TM,
+					NULL AS REAL_TOTAL_TM,
+					M.WORK_RESULT,
+					<include refid="calcReqStatusExpr"/> AS REQ_STATUS,
+					<include refid="calcResultStatusExpr"/> AS RESULT_STATUS,
+					M.CREAT_ID,
+					TO_CHAR(M.CREAT_DTTM, 'YYYY-MM-DD HH24:MI:SS') AS CREAT_DTTM
+				FROM TB_PM08M01 M
+				LEFT JOIN TB_CM06M01 U ON U.ID = M.REQ_ID
+				LEFT JOIN TB_CM04M01 D ON D.DEPT_ID = M.DEPT_ID
+				WHERE 1=1
+				<if test="holidayDtFrom != null and !holidayDtFrom.equals('') and holidayDtTo != null and !holidayDtTo.equals('')">
+				AND M.HOLIDAY_DT &lt;= #{holidayDtTo}
+				AND M.HOLIDAY_DT &gt;= #{holidayDtFrom}
+				</if>
+				<if test="reqId != null and !reqId.equals('')">
+				AND M.REQ_ID = #{reqId}
+				</if>
+				<if test="reqNm != null and !reqNm.equals('')">
+				AND (U.NAME LIKE '%' || #{reqNm} || '%' OR M.REQ_NM LIKE '%' || #{reqNm} || '%')
+				</if>
+				<if test="deptId != null and !deptId.equals('')">
+				AND M.DEPT_ID = #{deptId}
+				</if>
+				<if test="deptNm != null and !deptNm.equals('')">
+				AND D.DEPT_NM LIKE '%' || #{deptNm} || '%'
+				</if>
+				<if test="reqStatus != null and !reqStatus.equals('')">
+				AND <include refid="calcReqStatusExpr"/> = #{reqStatus}
+				</if>
+				<if test="resultStatus != null and !resultStatus.equals('')">
+				AND <include refid="calcResultStatusExpr"/> = #{resultStatus}
+				</if>
+				ORDER BY M.HOLIDAY_DT DESC, M.REQ_NO DESC
+			) T
+			<if test="firstIndex != null and lastIndex != null">
+			WHERE ROWNUM &lt;= #{lastIndex}
+			</if>
+		)
+		<if test="firstIndex != null and lastIndex != null">
+		WHERE RNUM &gt;= #{firstIndex}
+		</if>
+	</select>
+
+	<select id="selectSubstituteWorkDtl" parameterType="Map" resultType="CamelMap">
+		SELECT
+			M.CO_CD,
+			M.REQ_NO,
+			M.REQ_ID,
+			NVL((SELECT U.NAME FROM TB_CM06M01 U WHERE U.ID = M.REQ_ID), M.REQ_NM) AS REQ_NM,
+			M.DEPT_ID,
+			NVL(M.DEPT_NM, (SELECT DEPT_NM FROM TB_CM04M01 WHERE DEPT_ID = M.DEPT_ID)) AS DEPT_NM,
+			TO_CHAR(TO_DATE(M.HOLIDAY_DT, 'YYYYMMDD'), 'YYYY-MM-DD') AS HOLIDAY_DT,
+			M.HOLIDAY_DT AS RAW_HOLIDAY_DT,
+			TO_CHAR(TO_DATE(NVL(NULLIF(M.ST_TM, ''), '0000'), 'HH24MI'), 'HH24:MI') AS ST_TM,
+			TO_CHAR(TO_DATE(NVL(NULLIF(M.ED_TM, ''), '0000'), 'HH24MI'), 'HH24:MI') AS ED_TM,
+			M.ST_TM AS RAW_ST_TM,
+			M.ED_TM AS RAW_ED_TM,
+			M.SPECIAL_REASON,
+			CASE WHEN M.REAL_ST_TM IS NOT NULL AND M.REAL_ST_TM != '' THEN CASE WHEN INSTR(M.REAL_ST_TM, ':') > 0 THEN M.REAL_ST_TM WHEN LENGTH(M.REAL_ST_TM) = 4 THEN SUBSTR(M.REAL_ST_TM, 1, 2) || ':' || SUBSTR(M.REAL_ST_TM, 3, 2) ELSE M.REAL_ST_TM END ELSE NULL END AS REAL_ST_TM,
+			CASE WHEN M.REAL_ED_TM IS NOT NULL AND M.REAL_ED_TM != '' THEN CASE WHEN INSTR(M.REAL_ED_TM, ':') > 0 THEN M.REAL_ED_TM WHEN LENGTH(M.REAL_ED_TM) = 4 THEN SUBSTR(M.REAL_ED_TM, 1, 2) || ':' || SUBSTR(M.REAL_ED_TM, 3, 2) ELSE M.REAL_ED_TM END ELSE NULL END AS REAL_ED_TM,
+			M.REAL_ST_TM AS RAW_REAL_ST_TM,
+			M.REAL_ED_TM AS RAW_REAL_ED_TM,
+			M.WORK_RESULT,
+			M.REQ_MNG_OPN,
+			M.RESULT_MNG_OPN,
+			<include refid="calcReqStatusExpr"/> AS REQ_STATUS,
+			<include refid="calcResultStatusExpr"/> AS RESULT_STATUS,
+			M.CREAT_ID,
+			TO_CHAR(M.CREAT_DTTM, 'YYYY-MM-DD HH24:MI:SS') AS CREAT_DTTM
+		FROM TB_PM08M01 M
+		WHERE M.CO_CD = #{coCd}
+		  AND M.REQ_NO = #{reqNo}
+	</select>
+
+	<select id="selectSubstituteWorkDuplicateCheck" parameterType="Map" resultType="int">
+		SELECT COUNT(*)
+		FROM TB_PM08M01
+		WHERE CO_CD = #{coCd, jdbcType=VARCHAR}
+		  AND REQ_ID = #{reqId, jdbcType=VARCHAR}
+		  AND HOLIDAY_DT = REPLACE(#{holidayDt, jdbcType=VARCHAR}, '-', '')
+		<if test="excludeReqNo != null and !excludeReqNo.equals('')">
+		  AND REQ_NO != #{excludeReqNo, jdbcType=VARCHAR}
+		</if>
+	</select>
+
+	<insert id="insertSubstituteWork" parameterType="Map">
+		INSERT INTO TB_PM08M01 (
+			CO_CD,
+			REQ_NO,
+			REQ_ID,
+			REQ_NM,
+			DEPT_ID,
+			DEPT_NM,
+			HOLIDAY_DT,
+			ST_TM,
+			ED_TM,
+			SPECIAL_REASON,
+			REAL_ST_TM,
+			REAL_ED_TM,
+			WORK_RESULT,
+			REQ_STATUS,
+			RESULT_STATUS,
+			CREAT_ID,
+			CREAT_DTTM,
+			CREAT_PGM
+		) VALUES (
+			#{coCd, jdbcType=VARCHAR},
+			#{reqNo, jdbcType=VARCHAR},
+			#{reqId, jdbcType=VARCHAR},
+			#{reqNm, jdbcType=VARCHAR},
+			#{deptId, jdbcType=VARCHAR},
+			#{deptNm, jdbcType=VARCHAR},
+			#{holidayDt, jdbcType=VARCHAR},
+			#{stTm, jdbcType=VARCHAR},
+			#{edTm, jdbcType=VARCHAR},
+			#{specialReason, jdbcType=VARCHAR},
+			#{realStTm, jdbcType=VARCHAR},
+			#{realEdTm, jdbcType=VARCHAR},
+			#{workResult, jdbcType=VARCHAR},
+			#{reqStatus, jdbcType=VARCHAR},
+			#{resultStatus, jdbcType=VARCHAR},
+			#{creatId, jdbcType=VARCHAR},
+			SYSDATE,
+			'PM0801P01'
+		)
+	</insert>
+
+	<update id="updateSubstituteWork" parameterType="Map">
+		UPDATE TB_PM08M01
+		SET
+			DEPT_ID = #{deptId, jdbcType=VARCHAR},
+			DEPT_NM = #{deptNm, jdbcType=VARCHAR},
+			HOLIDAY_DT = #{holidayDt, jdbcType=VARCHAR},
+			ST_TM = #{stTm, jdbcType=VARCHAR},
+			ED_TM = #{edTm, jdbcType=VARCHAR},
+			SPECIAL_REASON = #{specialReason, jdbcType=VARCHAR},
+			REAL_ST_TM = #{realStTm, jdbcType=VARCHAR},
+			REAL_ED_TM = #{realEdTm, jdbcType=VARCHAR},
+			WORK_RESULT = #{workResult, jdbcType=VARCHAR},
+			UDT_ID = #{userId, jdbcType=VARCHAR},
+			UDT_DTTM = SYSDATE,
+			UDT_PGM = 'PM0801P01'
+		WHERE CO_CD = #{coCd, jdbcType=VARCHAR}
+		  AND REQ_NO = #{reqNo, jdbcType=VARCHAR}
+	</update>
+
+	<!-- 근무결과 등록/수정 전용 UPDATE (신청서 영역 필드는 절대 수정하지 않음) -->
+	<update id="updateSubstituteWorkResult" parameterType="Map">
+		UPDATE TB_PM08M01
+		SET
+			REAL_ST_TM = #{realStTm, jdbcType=VARCHAR},
+			REAL_ED_TM = #{realEdTm, jdbcType=VARCHAR},
+			WORK_RESULT = #{workResult, jdbcType=VARCHAR},
+			UDT_ID = #{userId, jdbcType=VARCHAR},
+			UDT_DTTM = SYSDATE,
+			UDT_PGM = 'PM0801P01'
+		WHERE CO_CD = #{coCd, jdbcType=VARCHAR}
+		  AND REQ_NO = #{reqNo, jdbcType=VARCHAR}
+	</update>
+
+	<delete id="deleteSubstituteWork" parameterType="Map">
+		DELETE FROM TB_PM08M01
+		WHERE CO_CD = #{coCd}
+		  AND REQ_NO = #{reqNo}
+	</delete>
+
+	<!-- 근무결과 자료 CLEAR 및 결과 결재상태 초기화 -->
+	<update id="deleteSubstituteWorkResult" parameterType="Map">
+		UPDATE TB_PM08M01
+		SET
+			REAL_ST_TM = NULL,
+			REAL_ED_TM = NULL,
+			WORK_RESULT = NULL,
+			RESULT_STATUS = NULL,
+			UDT_ID = #{userId, jdbcType=VARCHAR},
+			UDT_DTTM = SYSDATE,
+			UDT_PGM = 'PM0801P01'
+		WHERE CO_CD = #{coCd, jdbcType=VARCHAR}
+		  AND REQ_NO = #{reqNo, jdbcType=VARCHAR}
+	</update>
+
+	<select id="selectSubstituteWorkReqNoNext" parameterType="Map" resultType="String">
+		SELECT 'HSW' || TO_CHAR(SYSDATE, 'YYYYMMDD') || '-' || LPAD(MOD(TB_PM08M01_SQ01.NEXTVAL, 10000), 4, '0') FROM DUAL
+	</select>
+
+	<update id="updateSubstituteWorkReqStatus" parameterType="Map">
+		UPDATE TB_PM08M01
+		SET
+			REQ_STATUS = #{reqStatus, jdbcType=VARCHAR},
+			UDT_ID = #{udtId, jdbcType=VARCHAR},
+			UDT_DTTM = SYSDATE,
+			UDT_PGM = 'PM0801P01'
+		WHERE CO_CD = #{coCd}
+		  AND REQ_NO = #{reqNo}
+	</update>
+
+	<update id="updateSubstituteWorkResultStatus" parameterType="Map">
+		UPDATE TB_PM08M01
+		SET
+			RESULT_STATUS = #{resultStatus, jdbcType=VARCHAR},
+			UDT_ID = #{udtId, jdbcType=VARCHAR},
+			UDT_DTTM = SYSDATE,
+			UDT_PGM = 'PM0801P01'
+		WHERE CO_CD = #{coCd}
+		  AND REQ_NO = #{reqNo}
+	</update>
+
+	<select id="selectApprovalCount" parameterType="Map" resultType="int">
+		SELECT COUNT(*)
+		FROM TB_WB20M03
+		WHERE TODO_NO = #{reqNo}
+		  AND TODO_DIV1_CODE_ID = 'TODODIV20'
+		  AND TODO_DIV2_CODE_ID = #{todoDiv2CodeId}
+	</select>
+
+	<!-- 휴일대체근무 참여 프로젝트 목록 조회 (설비명 1순위: TB_CR02D02 최신값, 2순위(폴백): TB_PM08D01.EQP_NM 등록시점 스냅샷) -->
+	<select id="selectSubstituteWorkProjectList" parameterType="Map" resultType="CamelMap">
+		SELECT
+			D.REQ_NO,
+			D.SEQ,
+			D.ORDRS_NO,
+			D.SALES_CD,
+			D.CO_CD,
+			D.PJT_CD,
+			D.PJT_NM,
+			NVL((
+				SELECT MAX(EQP_NM)
+				  FROM TB_CR02D02
+				 WHERE SALES_CD = D.SALES_CD AND CO_CD = D.CO_CD
+			), D.EQP_NM) AS EQP_NM,
+			D.CLNT_CD,
+			D.CLNT_NM,
+			D.ETC
+		FROM TB_PM08D01 D
+		WHERE D.REQ_NO = #{reqNo}
+		ORDER BY D.SEQ
+	</select>
+
+	<!-- 휴일대체근무 참여 프로젝트 목록 삽입 -->
+	<insert id="insertSubstituteWorkProjectList" parameterType="Map">
+		INSERT INTO TB_PM08D01 (
+			REQ_NO, SEQ, ORDRS_NO, SALES_CD, CO_CD, PJT_CD, PJT_NM, EQP_NM, CLNT_CD, CLNT_NM, ETC
+		) VALUES (
+			#{reqNo}, NVL((SELECT MAX(SEQ) FROM TB_PM08D01 WHERE REQ_NO = #{reqNo}), 0) + 1,
+			#{ordrsNo, jdbcType=VARCHAR}, #{salesCd, jdbcType=VARCHAR}, #{coCd, jdbcType=VARCHAR}, #{pjtCd, jdbcType=VARCHAR}, #{pjtNm, jdbcType=VARCHAR}, #{eqpNm, jdbcType=VARCHAR},
+			#{clntCd, jdbcType=VARCHAR}, #{clntNm, jdbcType=VARCHAR}, #{etc, jdbcType=VARCHAR}
+		)
+	</insert>
+
+	<!-- 휴일대체근무 참여 프로젝트 목록 삭제 -->
+	<delete id="deleteSubstituteWorkProjectList" parameterType="Map">
+		DELETE FROM TB_PM08D01
+		WHERE REQ_NO = #{reqNo}
+	</delete>
+
+	<update id="updateSubstituteWorkReqMngOpn" parameterType="Map">
+		UPDATE TB_PM08M01
+		SET
+			REQ_MNG_OPN = #{reqMngOpn, jdbcType=VARCHAR},
+			UDT_ID = 'SYSTEM',
+			UDT_DTTM = SYSDATE,
+			UDT_PGM = 'WB20'
+		WHERE CO_CD = #{coCd, jdbcType=VARCHAR}
+		  AND REQ_NO = #{reqNo, jdbcType=VARCHAR}
+	</update>
+
+	<update id="updateSubstituteWorkResultMngOpn" parameterType="Map">
+		UPDATE TB_PM08M01
+		SET
+			RESULT_MNG_OPN = #{resultMngOpn, jdbcType=VARCHAR},
+			UDT_ID = 'SYSTEM',
+			UDT_DTTM = SYSDATE,
+			UDT_PGM = 'WB20'
+		WHERE CO_CD = #{coCd, jdbcType=VARCHAR}
+		  AND REQ_NO = #{reqNo, jdbcType=VARCHAR}
+	</update>
+
+	<!-- 신청자 본인(1순위) 외 해당 결재단계(TODODIV2410: 신청, TODODIV2420: 결과)의 결재 진행(승인 'Y') 여부 확인 -->
+	<select id="selectApprovedCountExceptApplicant" parameterType="Map" resultType="int">
+		SELECT COUNT(*)
+		  FROM TB_WB20M03
+		 WHERE TODO_NO = #{reqNo}
+		   <if test="todoDiv2CodeId != null and !todoDiv2CodeId.equals('')">
+		   AND TODO_DIV2_CODE_ID = #{todoDiv2CodeId}
+		   </if>
+		   AND SANCTN_SN &gt; 1
+		   AND SANCTN_STTUS = 'Y'
+	</select>
+
+	<!-- 대체휴가 현황 조회: 발생(PM08)/사용(PM07)/근무시간(PM30)/작업일보(PM01) 월별 집계 -->
+	<select id="selectSubstituteVacationStatusList" parameterType="Map" resultType="CamelMap">
+		SELECT
+			A.USER_ID,
+			A.USER_NM,
+			A.DEPT_NM,
+			A.LEVEL_NM,
+			NVL(V.SW_SUM, 0) AS GRANT_DAYS,
+			(NVL(U2.VAC_M01,0)+NVL(U2.VAC_M02,0)+NVL(U2.VAC_M03,0)+NVL(U2.VAC_M04,0)+NVL(U2.VAC_M05,0)+NVL(U2.VAC_M06,0)+
+			 NVL(U2.VAC_M07,0)+NVL(U2.VAC_M08,0)+NVL(U2.VAC_M09,0)+NVL(U2.VAC_M10,0)+NVL(U2.VAC_M11,0)+NVL(U2.VAC_M12,0)) AS USED_DAYS,
+			(NVL(V.SW_SUM, 0) -
+			 (NVL(U2.VAC_M01,0)+NVL(U2.VAC_M02,0)+NVL(U2.VAC_M03,0)+NVL(U2.VAC_M04,0)+NVL(U2.VAC_M05,0)+NVL(U2.VAC_M06,0)+
+			  NVL(U2.VAC_M07,0)+NVL(U2.VAC_M08,0)+NVL(U2.VAC_M09,0)+NVL(U2.VAC_M10,0)+NVL(U2.VAC_M11,0)+NVL(U2.VAC_M12,0))
+			) AS BALANCE_DAYS,
+			NVL(V.SW_M01, '') AS SW_M01,
+			NVL(V.SW_M02, '') AS SW_M02,
+			NVL(V.SW_M03, '') AS SW_M03,
+			NVL(V.SW_M04, '') AS SW_M04,
+			NVL(V.SW_M05, '') AS SW_M05,
+			NVL(V.SW_M06, '') AS SW_M06,
+			NVL(V.SW_M07, '') AS SW_M07,
+			NVL(V.SW_M08, '') AS SW_M08,
+			NVL(V.SW_M09, '') AS SW_M09,
+			NVL(V.SW_M10, '') AS SW_M10,
+			NVL(V.SW_M11, '') AS SW_M11,
+			NVL(V.SW_M12, '') AS SW_M12,
+			NVL(V.SW_SUM, 0) AS SW_SUM,
+			NVL(U2.VAC_M01, 0) AS VAC_M01,
+			NVL(U2.VAC_M02, 0) AS VAC_M02,
+			NVL(U2.VAC_M03, 0) AS VAC_M03,
+			NVL(U2.VAC_M04, 0) AS VAC_M04,
+			NVL(U2.VAC_M05, 0) AS VAC_M05,
+			NVL(U2.VAC_M06, 0) AS VAC_M06,
+			NVL(U2.VAC_M07, 0) AS VAC_M07,
+			NVL(U2.VAC_M08, 0) AS VAC_M08,
+			NVL(U2.VAC_M09, 0) AS VAC_M09,
+			NVL(U2.VAC_M10, 0) AS VAC_M10,
+			NVL(U2.VAC_M11, 0) AS VAC_M11,
+			NVL(U2.VAC_M12, 0) AS VAC_M12,
+			NVL(U2.VAC_DAY_M01, '') AS VAC_DAY_M01,
+			NVL(U2.VAC_DAY_M02, '') AS VAC_DAY_M02,
+			NVL(U2.VAC_DAY_M03, '') AS VAC_DAY_M03,
+			NVL(U2.VAC_DAY_M04, '') AS VAC_DAY_M04,
+			NVL(U2.VAC_DAY_M05, '') AS VAC_DAY_M05,
+			NVL(U2.VAC_DAY_M06, '') AS VAC_DAY_M06,
+			NVL(U2.VAC_DAY_M07, '') AS VAC_DAY_M07,
+			NVL(U2.VAC_DAY_M08, '') AS VAC_DAY_M08,
+			NVL(U2.VAC_DAY_M09, '') AS VAC_DAY_M09,
+			NVL(U2.VAC_DAY_M10, '') AS VAC_DAY_M10,
+			NVL(U2.VAC_DAY_M11, '') AS VAC_DAY_M11,
+			NVL(U2.VAC_DAY_M12, '') AS VAC_DAY_M12,
+			NVL(U3.ANN_SUM, 0) AS ANN_SUM,
+			NVL(U3.ANN_DAY_M01, '') AS ANN_DAY_M01,
+			NVL(U3.ANN_DAY_M02, '') AS ANN_DAY_M02,
+			NVL(U3.ANN_DAY_M03, '') AS ANN_DAY_M03,
+			NVL(U3.ANN_DAY_M04, '') AS ANN_DAY_M04,
+			NVL(U3.ANN_DAY_M05, '') AS ANN_DAY_M05,
+			NVL(U3.ANN_DAY_M06, '') AS ANN_DAY_M06,
+			NVL(U3.ANN_DAY_M07, '') AS ANN_DAY_M07,
+			NVL(U3.ANN_DAY_M08, '') AS ANN_DAY_M08,
+			NVL(U3.ANN_DAY_M09, '') AS ANN_DAY_M09,
+			NVL(U3.ANN_DAY_M10, '') AS ANN_DAY_M10,
+			NVL(U3.ANN_DAY_M11, '') AS ANN_DAY_M11,
+			NVL(U3.ANN_DAY_M12, '') AS ANN_DAY_M12,
+			NVL(W.WORK_TOT_M01, 0) AS WORK_TOT_M01,
+			NVL(W.WORK_TOT_M02, 0) AS WORK_TOT_M02,
+			NVL(W.WORK_TOT_M03, 0) AS WORK_TOT_M03,
+			NVL(W.WORK_TOT_M04, 0) AS WORK_TOT_M04,
+			NVL(W.WORK_TOT_M05, 0) AS WORK_TOT_M05,
+			NVL(W.WORK_TOT_M06, 0) AS WORK_TOT_M06,
+			NVL(W.WORK_TOT_M07, 0) AS WORK_TOT_M07,
+			NVL(W.WORK_TOT_M08, 0) AS WORK_TOT_M08,
+			NVL(W.WORK_TOT_M09, 0) AS WORK_TOT_M09,
+			NVL(W.WORK_TOT_M10, 0) AS WORK_TOT_M10,
+			NVL(W.WORK_TOT_M11, 0) AS WORK_TOT_M11,
+			NVL(W.WORK_TOT_M12, 0) AS WORK_TOT_M12,
+			NVL(W.WORK_OT_M01, 0) AS WORK_OT_M01,
+			NVL(W.WORK_OT_M02, 0) AS WORK_OT_M02,
+			NVL(W.WORK_OT_M03, 0) AS WORK_OT_M03,
+			NVL(W.WORK_OT_M04, 0) AS WORK_OT_M04,
+			NVL(W.WORK_OT_M05, 0) AS WORK_OT_M05,
+			NVL(W.WORK_OT_M06, 0) AS WORK_OT_M06,
+			NVL(W.WORK_OT_M07, 0) AS WORK_OT_M07,
+			NVL(W.WORK_OT_M08, 0) AS WORK_OT_M08,
+			NVL(W.WORK_OT_M09, 0) AS WORK_OT_M09,
+			NVL(W.WORK_OT_M10, 0) AS WORK_OT_M10,
+			NVL(W.WORK_OT_M11, 0) AS WORK_OT_M11,
+			NVL(W.WORK_OT_M12, 0) AS WORK_OT_M12,
+			NVL(X.RPT_HOUR_M01, 0) AS RPT_HOUR_M01,
+			NVL(X.RPT_HOUR_M02, 0) AS RPT_HOUR_M02,
+			NVL(X.RPT_HOUR_M03, 0) AS RPT_HOUR_M03,
+			NVL(X.RPT_HOUR_M04, 0) AS RPT_HOUR_M04,
+			NVL(X.RPT_HOUR_M05, 0) AS RPT_HOUR_M05,
+			NVL(X.RPT_HOUR_M06, 0) AS RPT_HOUR_M06,
+			NVL(X.RPT_HOUR_M07, 0) AS RPT_HOUR_M07,
+			NVL(X.RPT_HOUR_M08, 0) AS RPT_HOUR_M08,
+			NVL(X.RPT_HOUR_M09, 0) AS RPT_HOUR_M09,
+			NVL(X.RPT_HOUR_M10, 0) AS RPT_HOUR_M10,
+			NVL(X.RPT_HOUR_M11, 0) AS RPT_HOUR_M11,
+			NVL(X.RPT_HOUR_M12, 0) AS RPT_HOUR_M12
+		FROM (
+			SELECT
+				U.ID AS USER_ID,
+				U.EMP_NO,
+				U.NAME AS USER_NM,
+				SUBSTR(NVL(U.VIEW_DEPT_ID, U.DEPT_ID), 1, 5) AS DEPT_ID,
+				D.DEPT_NM,
+				NVL(D.SORT_NO, 999) AS SORT_NO,
+				(SELECT LEVEL_NM FROM TB_CM07M01 WHERE LEVEL_CD = U.LEVEL_CD) AS LEVEL_NM
+			FROM TB_CM06M01 U
+			LEFT JOIN TB_CM04M01 D ON D.DEPT_ID = SUBSTR(NVL(U.VIEW_DEPT_ID, U.DEPT_ID), 1, 5)
+			WHERE 1=1
+			  AND (NVL(U.VIEW_DEPT_ID, U.DEPT_ID) IS NULL OR (NVL(U.VIEW_DEPT_ID, U.DEPT_ID) NOT LIKE 'GUN95%' AND NVL(U.VIEW_DEPT_ID, U.DEPT_ID) NOT LIKE 'GUN00%'))
+			  AND (D.DEPT_NM IS NULL OR D.DEPT_NM NOT LIKE '%임원실%')
+			  AND (U.SALES_AREA IS NULL OR U.SALES_AREA != 'SALESAREA00')
+			<if test="useYn_S != null and !useYn_S.equals('')">
+			  AND U.USE_YN = #{useYn_S}
+			</if>
+			<if test="deptCd_S != null and !deptCd_S.equals('')">
+			  AND SUBSTR(NVL(U.VIEW_DEPT_ID, U.DEPT_ID), 1, 5) = SUBSTR(#{deptCd_S}, 1, 5)
+			</if>
+			<if test="deptNm_S != null and !deptNm_S.equals('')">
+			  AND D.DEPT_NM LIKE '%' || #{deptNm_S} || '%'
+			</if>
+			<if test="userNm_S != null and !userNm_S.equals('')">
+			  AND (U.NAME LIKE '%' || #{userNm_S} || '%' OR U.ID LIKE '%' || #{userNm_S} || '%')
+			</if>
+			<if test="userId_S != null and !userId_S.equals('')">
+			  AND U.ID = #{userId_S}
+			</if>
+		) A
+		LEFT JOIN (
+			SELECT
+				REQ_ID,
+				COUNT(*) AS SW_SUM,
+				LISTAGG(CASE WHEN SUBSTR(HOLIDAY_DT, 5, 2) = '01' THEN SUBSTR(HOLIDAY_DT, 7, 2) || ':' || REQ_NO END, ',') WITHIN GROUP (ORDER BY HOLIDAY_DT) AS SW_M01,
+				LISTAGG(CASE WHEN SUBSTR(HOLIDAY_DT, 5, 2) = '02' THEN SUBSTR(HOLIDAY_DT, 7, 2) || ':' || REQ_NO END, ',') WITHIN GROUP (ORDER BY HOLIDAY_DT) AS SW_M02,
+				LISTAGG(CASE WHEN SUBSTR(HOLIDAY_DT, 5, 2) = '03' THEN SUBSTR(HOLIDAY_DT, 7, 2) || ':' || REQ_NO END, ',') WITHIN GROUP (ORDER BY HOLIDAY_DT) AS SW_M03,
+				LISTAGG(CASE WHEN SUBSTR(HOLIDAY_DT, 5, 2) = '04' THEN SUBSTR(HOLIDAY_DT, 7, 2) || ':' || REQ_NO END, ',') WITHIN GROUP (ORDER BY HOLIDAY_DT) AS SW_M04,
+				LISTAGG(CASE WHEN SUBSTR(HOLIDAY_DT, 5, 2) = '05' THEN SUBSTR(HOLIDAY_DT, 7, 2) || ':' || REQ_NO END, ',') WITHIN GROUP (ORDER BY HOLIDAY_DT) AS SW_M05,
+				LISTAGG(CASE WHEN SUBSTR(HOLIDAY_DT, 5, 2) = '06' THEN SUBSTR(HOLIDAY_DT, 7, 2) || ':' || REQ_NO END, ',') WITHIN GROUP (ORDER BY HOLIDAY_DT) AS SW_M06,
+				LISTAGG(CASE WHEN SUBSTR(HOLIDAY_DT, 5, 2) = '07' THEN SUBSTR(HOLIDAY_DT, 7, 2) || ':' || REQ_NO END, ',') WITHIN GROUP (ORDER BY HOLIDAY_DT) AS SW_M07,
+				LISTAGG(CASE WHEN SUBSTR(HOLIDAY_DT, 5, 2) = '08' THEN SUBSTR(HOLIDAY_DT, 7, 2) || ':' || REQ_NO END, ',') WITHIN GROUP (ORDER BY HOLIDAY_DT) AS SW_M08,
+				LISTAGG(CASE WHEN SUBSTR(HOLIDAY_DT, 5, 2) = '09' THEN SUBSTR(HOLIDAY_DT, 7, 2) || ':' || REQ_NO END, ',') WITHIN GROUP (ORDER BY HOLIDAY_DT) AS SW_M09,
+				LISTAGG(CASE WHEN SUBSTR(HOLIDAY_DT, 5, 2) = '10' THEN SUBSTR(HOLIDAY_DT, 7, 2) || ':' || REQ_NO END, ',') WITHIN GROUP (ORDER BY HOLIDAY_DT) AS SW_M10,
+				LISTAGG(CASE WHEN SUBSTR(HOLIDAY_DT, 5, 2) = '11' THEN SUBSTR(HOLIDAY_DT, 7, 2) || ':' || REQ_NO END, ',') WITHIN GROUP (ORDER BY HOLIDAY_DT) AS SW_M11,
+				LISTAGG(CASE WHEN SUBSTR(HOLIDAY_DT, 5, 2) = '12' THEN SUBSTR(HOLIDAY_DT, 7, 2) || ':' || REQ_NO END, ',') WITHIN GROUP (ORDER BY HOLIDAY_DT) AS SW_M12
+			FROM TB_PM08M01
+			WHERE CO_CD = #{coCd} AND HOLIDAY_DT &gt;= #{yy} || '0101' AND HOLIDAY_DT &lt;= #{yy} || '1231'
+			GROUP BY REQ_ID
+		) V ON A.USER_ID = V.REQ_ID
+		LEFT JOIN (
+			SELECT
+				REQ_ID,
+				NVL(SUM(CASE WHEN VAC_MONTH = '01' THEN DEDUCT_DAYS ELSE 0 END), 0) AS VAC_M01,
+				NVL(SUM(CASE WHEN VAC_MONTH = '02' THEN DEDUCT_DAYS ELSE 0 END), 0) AS VAC_M02,
+				NVL(SUM(CASE WHEN VAC_MONTH = '03' THEN DEDUCT_DAYS ELSE 0 END), 0) AS VAC_M03,
+				NVL(SUM(CASE WHEN VAC_MONTH = '04' THEN DEDUCT_DAYS ELSE 0 END), 0) AS VAC_M04,
+				NVL(SUM(CASE WHEN VAC_MONTH = '05' THEN DEDUCT_DAYS ELSE 0 END), 0) AS VAC_M05,
+				NVL(SUM(CASE WHEN VAC_MONTH = '06' THEN DEDUCT_DAYS ELSE 0 END), 0) AS VAC_M06,
+				NVL(SUM(CASE WHEN VAC_MONTH = '07' THEN DEDUCT_DAYS ELSE 0 END), 0) AS VAC_M07,
+				NVL(SUM(CASE WHEN VAC_MONTH = '08' THEN DEDUCT_DAYS ELSE 0 END), 0) AS VAC_M08,
+				NVL(SUM(CASE WHEN VAC_MONTH = '09' THEN DEDUCT_DAYS ELSE 0 END), 0) AS VAC_M09,
+				NVL(SUM(CASE WHEN VAC_MONTH = '10' THEN DEDUCT_DAYS ELSE 0 END), 0) AS VAC_M10,
+				NVL(SUM(CASE WHEN VAC_MONTH = '11' THEN DEDUCT_DAYS ELSE 0 END), 0) AS VAC_M11,
+				NVL(SUM(CASE WHEN VAC_MONTH = '12' THEN DEDUCT_DAYS ELSE 0 END), 0) AS VAC_M12,
+				LISTAGG(CASE WHEN VAC_MONTH = '01' THEN VAC_DAY || ':' || REQ_NO END, ',') WITHIN GROUP (ORDER BY VAC_DT) AS VAC_DAY_M01,
+				LISTAGG(CASE WHEN VAC_MONTH = '02' THEN VAC_DAY || ':' || REQ_NO END, ',') WITHIN GROUP (ORDER BY VAC_DT) AS VAC_DAY_M02,
+				LISTAGG(CASE WHEN VAC_MONTH = '03' THEN VAC_DAY || ':' || REQ_NO END, ',') WITHIN GROUP (ORDER BY VAC_DT) AS VAC_DAY_M03,
+				LISTAGG(CASE WHEN VAC_MONTH = '04' THEN VAC_DAY || ':' || REQ_NO END, ',') WITHIN GROUP (ORDER BY VAC_DT) AS VAC_DAY_M04,
+				LISTAGG(CASE WHEN VAC_MONTH = '05' THEN VAC_DAY || ':' || REQ_NO END, ',') WITHIN GROUP (ORDER BY VAC_DT) AS VAC_DAY_M05,
+				LISTAGG(CASE WHEN VAC_MONTH = '06' THEN VAC_DAY || ':' || REQ_NO END, ',') WITHIN GROUP (ORDER BY VAC_DT) AS VAC_DAY_M06,
+				LISTAGG(CASE WHEN VAC_MONTH = '07' THEN VAC_DAY || ':' || REQ_NO END, ',') WITHIN GROUP (ORDER BY VAC_DT) AS VAC_DAY_M07,
+				LISTAGG(CASE WHEN VAC_MONTH = '08' THEN VAC_DAY || ':' || REQ_NO END, ',') WITHIN GROUP (ORDER BY VAC_DT) AS VAC_DAY_M08,
+				LISTAGG(CASE WHEN VAC_MONTH = '09' THEN VAC_DAY || ':' || REQ_NO END, ',') WITHIN GROUP (ORDER BY VAC_DT) AS VAC_DAY_M09,
+				LISTAGG(CASE WHEN VAC_MONTH = '10' THEN VAC_DAY || ':' || REQ_NO END, ',') WITHIN GROUP (ORDER BY VAC_DT) AS VAC_DAY_M10,
+				LISTAGG(CASE WHEN VAC_MONTH = '11' THEN VAC_DAY || ':' || REQ_NO END, ',') WITHIN GROUP (ORDER BY VAC_DT) AS VAC_DAY_M11,
+				LISTAGG(CASE WHEN VAC_MONTH = '12' THEN VAC_DAY || ':' || REQ_NO END, ',') WITHIN GROUP (ORDER BY VAC_DT) AS VAC_DAY_M12
+			FROM (
+				<!-- TB_PM07M03(일자상세) 조인 방식은 해당 상세 행이 없는 신청서(대체휴가 신청서 일부)를 누락시키는 문제가 있어,
+				     TB_PM07M01 자체의 ST_DT~ED_DT / DEDUCT_DAYS를 CONNECT BY로 일자 전개하는 방식으로 변경 -->
+				SELECT
+					DAYS.REQ_ID,
+					DAYS.REQ_NO,
+					DAYS.VAC_DT,
+					SUBSTR(DAYS.VAC_DT, 5, 2) AS VAC_MONTH,
+					SUBSTR(DAYS.VAC_DT, 7, 2) AS VAC_DAY,
+					DAYS.DEDUCT_DAYS
+				FROM (
+					SELECT
+						M.REQ_ID,
+						M.REQ_NO,
+						TO_CHAR(TO_DATE(M.ST_DT, 'YYYYMMDD') + (LEVEL - 1), 'YYYYMMDD') AS VAC_DT,
+						(M.DEDUCT_DAYS / (TO_DATE(M.ED_DT, 'YYYYMMDD') - TO_DATE(M.ST_DT, 'YYYYMMDD') + 1)) AS DEDUCT_DAYS
+					FROM TB_PM07M01 M
+					WHERE M.VAC_TYPE_CD IN ('PM07TYPE11', 'PM07TYPE12')
+					  AND NVL(M.SANCTN_STS, 'TEMP') != 'RTN'
+					  AND M.ST_DT IS NOT NULL AND M.ED_DT IS NOT NULL
+					  AND M.ST_DT &lt;= #{yy} || '1231' AND M.ED_DT &gt;= #{yy} || '0101'
+					CONNECT BY LEVEL &lt;= (TO_DATE(M.ED_DT, 'YYYYMMDD') - TO_DATE(M.ST_DT, 'YYYYMMDD') + 1)
+					  AND PRIOR M.REQ_NO = M.REQ_NO
+					  AND PRIOR DBMS_RANDOM.VALUE IS NOT NULL
+				) DAYS
+				WHERE SUBSTR(DAYS.VAC_DT, 1, 4) = #{yy}
+			) DD
+			GROUP BY REQ_ID
+		) U2 ON A.USER_ID = U2.REQ_ID
+		LEFT JOIN (
+			<!-- 연차휴가일(PM07TYPE01=연차, PM07TYPE02=반차) 사용 이력. U2(대체휴가)와 동일하게 TB_PM07M01 자체 ST_DT~ED_DT를 CONNECT BY로 일자 전개 -->
+			SELECT
+				REQ_ID,
+				NVL(SUM(DEDUCT_DAYS), 0) AS ANN_SUM,
+				LISTAGG(CASE WHEN VAC_MONTH = '01' THEN VAC_DAY || ':' || REQ_NO END, ',') WITHIN GROUP (ORDER BY VAC_DT) AS ANN_DAY_M01,
+				LISTAGG(CASE WHEN VAC_MONTH = '02' THEN VAC_DAY || ':' || REQ_NO END, ',') WITHIN GROUP (ORDER BY VAC_DT) AS ANN_DAY_M02,
+				LISTAGG(CASE WHEN VAC_MONTH = '03' THEN VAC_DAY || ':' || REQ_NO END, ',') WITHIN GROUP (ORDER BY VAC_DT) AS ANN_DAY_M03,
+				LISTAGG(CASE WHEN VAC_MONTH = '04' THEN VAC_DAY || ':' || REQ_NO END, ',') WITHIN GROUP (ORDER BY VAC_DT) AS ANN_DAY_M04,
+				LISTAGG(CASE WHEN VAC_MONTH = '05' THEN VAC_DAY || ':' || REQ_NO END, ',') WITHIN GROUP (ORDER BY VAC_DT) AS ANN_DAY_M05,
+				LISTAGG(CASE WHEN VAC_MONTH = '06' THEN VAC_DAY || ':' || REQ_NO END, ',') WITHIN GROUP (ORDER BY VAC_DT) AS ANN_DAY_M06,
+				LISTAGG(CASE WHEN VAC_MONTH = '07' THEN VAC_DAY || ':' || REQ_NO END, ',') WITHIN GROUP (ORDER BY VAC_DT) AS ANN_DAY_M07,
+				LISTAGG(CASE WHEN VAC_MONTH = '08' THEN VAC_DAY || ':' || REQ_NO END, ',') WITHIN GROUP (ORDER BY VAC_DT) AS ANN_DAY_M08,
+				LISTAGG(CASE WHEN VAC_MONTH = '09' THEN VAC_DAY || ':' || REQ_NO END, ',') WITHIN GROUP (ORDER BY VAC_DT) AS ANN_DAY_M09,
+				LISTAGG(CASE WHEN VAC_MONTH = '10' THEN VAC_DAY || ':' || REQ_NO END, ',') WITHIN GROUP (ORDER BY VAC_DT) AS ANN_DAY_M10,
+				LISTAGG(CASE WHEN VAC_MONTH = '11' THEN VAC_DAY || ':' || REQ_NO END, ',') WITHIN GROUP (ORDER BY VAC_DT) AS ANN_DAY_M11,
+				LISTAGG(CASE WHEN VAC_MONTH = '12' THEN VAC_DAY || ':' || REQ_NO END, ',') WITHIN GROUP (ORDER BY VAC_DT) AS ANN_DAY_M12
+			FROM (
+				SELECT
+					DAYS3.REQ_ID,
+					DAYS3.REQ_NO,
+					DAYS3.VAC_DT,
+					SUBSTR(DAYS3.VAC_DT, 5, 2) AS VAC_MONTH,
+					SUBSTR(DAYS3.VAC_DT, 7, 2) AS VAC_DAY,
+					DAYS3.DEDUCT_DAYS
+				FROM (
+					SELECT
+						M.REQ_ID,
+						M.REQ_NO,
+						TO_CHAR(TO_DATE(M.ST_DT, 'YYYYMMDD') + (LEVEL - 1), 'YYYYMMDD') AS VAC_DT,
+						(M.DEDUCT_DAYS / (TO_DATE(M.ED_DT, 'YYYYMMDD') - TO_DATE(M.ST_DT, 'YYYYMMDD') + 1)) AS DEDUCT_DAYS
+					FROM TB_PM07M01 M
+					WHERE M.VAC_TYPE_CD IN ('PM07TYPE01', 'PM07TYPE02')
+					  AND NVL(M.SANCTN_STS, 'TEMP') != 'RTN'
+					  AND M.ST_DT IS NOT NULL AND M.ED_DT IS NOT NULL
+					  AND M.ST_DT &lt;= #{yy} || '1231' AND M.ED_DT &gt;= #{yy} || '0101'
+					CONNECT BY LEVEL &lt;= (TO_DATE(M.ED_DT, 'YYYYMMDD') - TO_DATE(M.ST_DT, 'YYYYMMDD') + 1)
+					  AND PRIOR M.REQ_NO = M.REQ_NO
+					  AND PRIOR DBMS_RANDOM.VALUE IS NOT NULL
+				) DAYS3
+				WHERE SUBSTR(DAYS3.VAC_DT, 1, 4) = #{yy}
+			) DD3
+			GROUP BY REQ_ID
+		) U3 ON A.USER_ID = U3.REQ_ID
+		LEFT JOIN (
+			SELECT
+				EMP_NO,
+				NVL(SUM(CASE WHEN SUBSTR(WORK_DT, 5, 2) = '01' THEN NVL(TO_NUMBER(NULLIF(REPLACE(TOT_WORK_TM, ':', '.'), '')), 0) ELSE 0 END), 0) AS WORK_TOT_M01,
+				NVL(SUM(CASE WHEN SUBSTR(WORK_DT, 5, 2) = '02' THEN NVL(TO_NUMBER(NULLIF(REPLACE(TOT_WORK_TM, ':', '.'), '')), 0) ELSE 0 END), 0) AS WORK_TOT_M02,
+				NVL(SUM(CASE WHEN SUBSTR(WORK_DT, 5, 2) = '03' THEN NVL(TO_NUMBER(NULLIF(REPLACE(TOT_WORK_TM, ':', '.'), '')), 0) ELSE 0 END), 0) AS WORK_TOT_M03,
+				NVL(SUM(CASE WHEN SUBSTR(WORK_DT, 5, 2) = '04' THEN NVL(TO_NUMBER(NULLIF(REPLACE(TOT_WORK_TM, ':', '.'), '')), 0) ELSE 0 END), 0) AS WORK_TOT_M04,
+				NVL(SUM(CASE WHEN SUBSTR(WORK_DT, 5, 2) = '05' THEN NVL(TO_NUMBER(NULLIF(REPLACE(TOT_WORK_TM, ':', '.'), '')), 0) ELSE 0 END), 0) AS WORK_TOT_M05,
+				NVL(SUM(CASE WHEN SUBSTR(WORK_DT, 5, 2) = '06' THEN NVL(TO_NUMBER(NULLIF(REPLACE(TOT_WORK_TM, ':', '.'), '')), 0) ELSE 0 END), 0) AS WORK_TOT_M06,
+				NVL(SUM(CASE WHEN SUBSTR(WORK_DT, 5, 2) = '07' THEN NVL(TO_NUMBER(NULLIF(REPLACE(TOT_WORK_TM, ':', '.'), '')), 0) ELSE 0 END), 0) AS WORK_TOT_M07,
+				NVL(SUM(CASE WHEN SUBSTR(WORK_DT, 5, 2) = '08' THEN NVL(TO_NUMBER(NULLIF(REPLACE(TOT_WORK_TM, ':', '.'), '')), 0) ELSE 0 END), 0) AS WORK_TOT_M08,
+				NVL(SUM(CASE WHEN SUBSTR(WORK_DT, 5, 2) = '09' THEN NVL(TO_NUMBER(NULLIF(REPLACE(TOT_WORK_TM, ':', '.'), '')), 0) ELSE 0 END), 0) AS WORK_TOT_M09,
+				NVL(SUM(CASE WHEN SUBSTR(WORK_DT, 5, 2) = '10' THEN NVL(TO_NUMBER(NULLIF(REPLACE(TOT_WORK_TM, ':', '.'), '')), 0) ELSE 0 END), 0) AS WORK_TOT_M10,
+				NVL(SUM(CASE WHEN SUBSTR(WORK_DT, 5, 2) = '11' THEN NVL(TO_NUMBER(NULLIF(REPLACE(TOT_WORK_TM, ':', '.'), '')), 0) ELSE 0 END), 0) AS WORK_TOT_M11,
+				NVL(SUM(CASE WHEN SUBSTR(WORK_DT, 5, 2) = '12' THEN NVL(TO_NUMBER(NULLIF(REPLACE(TOT_WORK_TM, ':', '.'), '')), 0) ELSE 0 END), 0) AS WORK_TOT_M12,
+				NVL(SUM(CASE WHEN SUBSTR(WORK_DT, 5, 2) = '01' THEN NVL(TO_NUMBER(NULLIF(REPLACE(OT_TM, ':', '.'), '')), 0) ELSE 0 END), 0) AS WORK_OT_M01,
+				NVL(SUM(CASE WHEN SUBSTR(WORK_DT, 5, 2) = '02' THEN NVL(TO_NUMBER(NULLIF(REPLACE(OT_TM, ':', '.'), '')), 0) ELSE 0 END), 0) AS WORK_OT_M02,
+				NVL(SUM(CASE WHEN SUBSTR(WORK_DT, 5, 2) = '03' THEN NVL(TO_NUMBER(NULLIF(REPLACE(OT_TM, ':', '.'), '')), 0) ELSE 0 END), 0) AS WORK_OT_M03,
+				NVL(SUM(CASE WHEN SUBSTR(WORK_DT, 5, 2) = '04' THEN NVL(TO_NUMBER(NULLIF(REPLACE(OT_TM, ':', '.'), '')), 0) ELSE 0 END), 0) AS WORK_OT_M04,
+				NVL(SUM(CASE WHEN SUBSTR(WORK_DT, 5, 2) = '05' THEN NVL(TO_NUMBER(NULLIF(REPLACE(OT_TM, ':', '.'), '')), 0) ELSE 0 END), 0) AS WORK_OT_M05,
+				NVL(SUM(CASE WHEN SUBSTR(WORK_DT, 5, 2) = '06' THEN NVL(TO_NUMBER(NULLIF(REPLACE(OT_TM, ':', '.'), '')), 0) ELSE 0 END), 0) AS WORK_OT_M06,
+				NVL(SUM(CASE WHEN SUBSTR(WORK_DT, 5, 2) = '07' THEN NVL(TO_NUMBER(NULLIF(REPLACE(OT_TM, ':', '.'), '')), 0) ELSE 0 END), 0) AS WORK_OT_M07,
+				NVL(SUM(CASE WHEN SUBSTR(WORK_DT, 5, 2) = '08' THEN NVL(TO_NUMBER(NULLIF(REPLACE(OT_TM, ':', '.'), '')), 0) ELSE 0 END), 0) AS WORK_OT_M08,
+				NVL(SUM(CASE WHEN SUBSTR(WORK_DT, 5, 2) = '09' THEN NVL(TO_NUMBER(NULLIF(REPLACE(OT_TM, ':', '.'), '')), 0) ELSE 0 END), 0) AS WORK_OT_M09,
+				NVL(SUM(CASE WHEN SUBSTR(WORK_DT, 5, 2) = '10' THEN NVL(TO_NUMBER(NULLIF(REPLACE(OT_TM, ':', '.'), '')), 0) ELSE 0 END), 0) AS WORK_OT_M10,
+				NVL(SUM(CASE WHEN SUBSTR(WORK_DT, 5, 2) = '11' THEN NVL(TO_NUMBER(NULLIF(REPLACE(OT_TM, ':', '.'), '')), 0) ELSE 0 END), 0) AS WORK_OT_M11,
+				NVL(SUM(CASE WHEN SUBSTR(WORK_DT, 5, 2) = '12' THEN NVL(TO_NUMBER(NULLIF(REPLACE(OT_TM, ':', '.'), '')), 0) ELSE 0 END), 0) AS WORK_OT_M12
+			FROM TB_PM30M01
+			WHERE CO_CD = #{coCd} AND WORK_DT &gt;= #{yy} || '0101' AND WORK_DT &lt;= #{yy} || '1231'
+			GROUP BY EMP_NO
+		) W ON A.EMP_NO = W.EMP_NO
+		LEFT JOIN (
+			SELECT
+				WORK_RPT_ID,
+				NVL(SUM(CASE WHEN TO_CHAR(WORK_RPT_DT, 'MM') = '01' THEN NVL(WORK_RPT_HOUR, 0) ELSE 0 END), 0) AS RPT_HOUR_M01,
+				NVL(SUM(CASE WHEN TO_CHAR(WORK_RPT_DT, 'MM') = '02' THEN NVL(WORK_RPT_HOUR, 0) ELSE 0 END), 0) AS RPT_HOUR_M02,
+				NVL(SUM(CASE WHEN TO_CHAR(WORK_RPT_DT, 'MM') = '03' THEN NVL(WORK_RPT_HOUR, 0) ELSE 0 END), 0) AS RPT_HOUR_M03,
+				NVL(SUM(CASE WHEN TO_CHAR(WORK_RPT_DT, 'MM') = '04' THEN NVL(WORK_RPT_HOUR, 0) ELSE 0 END), 0) AS RPT_HOUR_M04,
+				NVL(SUM(CASE WHEN TO_CHAR(WORK_RPT_DT, 'MM') = '05' THEN NVL(WORK_RPT_HOUR, 0) ELSE 0 END), 0) AS RPT_HOUR_M05,
+				NVL(SUM(CASE WHEN TO_CHAR(WORK_RPT_DT, 'MM') = '06' THEN NVL(WORK_RPT_HOUR, 0) ELSE 0 END), 0) AS RPT_HOUR_M06,
+				NVL(SUM(CASE WHEN TO_CHAR(WORK_RPT_DT, 'MM') = '07' THEN NVL(WORK_RPT_HOUR, 0) ELSE 0 END), 0) AS RPT_HOUR_M07,
+				NVL(SUM(CASE WHEN TO_CHAR(WORK_RPT_DT, 'MM') = '08' THEN NVL(WORK_RPT_HOUR, 0) ELSE 0 END), 0) AS RPT_HOUR_M08,
+				NVL(SUM(CASE WHEN TO_CHAR(WORK_RPT_DT, 'MM') = '09' THEN NVL(WORK_RPT_HOUR, 0) ELSE 0 END), 0) AS RPT_HOUR_M09,
+				NVL(SUM(CASE WHEN TO_CHAR(WORK_RPT_DT, 'MM') = '10' THEN NVL(WORK_RPT_HOUR, 0) ELSE 0 END), 0) AS RPT_HOUR_M10,
+				NVL(SUM(CASE WHEN TO_CHAR(WORK_RPT_DT, 'MM') = '11' THEN NVL(WORK_RPT_HOUR, 0) ELSE 0 END), 0) AS RPT_HOUR_M11,
+				NVL(SUM(CASE WHEN TO_CHAR(WORK_RPT_DT, 'MM') = '12' THEN NVL(WORK_RPT_HOUR, 0) ELSE 0 END), 0) AS RPT_HOUR_M12
+			FROM TB_PM01M01
+			WHERE CO_CD = #{coCd}
+			  AND WORK_RPT_DT &gt;= TO_DATE(#{yy} || '0101', 'YYYYMMDD')
+			  AND WORK_RPT_DT &lt; TO_DATE(#{yy} || '1231', 'YYYYMMDD') + 1
+			GROUP BY WORK_RPT_ID
+		) X ON A.USER_ID = X.WORK_RPT_ID
+		ORDER BY A.SORT_NO ASC, A.DEPT_NM ASC, A.USER_NM ASC
+	</select>
+
+</mapper>
