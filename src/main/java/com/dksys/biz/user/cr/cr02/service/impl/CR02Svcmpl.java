@@ -433,12 +433,15 @@ public class CR02Svcmpl implements CR02Svc {
         Map<String, String> originalOrdrsInfo = gson.fromJson(param.get("originalOrdrsInfo"), Map.class); // 수정 전 데이터
 
         // =============================================================================================================================변경전 수정 시작
-        Map<String, String> selectPrjctInfo = bm16Mapper.selectPrjctInfo(originalOrdrsInfo);
-        // 수정후의 값이 AS 이고 2024-12-27일이후인 겨우에만 추가 등록 처리함.
+        Map<String, String> beforePrjctInfo = bm16Mapper.selectPrjctInfo(originalOrdrsInfo);
+        DateTimeFormatter projectDateFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+        LocalDateTime asProjectApplyDate = LocalDateTime.parse("2024-12-27 00:00:00", projectDateFormatter);
+        // 수정 전의 값이 AS이고 기존 프로젝트가 2024-12-27 이후 생성된 경우에만 차감/삭제 처리함.
         // 조건 보완 isBeforeCnd1 + isBeforeCnd2 = isBefore
         boolean isBeforeCnd1 = (("ORDRSDIV2".equals(originalOrdrsInfo.get("ordrsDiv")) || "ORDRSDIV3".equals(originalOrdrsInfo.get("ordrsDiv"))));
-        boolean isBeforeCnd2 = LocalDateTime.parse(selectPrjctInfo.get("creatDttm"), DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))
-                .isAfter(LocalDateTime.parse("2024-12-27 00:00:00", DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
+        boolean isBeforeCnd2 = beforePrjctInfo != null
+                && beforePrjctInfo.get("creatDttm") != null
+                && LocalDateTime.parse(beforePrjctInfo.get("creatDttm"), projectDateFormatter).isAfter(asProjectApplyDate);
         boolean isBefore = isBeforeCnd1 && isBeforeCnd2;
         // 수정 전의 값이 AS 이고 2024-12-27일이후인 경우에만 수정 및 삭제 처리함
         if (isBefore) {
@@ -459,11 +462,13 @@ public class CR02Svcmpl implements CR02Svc {
         // ============================================================================================================================= 변경전 수정 끝
 
         // ============================================================================================================================= 변경후 수정 시작
+        Map<String, String> afterPrjctInfo = bm16Mapper.selectPrjctInfo(param);
         // 수정후의 값이 AS 이고 2024-12-27일이후인 경우에만 추가 등록 처리함.
         // 조건 보완 isAfterCnd1 + isAfterCnd2 = isAfter
         boolean isAfterCnd1 = (("ORDRSDIV2".equals(param.get("ordrsDiv")) || "ORDRSDIV3".equals(param.get("ordrsDiv"))));
-        boolean isAfterCnd2 = LocalDateTime.parse(selectPrjctInfo.get("creatDttm"), DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))
-                .isAfter(LocalDateTime.parse("2024-12-27 00:00:00", DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
+        boolean isAfterCnd2 = afterPrjctInfo != null
+                && afterPrjctInfo.get("creatDttm") != null
+                && LocalDateTime.parse(afterPrjctInfo.get("creatDttm"), projectDateFormatter).isAfter(asProjectApplyDate);
         boolean isAfter = isAfterCnd1 && isAfterCnd2;
 
         // 수정 후의 값이 AS 이고 2024-12-27일이후인 겨우에만 추가 등록 처리함.
