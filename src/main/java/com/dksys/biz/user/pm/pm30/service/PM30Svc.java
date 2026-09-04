@@ -15,4 +15,10 @@ public interface PM30Svc {
 	List<Map<String, String>> selectAttendanceEmployeeMonthly(Map<String, String> paramMap);
 	List<Map<String, String>> selectHourlyWorkerMonthly(Map<String, String> paramMap);
 
+	List<Map<String, String>> selectAttendanceChangeList(Map<String, String> paramMap);
+
+	Map<String, Object> saveAttendanceChange(Map<String, Object> paramMap) throws Exception;
+
+	Map<String, Object> deleteAttendanceList(Map<String, Object> paramMap) throws Exception;
+
 }

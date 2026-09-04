@@ -70,6 +70,20 @@ var GridColumnConfig = (function() {
 		return meta;
 	}
 
+	// AX5-Grid 버그 회피: 다단(그룹) 헤더에서 그룹의 첫 번째 자식 리프 컬럼이 숨김 상태면
+	// 헤더 폭 계산이 깨져서 그 다음으로 보이는 첫 컬럼의 헤더 셀 폭이 0으로 렌더링되고
+	// 라벨이 안 보인다(실제 재현 확인됨). 숨김 리프는 항상 그룹 자식 배열의 끝으로 옮겨서
+	// "그룹의 렌더링되는 실제 첫 컬럼"이 배열 인덱스 0이 되도록 보장한다 — 숨김 컬럼은
+	// 화면에 그려지지 않으므로 배열 내 순서를 바꿔도 사용자에게 보이는 순서엔 영향이 없다.
+	function moveHiddenLeavesToEnd(cols) {
+		var visible = [], hidden = [];
+		$.each(cols || [], function(i, col) {
+			if (!col.columns && col.hidden) hidden.push(col);
+			else visible.push(col);
+		});
+		return visible.concat(hidden);
+	}
+
 	// 저장된 메타 트리를 화면 기본 컬럼 정의에 병합
 	// - 순서: 저장된 순서 우선, 저장에 없는 신규 컬럼은 원래 순서대로 뒤에 추가
 	// - leaf: key 매칭 (width/hidden 반영)
@@ -96,7 +110,7 @@ var GridColumnConfig = (function() {
 				var def = defCols[matchIdx];
 				var col = $.extend({}, def);
 				if (saved.columns && def.columns) {
-					col.columns = mergeColumns(def.columns, saved.columns);
+					col.columns = moveHiddenLeavesToEnd(mergeColumns(def.columns, saved.columns));
 				} else {
 					if (typeof saved.width === 'number' && saved.width > 0) col.width = saved.width;
 					col.hidden = !!saved.hidden;

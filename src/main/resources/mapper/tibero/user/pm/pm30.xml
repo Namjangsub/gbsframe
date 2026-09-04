@@ -41,22 +41,36 @@
 			NIGHT_MEAL_YN,
 			SALARY_PAY_YN,
 			VAC_APPL_NO,
+			(SELECT M.VAC_TYPE_CD FROM TB_PM07M01 M WHERE M.REQ_NO = A.VAC_APPL_NO AND ROWNUM = 1) AS VAC_TYPE_CD,
+			(SELECT (SELECT CODE_NM FROM TB_CM05M01 WHERE CODE_ID = M.VAC_TYPE_CD) FROM TB_PM07M01 M WHERE M.REQ_NO = A.VAC_APPL_NO AND ROWNUM = 1) AS VAC_TYPE_NM,
+			(SELECT M.AMPM_CD FROM TB_PM07M01 M WHERE M.REQ_NO = A.VAC_APPL_NO AND ROWNUM = 1) AS AMPM_CD,
+			(SELECT (SELECT CODE_NM FROM TB_CM05M01 WHERE CODE_ID = M.AMPM_CD) FROM TB_PM07M01 M WHERE M.REQ_NO = A.VAC_APPL_NO AND ROWNUM = 1) AS AMPM_NM,
 			TRIP_APPL_NO,
 			TRIP_REPLY_NO,
 			WORK_APPL_NO,
-			ORDRS_NO
+			ORDRS_NO,
+			CLS_NORMAL,
+			CLS_OT,
+			CLS_NIGHT,
+			CLS_TOTAL,
+			COALESCE((SELECT TRIP_TYPE_CDS FROM TB_PM51M01 WHERE TRIP_REQ_NO = A.TRIP_APPL_NO), (SELECT TRIP_TYPE_CDS FROM TB_PM51M01 WHERE TRIP_REQ_NO = (SELECT TRIP_REQ_NO FROM TB_PM52M01 WHERE TRIP_RPT_NO = A.TRIP_REPLY_NO))) AS TRIP_TYPE_CDS,
+			COALESCE((SELECT TRIP_NATION_NM FROM TB_PM51M01 WHERE TRIP_REQ_NO = A.TRIP_APPL_NO), (SELECT TRIP_NATION_NM FROM TB_PM51M01 WHERE TRIP_REQ_NO = (SELECT TRIP_REQ_NO FROM TB_PM52M01 WHERE TRIP_RPT_NO = A.TRIP_REPLY_NO))) AS TRIP_NATION_NM,
+			COALESCE((SELECT POSITION_NM FROM TB_PM30M02 WHERE WORK_DT = A.WORK_DT AND EMP_NO = A.EMP_NO AND ROWNUM = 1), (SELECT L.LEVEL_NM FROM TB_CM06M01 C LEFT JOIN TB_CM07M01 L ON C.LEVEL_CD = L.LEVEL_CD WHERE (C.EMP_NO = A.EMP_NO OR C.ID = A.USER_ID) AND ROWNUM = 1)) AS POSITION_NM,
+			COALESCE((SELECT T4.DEPT_NM FROM TB_CM06M01 T6 INNER JOIN TB_CM04M01 T4 ON SUBSTR(T6.VIEW_DEPT_ID,1,5) = T4.DEPT_ID WHERE (T6.EMP_NO = A.EMP_NO OR T6.ID = A.USER_ID) AND ROWNUM = 1), (SELECT T4.DEPT_NM FROM TB_CM06M01 T6 INNER JOIN TB_CM04M01 T4 ON SUBSTR(T6.DEPT_ID,1,5) = T4.DEPT_ID WHERE (T6.EMP_NO = A.EMP_NO OR T6.ID = A.USER_ID) AND ROWNUM = 1)) AS DEPT_NM,
+			(SELECT SALES_AREA FROM TB_CM06M01 WHERE (EMP_NO = A.EMP_NO OR ID = A.USER_ID) AND ROWNUM = 1) AS SALES_AREA
 		FROM TB_PM30M01 A
 		WHERE A.CO_CD = #{coCd, jdbcType=VARCHAR}
 		  AND A.WORK_DT &gt;= #{stDt, jdbcType=VARCHAR}
 		  AND A.WORK_DT &lt;= #{edDt, jdbcType=VARCHAR}
-		<if test="empNo != null and empNo != ''">
-		  AND A.EMP_NO = #{empNo, jdbcType=VARCHAR}
+		<if test="empNo != null and empNo != '' and workerKeyword != null and workerKeyword != ''">
+		  AND (A.EMP_NO = #{empNo, jdbcType=VARCHAR} OR A.USER_ID = #{empNo, jdbcType=VARCHAR} OR A.EMP_NM LIKE '%' || #{workerKeyword, jdbcType=VARCHAR} || '%' OR A.EMP_NO LIKE '%' || #{workerKeyword, jdbcType=VARCHAR} || '%')
+		</if>
+	
+		<if test="(empNo == null or empNo == '') and workerKeyword != null and workerKeyword != ''">
+		  AND (A.EMP_NO LIKE '%' || #{workerKeyword, jdbcType=VARCHAR} || '%' OR A.EMP_NM LIKE '%' || #{workerKeyword, jdbcType=VARCHAR} || '%')
 		</if>
 		<if test="deptId != null and deptId != ''">
-		  AND EXISTS (SELECT 1 FROM TB_CM06M01 U WHERE U.EMP_NO = A.EMP_NO AND SUBSTR(U.DEPT_ID, 1, 5) = SUBSTR(#{deptId, jdbcType=VARCHAR}, 1, 5))
-		</if>
-		<if test="workerKeyword != null and workerKeyword != ''">
-		  AND (A.EMP_NO LIKE '%' || #{workerKeyword, jdbcType=VARCHAR} || '%' OR A.EMP_NM LIKE '%' || #{workerKeyword, jdbcType=VARCHAR} || '%')
+		  AND EXISTS (SELECT 1 FROM TB_CM06M01 U WHERE (U.EMP_NO = A.EMP_NO OR U.ID = A.USER_ID) AND SUBSTR(U.DEPT_ID, 1, 5) = SUBSTR(#{deptId, jdbcType=VARCHAR}, 1, 5))
 		</if>
 		<if test="applyType != null and applyType == 'TRIP'">
 		  AND (A.TRIP_APPL_NO IS NOT NULL OR A.TRIP_REPLY_NO IS NOT NULL)
@@ -112,6 +126,10 @@
 				TRIP_REPLY_NO = #{tripReplyNo, jdbcType=VARCHAR},
 				WORK_APPL_NO = #{workApplNo, jdbcType=VARCHAR},
 				ORDRS_NO = #{ordrsNo, jdbcType=VARCHAR},
+				CLS_NORMAL = #{clsNormal, jdbcType=VARCHAR},
+				CLS_OT = #{clsOt, jdbcType=VARCHAR},
+				CLS_NIGHT = #{clsNight, jdbcType=VARCHAR},
+				CLS_TOTAL = #{clsTotal, jdbcType=VARCHAR},
 				UPDT_ID = #{loginId, jdbcType=VARCHAR},
 				UPDT_PGM = 'PM3001M01',
 				UPDT_DTTM = SYSDATE
@@ -124,6 +142,7 @@
 				RMK, SUBST_WORK_YN, LATE_TXT, EARLY_LEAVE_TXT, VACATION_TXT,
 				WORK_TYPE_NM, ORG_DIV_NM, HOLIDAY_YN, LUNCH_YN, DINNER_YN, NIGHT_MEAL_YN, SALARY_PAY_YN,
 				VAC_APPL_NO, TRIP_APPL_NO, TRIP_REPLY_NO, WORK_APPL_NO, ORDRS_NO,
+				CLS_NORMAL, CLS_OT, CLS_NIGHT, CLS_TOTAL,
 				CREAT_ID, CREAT_PGM, CREAT_DTTM
 			) VALUES (
 				#{coCd, jdbcType=VARCHAR}, #{workDt, jdbcType=VARCHAR}, #{empNo, jdbcType=VARCHAR}, #{userId, jdbcType=VARCHAR},
@@ -141,6 +160,7 @@
 				#{workTypeNm, jdbcType=VARCHAR}, #{orgDivNm, jdbcType=VARCHAR}, #{holidayYn, jdbcType=VARCHAR},
 				#{lunchYn, jdbcType=VARCHAR}, #{dinnerYn, jdbcType=VARCHAR}, #{nightMealYn, jdbcType=VARCHAR}, #{salaryPayYn, jdbcType=VARCHAR},
 				#{vacApplNo, jdbcType=VARCHAR}, #{tripApplNo, jdbcType=VARCHAR}, #{tripReplyNo, jdbcType=VARCHAR}, #{workApplNo, jdbcType=VARCHAR}, #{ordrsNo, jdbcType=VARCHAR},
+				#{clsNormal, jdbcType=VARCHAR}, #{clsOt, jdbcType=VARCHAR}, #{clsNight, jdbcType=VARCHAR}, #{clsTotal, jdbcType=VARCHAR},
 				#{loginId, jdbcType=VARCHAR}, 'PM3001M01', SYSDATE
 			)
 	</update>
@@ -195,6 +215,14 @@
 			)
 	</update>
 
+	<!-- 근태변환 데이터 단건/목록 삭제 (TB_PM30M01만 삭제, TB_PM30M02 원본 로그는 보존) -->
+	<delete id="deleteAttendance" parameterType="Map">
+		DELETE FROM TB_PM30M01
+		WHERE CO_CD = #{coCd, jdbcType=VARCHAR}
+		  AND WORK_DT = #{workDt, jdbcType=VARCHAR}
+		  AND EMP_NO = #{empNo, jdbcType=VARCHAR}
+	</delete>
+
 	<!--
 		주의: 표A(근태로그)의 "사원번호"는 TB_CM06M01.EMP_NO 값이지만,
 		PM51/PM07/PM52의 USER_ID·REQ_ID 컬럼은 TB_CM06M01.ID(로그인ID)를 저장한다.
@@ -202,109 +230,175 @@
 		결과는 프론트가 사용하는 EMP_NO 기준으로 반환한다.
 	-->
 
-	<!-- 출장 데이터 조회 (PM51 신청서 + D03 일자/프로젝트 대표 상세 기준, Tibero CBO Pushdown & NL Join 극상 튜닝) -->
-	<select id="selectTripList" parameterType="Map" resultType="CamelMap">
-		SELECT /*+ LEADING(U D M D3) USE_NL(D M D3) INDEX(D) PUSH_PRED(D3) */
-			U.EMP_NO AS EMP_NO,
-			M.TRIP_REQ_NO AS TRIP_REQ_NO,
-			D.TRIP_ST_DTM,
-			D.TRIP_ED_DTM,
-			M.TRIP_PLACE,
-			M.APRV_STS_CD,
-			NVL(D3.EQUIP_NM, M.EQUIP_NM) AS EQUIP_NM,
-			NVL(D3.CLNT_PJT, M.CLNT_PJT) AS CLNT_PJT,
-			NVL(D3.CLNT_PJT_NM, FN_CM05M01_CD_TO_NM(M.CLNT_PJT)) AS CLNT_PJT_NM,
-			NVL(D3.SALES_CD, M.SALES_CD) AS SALES_CD,
-			NVL(D3.ORDRS_NO, M.SALES_CD) AS ORDRS_NO,
-			D3.ST_DT,
-			D3.ED_DT,
-			D3.MD,
-			M.TRIP_DIV,
-			FN_CM05M01_CD_TO_NM(M.TRIP_DIV) AS TRIP_DIV_NM,
-			M.TRIP_TYPE_CDS,
-			FN_CM05M01_CD_TO_NM(M.TRIP_TYPE_CDS) AS TRIP_TYPE_NM
-		FROM TB_CM06M01 U
-		INNER JOIN TB_PM51D01 D ON D.USER_ID = U.ID
-		INNER JOIN TB_PM51M01 M ON M.TRIP_REQ_NO = D.TRIP_REQ_NO
-		LEFT OUTER JOIN (
-		    SELECT TRIP_REQ_NO, ST_DT, ED_DT, EQUIP_NM, CLNT_PJT, CLNT_PJT_NM, SALES_CD, ORDRS_NO, MD,
-		           ROW_NUMBER() OVER(PARTITION BY TRIP_REQ_NO, ST_DT, ED_DT ORDER BY SEQ ASC) AS RN
-		    FROM TB_PM51D03
-		    WHERE ST_DT &lt;= #{edDt, jdbcType=VARCHAR}
-		      AND ED_DT &gt;= #{stDt, jdbcType=VARCHAR}
-		) D3 ON D3.TRIP_REQ_NO = D.TRIP_REQ_NO AND D3.RN = 1
-		WHERE U.EMP_NO IN
-		<foreach collection="empNoList" item="item" open="(" separator="," close=")">
-			#{item, jdbcType=VARCHAR}
-		</foreach>
-		  AND D.TRIP_ST_DTM &lt;= #{edDt, jdbcType=VARCHAR} || '999999'
-		  AND D.TRIP_ED_DTM &gt;= #{stDt, jdbcType=VARCHAR} || '000000'
-		ORDER BY D.TRIP_ST_DTM ASC
-	</select>
-
-	<!-- 휴가 데이터 조회 (PM07 기준) -->
-	<select id="selectVacationList" parameterType="Map" resultType="CamelMap">
+	<!-- 출장(복명서 우선)/휴가/휴일대체근무 통합 일자별 신청내역 조회 (UNION ALL).
+	     기존 selectTripList/selectReportTripList/selectVacationList/selectSubstWorkList 4개를 대체.
+	     SRC_TYPE으로 구분: TRIP_RPT(출장-복명서 있음, 실제일시)/TRIP_REQ(출장-복명서 없음, 계획일시)/VAC(휴가)/SUBSTWORK(휴일대체근무) -->
+	<select id="selectDailyApplicationList" parameterType="Map" resultType="CamelMap">
 		SELECT
-			U.EMP_NO AS EMP_NO,
-			M.REQ_NO AS REQ_NO,
-			D.VAC_DT,
-			M.VAC_TYPE_CD,
-			(SELECT CODE_NM FROM TB_CM05M01 WHERE CODE_ID = M.VAC_TYPE_CD) AS VAC_TYPE_NM,
-			M.AMPM_CD,
-			M.SANCTN_STS,
-			D.WORK_HOUR
-		FROM TB_PM07M03 D
-		INNER JOIN TB_PM07M01 M ON M.CO_CD = D.CO_CD AND M.REQ_NO = D.REQ_NO
-		INNER JOIN TB_CM06M01 U ON U.ID = M.REQ_ID
-		WHERE U.EMP_NO IN
-		<foreach collection="empNoList" item="item" open="(" separator="," close=")">
-			#{item, jdbcType=VARCHAR}
-		</foreach>
-		  AND D.VAC_DT &gt;= #{stDt, jdbcType=VARCHAR}
-		  AND D.VAC_DT &lt;= #{edDt, jdbcType=VARCHAR}
-		ORDER BY D.VAC_DT ASC
-	</select>
+			EMP_NO, SRC_TYPE, APPL_NO, RPT_NO, ST_DT, ED_DT,
+			TRIP_TYPE_CDS, TRIP_TYPE_NM, TRIP_PLACE, TRIP_DIV, TRIP_DIV_NM,
+			EQUIP_NM, CLNT_PJT, CLNT_PJT_NM, SALES_CD, ORDRS_NO,
+			VAC_TYPE_CD, VAC_TYPE_NM, AMPM_CD, WORK_HOUR,
+			STS
+		FROM (
+			-- 1) 출장(복명서 있는 경우: 실제일시, TB_PM52D02 기준, 출장자별 개별행)
+			SELECT /*+ LEADING(U D M D3) USE_NL(D M D3) INDEX(D) PUSH_PRED(D3) */
+				U.EMP_NO AS EMP_NO,
+				'TRIP_RPT' AS SRC_TYPE,
+				M.TRIP_REQ_NO AS APPL_NO,
+				M.TRIP_RPT_NO AS RPT_NO,
+				SUBSTR(D.TRIP_ST_DTM, 1, 8) AS ST_DT,
+				SUBSTR(D.TRIP_ED_DTM, 1, 8) AS ED_DT,
+				R.TRIP_TYPE_CDS,
+				FN_CM05M01_CD_TO_NM(R.TRIP_TYPE_CDS) AS TRIP_TYPE_NM,
+				R.TRIP_PLACE,
+				R.TRIP_DIV,
+				FN_CM05M01_CD_TO_NM(R.TRIP_DIV) AS TRIP_DIV_NM,
+				NVL(D3.EQUIP_NM, R.EQUIP_NM) AS EQUIP_NM,
+				NVL(D3.CLNT_PJT, R.CLNT_PJT) AS CLNT_PJT,
+				NVL(D3.CLNT_PJT_NM, FN_CM05M01_CD_TO_NM(R.CLNT_PJT)) AS CLNT_PJT_NM,
+				NVL(D3.SALES_CD, R.SALES_CD) AS SALES_CD,
+				NVL(D3.ORDRS_NO, R.SALES_CD) AS ORDRS_NO,
+				CAST(NULL AS VARCHAR2(20)) AS VAC_TYPE_CD,
+				CAST(NULL AS VARCHAR2(100)) AS VAC_TYPE_NM,
+				CAST(NULL AS VARCHAR2(20)) AS AMPM_CD,
+				CAST(NULL AS NUMBER) AS WORK_HOUR,
+				M.APRV_STS_CD AS STS
+			FROM TB_CM06M01 U
+			INNER JOIN TB_PM52D02 D ON D.USER_ID = U.ID
+			INNER JOIN TB_PM52M01 M ON M.TRIP_RPT_NO = D.TRIP_RPT_NO
+			LEFT OUTER JOIN TB_PM51M01 R ON R.TRIP_REQ_NO = M.TRIP_REQ_NO
+			LEFT OUTER JOIN (
+				SELECT TRIP_RPT_NO, ST_DT, ED_DT, EQUIP_NM, CLNT_PJT, CLNT_PJT_NM, SALES_CD, ORDRS_NO,
+					   ROW_NUMBER() OVER(PARTITION BY TRIP_RPT_NO, ST_DT, ED_DT ORDER BY SEQ ASC) AS RN
+				FROM TB_PM52D03
+				WHERE ST_DT &lt;= #{edDt, jdbcType=VARCHAR}
+				  AND ED_DT &gt;= #{stDt, jdbcType=VARCHAR}
+			) D3 ON D3.TRIP_RPT_NO = D.TRIP_RPT_NO AND D3.RN = 1
+			WHERE U.EMP_NO IN
+			<foreach collection="empNoList" item="item" open="(" separator="," close=")">
+				#{item, jdbcType=VARCHAR}
+			</foreach>
+			  AND D.TRIP_ST_DTM &lt;= #{edDt, jdbcType=VARCHAR} || '999999'
+			  AND D.TRIP_ED_DTM &gt;= #{stDt, jdbcType=VARCHAR} || '000000'
 
-	<!-- 출장복명서 데이터 조회 (TB_PM52M01/D02/D03 및 PM51M01 대표 상세 기준, Tibero CBO Pushdown & NL Join 극상 튜닝) -->
-	<select id="selectReportTripList" parameterType="Map" resultType="CamelMap">
-		SELECT /*+ LEADING(U D M D3) USE_NL(D M R D3) INDEX(D) PUSH_PRED(D3) */
-			U.EMP_NO AS EMP_NO,
-			M.TRIP_RPT_NO AS TRIP_RPT_NO,
-			M.TRIP_REQ_NO AS TRIP_REQ_NO,
-			D.TRIP_ST_DTM,
-			D.TRIP_ED_DTM,
-			R.TRIP_PLACE,
-			M.APRV_STS_CD,
-			NVL(D3.EQUIP_NM, R.EQUIP_NM) AS EQUIP_NM,
-			NVL(D3.CLNT_PJT, R.CLNT_PJT) AS CLNT_PJT,
-			NVL(D3.CLNT_PJT_NM, FN_CM05M01_CD_TO_NM(R.CLNT_PJT)) AS CLNT_PJT_NM,
-			NVL(D3.SALES_CD, R.SALES_CD) AS SALES_CD,
-			NVL(D3.ORDRS_NO, R.SALES_CD) AS ORDRS_NO,
-			D3.ST_DT,
-			D3.ED_DT,
-			D3.MD,
-			R.TRIP_DIV,
-			FN_CM05M01_CD_TO_NM(R.TRIP_DIV) AS TRIP_DIV_NM,
-			R.TRIP_TYPE_CDS,
-			FN_CM05M01_CD_TO_NM(R.TRIP_TYPE_CDS) AS TRIP_TYPE_NM
-		FROM TB_CM06M01 U
-		INNER JOIN TB_PM52D02 D ON D.USER_ID = U.ID
-		INNER JOIN TB_PM52M01 M ON M.TRIP_RPT_NO = D.TRIP_RPT_NO
-		LEFT OUTER JOIN TB_PM51M01 R ON R.TRIP_REQ_NO = M.TRIP_REQ_NO
-		LEFT OUTER JOIN (
-		    SELECT TRIP_RPT_NO, ST_DT, ED_DT, EQUIP_NM, CLNT_PJT, CLNT_PJT_NM, SALES_CD, ORDRS_NO, MD,
-		           ROW_NUMBER() OVER(PARTITION BY TRIP_RPT_NO, ST_DT, ED_DT ORDER BY SEQ ASC) AS RN
-		    FROM TB_PM52D03
-		    WHERE ST_DT &lt;= #{edDt, jdbcType=VARCHAR}
-		      AND ED_DT &gt;= #{stDt, jdbcType=VARCHAR}
-		) D3 ON D3.TRIP_RPT_NO = D.TRIP_RPT_NO AND D3.RN = 1
-		WHERE U.EMP_NO IN
-		<foreach collection="empNoList" item="item" open="(" separator="," close=")">
-			#{item, jdbcType=VARCHAR}
-		</foreach>
-		  AND D.TRIP_ST_DTM &lt;= #{edDt, jdbcType=VARCHAR} || '999999'
-		  AND D.TRIP_ED_DTM &gt;= #{stDt, jdbcType=VARCHAR} || '000000'
-		ORDER BY D.TRIP_ST_DTM ASC
+			UNION ALL
+
+			-- 2) 출장(복명서 없는 경우: 계획일시, TB_PM51D01 기준, 출장자별 개별행)
+			SELECT /*+ LEADING(U D M D3) USE_NL(D M D3) INDEX(D) PUSH_PRED(D3) */
+				U.EMP_NO AS EMP_NO,
+				'TRIP_REQ' AS SRC_TYPE,
+				M.TRIP_REQ_NO AS APPL_NO,
+				CAST(NULL AS VARCHAR2(30)) AS RPT_NO,
+				SUBSTR(D.TRIP_ST_DTM, 1, 8) AS ST_DT,
+				SUBSTR(D.TRIP_ED_DTM, 1, 8) AS ED_DT,
+				M.TRIP_TYPE_CDS,
+				FN_CM05M01_CD_TO_NM(M.TRIP_TYPE_CDS) AS TRIP_TYPE_NM,
+				M.TRIP_PLACE,
+				M.TRIP_DIV,
+				FN_CM05M01_CD_TO_NM(M.TRIP_DIV) AS TRIP_DIV_NM,
+				NVL(D3.EQUIP_NM, M.EQUIP_NM) AS EQUIP_NM,
+				NVL(D3.CLNT_PJT, M.CLNT_PJT) AS CLNT_PJT,
+				NVL(D3.CLNT_PJT_NM, FN_CM05M01_CD_TO_NM(M.CLNT_PJT)) AS CLNT_PJT_NM,
+				NVL(D3.SALES_CD, M.SALES_CD) AS SALES_CD,
+				NVL(D3.ORDRS_NO, M.SALES_CD) AS ORDRS_NO,
+				CAST(NULL AS VARCHAR2(20)) AS VAC_TYPE_CD,
+				CAST(NULL AS VARCHAR2(100)) AS VAC_TYPE_NM,
+				CAST(NULL AS VARCHAR2(20)) AS AMPM_CD,
+				CAST(NULL AS NUMBER) AS WORK_HOUR,
+				M.APRV_STS_CD AS STS
+			FROM TB_CM06M01 U
+			INNER JOIN TB_PM51D01 D ON D.USER_ID = U.ID
+			INNER JOIN TB_PM51M01 M ON M.TRIP_REQ_NO = D.TRIP_REQ_NO
+			LEFT OUTER JOIN (
+				SELECT TRIP_REQ_NO, ST_DT, ED_DT, EQUIP_NM, CLNT_PJT, CLNT_PJT_NM, SALES_CD, ORDRS_NO,
+					   ROW_NUMBER() OVER(PARTITION BY TRIP_REQ_NO, ST_DT, ED_DT ORDER BY SEQ ASC) AS RN
+				FROM TB_PM51D03
+				WHERE ST_DT &lt;= #{edDt, jdbcType=VARCHAR}
+				  AND ED_DT &gt;= #{stDt, jdbcType=VARCHAR}
+			) D3 ON D3.TRIP_REQ_NO = D.TRIP_REQ_NO AND D3.RN = 1
+			WHERE U.EMP_NO IN
+			<foreach collection="empNoList" item="item" open="(" separator="," close=")">
+				#{item, jdbcType=VARCHAR}
+			</foreach>
+			  AND D.TRIP_ST_DTM &lt;= #{edDt, jdbcType=VARCHAR} || '999999'
+			  AND D.TRIP_ED_DTM &gt;= #{stDt, jdbcType=VARCHAR} || '000000'
+			  AND NOT EXISTS (
+				  SELECT 1 FROM TB_PM52M01 M2
+				  INNER JOIN TB_PM52D02 D2 ON D2.TRIP_RPT_NO = M2.TRIP_RPT_NO
+				  WHERE M2.TRIP_REQ_NO = D.TRIP_REQ_NO AND D2.USER_ID = D.USER_ID
+			  )
+
+			UNION ALL
+
+			-- 3) 휴가 (TB_PM07M01/TB_PM07M03 기준, 일자별)
+			SELECT
+				U.EMP_NO AS EMP_NO,
+				'VAC' AS SRC_TYPE,
+				M.REQ_NO AS APPL_NO,
+				CAST(NULL AS VARCHAR2(30)) AS RPT_NO,
+				D.VAC_DT AS ST_DT,
+				D.VAC_DT AS ED_DT,
+				CAST(NULL AS VARCHAR2(20)) AS TRIP_TYPE_CDS,
+				CAST(NULL AS VARCHAR2(100)) AS TRIP_TYPE_NM,
+				CAST(NULL AS VARCHAR2(200)) AS TRIP_PLACE,
+				CAST(NULL AS VARCHAR2(20)) AS TRIP_DIV,
+				CAST(NULL AS VARCHAR2(100)) AS TRIP_DIV_NM,
+				CAST(NULL AS VARCHAR2(200)) AS EQUIP_NM,
+				CAST(NULL AS VARCHAR2(30)) AS CLNT_PJT,
+				CAST(NULL AS VARCHAR2(200)) AS CLNT_PJT_NM,
+				CAST(NULL AS VARCHAR2(30)) AS SALES_CD,
+				CAST(NULL AS VARCHAR2(30)) AS ORDRS_NO,
+				M.VAC_TYPE_CD,
+				(SELECT CODE_NM FROM TB_CM05M01 WHERE CODE_ID = M.VAC_TYPE_CD) AS VAC_TYPE_NM,
+				M.AMPM_CD,
+				D.WORK_HOUR,
+				M.SANCTN_STS AS STS
+			FROM TB_PM07M03 D
+			INNER JOIN TB_PM07M01 M ON M.CO_CD = D.CO_CD AND M.REQ_NO = D.REQ_NO
+			INNER JOIN TB_CM06M01 U ON U.ID = M.REQ_ID
+			WHERE U.EMP_NO IN
+			<foreach collection="empNoList" item="item" open="(" separator="," close=")">
+				#{item, jdbcType=VARCHAR}
+			</foreach>
+			  AND D.VAC_DT &gt;= #{stDt, jdbcType=VARCHAR}
+			  AND D.VAC_DT &lt;= #{edDt, jdbcType=VARCHAR}
+
+			UNION ALL
+
+			-- 4) 휴일대체근무 (TB_PM08M01, HOLIDAY_DT만 — 승인상태 무관하게 매칭, 사용자 확정 사항)
+			SELECT
+				U.EMP_NO AS EMP_NO,
+				'SUBSTWORK' AS SRC_TYPE,
+				M.REQ_NO AS APPL_NO,
+				CAST(NULL AS VARCHAR2(30)) AS RPT_NO,
+				M.HOLIDAY_DT AS ST_DT,
+				M.HOLIDAY_DT AS ED_DT,
+				CAST(NULL AS VARCHAR2(20)) AS TRIP_TYPE_CDS,
+				CAST(NULL AS VARCHAR2(100)) AS TRIP_TYPE_NM,
+				CAST(NULL AS VARCHAR2(200)) AS TRIP_PLACE,
+				CAST(NULL AS VARCHAR2(20)) AS TRIP_DIV,
+				CAST(NULL AS VARCHAR2(100)) AS TRIP_DIV_NM,
+				CAST(NULL AS VARCHAR2(200)) AS EQUIP_NM,
+				CAST(NULL AS VARCHAR2(30)) AS CLNT_PJT,
+				CAST(NULL AS VARCHAR2(200)) AS CLNT_PJT_NM,
+				CAST(NULL AS VARCHAR2(30)) AS SALES_CD,
+				CAST(NULL AS VARCHAR2(30)) AS ORDRS_NO,
+				CAST(NULL AS VARCHAR2(20)) AS VAC_TYPE_CD,
+				CAST(NULL AS VARCHAR2(100)) AS VAC_TYPE_NM,
+				CAST(NULL AS VARCHAR2(20)) AS AMPM_CD,
+				CAST(NULL AS NUMBER) AS WORK_HOUR,
+				CAST(NULL AS VARCHAR2(20)) AS STS
+			FROM TB_PM08M01 M
+			INNER JOIN TB_CM06M01 U ON U.ID = M.REQ_ID
+			WHERE U.EMP_NO IN
+			<foreach collection="empNoList" item="item" open="(" separator="," close=")">
+				#{item, jdbcType=VARCHAR}
+			</foreach>
+			  AND M.HOLIDAY_DT &gt;= #{stDt, jdbcType=VARCHAR}
+			  AND M.HOLIDAY_DT &lt;= #{edDt, jdbcType=VARCHAR}
+		)
+		ORDER BY ST_DT ASC
 	</select>
 
 	<!-- 사원마스터 직종구분 조회 (근무형태/조직구분 자동판정용) -->
@@ -433,5 +527,46 @@
 		</if>
 		GROUP BY A.EMP_NO, A.EMP_NM ORDER BY A.EMP_NM, A.EMP_NO
 	</select>
+
+	<!-- 월근태 변동분내역 조회 (월+사원번호 기준, SEQ 1,2 두 건) -->
+	<select id="selectAttendanceChangeList" parameterType="Map" resultType="CamelMap">
+		SELECT
+			CO_CD,
+			WORK_YM,
+			EMP_NO,
+			SEQ,
+			CONTENT_TXT1,
+			CONTENT_TXT2
+		FROM TB_PM30M03
+		WHERE CO_CD = #{coCd, jdbcType=VARCHAR}
+		  AND WORK_YM = #{workYm, jdbcType=VARCHAR}
+		  AND EMP_NO = #{empNo, jdbcType=VARCHAR}
+		ORDER BY SEQ ASC
+	</select>
+
+	<!-- 월근태 변동분내역 Merge (Insert/Update) -->
+	<update id="mergeAttendanceChange" parameterType="Map">
+		MERGE INTO TB_PM30M03 A
+		USING DUAL
+		ON (A.CO_CD = #{coCd, jdbcType=VARCHAR}
+		    AND A.WORK_YM = #{workYm, jdbcType=VARCHAR}
+		    AND A.EMP_NO = #{empNo, jdbcType=VARCHAR}
+		    AND A.SEQ = #{seq, jdbcType=NUMERIC})
+		WHEN MATCHED THEN
+			UPDATE SET
+				CONTENT_TXT1 = #{contentTxt1, jdbcType=VARCHAR},
+				CONTENT_TXT2 = #{contentTxt2, jdbcType=VARCHAR},
+				UPDT_ID = #{loginId, jdbcType=VARCHAR},
+				UPDT_PGM = 'PM3002M01',
+				UPDT_DTTM = SYSDATE
+		WHEN NOT MATCHED THEN
+			INSERT (
+				CO_CD, WORK_YM, EMP_NO, SEQ, CONTENT_TXT1, CONTENT_TXT2, CREAT_ID, CREAT_PGM, CREAT_DTTM
+			) VALUES (
+				#{coCd, jdbcType=VARCHAR}, #{workYm, jdbcType=VARCHAR}, #{empNo, jdbcType=VARCHAR}, #{seq, jdbcType=NUMERIC},
+				#{contentTxt1, jdbcType=VARCHAR}, #{contentTxt2, jdbcType=VARCHAR},
+				#{loginId, jdbcType=VARCHAR}, 'PM3002M01', SYSDATE
+			)
+	</update>
 
 </mapper>

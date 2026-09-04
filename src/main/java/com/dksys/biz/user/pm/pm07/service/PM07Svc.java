@@ -13,6 +13,8 @@ public interface PM07Svc {
 
 	List<Map<String, String>> selectVacationCalendarList(Map<String, String> paramMap);
 
+	List<Map<String, String>> selectAttendanceCalendarList(Map<String, String> paramMap);
+
 	Map<String, String> selectVacationDtl(Map<String, String> paramMap);
 
 	Map<String, String> insertVacation(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;

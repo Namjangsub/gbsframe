@@ -14,11 +14,7 @@ public interface PM30Mapper {
 
 	int mergeAttendanceRaw(Map<String, Object> paramMap);
 
-	List<Map<String, String>> selectTripList(Map<String, Object> paramMap);
-
-	List<Map<String, String>> selectVacationList(Map<String, Object> paramMap);
-
-	List<Map<String, String>> selectReportTripList(Map<String, Object> paramMap);
+	List<Map<String, String>> selectDailyApplicationList(Map<String, Object> paramMap);
 
 	List<Map<String, String>> selectEmpSalesArea(Map<String, Object> paramMap);
 
@@ -29,5 +25,11 @@ public interface PM30Mapper {
 	List<Map<String, String>> selectAttendanceEmployeeMonthly(Map<String, String> paramMap);
 
 	List<Map<String, String>> selectHourlyWorkerMonthly(Map<String, String> paramMap);
+
+	List<Map<String, String>> selectAttendanceChangeList(Map<String, String> paramMap);
+
+	int mergeAttendanceChange(Map<String, Object> paramMap);
+
+	int deleteAttendance(Map<String, Object> paramMap);
 
 }

@@ -3626,7 +3626,7 @@
 		var isTeamManager = isApplicantTeamManager(applicantId);
 		var isApproverTeamManager = isCurrentApproverTeamManager(applicantId);
 		var isAccounting = isAccountingUser();
-		var generalLocked = isApprovalEntryMode() || hasCompletedRptApproval() || isRptPaid();
+		var generalLocked = (isApprovalEntryMode() && !isApplicantBeforeAnyApproval()) || hasCompletedRptApproval() || isRptPaid();
 		if (generalLocked && (isTeamManager || isApproverTeamManager) && !isAccounting && !isRptPaid()) {
 			saveTripRptMngEval();
 			return;
@@ -3672,10 +3672,11 @@
 
 		// 신청인 본인이 팀장인 경우(등록 시점 포함) 또는 현재 로그인한 사용자가 신청인의 팀장(결재자)인 경우
 		// 부서장평가 및 결재자판단 필수 입력 검증
+		// 단, 신청인 본인이 곧 그 팀장/결재자로 조직데이터상 잡히는 경우(자기 자신 결재)는 제외 — 본인 평가를 강제하지 않는다.
 		var applicantId = $('#reqViewReqId').val() || '';
 		var isTeamManager = isApplicantTeamManager(applicantId);
 		var isApproverTeamManager = isCurrentApproverTeamManager(applicantId);
-		if ((isTeamManager || isApproverTeamManager) && !isAccounting) {
+		if ((isTeamManager || isApproverTeamManager) && !isAccounting && !isRptApplicant()) {
 			if (!$('#deptEvalCd').val()) {
 				setErrorStyle($('#deptEvalCd'));
 				alert("부서장평가는 필수 선택입니다.");
@@ -4253,6 +4254,12 @@
 		return popParam.actionType === 'V' || !!popParam.todoFileTrgtKey || !!popParam.sanctnSn || !!popParam.todoDiv1CodeId;
 	}
 
+	function isApplicantBeforeAnyApproval() {
+		if (!popParam) return false;
+		if (popParam.actionType === 'V' && !popParam.todoFileTrgtKey && !popParam.sanctnSn && !popParam.todoDiv1CodeId) return false;
+		return isRptApplicant() && !hasCompletedRptApproval() && !isRptPaid();
+	}
+
 	function isRptProjectGridEditBlocked() {
 		return isApprovalEntryMode();
 	}
@@ -4394,7 +4401,9 @@
 		var isAccountingActive = isAccounting && !isRptPaid() && !hasCompletedMngApproval();
 
 		// 결재 진입 상태 시 락 판정 (기본적으로 결재선 승인이 완료되었거나 회계 지급 완료된 경우 하드 락)
-		var locked = isApprovalEntryMode() || hasCompletedRptApproval() || isRptPaid();
+		// 예외: 신청인 본인이고 아직 아무도 승인/지급하지 않았다면, 결재함 등 결재 진입 경로(isApprovalEntryMode)로
+		// 열렸더라도 잠그지 않는다 — 신청인은 자신의 결재가 시작되기 전까지 자유롭게 수정할 수 있어야 한다.
+		var locked = (isApprovalEntryMode() && !isApplicantBeforeAnyApproval()) || hasCompletedRptApproval() || isRptPaid();
 		var $popArea = $('#popForm').closest('.popup_area');
 
 		if (locked) {
@@ -4444,7 +4453,9 @@
 
 		// [특별 권한 정책] 신청인이 팀장이거나 현재 로그인한 사용자가 신청인의 팀장(결재자)인 경우
 		// 이 블록은 반드시 마지막에 실행되어 다른 로직에 덮이지 않도록 함
-		if ((isTeamManager || isApproverTeamManager) && !isAccounting) {
+		// 단, 신청인 본인이 곧 그 팀장/결재자로 조직데이터상 잡히는 경우(자기 자신 결재)는 제외한다 —
+		// 그 경우 저장 버튼을 숨기고 결재처리로 일원화하면 신청인 본인이 편집할 방법이 없어진다.
+		if ((isTeamManager || isApproverTeamManager) && !isAccounting && !applicant) {
 			// 팀장이 수정 가능한 조건: 회계 지급 전이면서, 담당팀장 본인의 일반결재가 아직 완료되지 않은 경우에만.
 			// 본인 결재가 이미 완료된 상태면 재조회해도 저장버튼/부서장평가영역을 다시 열어주지 않는다.
 			var isCompleted = isRptPaid() || hasOwnGeneralApprovalCompleted();
@@ -4525,7 +4536,7 @@
 		if ((isTeamManager || isApproverTeamManager || isAccounting) && !isCompleted && !hasCompletedMngApproval()) {
 			return false;
 		}
-		return isApprovalEntryMode() || isCompleted;
+		return (isApprovalEntryMode() && !isApplicantBeforeAnyApproval()) || isCompleted;
 	}
 
 	// 통화 공통코드(CURR01 등) 또는 코드명을 정산 헤더에 표시할 통화단위로 변환
@@ -4562,7 +4573,7 @@
 	}
 
 	function isRptTravelerGridEditBlocked() {
-		return isApprovalEntryMode() || hasCompletedRptApproval() || isRptPaid();
+		return (isApprovalEntryMode() && !isApplicantBeforeAnyApproval()) || hasCompletedRptApproval() || isRptPaid();
 	}
 
 	// 순차결재 진입 안내: 로그인 사용자가 이 복명서의 결재 대상이면서 아직 본인 차례가 아니면

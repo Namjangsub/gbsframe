@@ -535,7 +535,7 @@
 			,"reqDeptNm"  : $('#reqDeptNm_S').val() || ""
 		};
 
-		postAjax("/user/pm/pm07/selectVacationCalendarList", formData, null, function(data) {
+		postAjax("/user/pm/pm07/selectAttendanceCalendarList", formData, null, function(data) {
 			try {
 				currentCalendarData = data.result || [];
 				renderGoogleCalendar(yy, mm, currentCalendarData);
@@ -599,6 +599,7 @@
 				var weekEndStr = weekEndMoment.format("YYYYMMDD");
 
 				$.each(vacList, function(idx, item) {
+					item.__calendarDataIdx__ = idx;
 					var st = item.stDt || item.rawStDt;
 					var ed = item.edDt || item.rawEdDt;
 					if (!st || !ed) return true;
@@ -635,6 +636,7 @@
 
 						weekEvents.push({
 							item: item,
+							itemIdx: item.__calendarDataIdx__,
 							startCol: Math.max(0, startCol),
 							endCol: Math.min(6, endCol),
 							contLeft: contLeft,
@@ -692,11 +694,18 @@
 
 					// 당월이 아닌 기간의 이벤트 여부 판단 (완전 전월/익월 또는 해당월 밖 일정)
 					var isCurrentMonthEvent = !(ev.st > monthEndStr || ev.ed < monthStartStr);
-					var typeColor = isCurrentMonthEvent ? getVacationStyle(item.vacTypeCd, vacTypeNm) : {
-						bg: "#f3f4f6",
-						text: "#8c959f",
-						border: "#d0d7de"
-					};
+					var typeColor;
+					if (isCurrentMonthEvent) {
+						if (item.srcType === 'TRIP') {
+							typeColor = { bg: '#34a853', text: '#ffffff', border: '#1e7e34' };
+						} else if (item.srcType === 'SUBST') {
+							typeColor = { bg: '#f9ab00', text: '#3c2f00', border: '#c67c00' };
+						} else {
+							typeColor = getVacationStyle(item.vacTypeCd, vacTypeNm);
+						}
+					} else {
+						typeColor = { bg: "#f3f4f6", text: "#8c959f", border: "#d0d7de" };
+					}
 
 					var colSpan = ev.endCol - ev.startCol + 1;
 					var startGridCol = ev.startCol + 1; // 1-indexed
@@ -717,11 +726,14 @@
 					}
 
 					var deptNm = item.deptNm || item.reqDeptNm || "부서미지정";
-					var barHtml = '<a class="' + barCls + '" style="' + gridStyleStr + '" '
-					            + 'onmouseenter="showGcalEventPopover(event, \'' + reqIdNm.replace(/'/g, "\\'") + '\', \'' + vacTypeNm.replace(/'/g, "\\'") + '\', \'' + ampmLabel.replace(/'/g, "\\'") + '\', \'' + ev.st + '\', \'' + ev.ed + '\', \'' + (item.reqRmk || '').replace(/'/g, "\\'") + '\', \'' + deptNm.replace(/'/g, "\\'") + '\');" '
+					var isOwnEvent = (item.reqId === jwt.userId);
+					var cursorStyle = isOwnEvent ? 'cursor:pointer;' : 'cursor:default;';
+					var barHtml = '<a class="' + barCls + '" style="' + gridStyleStr + cursorStyle + '" '
+					            + 'data-cal-idx="' + ev.itemIdx + '" '
+					            + 'onmouseenter="showGcalEventPopover(event, ' + ev.itemIdx + ');" '
 					            + 'onmousemove="moveGcalEventPopover(event);" '
 					            + 'onmouseleave="hideGcalEventPopover();" '
-					            + 'onclick="openVacationDetailModal(\'' + item.reqNo + '\');">';
+					            + (isOwnEvent ? 'onclick="handleGcalEventClick(' + ev.itemIdx + ');"' : '') + '>';
 					barHtml += '<i class="fas fa-user-clock"></i> ' + reqIdNm + ' ' + vacTypeNm + ampmLabel;
 					barHtml += '</a>';
 
@@ -749,16 +761,28 @@
 		bringGcalBarToFront(this);
 	});
 
-	function showGcalEventPopover(e, reqIdNm, vacTypeNm, ampmLabel, st, ed, reqRmk, deptNm) {
+	function showGcalEventPopover(e, idx) {
+		var item = currentCalendarData[idx];
+		if (!item) return;
+
 		var $pop = $('#vacationInfoPopover');
 		if ($pop.length === 0) {
 			$pop = $('<div id="vacationInfoPopover" class="vacation-info-popover"></div>');
 			$('body').append($pop);
 		}
-		var html = '<div class="popover-title"><i class="fas fa-user-clock" style="margin-right: 5px;"></i>' + reqIdNm + ' (' + (deptNm || "부서미지정") + ')</div>';
-		html += '<div class="popover-item"><b>휴가유형:</b> ' + vacTypeNm + ampmLabel + '</div>';
-		html += '<div class="popover-item"><b>휴가기간:</b> ' + st + ' ~ ' + ed + '</div>';
-		html += '<div class="popover-item"><b>휴가사유:</b> ' + (reqRmk || '없음') + '</div>';
+
+		var reqIdNm = item.reqIdNm || item.userNm || "신청자";
+		var deptNm = item.deptNm || item.reqDeptNm || "부서미지정";
+		var vacTypeNm = item.vacTypeNm || "휴가";
+		var ampmLabel = (item.ampmNm) ? (" (" + item.ampmNm + ")") : "";
+		var st = item.stDt || item.rawStDt || "";
+		var ed = item.edDt || item.rawEdDt || "";
+		var reqRmk = item.reqRmk || "없음";
+
+		var html = '<div class="popover-title"><i class="fas fa-user-clock" style="margin-right: 5px;"></i>' + reqIdNm + ' (' + deptNm + ')</div>';
+		html += '<div class="popover-item"><b>유형:</b> ' + vacTypeNm + ampmLabel + '</div>';
+		html += '<div class="popover-item"><b>기간:</b> ' + st + ' ~ ' + ed + '</div>';
+		html += '<div class="popover-item"><b>비고:</b> ' + reqRmk + '</div>';
 		$pop.html(html);
 
 		var mouseX = e.clientX || (e.originalEvent ? e.originalEvent.clientX : 0);
@@ -835,6 +859,42 @@
 				});
 			}
 		});
+	}
+
+	// 캘린더 이벤트 바 클릭 핸들러 (srcType/docType에 따라 분기)
+	function handleGcalEventClick(idx) {
+		var item = currentCalendarData[idx];
+		if (!item) return;
+
+		if (item.srcType === 'VACATION') {
+			openVacationDetailModal(item.reqNo);
+		} else if (item.srcType === 'TRIP') {
+			if (item.docType === 'TRIP_RPT') {
+				openModal("/static/html/user/pm/pm51/PM5102P01.html", 1500, 860, "출장복명서 수정", {actionType:"U", tripRptNo: item.docNo, pgmId:"PM5102P01"}, function(){ DataSearch(); });
+			} else if (item.docType === 'TRIP_REQ') {
+				openModal("/static/html/user/pm/pm51/PM5101P01.html", 1500, 860, "출장신청서 수정", {actionType:"U", tripReqNo: item.docNo, pgmId:"PM5101P01"}, function(){ DataSearch(); });
+			}
+		} else if (item.srcType === 'SUBST') {
+			postAjax("/user/pm/pm08/selectSubstituteWorkDtl", {coCd: jwt.coCd || "GUN", reqNo: item.docNo}, null, function(data) {
+				if (data && data.result) {
+					var row = data.result;
+					var paramObj = {
+						actionType: "U",
+						openStage: "",
+						coCd: "GUN",
+						userId: jwt.userId,
+						userNm: jwt.userNm,
+						pgmId: "PM0801P01"
+					};
+					// 행의 모든 필드를 spread
+					$.each(row, function(key, val) {
+						paramObj[key] = (typeof(val) == "undefined") ? "" : val;
+					});
+					paramObj.coCd = "GUN";
+					openModal("/static/html/user/pm/pm08/PM0801P01.html", 1100, 800, "", paramObj, function(){ DataSearch(); });
+				}
+			});
+		}
 	}
 
 	// 신청자(사원) 검색

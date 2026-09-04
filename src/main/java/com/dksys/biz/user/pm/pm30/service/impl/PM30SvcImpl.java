@@ -76,28 +76,16 @@ public class PM30SvcImpl implements PM30Svc {
 		@SuppressWarnings("unchecked")
 		List<String> empNoList = (List<String>) paramMap.get("empNoList");
 
-		List<Map<String, String>> tripList = new ArrayList<>();
-		List<Map<String, String>> vacationList = new ArrayList<>();
-		List<Map<String, String>> reportTripList = new ArrayList<>();
+		List<Map<String, String>> dailyApplicationList = new ArrayList<>();
 		List<Map<String, String>> empSalesAreaList = new ArrayList<>();
 
 		if (empNoList != null && !empNoList.isEmpty()) {
 			Map<String, Object> queryMap = new HashMap<>(paramMap);
 			queryMap.put("empNoList", empNoList);
 
-			tripList = pm30Mapper.selectTripList(queryMap);
-			if (tripList == null) {
-				tripList = new ArrayList<>();
-			}
-
-			vacationList = pm30Mapper.selectVacationList(queryMap);
-			if (vacationList == null) {
-				vacationList = new ArrayList<>();
-			}
-
-			reportTripList = pm30Mapper.selectReportTripList(queryMap);
-			if (reportTripList == null) {
-				reportTripList = new ArrayList<>();
+			dailyApplicationList = pm30Mapper.selectDailyApplicationList(queryMap);
+			if (dailyApplicationList == null) {
+				dailyApplicationList = new ArrayList<>();
 			}
 
 			empSalesAreaList = pm30Mapper.selectEmpSalesArea(queryMap);
@@ -114,9 +102,7 @@ public class PM30SvcImpl implements PM30Svc {
 
 		result.put("resultCode", "0000");
 		result.put("resultMessage", "성공");
-		result.put("tripList", tripList);
-		result.put("vacationList", vacationList);
-		result.put("reportTripList", reportTripList);
+		result.put("dailyApplicationList", dailyApplicationList);
 		result.put("empSalesAreaList", empSalesAreaList);
 
 		return result;
@@ -135,6 +121,60 @@ public class PM30SvcImpl implements PM30Svc {
 	@Override
 	public List<Map<String, String>> selectHourlyWorkerMonthly(Map<String, String> paramMap) {
 		return pm30Mapper.selectHourlyWorkerMonthly(paramMap);
+	}
+
+	@Override
+	public List<Map<String, String>> selectAttendanceChangeList(Map<String, String> paramMap) {
+		return pm30Mapper.selectAttendanceChangeList(paramMap);
+	}
+
+	@Override
+	public Map<String, Object> saveAttendanceChange(Map<String, Object> paramMap) throws Exception {
+		Map<String, Object> result = new HashMap<>();
+
+		String coCd = (String) paramMap.get("coCd");
+		String loginId = (String) paramMap.get("loginId");
+		if (loginId == null || loginId.isEmpty()) {
+			loginId = (String) paramMap.get("userId");
+		}
+		if (loginId == null || loginId.isEmpty()) {
+			loginId = "SYSTEM";
+		}
+
+		paramMap.put("coCd", coCd);
+		paramMap.put("loginId", loginId);
+
+		int resultCount = pm30Mapper.mergeAttendanceChange(paramMap);
+
+		result.put("resultCode", "0000");
+		result.put("resultMessage", "저장되었습니다.");
+		result.put("resultCount", resultCount);
+
+		return result;
+	}
+
+	@Override
+	public Map<String, Object> deleteAttendanceList(Map<String, Object> paramMap) throws Exception {
+		Map<String, Object> result = new HashMap<>();
+
+		String coCd = (String) paramMap.get("coCd");
+
+		@SuppressWarnings("unchecked")
+		List<Map<String, Object>> list = (List<Map<String, Object>>) paramMap.get("list");
+
+		int resultCount = 0;
+		if (list != null && !list.isEmpty()) {
+			for (Map<String, Object> row : list) {
+				row.put("coCd", coCd);
+				resultCount += pm30Mapper.deleteAttendance(row);
+			}
+		}
+
+		result.put("resultCode", "0000");
+		result.put("resultMessage", "삭제되었습니다.");
+		result.put("resultCount", resultCount);
+
+		return result;
 	}
 
 }

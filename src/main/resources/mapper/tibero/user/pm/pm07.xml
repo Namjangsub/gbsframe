@@ -104,6 +104,249 @@
 		ORDER BY M.ST_DT ASC, M.REQ_NO ASC
 	</select>
 
+	<!--
+		PM0702M01(휴가신청자 캘린더) 전용 통합 조회.
+		selectVacationCalendarList(휴가 전용, PM0711M01/PM0810M01/PM0710M01 등에서 공용으로 사용 중이므로 절대 수정 금지)와는 별도로,
+		휴가(TB_PM07M01) + 출장(TB_PM51M01/TB_PM52M01, 복명서 있으면 복명서 실제일시 기준/없으면 신청서 계획일시 기준, 출장자별 개별 행)
+		+ 대체휴일근무(TB_PM08M01, HOLIDAY_DT만) 를 UNION ALL로 병합해서 내려준다.
+		vacTypeCd/sanctnSts 필터는 휴가(VACATION) 데이터에만 적용하고 출장/대체근무 행에는 적용하지 않는다.
+		DOC_TYPE/DOC_NO는 프론트에서 본인 건 클릭 시 원본 신청/복명서 모달을 여는 용도(REQ_NO는 츨장의 경우 출장자별로 유일하도록 SEQ를 붙여 가공된 값이라 원본 키가 별도로 필요).
+	-->
+	<select id="selectAttendanceCalendarList" parameterType="Map" resultType="CamelMap">
+		SELECT * FROM (
+			SELECT
+				M.CO_CD,
+				M.REQ_NO,
+				M.REQ_ID,
+				M.REQ_DEPT_ID,
+				M.VAC_TYPE_CD,
+				C1.CODE_NM AS VAC_TYPE_NM,
+				U.NAME AS REQ_ID_NM,
+				D.DEPT_NM AS REQ_DEPT_NM,
+				M.AMPM_CD,
+				C2.CODE_NM AS AMPM_NM,
+				TO_CHAR(TO_DATE(M.ST_DT, 'YYYYMMDD'), 'YYYY-MM-DD') AS ST_DT,
+				TO_CHAR(TO_DATE(M.ED_DT, 'YYYYMMDD'), 'YYYY-MM-DD') AS ED_DT,
+				M.ST_DT AS RAW_ST_DT,
+				M.ED_DT AS RAW_ED_DT,
+				M.REQ_RMK,
+				NVL(W.CALC_SANCTN_STS, NVL(M.SANCTN_STS, 'TEMP')) AS SANCTN_STS,
+				'VACATION' AS SRC_TYPE,
+				'VACATION' AS DOC_TYPE,
+				M.REQ_NO AS DOC_NO
+			FROM TB_PM07M01 M
+			LEFT OUTER JOIN TB_CM06M01 U ON M.REQ_ID = U.ID
+			LEFT OUTER JOIN TB_CM04M01 D ON M.REQ_DEPT_ID = D.DEPT_ID
+			LEFT OUTER JOIN TB_CM05M01 C1 ON M.VAC_TYPE_CD = C1.CODE_ID
+			LEFT OUTER JOIN TB_CM05M01 C2 ON M.AMPM_CD = C2.CODE_ID
+			LEFT OUTER JOIN (
+				SELECT
+					TODO_NO,
+					CASE
+						WHEN SUM(CASE WHEN TODO_CF_DT IS NOT NULL AND (SANCTN_STTUS = 'N' OR SANCTN_STTUS = 'R' OR SANCTN_STTUS = '4') THEN 1 ELSE 0 END) &gt; 0 THEN 'RTN'
+						WHEN COUNT(TODO_KEY) = 0 THEN 'TEMP'
+						WHEN COUNT(TODO_KEY) &gt; 0 AND COUNT(TODO_KEY) = SUM(CASE WHEN TODO_CF_DT IS NOT NULL AND SANCTN_STTUS != 'N' THEN 1 ELSE 0 END) THEN 'END'
+						WHEN SUM(CASE WHEN SANCTN_SN &gt; 1 AND TODO_CF_DT IS NOT NULL AND SANCTN_STTUS != 'N' THEN 1 ELSE 0 END) &gt; 0 THEN 'ING'
+						ELSE 'REQ'
+					END AS CALC_SANCTN_STS
+				FROM TB_WB20M03
+				WHERE TODO_DIV1_CODE_ID = 'TODODIV20'
+				GROUP BY TODO_NO
+			) W ON M.REQ_NO = W.TODO_NO
+			WHERE 1=1
+			<if test="reqDtFrom != null and !reqDtFrom.equals('') and reqDtTo != null and !reqDtTo.equals('')">
+			  AND M.ST_DT &lt;= #{reqDtTo}
+			  AND M.ED_DT &gt;= #{reqDtFrom}
+			</if>
+			<if test="vacTypeCd != null and !vacTypeCd.equals('')">
+			  AND M.VAC_TYPE_CD = #{vacTypeCd}
+			</if>
+			<if test="reqId != null and !reqId.equals('')">
+			  AND M.REQ_ID = #{reqId}
+			</if>
+			<if test="reqIdNm != null and !reqIdNm.equals('')">
+			  AND (U.NAME LIKE '%' || #{reqIdNm} || '%' OR M.REQ_TITL LIKE '%' || #{reqIdNm} || '%' OR M.REQ_ID LIKE '%' || #{reqIdNm} || '%')
+			</if>
+			<if test="reqDeptId != null and !reqDeptId.equals('')">
+			  AND M.REQ_DEPT_ID = #{reqDeptId}
+			</if>
+			<if test="reqDeptNm != null and !reqDeptNm.equals('')">
+			  AND D.DEPT_NM LIKE '%' || #{reqDeptNm} || '%'
+			</if>
+			<if test="sanctnSts != null and !sanctnSts.equals('')">
+			  AND NVL(W.CALC_SANCTN_STS, NVL(M.SANCTN_STS, 'TEMP')) = #{sanctnSts}
+			</if>
+
+			UNION ALL
+
+			<!-- 출장: 복명서(TB_PM52M01)가 있는 신청건 -> 복명서 출장자(TB_PM52D02) 실제일시 기준, 출장자별 1행 -->
+			SELECT
+				RM.CO_CD,
+				RPT.TRIP_RPT_NO || '_' || D.SEQ AS REQ_NO,
+				D.USER_ID AS REQ_ID,
+				NULL AS REQ_DEPT_ID,
+				NULL AS VAC_TYPE_CD,
+				'출장' AS VAC_TYPE_NM,
+				D.USER_NM AS REQ_ID_NM,
+				D.DEPT_NM AS REQ_DEPT_NM,
+				NULL AS AMPM_CD,
+				NULL AS AMPM_NM,
+				TO_CHAR(TO_DATE(SUBSTR(D.TRIP_ST_DTM, 1, 8), 'YYYYMMDD'), 'YYYY-MM-DD') AS ST_DT,
+				TO_CHAR(TO_DATE(SUBSTR(D.TRIP_ED_DTM, 1, 8), 'YYYYMMDD'), 'YYYY-MM-DD') AS ED_DT,
+				SUBSTR(D.TRIP_ST_DTM, 1, 8) AS RAW_ST_DT,
+				SUBSTR(D.TRIP_ED_DTM, 1, 8) AS RAW_ED_DT,
+				RM.TRIP_PLACE AS REQ_RMK,
+				NVL(WT.CALC_SANCTN_STS, 'TEMP') AS SANCTN_STS,
+				'TRIP' AS SRC_TYPE,
+				'TRIP_RPT' AS DOC_TYPE,
+				RPT.TRIP_RPT_NO AS DOC_NO
+			FROM TB_PM52M01 RPT
+			JOIN TB_PM52D02 D ON D.TRIP_RPT_NO = RPT.TRIP_RPT_NO
+			JOIN TB_PM51M01 RM ON RM.TRIP_REQ_NO = RPT.TRIP_REQ_NO
+			LEFT OUTER JOIN (
+				SELECT
+					TODO_NO,
+					CASE
+						WHEN SUM(CASE WHEN TODO_CF_DT IS NOT NULL AND (SANCTN_STTUS = 'N' OR SANCTN_STTUS = 'R' OR SANCTN_STTUS = '4') THEN 1 ELSE 0 END) &gt; 0 THEN 'RTN'
+						WHEN COUNT(TODO_KEY) = 0 THEN 'TEMP'
+						WHEN COUNT(TODO_KEY) &gt; 0 AND COUNT(TODO_KEY) = SUM(CASE WHEN TODO_CF_DT IS NOT NULL AND SANCTN_STTUS != 'N' THEN 1 ELSE 0 END) THEN 'END'
+						WHEN SUM(CASE WHEN SANCTN_SN &gt; 1 AND TODO_CF_DT IS NOT NULL AND SANCTN_STTUS != 'N' THEN 1 ELSE 0 END) &gt; 0 THEN 'ING'
+						ELSE 'REQ'
+					END AS CALC_SANCTN_STS
+				FROM TB_WB20M03
+				WHERE TODO_DIV1_CODE_ID = 'TODODIV20' AND TODO_DIV2_CODE_ID = 'TODODIV2200'
+				GROUP BY TODO_NO
+			) WT ON WT.TODO_NO = RPT.TRIP_RPT_NO
+			WHERE 1=1
+			<if test="reqDtFrom != null and !reqDtFrom.equals('') and reqDtTo != null and !reqDtTo.equals('')">
+			  AND SUBSTR(D.TRIP_ST_DTM, 1, 8) &lt;= #{reqDtTo}
+			  AND SUBSTR(D.TRIP_ED_DTM, 1, 8) &gt;= #{reqDtFrom}
+			</if>
+			<if test="reqId != null and !reqId.equals('')">
+			  AND D.USER_ID = #{reqId}
+			</if>
+			<if test="reqIdNm != null and !reqIdNm.equals('')">
+			  AND (D.USER_NM LIKE '%' || #{reqIdNm} || '%' OR D.USER_ID LIKE '%' || #{reqIdNm} || '%')
+			</if>
+			<if test="reqDeptNm != null and !reqDeptNm.equals('')">
+			  AND D.DEPT_NM LIKE '%' || #{reqDeptNm} || '%'
+			</if>
+
+			UNION ALL
+
+			<!-- 출장: 복명서가 없는 신청건 -> 신청서 출장자(TB_PM51D01) 계획일시 기준, 출장자별 1행 -->
+			SELECT
+				RM.CO_CD,
+				RM.TRIP_REQ_NO || '_' || D.SEQ AS REQ_NO,
+				D.USER_ID AS REQ_ID,
+				NULL AS REQ_DEPT_ID,
+				NULL AS VAC_TYPE_CD,
+				'출장' AS VAC_TYPE_NM,
+				D.USER_NM AS REQ_ID_NM,
+				D.DEPT_NM AS REQ_DEPT_NM,
+				NULL AS AMPM_CD,
+				NULL AS AMPM_NM,
+				TO_CHAR(TO_DATE(SUBSTR(D.TRIP_ST_DTM, 1, 8), 'YYYYMMDD'), 'YYYY-MM-DD') AS ST_DT,
+				TO_CHAR(TO_DATE(SUBSTR(D.TRIP_ED_DTM, 1, 8), 'YYYYMMDD'), 'YYYY-MM-DD') AS ED_DT,
+				SUBSTR(D.TRIP_ST_DTM, 1, 8) AS RAW_ST_DT,
+				SUBSTR(D.TRIP_ED_DTM, 1, 8) AS RAW_ED_DT,
+				RM.TRIP_PLACE AS REQ_RMK,
+				NVL(WT.CALC_SANCTN_STS, 'TEMP') AS SANCTN_STS,
+				'TRIP' AS SRC_TYPE,
+				'TRIP_REQ' AS DOC_TYPE,
+				RM.TRIP_REQ_NO AS DOC_NO
+			FROM TB_PM51M01 RM
+			JOIN TB_PM51D01 D ON D.TRIP_REQ_NO = RM.TRIP_REQ_NO
+			LEFT OUTER JOIN (
+				SELECT
+					TODO_NO,
+					CASE
+						WHEN SUM(CASE WHEN TODO_CF_DT IS NOT NULL AND (SANCTN_STTUS = 'N' OR SANCTN_STTUS = 'R' OR SANCTN_STTUS = '4') THEN 1 ELSE 0 END) &gt; 0 THEN 'RTN'
+						WHEN COUNT(TODO_KEY) = 0 THEN 'TEMP'
+						WHEN COUNT(TODO_KEY) &gt; 0 AND COUNT(TODO_KEY) = SUM(CASE WHEN TODO_CF_DT IS NOT NULL AND SANCTN_STTUS != 'N' THEN 1 ELSE 0 END) THEN 'END'
+						WHEN SUM(CASE WHEN SANCTN_SN &gt; 1 AND TODO_CF_DT IS NOT NULL AND SANCTN_STTUS != 'N' THEN 1 ELSE 0 END) &gt; 0 THEN 'ING'
+						ELSE 'REQ'
+					END AS CALC_SANCTN_STS
+				FROM TB_WB20M03
+				WHERE TODO_DIV1_CODE_ID = 'TODODIV20' AND TODO_DIV2_CODE_ID = 'TODODIV2190'
+				GROUP BY TODO_NO
+			) WT ON WT.TODO_NO = RM.TRIP_REQ_NO
+			WHERE NOT EXISTS (SELECT 1 FROM TB_PM52M01 R2 WHERE R2.TRIP_REQ_NO = RM.TRIP_REQ_NO)
+			<if test="reqDtFrom != null and !reqDtFrom.equals('') and reqDtTo != null and !reqDtTo.equals('')">
+			  AND SUBSTR(D.TRIP_ST_DTM, 1, 8) &lt;= #{reqDtTo}
+			  AND SUBSTR(D.TRIP_ED_DTM, 1, 8) &gt;= #{reqDtFrom}
+			</if>
+			<if test="reqId != null and !reqId.equals('')">
+			  AND D.USER_ID = #{reqId}
+			</if>
+			<if test="reqIdNm != null and !reqIdNm.equals('')">
+			  AND (D.USER_NM LIKE '%' || #{reqIdNm} || '%' OR D.USER_ID LIKE '%' || #{reqIdNm} || '%')
+			</if>
+			<if test="reqDeptNm != null and !reqDeptNm.equals('')">
+			  AND D.DEPT_NM LIKE '%' || #{reqDeptNm} || '%'
+			</if>
+
+			UNION ALL
+
+			<!-- 대체휴일근무(TB_PM08M01): HOLIDAY_DT(휴일근무일) 기준 단일일자 이벤트 -->
+			SELECT
+				M.CO_CD,
+				M.REQ_NO,
+				M.REQ_ID,
+				M.DEPT_ID AS REQ_DEPT_ID,
+				NULL AS VAC_TYPE_CD,
+				'대체근무' AS VAC_TYPE_NM,
+				NVL(U.NAME, M.REQ_NM) AS REQ_ID_NM,
+				NVL(M.DEPT_NM, D.DEPT_NM) AS REQ_DEPT_NM,
+				NULL AS AMPM_CD,
+				NULL AS AMPM_NM,
+				TO_CHAR(TO_DATE(M.HOLIDAY_DT, 'YYYYMMDD'), 'YYYY-MM-DD') AS ST_DT,
+				TO_CHAR(TO_DATE(M.HOLIDAY_DT, 'YYYYMMDD'), 'YYYY-MM-DD') AS ED_DT,
+				M.HOLIDAY_DT AS RAW_ST_DT,
+				M.HOLIDAY_DT AS RAW_ED_DT,
+				M.SPECIAL_REASON AS REQ_RMK,
+				NVL(WP.CALC_SANCTN_STS, 'TEMP') AS SANCTN_STS,
+				'SUBST' AS SRC_TYPE,
+				'SUBST' AS DOC_TYPE,
+				M.REQ_NO AS DOC_NO
+			FROM TB_PM08M01 M
+			LEFT OUTER JOIN TB_CM06M01 U ON U.ID = M.REQ_ID
+			LEFT OUTER JOIN TB_CM04M01 D ON D.DEPT_ID = M.DEPT_ID
+			LEFT OUTER JOIN (
+				SELECT
+					TODO_NO,
+					CASE
+						WHEN SUM(CASE WHEN TODO_CF_DT IS NOT NULL AND (SANCTN_STTUS = 'N' OR SANCTN_STTUS = 'R' OR SANCTN_STTUS = '4') THEN 1 ELSE 0 END) &gt; 0 THEN 'RTN'
+						WHEN COUNT(TODO_KEY) = 0 THEN 'TEMP'
+						WHEN COUNT(TODO_KEY) &gt; 0 AND COUNT(TODO_KEY) = SUM(CASE WHEN TODO_CF_DT IS NOT NULL AND SANCTN_STTUS != 'N' THEN 1 ELSE 0 END) THEN 'END'
+						WHEN SUM(CASE WHEN SANCTN_SN &gt; 1 AND TODO_CF_DT IS NOT NULL AND SANCTN_STTUS != 'N' THEN 1 ELSE 0 END) &gt; 0 THEN 'ING'
+						ELSE 'REQ'
+					END AS CALC_SANCTN_STS
+				FROM TB_WB20M03
+				WHERE TODO_DIV1_CODE_ID = 'TODODIV20' AND TODO_DIV2_CODE_ID = 'TODODIV2410'
+				GROUP BY TODO_NO
+			) WP ON WP.TODO_NO = M.REQ_NO
+			WHERE 1=1
+			<if test="reqDtFrom != null and !reqDtFrom.equals('') and reqDtTo != null and !reqDtTo.equals('')">
+			  AND M.HOLIDAY_DT &lt;= #{reqDtTo}
+			  AND M.HOLIDAY_DT &gt;= #{reqDtFrom}
+			</if>
+			<if test="reqId != null and !reqId.equals('')">
+			  AND M.REQ_ID = #{reqId}
+			</if>
+			<if test="reqIdNm != null and !reqIdNm.equals('')">
+			  AND (U.NAME LIKE '%' || #{reqIdNm} || '%' OR M.REQ_NM LIKE '%' || #{reqIdNm} || '%' OR M.REQ_ID LIKE '%' || #{reqIdNm} || '%')
+			</if>
+			<if test="reqDeptId != null and !reqDeptId.equals('')">
+			  AND M.DEPT_ID = #{reqDeptId}
+			</if>
+			<if test="reqDeptNm != null and !reqDeptNm.equals('')">
+			  AND NVL(M.DEPT_NM, D.DEPT_NM) LIKE '%' || #{reqDeptNm} || '%'
+			</if>
+		) UT
+		ORDER BY UT.ST_DT ASC, UT.REQ_NO ASC
+	</select>
+
 	<select id="selectVacationList" parameterType="Map" resultType="CamelMap">
 		SELECT *
 		FROM (
@@ -771,11 +1014,21 @@
 				D.DEPT_NM,
 				NVL(D.SORT_NO, 999) AS SORT_NO,
 				TO_CHAR(TO_DATE(REGEXP_REPLACE(U.ENTER_DT, '[^0-9]', ''), 'YYYYMMDD'), 'YYYY-MM-DD') AS ENTER_DT,
-				#{yy} || '-12-31' AS BASE_DT,
+				CASE
+					WHEN (U.USE_YN = 'N' OR U.LEAVE_DT IS NOT NULL) AND LENGTH(REGEXP_REPLACE(U.LEAVE_DT, '[^0-9]', '')) = 8 AND REGEXP_REPLACE(U.LEAVE_DT, '[^0-9]', '') &lt;= #{yy} || '1231'
+					THEN TO_CHAR(TO_DATE(REGEXP_REPLACE(U.LEAVE_DT, '[^0-9]', ''), 'YYYYMMDD'), 'YYYY-MM-DD')
+					ELSE #{yy} || '-12-31'
+				END AS BASE_DT,
 				CASE
 					WHEN U.ENTER_DT IS NOT NULL AND LENGTH(REGEXP_REPLACE(U.ENTER_DT, '[^0-9]', '')) = 8 THEN
-						TO_CHAR(TRUNC(MONTHS_BETWEEN(TO_DATE(#{yy} || '1231', 'YYYYMMDD'), TO_DATE(REGEXP_REPLACE(U.ENTER_DT, '[^0-9]', ''), 'YYYYMMDD')) / 12), 'FM00') || '년 ' ||
-						TO_CHAR(TRUNC(MOD(MONTHS_BETWEEN(TO_DATE(#{yy} || '1231', 'YYYYMMDD'), TO_DATE(REGEXP_REPLACE(U.ENTER_DT, '[^0-9]', ''), 'YYYYMMDD')), 12)), 'FM00') || '개월'
+						TO_CHAR(TRUNC(MONTHS_BETWEEN(
+							TO_DATE(CASE WHEN (U.USE_YN = 'N' OR U.LEAVE_DT IS NOT NULL) AND LENGTH(REGEXP_REPLACE(U.LEAVE_DT, '[^0-9]', '')) = 8 AND REGEXP_REPLACE(U.LEAVE_DT, '[^0-9]', '') &lt;= #{yy} || '1231' THEN REGEXP_REPLACE(U.LEAVE_DT, '[^0-9]', '') ELSE #{yy} || '1231' END, 'YYYYMMDD'),
+							TO_DATE(REGEXP_REPLACE(U.ENTER_DT, '[^0-9]', ''), 'YYYYMMDD')
+						) / 12), 'FM00') || '년 ' ||
+						TO_CHAR(TRUNC(MOD(MONTHS_BETWEEN(
+							TO_DATE(CASE WHEN (U.USE_YN = 'N' OR U.LEAVE_DT IS NOT NULL) AND LENGTH(REGEXP_REPLACE(U.LEAVE_DT, '[^0-9]', '')) = 8 AND REGEXP_REPLACE(U.LEAVE_DT, '[^0-9]', '') &lt;= #{yy} || '1231' THEN REGEXP_REPLACE(U.LEAVE_DT, '[^0-9]', '') ELSE #{yy} || '1231' END, 'YYYYMMDD'),
+							TO_DATE(REGEXP_REPLACE(U.ENTER_DT, '[^0-9]', ''), 'YYYYMMDD')
+						), 12)), 'FM00') || '개월'
 					ELSE ''
 				END AS WORK_YEARS,
 				NVL(G.GRANT_DAYS, 0) AS GRANT_DAYS,
@@ -836,6 +1089,9 @@
 			  AND (NVL(U.VIEW_DEPT_ID, U.DEPT_ID) IS NULL OR (NVL(U.VIEW_DEPT_ID, U.DEPT_ID) NOT LIKE 'GUN95%' AND NVL(U.VIEW_DEPT_ID, U.DEPT_ID) NOT LIKE 'GUN00%'))
 			  AND (D.DEPT_NM IS NULL OR D.DEPT_NM NOT LIKE '%임원실%')
 			  AND (U.SALES_AREA IS NULL OR U.SALES_AREA != 'SALESAREA00')
+			  <!-- 기준연도 근무 대상자만 조회 (기준연도 이후 입사자 및 기준연도 이전 퇴사자 제외) -->
+			  AND (U.ENTER_DT IS NULL OR REGEXP_REPLACE(U.ENTER_DT, '[^0-9]', '') &lt;= #{yy} || '1231')
+			  AND (U.LEAVE_DT IS NULL OR REGEXP_REPLACE(U.LEAVE_DT, '[^0-9]', '') &gt;= #{yy} || '0101')
 			<if test="useYn_S != null and !useYn_S.equals('')">
 			  AND U.USE_YN = #{useYn_S}
 			</if>
