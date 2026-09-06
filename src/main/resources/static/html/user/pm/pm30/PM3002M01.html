@@ -282,29 +282,30 @@
 		 * PM30AttendanceReportUtil - 향후 유지보수를 위한 월별 근태 및 사원 직종 판정 공통 재사용 스니펫
 		 */
 		var PM30AttendanceReportUtil = {
-			// 개인 마스터에 있는 salesArea 기준 판정: 시급직 = SALESAREA60 이면 2페이지짜리, 나머지는 모두 1페이지용
+			// 개인 마스터에 있는 salesArea 및 orgDivNm 기준 판정: 시급직 = SALESAREA60 또는 '시급직'이면 2페이지짜리(좌우배치), 나머지는 모두 1페이지용
 			isHourlyWorker: function(list, firstItem, currentWorkerInfo) {
-				// 1. 조회 데이터 목록(list)의 개인 마스터 salesArea 검사
+				function checkHourly(obj) {
+					if (!obj) return false;
+					var sa = String(obj.salesArea || obj.sales_area || obj.salesAreaCd || '').trim().toUpperCase();
+					var od = String(obj.orgDivNm || obj.org_div_nm || '').trim();
+					if (sa === 'SALESAREA60' || sa.indexOf('시급직') !== -1 || od === '시급직') return true;
+					return false;
+				}
+
+				// 1. 조회 데이터 목록(list)의 salesArea/orgDivNm 검사
 				if (Array.isArray(list) && list.length > 0) {
 					for (var i = 0; i < list.length; i++) {
-						var sa = String(list[i].salesArea || list[i].sales_area || '').trim().toUpperCase();
-						if (sa === 'SALESAREA60') return true;
+						if (checkHourly(list[i])) return true;
 					}
 				}
 
-				// 2. firstItem 객체의 salesArea 검사
-				if (firstItem) {
-					var saFirst = String(firstItem.salesArea || firstItem.sales_area || '').trim().toUpperCase();
-					if (saFirst === 'SALESAREA60') return true;
-				}
+				// 2. firstItem 객체 검사
+				if (checkHourly(firstItem)) return true;
 
-				// 3. currentWorkerInfo 객체의 salesArea 검사
-				if (currentWorkerInfo) {
-					var saInfo = String(currentWorkerInfo.salesArea || currentWorkerInfo.sales_area || '').trim().toUpperCase();
-					if (saInfo === 'SALESAREA60') return true;
-				}
+				// 3. currentWorkerInfo 객체 검사
+				if (checkHourly(currentWorkerInfo)) return true;
 
-				// 시급직 = SALESAREA60 외 나머지는 모두 1페이지용 (연봉직)
+				// 시급직 외 나머지는 모두 1페이지용 (연봉직)
 				return false;
 			},
 
@@ -383,12 +384,15 @@
 				var contentTxt2 = fullString.length > 200 ? fullString.substring(200, 400) : '';
 
 				var ym = $('#workYm_S').val();
-				var empNo = $('#workRptId_S').val();
+				var empNo = $('#workRptId_S').val()
+					|| (currentMonthlyData && currentMonthlyData[0] ? (currentMonthlyData[0].empNo || currentMonthlyData[0].userId) : '')
+					|| currentWorkerInfo.empNo
+					|| $('#workRptIdNm_S').val();
 				if (!ym || !empNo) return;
 
 				var workYmForDb = ym.replace('-', '');
 				var saveParams = {
-					coCd: jwt.coCd,
+					coCd: jwt.coCd || "GUN",
 					workYm: workYmForDb,
 					empNo: empNo,
 					seq: seq,
@@ -558,11 +562,36 @@
 			postAjax('/user/pm/pm30/selectAttendanceList', searchParams, null, function(data) {
 				var list = (data && data.resultList) ? data.resultList : [];
 				currentMonthlyData = list;
-				renderMonthlyReportTable(year, month, lastDay, list, true); // 백엔드 조회 자료 기반 직종서식 자동 설정
 
-				// 변동분내역 로드 (사원이 선택된 경우만)
-				if (empIdVal) {
-					loadAttendanceChangeList(empIdVal, ym);
+				// 조회된 근태 데이터가 존재할 경우, 첫 번째 행의 사원정보(직종/사번/부서 등)를 currentWorkerInfo에 실시간 동기화
+				if (list.length > 0 && list[0]) {
+					var item0 = list[0];
+					if (item0.empNo) {
+						currentWorkerInfo = {
+							empNo: item0.empNo || item0.userId || '',
+							empNm: item0.empNm || '',
+							deptNm: item0.deptNm || '',
+							positionNm: item0.positionNm || '',
+							salesArea: item0.salesArea || '',
+							orgDivNm: item0.orgDivNm || ''
+						};
+						if (currentWorkerInfo.empNo) {
+							$('#workRptId_S').val(currentWorkerInfo.empNo);
+						}
+					}
+				}
+
+				renderMonthlyReportTable(year, month, lastDay, list, true); // 백엔드 조회 자료 기반 직종서식 자동 설정
+				renderAttendanceChangeInputs(); // 변동분 입력 필드 즉시 활성화 렌더링
+
+				// 변동분내역 로드 (사원 식별자 다각적 확인)
+				var finalEmpNo = $('#workRptId_S').val()
+					|| (list.length > 0 ? (list[0].empNo || list[0].userId) : '')
+					|| currentWorkerInfo.empNo
+					|| $('#workRptIdNm_S').val();
+
+				if (finalEmpNo) {
+					loadAttendanceChangeList(finalEmpNo, ym);
 				}
 			});
 		}
@@ -571,9 +600,9 @@
 		var pm30ChangeData = {};
 		function loadAttendanceChangeList(empNo, workYm) {
 			// workYm 형식 변환: "YYYY-MM" -> "YYYYMM"
-			var workYmForDb = workYm.replace('-', '');
+			var workYmForDb = String(workYm || '').replace('-', '');
 			var params = {
-				coCd: jwt.coCd,
+				coCd: jwt.coCd || "GUN",
 				workYm: workYmForDb,
 				empNo: empNo
 			};

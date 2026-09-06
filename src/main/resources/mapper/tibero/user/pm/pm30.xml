@@ -538,9 +538,13 @@
 			CONTENT_TXT1,
 			CONTENT_TXT2
 		FROM TB_PM30M03
-		WHERE CO_CD = #{coCd, jdbcType=VARCHAR}
+		WHERE (CO_CD = #{coCd, jdbcType=VARCHAR} OR #{coCd, jdbcType=VARCHAR} IS NULL)
 		  AND WORK_YM = #{workYm, jdbcType=VARCHAR}
-		  AND EMP_NO = #{empNo, jdbcType=VARCHAR}
+		  AND (
+		      EMP_NO = #{empNo, jdbcType=VARCHAR}
+		      OR EMP_NO = (SELECT ID FROM TB_CM06M01 WHERE (EMP_NO = #{empNo, jdbcType=VARCHAR} OR ID = #{empNo, jdbcType=VARCHAR} OR NAME = #{empNo, jdbcType=VARCHAR}) AND ROWNUM = 1)
+		      OR EMP_NO = (SELECT EMP_NO FROM TB_CM06M01 WHERE (EMP_NO = #{empNo, jdbcType=VARCHAR} OR ID = #{empNo, jdbcType=VARCHAR} OR NAME = #{empNo, jdbcType=VARCHAR}) AND ROWNUM = 1)
+		  )
 		ORDER BY SEQ ASC
 	</select>
 
@@ -548,9 +552,11 @@
 	<update id="mergeAttendanceChange" parameterType="Map">
 		MERGE INTO TB_PM30M03 A
 		USING DUAL
-		ON (A.CO_CD = #{coCd, jdbcType=VARCHAR}
+		ON (A.CO_CD = NVL(#{coCd, jdbcType=VARCHAR}, 'GUN')
 		    AND A.WORK_YM = #{workYm, jdbcType=VARCHAR}
-		    AND A.EMP_NO = #{empNo, jdbcType=VARCHAR}
+		    AND (A.EMP_NO = #{empNo, jdbcType=VARCHAR}
+		         OR A.EMP_NO = (SELECT ID FROM TB_CM06M01 WHERE (EMP_NO = #{empNo, jdbcType=VARCHAR} OR ID = #{empNo, jdbcType=VARCHAR} OR NAME = #{empNo, jdbcType=VARCHAR}) AND ROWNUM = 1)
+		         OR A.EMP_NO = (SELECT EMP_NO FROM TB_CM06M01 WHERE (EMP_NO = #{empNo, jdbcType=VARCHAR} OR ID = #{empNo, jdbcType=VARCHAR} OR NAME = #{empNo, jdbcType=VARCHAR}) AND ROWNUM = 1))
 		    AND A.SEQ = #{seq, jdbcType=NUMERIC})
 		WHEN MATCHED THEN
 			UPDATE SET
@@ -563,7 +569,9 @@
 			INSERT (
 				CO_CD, WORK_YM, EMP_NO, SEQ, CONTENT_TXT1, CONTENT_TXT2, CREAT_ID, CREAT_PGM, CREAT_DTTM
 			) VALUES (
-				#{coCd, jdbcType=VARCHAR}, #{workYm, jdbcType=VARCHAR}, #{empNo, jdbcType=VARCHAR}, #{seq, jdbcType=NUMERIC},
+				NVL(#{coCd, jdbcType=VARCHAR}, 'GUN'), #{workYm, jdbcType=VARCHAR},
+				COALESCE((SELECT EMP_NO FROM TB_CM06M01 WHERE (EMP_NO = #{empNo, jdbcType=VARCHAR} OR ID = #{empNo, jdbcType=VARCHAR} OR NAME = #{empNo, jdbcType=VARCHAR}) AND ROWNUM = 1), #{empNo, jdbcType=VARCHAR}),
+				#{seq, jdbcType=NUMERIC},
 				#{contentTxt1, jdbcType=VARCHAR}, #{contentTxt2, jdbcType=VARCHAR},
 				#{loginId, jdbcType=VARCHAR}, 'PM3002M01', SYSDATE
 			)
