@@ -156,7 +156,7 @@
 			margin: 0 !important;
 			box-sizing: border-box !important;
 			background: #ffffff;
-			text-align: left;
+			text-align: center !important;
 		}
 		.pm30-chg-input:focus {
 			border-color: #3b82f6 !important;
@@ -348,6 +348,27 @@
 			}
 		};
 
+		// 변동분내역 셀 단위 입력값 유효성 검증 및 정제 함수 (전역 스코프)
+		function sanitizeChgCell(col, rawVal) {
+			rawVal = (rawVal || '').trim();
+			if (!rawVal) return '';
+			// 텍스트 필드 (col 0: 적요, col 1: 요일구분, col 13: 근무지, col 14: 비고): 구분자 파이프(|) 제거
+			if (col === 0 || col === 1 || col === 13 || col === 14) {
+				return rawVal.replace(/\|/g, '').trim();
+			}
+			// 시간 수치 필드 (col 2 ~ 11) 및 수당 필드 (col 12)
+			var normalized = rawVal.replace(':', '.').trim();
+			var match = normalized.match(/^-?[0-9]+(\.[0-9]+)?/);
+			if (match) {
+				var num = parseFloat(match[0]);
+				if (!isNaN(num)) {
+					num = Math.round(num * 10) / 10;
+					return (num === 0) ? '' : (num % 1 === 0 ? String(num) : num.toFixed(1));
+				}
+			}
+			return ''; // 한글/영문 등 유효하지 않은 오타 문자는 빈칸으로 정제
+		}
+
 		$(document).ready(function() {
 			mainDefaultLoad("생산관리", "월별 근태현황");
 
@@ -364,7 +385,7 @@
 
 			loadMonthlyReport();
 
-			// 변동분내역 입력칸 자동저장 (focusout 위임) - 15개 전체 필드 지원
+			// 변동분내역 입력칸 자동저장 (focusout 위임) - 15개 전체 필드 지원 및 입력 정제
 			$('#monthlyReportTableWrapper').on('focusout', '.pm30-chg-input', function() {
 				var seq = parseInt($(this).data('seq'), 10);
 				var $tr = $(this).closest('tr');
@@ -375,13 +396,24 @@
 				$tr.find('.pm30-chg-input').each(function() {
 					var col = parseInt($(this).data('col'), 10);
 					if (!isNaN(col) && col >= 0 && col < 15) {
-						rowValues[col] = $(this).val() || '';
+						var cleanVal = sanitizeChgCell(col, $(this).val());
+						$(this).val(cleanVal); // 화면의 입력창에도 정제된 값 즉시 동기화
+						rowValues[col] = cleanVal;
 					}
 				});
 
 				var fullString = rowValues.join('|');
 				var contentTxt1 = fullString.substring(0, 200);
 				var contentTxt2 = fullString.length > 200 ? fullString.substring(200, 400) : '';
+
+				// 변동분 정상시간 (NORM_TM: col 3 + col 6 + col 9 합계: 평일 정상, 토요 정상, 휴일 정상)
+				var normTm = (parseFloat(rowValues[2]) || 0) + (parseFloat(rowValues[5]) || 0) + (parseFloat(rowValues[8]) || 0);
+				// 변동분 연장시간 (OT_TM: col 4 + col 5 + col 7 + col 8 + col 10 + col 11 합계: 평일 연장/야간, 토요 연장/야간, 휴일 연장/야간)
+				var otTm = (parseFloat(rowValues[3]) || 0) + (parseFloat(rowValues[4]) || 0) + (parseFloat(rowValues[6]) || 0) +
+				           (parseFloat(rowValues[7]) || 0) + (parseFloat(rowValues[9]) || 0) + (parseFloat(rowValues[10]) || 0);
+
+				normTm = Math.round(normTm * 10) / 10;
+				otTm = Math.round(otTm * 10) / 10;
 
 				var ym = $('#workYm_S').val();
 				var empNo = $('#workRptId_S').val()
@@ -398,12 +430,14 @@
 					seq: seq,
 					contentTxt1: contentTxt1,
 					contentTxt2: contentTxt2,
+					normTm: normTm,
+					otTm: otTm,
 					loginId: jwt.userId || jwt.userNm || ''
 				};
 
 				postAjax('/user/pm/pm30/saveAttendanceChange', saveParams, null, function(data) {
 					if (data && data.resultCode === '0000') {
-						pm30ChangeData[seq] = { seq: seq, contentTxt1: contentTxt1, contentTxt2: contentTxt2 };
+						pm30ChangeData[seq] = { seq: seq, contentTxt1: contentTxt1, contentTxt2: contentTxt2, normTm: normTm, otTm: otTm };
 					}
 				});
 			});
@@ -678,7 +712,8 @@
 			$('.pm30-chg-row').each(function() {
 				$(this).find('.pm30-chg-input').each(function() {
 					var col = parseInt($(this).data('col'), 10);
-					var val = parseFloat($(this).val());
+					var cleanStr = sanitizeChgCell(col, $(this).val());
+					var val = cleanStr ? parseFloat(cleanStr) : 0;
 					if (!isNaN(val) && val > 0) {
 						if (col === 2) norm += val;
 						else if (col === 3) ot += val;

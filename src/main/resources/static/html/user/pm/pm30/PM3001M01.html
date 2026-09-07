@@ -561,9 +561,23 @@
 				badgeHtml += '<span style="display:inline-block; padding:1px 5px; margin-right:4px; font-size:10px; font-weight:bold; line-height:14px; color:#ffffff; background-color:#2563eb; border-radius:3px; vertical-align:middle;">출장</span>';
 			}
 
-			if (item.vacApplNo) {
-				// 휴가신청서 = 초록 (#16a34a)
+			var halfType = (typeof getHalfVacationType === 'function') ? getHalfVacationType(item) : null;
+			var hasVac = !!(item.vacApplNo || (item.vacationTxt && String(item.vacationTxt).trim() !== '') || (typeof isHalfVacationRow === 'function' && isHalfVacationRow(item)));
+
+			if (hasVac) {
+				// 휴가 배지는 초록색 (#16a34a)으로 깔끔하게 표출
 				badgeHtml += '<span style="display:inline-block; padding:1px 5px; margin-right:4px; font-size:10px; font-weight:bold; line-height:14px; color:#ffffff; background-color:#16a34a; border-radius:3px; vertical-align:middle;">휴가</span>';
+
+				// 툴팁이 아닌 뱃지와 함께 보이는 텍스트 뒤에 (오전)/(오후)를 추가
+				if (halfType === 'AM') {
+					if (val.indexOf('오전') === -1) {
+						val = val ? (val + '(오전)') : '반차(오전)';
+					}
+				} else if (halfType === 'PM') {
+					if (val.indexOf('오후') === -1) {
+						val = val ? (val + '(오후)') : '반차(오후)';
+					}
+				}
 			}
 
 			if (item.workApplNo) {
@@ -597,11 +611,13 @@
 			if (isTrip) return true;
 			var inTmVal = item.inTm ? String(item.inTm).trim() : '';
 			var outTmVal = item.outTm ? String(item.outTm).trim() : '';
+			var inDttmVal = item.inDttm ? String(item.inDttm).trim() : '';
+			var outDttmVal = item.outDttm ? String(item.outDttm).trim() : '';
 			var isHoliday = String(item.holidayYn || '').trim() === '휴일';
 			var isVacation = String(item.workTypeNm || '').trim() === '휴가';
-			if ((isHoliday || isVacation) && inTmVal === '' && outTmVal === '') return false;
-			if (colName === 'inDttm') return inTmVal === '';
-			if (colName === 'outDttm') return outTmVal === '';
+			if ((isHoliday || isVacation) && inTmVal === '' && outTmVal === '' && inDttmVal === '' && outDttmVal === '') return false;
+			if (colName === 'inDttm') return inDttmVal === '' && inTmVal === '';
+			if (colName === 'outDttm') return outDttmVal === '' && outTmVal === '';
 			return false;
 		}
 
@@ -835,8 +851,8 @@
 							var item = this.item;
 							if (!item) return '';
 							var isHoliday = String(item.holidayYn || '').trim() === '휴일';
-							var inTmVal = item.inTm ? String(item.inTm).trim() : '';
-							var outTmVal = item.outTm ? String(item.outTm).trim() : '';
+							var inTmVal = item.inDttm ? String(item.inDttm).trim() : (item.inTm ? String(item.inTm).trim() : '');
+							var outTmVal = item.outDttm ? String(item.outDttm).trim() : (item.outTm ? String(item.outTm).trim() : '');
 							var totWorkTmVal = item.totWorkTm ? String(item.totWorkTm).trim() : '';
 							var hasWork = (inTmVal !== '' || outTmVal !== '' || (totWorkTmVal !== '' && totWorkTmVal !== '00:00' && totWorkTmVal !== '0'));
 							var hasNoAppl = !(item.vacApplNo || item.tripApplNo || item.tripReplyNo);
@@ -2075,25 +2091,6 @@
 					outTimePart = outParts[outParts.length - 1] || '';
 				}
 
-				// 지각 판정 예외: 출근판정이 '지각'이더라도 08:30 이하(이전)이면 지각이 아님!
-				var isLate = (inJudge === '지각');
-				if (isLate && inTimePart && inTimePart <= '08:30') {
-					isLate = false;
-				}
-
-				// 조퇴 판정 예외: 퇴근판정이 '조퇴'이더라도 17:30 이상(이후)이거나 익일 퇴근인 경우 조퇴가 아님!
-				var isEarlyLeave = (outJudge === '조퇴');
-				var isNextDayOutPasted = false;
-				if (outTimeStr && outTimeStr.indexOf('-') !== -1) {
-					var outDtPartPasted = outTimeStr.split(' ')[0].replace(/[^0-9]/g, '');
-					if (outDtPartPasted > workDt) {
-						isNextDayOutPasted = true;
-					}
-				}
-				if (isEarlyLeave && (isNextDayOutPasted || (outTimePart && outTimePart >= '17:30'))) {
-					isEarlyLeave = false;
-				}
-
 				var newRow = {
 					workDt: workDt,
 					empNm: empNm,
@@ -2300,235 +2297,9 @@
 			};
 		}
 
-		// ─ 행에 출장/휴가/휴일대체근무 중 하나라도 연결돼 있는지 판정하는 단일 기준.
-		// 근무형태를 '휴일'로 되돌릴지 말지를 정하는 모든 곳(휴일 자동판정, 재동기화)이 반드시
-		// 이 기준 하나만 써야 한다 — 예전에 recalcRowAttendanceObject 쪽만 workApplNo(PM08)를
-		// 빠뜨려서, 세콤 누락으로 출퇴근시각이 비어있는 휴일대체근무 행이 재계산될 때마다
-		// '사내2'였던 근무형태가 다시 '휴일'로 되돌아가는 버그가 있었다. ─
-		function rowHasApplicationLinkage(row, matchedSubstWork) {
-			return !!(row.vacApplNo || row.tripApplNo || row.tripReplyNo || row.workApplNo || matchedSubstWork);
-		}
-
-		// ─ 근무형태(workTypeNm) 단일 판정 헬퍼 — 매칭된 출장/휴가/휴일대체근무 정보를 기준으로
-		// 근무형태 select box 옵션과 정확히 일치하는 값을 결정한다. 변환 시(convertPastedData)와
-		// 조회 시(refreshApplicationLinkageNos) 양쪽에서 반드시 이 함수 하나만 써야 한다 —
-		// 예전에 각자 판정 체인을 따로 복붙했다가, 조회 경로만 수정을 놓쳐서 대체휴가(PM07TYPE11/12)가
-		// 조회할 때는 다시 '휴일'로 남아있는 버그가 있었다. ─
-		// ─ 사내근무 유형 판정:
-		// 사내1: 사내(시급직_평일,휴일 & 연봉직_평일)
-		// 사내2: 연봉직(휴일)
-		function getInhouseWorkTypeByOrg(row) {
-			if (!row) return '사내1';
-			var orgDiv = String(row.orgDivNm || '').trim();
-			var salesArea = String(row.salesArea || row.salesAreaCd || '').trim();
-			var isHourly = (orgDiv === '시급직' || salesArea === 'SALESAREA60' || salesArea === '시급직(생산)' || salesArea === '시급직(현장)');
-			var isHoliday = (String(row.holidayYn || '').trim() === '휴일');
-
-			// 연봉직(휴일) -> 사내2
-			if (!isHourly && isHoliday) {
-				return '사내2';
-			}
-			// 시급직(평일,휴일) & 연봉직(평일) -> 사내1
-			return '사내1';
-		}
-
-		// ─ 조퇴, 외출, 지각 (반차 포함) 발생 행 여부 판정 헬퍼 ─
-		function isLateEarlyOutgoRow(row, matchedVacation) {
-			if (!row) return false;
-			// 1. 지각
-			var inTime = (typeof extractHHmm === 'function') ? extractHHmm(row.inTm || row.inDttm) : (row.inTm || row.inDttm || '');
-			var isLate = (String(row.lateTxt || '').trim() === '1') || (String(row.inJdgNm || '').trim() === '지각');
-			if (!isLate && inTime && inTime.length >= 5) {
-				var inHm = inTime.substr(inTime.length - 5, 5);
-				if (inHm > '08:30') isLate = true;
-			}
-			// 2. 조퇴
-			var isEarly = (String(row.earlyLeaveTxt || '').trim() === '1') || (String(row.outJdgNm || '').trim() === '조퇴');
-			var outTime = (typeof extractHHmm === 'function') ? extractHHmm(row.outTm || row.outDttm) : (row.outTm || row.outDttm || '');
-			if (!isEarly && outTime && outTime.length >= 5) {
-				var outHm = outTime.substr(outTime.length - 5, 5);
-				if (outHm < '17:30' && outHm > '00:00') isEarly = true;
-			}
-			// 3. 외출
-			var isOuting = (String(row.outgoYn || '').trim().toUpperCase() === 'Y') ||
-			               (matchedVacation && String(matchedVacation.vacTypeCd || '').trim() === 'PM07TYPE04') ||
-			               (String(row.rmk || '').indexOf('외출') !== -1) ||
-			               (String(row.spclMtr || '').indexOf('외출') !== -1);
-			// 4. 반차 (4시간 근무 + 4시간 휴가 결합으로 조퇴/지각과 같은 사내 근무 범주)
-			var isHalfVac = false;
-			if (matchedVacation) {
-				var vHour = Number(matchedVacation.workHour);
-				var vNm = String(matchedVacation.vacTypeNm || matchedVacation.pureVacTypeNm || matchedVacation.vacTypeCdNm || '');
-				if (vHour === 4 || vNm.indexOf('반차') !== -1) isHalfVac = true;
-			}
-			if (String(row.vacationTxt || '').trim() === '0.5') isHalfVac = true;
-			if (String(row.rmk || '').indexOf('반차') !== -1 || String(row.spclMtr || '').indexOf('반차') !== -1) isHalfVac = true;
-
-			return isLate || isEarly || isOuting || isHalfVac;
-		}
-
-		// ─ 근무형태(workTypeNm) 자동 판정 결과 산출 함수 (순수 판정명 반환) ─
-		function determineWorkTypeNm(row, matchedTrip, matchedVacation, matchedSubstWork) {
-			if (!row) return '';
-			// 이미 '제외'(근태제외자)로 판정된 경우 '제외' 상태를 보존 (휴일로 덮어쓰지 않음)
-			if (String(row.workTypeNm || '').trim() === '제외') {
-				return '제외';
-			}
-
-			// 1. 출장 (설치시운전, 설치장애, A/S(무상), 기타출장)
-			if (matchedTrip) {
-				var tripTc = String(matchedTrip.tripTypeCds || '').trim();
-				if (tripTc === 'PM51TYPE30') return '설치시운전';
-				else if (tripTc === 'PM51TYPE40') return '설치장애';
-				else if (tripTc === 'PM51TYPE60') return 'A/S(무상)';
-				else return '기타출장';
-			}
-
-			// 2. 전일 휴가 (연차, 포상, 대체휴가 등 1일 전일 휴가 - 반차/외출은 출근 근무로 처리)
-			if (matchedVacation && !isLateEarlyOutgoRow(row, matchedVacation)) {
-				return '휴가';
-			}
-
-			var isHoliday = String(row.holidayYn || '').trim() === '휴일';
-			// 근태내역(출근/퇴근 타각 시각 또는 총 근무시간) 존재 여부 정밀 확인
-			var inTimeStr = String(row.inDttm || row.inTm || '').trim();
-			var outTimeStr = String(row.outDttm || row.outTm || '').trim();
-			var totWorkVal = Number(row.totWorkTm || 0);
-			var hasWorkTime = (inTimeStr !== '' || outTimeStr !== '' || totWorkVal > 0);
-
-			// 3. 휴일인 경우:
-			//    - 근태내역이 있거나 휴일대체근무 신청서가 있을 때: 사내1(시급직), 사내2(연봉직) 판정
-			//    - 근태내역이 없으면: 기본 '휴일'
-			if (isHoliday) {
-				if (hasWorkTime || matchedSubstWork) {
-					return getInhouseWorkTypeByOrg(row); // 시급직: 사내1, 연봉직: 사내2
-				}
-				return '휴일';
-			}
-
-			// 4. 평일인 경우:
-			//    - 조퇴, 외출, 지각, 반차 또는 일반 근무: 평일 사내1 자동 반영
-			return getInhouseWorkTypeByOrg(row); // 평일: 사내1
-		}
-
-		// 변환작업(convertPastedData) 등에서 추천값을 row.workTypeNm에 직접 반영할 때 사용
-		function applyWorkTypeNmDecision(row, matchedTrip, matchedVacation, matchedSubstWork) {
-			row.workTypeNm = determineWorkTypeNm(row, matchedTrip, matchedVacation, matchedSubstWork);
-			return row;
-		}
-
-		// ─ 출근/퇴근 판정(inJdgNm, outJdgNm) 단일 표준 판정 헬퍼 ─
-		// 휴일(holidayYn === '휴일')이거나 휴일대체근무 신청서(workApplNo / substWorkYn === '1')가 있는 경우
-		// 출근판정: '휴일출근', 퇴근판정: 야간근무 시 '휴일연장/야간근무', 연장근무 시 '휴일연장', 기본 '휴일퇴근'으로 판정한다.
-		function applyAttendanceJudgment(row) {
-			if (!row) return;
-
-			var wt = String(row.workTypeNm || '').trim();
-			var isVacation = (wt === '휴가');
-			var isHoliday = (String(row.holidayYn || '').trim() === '휴일') || (wt === '휴일');
-			var hasSubstWork = !!(row.workApplNo || String(row.substWorkYn || '').trim() === '1');
-
-			var effectiveInStr = row.inDttm ? String(row.inDttm).trim() : (row.inTm ? String(row.inTm).trim() : '');
-			var effectiveOutStr = row.outDttm ? String(row.outDttm).trim() : (row.outTm ? String(row.outTm).trim() : '');
-
-			if (hasSubstWork) {
-				// 휴일대체근무 신청서가 연동된 행: 출퇴근 시각 유무와 상관없이 무조건 휴일출근 / 휴일퇴근 판정 기본 적용
-				row.inJdgNm = '휴일출근';
-				row.lateTxt = '';
-
-				var otMins = parseHHmmToMinutes(row.otTm);
-				var ngtMins = parseHHmmToMinutes(row.nghtTm);
-				var totalOtMins = otMins + ngtMins;
-				var hasNight = (ngtMins > 0);
-
-				if (hasNight) {
-					row.outJdgNm = '휴일연장/야간근무';
-				} else if (totalOtMins >= 30) {
-					row.outJdgNm = '휴일연장';
-				} else {
-					row.outJdgNm = '휴일퇴근';
-				}
-				row.earlyLeaveTxt = '';
-			} else if (isVacation) {
-				// 근무형태가 휴가인 행: 휴일과 마찬가지로 출/퇴근 판정 '휴가' 처리 및 지각/조퇴 비움
-				row.inJdgNm = '휴가';
-				row.outJdgNm = '휴가';
-				row.lateTxt = '';
-				row.earlyLeaveTxt = '';
-			} else if (isHoliday) {
-				// 순수 휴일인 행: 출퇴근 기록이 있으면 휴일출근/휴일퇴근 판정, 없으면 '휴일' / '휴일'
-				if (!effectiveInStr && !effectiveOutStr) {
-					row.inJdgNm = '휴일';
-					row.outJdgNm = '휴일';
-					row.lateTxt = '';
-					row.earlyLeaveTxt = '';
-				} else {
-					row.inJdgNm = '휴일출근';
-					row.lateTxt = '';
-
-					var otMins = parseHHmmToMinutes(row.otTm);
-					var ngtMins = parseHHmmToMinutes(row.nghtTm);
-					var totalOtMins = otMins + ngtMins;
-					var hasNight = (ngtMins > 0);
-
-					if (hasNight) {
-						row.outJdgNm = '휴일연장/야간근무';
-					} else if (totalOtMins >= 30) {
-						row.outJdgNm = '휴일연장';
-					} else {
-						row.outJdgNm = '휴일퇴근';
-					}
-					row.earlyLeaveTxt = '';
-				}
-			} else {
-				// 평일 출근/퇴근 판정
-				var inTimeNorm = effectiveInStr ? normalizeHHmm(effectiveInStr) : '';
-				var outTimeNorm = effectiveOutStr ? normalizeHHmm(effectiveOutStr) : '';
-
-				// 익일 퇴근(outDt > workDt) 여부 정밀 확인 — 24시 넘겨 익일 새벽 퇴근한 건이 00:44 < 17:30 에 걸려 조퇴로 잘못 판정되는 것을 차단한다.
-				var isNextDayOut = false;
-				var wd = row.workDt ? String(row.workDt).replace(/[^0-9]/g, '') : '';
-				var dtFormatted = (wd.length === 8) ? (wd.substr(0,4)+'-'+wd.substr(4,2)+'-'+wd.substr(6,2)) : '';
-				if (effectiveOutStr && dtFormatted && effectiveOutStr.indexOf('-') !== -1) {
-					var outDtPart = effectiveOutStr.split(' ')[0];
-					if (outDtPart > dtFormatted) {
-						isNextDayOut = true;
-					}
-				}
-
-				if (!inTimeNorm) {
-					row.inJdgNm = '';
-					row.lateTxt = '';
-				} else {
-					row.inJdgNm = (inTimeNorm > '08:30') ? '지각' : '정상출근';
-					row.lateTxt = (inTimeNorm > '08:30') ? '1' : '';
-				}
-
-				if (!outTimeNorm) {
-					row.outJdgNm = '';
-					row.earlyLeaveTxt = '';
-				} else {
-					var otMins = parseHHmmToMinutes(row.otTm);
-					var ngtMins = parseHHmmToMinutes(row.nghtTm);
-					var totalOtMins = otMins + ngtMins;
-					var hasNight = (ngtMins > 0);
-
-					// 익일 퇴근(isNextDayOut)이 아니며 당일 퇴근 시각이 17:30 미만일 때만 조퇴!
-					var isEarlyLeave = (!isNextDayOut && outTimeNorm < '17:30');
-
-					if (hasNight) {
-						row.outJdgNm = '연장/야간근무';
-					} else if (totalOtMins >= 30) {
-						row.outJdgNm = '연장근무';
-					} else if (isEarlyLeave) {
-						row.outJdgNm = '조퇴';
-					} else {
-						row.outJdgNm = '정상퇴근';
-					}
-					row.earlyLeaveTxt = isEarlyLeave ? '1' : '';
-				}
-			}
-		}
+		// ─ 모든 근태 판정 규칙(근무형태/사내구분/반차/지각/조퇴/신청서연동/출퇴근 판정 등)은 ─
+		// PM30AttendanceCommon.js 에 완전히 일원화(Single Source of Truth)되어 공용 관리됩니다.
+		// (새로운 조건 추가/변경 시 PM30AttendanceCommon.js 한 곳에서만 집중 수정 관리)
 
 		// ─ 백엔드 dailyApplicationList를 SRC_TYPE별 분할(tripList, vacationList, substWorkList, reportTripList)해주는 필수 어댑터 ─
 		function splitDailyApplicationList(data) {
@@ -2706,16 +2477,28 @@
 
 					var fullVacNm = vacNm;
 					if (isHalfVac) {
-						if (!ampmTxt) {
-							var inH = row.inTm ? parseInt(String(row.inTm).split(':')[0], 10) : 0;
-							var outH = row.outTm ? parseInt(String(row.outTm).split(':')[0], 10) : 0;
-							if (inH >= 12) ampmTxt = '오전';
-							else if (outH > 0 && outH <= 14) ampmTxt = '오후';
-							else ampmTxt = '오전';
+						var effIn = row.inDttm ? String(row.inDttm).trim() : (row.inTm ? String(row.inTm).trim() : '');
+						var effOut = row.outDttm ? String(row.outDttm).trim() : (row.outTm ? String(row.outTm).trim() : '');
+						var inTimePart = effIn.indexOf(' ') !== -1 ? effIn.split(' ')[1] : effIn;
+						var outTimePart = effOut.indexOf(' ') !== -1 ? effOut.split(' ')[1] : effOut;
+						var inH = inTimePart ? parseInt(inTimePart.split(':')[0], 10) : 0;
+						var outH = outTimePart ? parseInt(outTimePart.split(':')[0], 10) : 0;
+						// 실제 출퇴근 시간이 존재할 경우, 신청서 코드보다 실제 출퇴근 패턴(오전 출근 ~ 오후 퇴근 = 오후 반차)을 최우선 판정
+						if (inH > 0 && inH < 12 && outH > 0 && outH <= 15) {
+							ampmTxt = '오후';
+						} else if (inH >= 12) {
+							ampmTxt = '오전';
+						} else if (!ampmTxt) {
+							if (inH > 0 && inH < 12) ampmTxt = '오후';
+							else if (outH > 0 && outH <= 15) ampmTxt = '오후';
+							else ampmTxt = '오후';
 						}
 						var baseNm = (vacNm.indexOf('연차') !== -1 || vacNm === '반차') ? '반차' : vacNm.replace(/반차/g, '');
 						fullVacNm = baseNm + '(' + ampmTxt + ')';
 					}
+
+					row.ampmCd = matchedVacation.ampmCd || '';
+					row.ampmNm = ampmTxt || '';
 
 					if (!matchedTrip) {
 						row.spclMtr = fullVacNm;
@@ -3270,6 +3053,11 @@
 			var wd = row.workDt ? String(row.workDt).replace(/[^0-9]/g, '') : '';
 			var dtFormatted = (wd.length === 8) ? (wd.substr(0,4)+'-'+wd.substr(4,2)+'-'+wd.substr(6,2)) : '';
 			if (!dtFormatted) return row;
+
+			// 1. 공용 단일 실적 및 출퇴근/근태 판정 재계산 (IN_DTTM/OUT_DTTM 최우선 기준 totWorkTm, otTm, nghtTm 및 applyAttendanceJudgment 선행 실행)
+			if (typeof recalcRowAttendanceObject === 'function') {
+				recalcRowAttendanceObject(row);
+			}
 
 			var wt = String(row.workTypeNm || '').trim();
 			var hasSubstWork = !!(row.workApplNo || String(row.substWorkYn || '').trim() === '1');

@@ -7,14 +7,13 @@
 	<select id="selectTripReqListCount" parameterType="Map" resultType="int">
 		SELECT COUNT(*)
 		FROM TB_PM51M01 M
-		LEFT OUTER JOIN TB_PM52M01 RP ON M.TRIP_REQ_NO = RP.TRIP_REQ_NO
 		WHERE 1 = 1
 		<if test="coCd != null and coCd != ''">
 			AND M.CO_CD = #{coCd}
 		</if>
 		<if test="srchStDt != null and srchStDt != '' and srchEdDt != null and srchEdDt != ''">
-			AND SUBSTR(M.TRIP_ST_DTM, 1, 8) &lt;= TO_CHAR(TO_DATE(#{srchEdDt}, 'YYYY-MM-DD'), 'YYYYMMDD')
-			AND SUBSTR(M.TRIP_ED_DTM, 1, 8) &gt;= TO_CHAR(TO_DATE(#{srchStDt}, 'YYYY-MM-DD'), 'YYYYMMDD')
+			AND M.TRIP_ST_DTM &lt;= REPLACE(#{srchEdDt}, '-', '') || '235959'
+			AND M.TRIP_ED_DTM &gt;= REPLACE(#{srchStDt}, '-', '') || '000000'
 		</if>
 		<if test="tripDiv != null and tripDiv != ''">
 			AND M.TRIP_DIV = #{tripDiv}
@@ -84,8 +83,8 @@
 			AND M.CO_CD = #{coCd}
 		</if>
 		<if test="srchStDt != null and srchStDt != '' and srchEdDt != null and srchEdDt != ''">
-			AND SUBSTR(M.TRIP_ST_DTM, 1, 8) &lt;= TO_CHAR(TO_DATE(#{srchEdDt}, 'YYYY-MM-DD'), 'YYYYMMDD')
-			AND SUBSTR(M.TRIP_ED_DTM, 1, 8) &gt;= TO_CHAR(TO_DATE(#{srchStDt}, 'YYYY-MM-DD'), 'YYYYMMDD')
+			AND M.TRIP_ST_DTM &lt;= REPLACE(#{srchEdDt}, '-', '') || '235959'
+			AND M.TRIP_ED_DTM &gt;= REPLACE(#{srchStDt}, '-', '') || '000000'
 		</if>
 		<if test="tripDiv != null and tripDiv != ''">
 			AND M.TRIP_DIV = #{tripDiv}
@@ -104,7 +103,7 @@
 		<if test="salesCd != null and salesCd != ''">
 			AND M.SALES_CD LIKE '%' || #{salesCd} || '%'
 		</if>
-		ORDER BY M.TRIP_ST_DTM DESC, CLNT_NM ASC, CLNT_PJT_NM ASC, TRIP_DIV_NM ASC, TRAVELER_LIST ASC, M.SALES_CD ASC
+		ORDER BY M.TRIP_ST_DTM DESC, M.TRIP_REQ_NO DESC
 	</select>
 
 	<!-- 출장신청서 마스터 상세 -->
@@ -167,27 +166,27 @@
 		WHERE TRIP_REQ_NO = #{tripReqNo}
 	</select>
 
-	<!-- 출장신청서에 기본 등록된 경비가 없으면 출장복명서에서 경비 합계 가져오기 -->
+	<!-- 출장신청서에 기본 등록된 경비가 없으면 출장복명서에서 경비 합계 가져오기 (단일 테이블 스캔 최적화) -->
 	<select id="selectTripRptExpenseSummaryByReqNo" parameterType="Map" resultType="CamelMap">
-		SELECT
-			'교통비' AS EXP_ITEM_CD, 'KRW' AS CURR_CD, NVL(SUM(NVL(TRAFFIC_AMT, 0)), 0) AS KRW_AMT, 0 AS USD_AMT
-		FROM TB_PM52D02 WHERE TRIP_RPT_NO = (SELECT MAX(TRIP_RPT_NO) FROM TB_PM52M01 WHERE TRIP_REQ_NO = #{tripReqNo})
+		WITH EXP_SUM AS (
+			SELECT
+				NVL(SUM(NVL(D.TRAFFIC_AMT, 0)), 0) AS TRAFFIC_AMT,
+				NVL(SUM(NVL(D.LODGING_AMT, 0)), 0) AS LODGING_AMT,
+				NVL(SUM(NVL(D.MEAL_AMT, 0)), 0) AS MEAL_AMT,
+				NVL(SUM(NVL(D.DAILY_AMT, 0)), 0) AS DAILY_AMT,
+				NVL(SUM(NVL(D.SPECIAL_AMT, 0)), 0) AS SPECIAL_AMT
+			FROM TB_PM52D02 D
+			WHERE D.TRIP_RPT_NO = (SELECT MAX(TRIP_RPT_NO) FROM TB_PM52M01 WHERE TRIP_REQ_NO = #{tripReqNo})
+		)
+		SELECT '교통비' AS EXP_ITEM_CD, 'KRW' AS CURR_CD, TRAFFIC_AMT AS KRW_AMT, 0 AS USD_AMT FROM EXP_SUM
 		UNION ALL
-		SELECT
-			'숙박비' AS EXP_ITEM_CD, 'KRW' AS CURR_CD, NVL(SUM(NVL(LODGING_AMT, 0)), 0) AS KRW_AMT, 0 AS USD_AMT
-		FROM TB_PM52D02 WHERE TRIP_RPT_NO = (SELECT MAX(TRIP_RPT_NO) FROM TB_PM52M01 WHERE TRIP_REQ_NO = #{tripReqNo})
+		SELECT '숙박비' AS EXP_ITEM_CD, 'KRW' AS CURR_CD, LODGING_AMT AS KRW_AMT, 0 AS USD_AMT FROM EXP_SUM
 		UNION ALL
-		SELECT
-			'식대' AS EXP_ITEM_CD, 'KRW' AS CURR_CD, NVL(SUM(NVL(MEAL_AMT, 0)), 0) AS KRW_AMT, 0 AS USD_AMT
-		FROM TB_PM52D02 WHERE TRIP_RPT_NO = (SELECT MAX(TRIP_RPT_NO) FROM TB_PM52M01 WHERE TRIP_REQ_NO = #{tripReqNo})
+		SELECT '식대' AS EXP_ITEM_CD, 'KRW' AS CURR_CD, MEAL_AMT AS KRW_AMT, 0 AS USD_AMT FROM EXP_SUM
 		UNION ALL
-		SELECT
-			'일비' AS EXP_ITEM_CD, 'KRW' AS CURR_CD, NVL(SUM(NVL(DAILY_AMT, 0)), 0) AS KRW_AMT, 0 AS USD_AMT
-		FROM TB_PM52D02 WHERE TRIP_RPT_NO = (SELECT MAX(TRIP_RPT_NO) FROM TB_PM52M01 WHERE TRIP_REQ_NO = #{tripReqNo})
+		SELECT '일비' AS EXP_ITEM_CD, 'KRW' AS CURR_CD, DAILY_AMT AS KRW_AMT, 0 AS USD_AMT FROM EXP_SUM
 		UNION ALL
-		SELECT
-			'특별비' AS EXP_ITEM_CD, 'KRW' AS CURR_CD, NVL(SUM(NVL(SPECIAL_AMT, 0)), 0) AS KRW_AMT, 0 AS USD_AMT
-		FROM TB_PM52D02 WHERE TRIP_RPT_NO = (SELECT MAX(TRIP_RPT_NO) FROM TB_PM52M01 WHERE TRIP_REQ_NO = #{tripReqNo})
+		SELECT '특별비' AS EXP_ITEM_CD, 'KRW' AS CURR_CD, SPECIAL_AMT AS KRW_AMT, 0 AS USD_AMT FROM EXP_SUM
 	</select>
 
 	<!-- 출장신청서 출장자 상세 -->
@@ -706,8 +705,8 @@
 			AND M.CO_CD = #{coCd}
 		</if>
 		<if test="srchStDt != null and srchStDt != '' and srchEdDt != null and srchEdDt != ''">
-			AND SUBSTR(M.ACT_ST_DTM, 1, 8) &lt;= TO_CHAR(TO_DATE(#{srchEdDt}, 'YYYY-MM-DD'), 'YYYYMMDD')
-			AND SUBSTR(M.ACT_ED_DTM, 1, 8) &gt;= TO_CHAR(TO_DATE(#{srchStDt}, 'YYYY-MM-DD'), 'YYYYMMDD')
+			AND M.ACT_ST_DTM &lt;= REPLACE(#{srchEdDt}, '-', '') || '235959'
+			AND M.ACT_ED_DTM &gt;= REPLACE(#{srchStDt}, '-', '') || '000000'
 		</if>
 		<if test="tripDiv != null and tripDiv != ''">
 			AND EXISTS (SELECT 1 FROM TB_PM51M01 R WHERE R.TRIP_REQ_NO = M.TRIP_REQ_NO AND R.TRIP_DIV = #{tripDiv})
@@ -770,8 +769,8 @@
 			AND M.CO_CD = #{coCd}
 		</if>
 		<if test="srchStDt != null and srchStDt != '' and srchEdDt != null and srchEdDt != ''">
-			AND SUBSTR(M.ACT_ST_DTM, 1, 8) &lt;= TO_CHAR(TO_DATE(#{srchEdDt}, 'YYYY-MM-DD'), 'YYYYMMDD')
-			AND SUBSTR(M.ACT_ED_DTM, 1, 8) &gt;= TO_CHAR(TO_DATE(#{srchStDt}, 'YYYY-MM-DD'), 'YYYYMMDD')
+			AND M.ACT_ST_DTM &lt;= REPLACE(#{srchEdDt}, '-', '') || '235959'
+			AND M.ACT_ED_DTM &gt;= REPLACE(#{srchStDt}, '-', '') || '000000'
 		</if>
 		<if test="tripDiv != null and tripDiv != ''">
 			AND R.TRIP_DIV = #{tripDiv}
@@ -798,7 +797,7 @@
 				  AND D.USER_NM LIKE '%' || #{travelerNm} || '%'
 			)
 		</if>
-		ORDER BY M.ACT_ST_DTM DESC, CLNT_NM ASC, CLNT_PJT_NM ASC, TRIP_DIV_NM ASC, TRAVELER_LIST ASC, TRIP_TYPE_CDS_NM ASC, R.SALES_CD ASC
+		ORDER BY M.ACT_ST_DTM DESC, M.TRIP_RPT_NO DESC
 	</select>
 
 	<!-- 복명대상 신청서 조회 (결재완료+미복명) -->
@@ -893,8 +892,7 @@
 			M.FILE_TRGT_KEY
 		FROM TB_PM52D01 D
 		LEFT JOIN TB_PM01D01 T
-			ON T.CO_CD = D.CO_CD
-			AND T.WORK_RPT_NO = D.WORK_RPT_NO
+			ON T.WORK_RPT_NO = D.WORK_RPT_NO
 			AND T.WORK_RPT_NO_SEQ = D.WORK_RPT_NO_SEQ
 		LEFT JOIN TB_PM01M01 M
 			ON M.WORK_RPT_NO = D.WORK_RPT_NO
@@ -1044,8 +1042,8 @@
 		<if test="tripReqNo != null and tripReqNo != ''">
 			AND D.TRIP_REQ_NO != #{tripReqNo}
 		</if>
-		AND SUBSTR(D.TRIP_ST_DTM, 1, 8) &lt;= #{tripEdDate}
-		AND SUBSTR(D.TRIP_ED_DTM, 1, 8) &gt;= #{tripStDate}
+		AND D.TRIP_ST_DTM &lt;= REPLACE(#{tripEdDate}, '-', '') || '235959'
+		AND D.TRIP_ED_DTM &gt;= REPLACE(#{tripStDate}, '-', '') || '000000'
 		UNION ALL
 		SELECT '출장복명서' AS DOC_TYPE, R.TRIP_RPT_NO AS DOC_NO, D2.TRIP_ST_DTM, D2.TRIP_ED_DTM,
 		       M2.TRIP_PLACE, FN_CM05M01_CD_TO_NM(M2.TRIP_TYPE_CDS) AS TRIP_TYPE_NM
@@ -1056,8 +1054,8 @@
 		<if test="tripReqNo != null and tripReqNo != ''">
 			AND R.TRIP_REQ_NO != #{tripReqNo}
 		</if>
-		AND SUBSTR(D2.TRIP_ST_DTM, 1, 8) &lt;= #{tripEdDate}
-		AND SUBSTR(D2.TRIP_ED_DTM, 1, 8) &gt;= #{tripStDate}
+		AND D2.TRIP_ST_DTM &lt;= REPLACE(#{tripEdDate}, '-', '') || '235959'
+		AND D2.TRIP_ED_DTM &gt;= REPLACE(#{tripStDate}, '-', '') || '000000'
 	</select>
 
 	<!-- 출장자의 해당 월 전체 출장 일정 조회 (캘린더 모달용) -->
@@ -1069,8 +1067,8 @@
 		<if test="tripReqNo != null and tripReqNo != ''">
 			AND D.TRIP_REQ_NO != #{tripReqNo, jdbcType=VARCHAR}
 		</if>
-		AND SUBSTR(D.TRIP_ST_DTM, 1, 8) &lt;= #{monthEdDt, jdbcType=VARCHAR}
-		AND SUBSTR(D.TRIP_ED_DTM, 1, 8) &gt;= #{monthStDt, jdbcType=VARCHAR}
+		AND D.TRIP_ST_DTM &lt;= REPLACE(#{monthEdDt, jdbcType=VARCHAR}, '-', '') || '235959'
+		AND D.TRIP_ED_DTM &gt;= REPLACE(#{monthStDt, jdbcType=VARCHAR}, '-', '') || '000000'
 		UNION ALL
 		SELECT '출장복명서' AS DOC_TYPE, R.TRIP_RPT_NO AS DOC_NO, D2.TRIP_ST_DTM, D2.TRIP_ED_DTM, D2.USER_NM
 		FROM TB_PM52D02 D2
@@ -1079,8 +1077,8 @@
 		<if test="tripReqNo != null and tripReqNo != ''">
 			AND R.TRIP_REQ_NO != #{tripReqNo, jdbcType=VARCHAR}
 		</if>
-		AND SUBSTR(D2.TRIP_ST_DTM, 1, 8) &lt;= #{monthEdDt, jdbcType=VARCHAR}
-		AND SUBSTR(D2.TRIP_ED_DTM, 1, 8) &gt;= #{monthStDt, jdbcType=VARCHAR}
+		AND D2.TRIP_ST_DTM &lt;= REPLACE(#{monthEdDt, jdbcType=VARCHAR}, '-', '') || '235959'
+		AND D2.TRIP_ED_DTM &gt;= REPLACE(#{monthStDt, jdbcType=VARCHAR}, '-', '') || '000000'
 		ORDER BY TRIP_ST_DTM ASC
 	</select>
 
