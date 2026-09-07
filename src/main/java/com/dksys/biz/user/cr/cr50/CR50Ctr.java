@@ -232,7 +232,7 @@ public class CR50Ctr {
                     for (Map<String, String> file : fileList) {
                         String fKey = String.valueOf(file.get("fileKey"));
                         String fName = file.get("fileName");
-                        if (fName.equals("PFU_" + paramMap.get("ordrsNo") + "_" + paramMap.get("fileTrgtKey") + ".pdf") && !fKey.equals(String.valueOf(newFileKey))) {
+                        if (fName != null && fName.equals("PFU_" + paramMap.get("ordrsNo") + "_" + paramMap.get("fileTrgtKey") + ".pdf") && !fKey.equals(String.valueOf(newFileKey))) {
                             cm08Svc.deleteFile(fKey);
                         }
                     }
@@ -249,8 +249,13 @@ public class CR50Ctr {
                 model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
             }
         } catch (Exception e) {
+            logger.error("updatePfu Exception: ", e);
             model.addAttribute("resultCode", 900);
-            model.addAttribute("resultMessage", e.getMessage());
+            String message = e.getMessage();
+            if (message == null || message.trim().isEmpty()) {
+                message = e.toString();
+            }
+            model.addAttribute("resultMessage", message);
         }
         return "jsonView";
     }

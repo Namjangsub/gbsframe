@@ -1788,19 +1788,44 @@
 		  });
 		}
 
+	function parseAjaxResult(data, defaultSuccessMsg, defaultFailMsg) {
+		var res = data;
+		if (typeof res === "string") {
+			try { res = JSON.parse(res); } catch(e) {}
+		}
+		if (res && res.responseJSON) {
+			res = res.responseJSON;
+		}
+		var code = res ? (res.resultCode || res.status) : null;
+		var msg = "";
+		if (res && res.resultMessage) {
+			msg = res.resultMessage;
+		} else if (res && res.message) {
+			msg = res.message;
+		} else if (res && res.error) {
+			msg = res.error;
+		} else if (code == 200) {
+			msg = defaultSuccessMsg || "처리되었습니다.";
+		} else {
+			msg = defaultFailMsg || "처리 중 오류가 발생했습니다.";
+		}
+		return { code: code, message: msg, raw: res };
+	}
+
 	function insertPFU() {
 		if (inputValidation($('.popup_area [required]'))) {						// 필수 필드의 유효성 검사
 			var formData = makeFormData();
 			if (formData) {
 				filePostAjax("/user/cr/cr50/insertPfu", formData ,function(data) {
-					// alert(data.resultMessage);
-					if (data.resultCode == 200) {
-						$("#fileTrgtKey").val(data.fileTrgtKey);
+					var result = parseAjaxResult(data, "등록되었습니다.", "등록 처리에 실패했습니다.");
+					if (result.code == 200) {
+						var fileTrgtKey = (result.raw && result.raw.fileTrgtKey) || $("#fileTrgtKey").val();
+						$("#fileTrgtKey").val(fileTrgtKey);
 						kakaoTodo();
 						modalStack.last().callback(formData);
 						modalStack.close();
 					} else {
-						alert(data.resultMessage);
+						alert(result.message);
 					}
 				});
 			}
@@ -1813,14 +1838,15 @@
 		if (inputValidation($('.popup_area [required]'))) {						// 필수 필드의 유효성 검사
 			var formData = makeFormData();
 			if (formData) {
-	      		filePostAjax("/user/cr/cr50/updatePfu", formData,function(data) {
-						alert(data.resultMessage);
-						if (data.resultCode == 200) {
-	                        kakaoTodo();
-							gridView.setData(0);
-							modalStack.close();
-						}
-					});
+	      		filePostAjax("/user/cr/cr50/updatePfu", formData, function(data) {
+					var result = parseAjaxResult(data, "수정되었습니다.", "수정 처리에 실패했습니다.");
+					alert(result.message);
+					if (result.code == 200) {
+						kakaoTodo();
+						gridView.setData(0);
+						modalStack.close();
+					}
+				});
 			}
 		}
 	}

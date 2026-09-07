@@ -3,6 +3,7 @@ package com.dksys.biz.user.cr.cr50.service.impl;
 import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -253,19 +254,21 @@ public class CR50SvcImpl implements CR50Svc {
         param.put("comonCd", paramMap.get("comonCd")); // 프로트엔드에 넘어온 화일 저장 위치 정보
 
         List<Map<String, String>> uploadFileList = gsonDtl.fromJson(paramMap.get("uploadFileArr"), dtlMap);
-        if (uploadFileList.size() > 0) {
+        if (uploadFileList != null && uploadFileList.size() > 0) {
             // 접근 권한 없으면 Exception 발생 (jobType, userId, comonCd 3개 필수값 필요)
             param.put("jobType", "fileUp");
             cm15Svc.selectFileAuthCheck(param);
         }
         String[] deleteFileArr = gsonDtl.fromJson(paramMap.get("deleteFileArr"), String[].class);
-        List<String> deleteFileList = Arrays.asList(deleteFileArr);
+        List<String> deleteFileList = deleteFileArr != null ? Arrays.asList(deleteFileArr) : Collections.emptyList();
         for (String fileKey : deleteFileList) { // 삭제할 파일 하나씩 점검 필요(전체 목록에서 삭제 선택시 필요함)
             Map<String, String> fileInfo = cm08Svc.selectFileInfo(fileKey);
-            // 접근 권한 없으면 Exception 발생
-            param.put("comonCd", fileInfo.get("comonCd")); // 삭제할 파일이 보관된 저장 위치 정보
-            param.put("jobType", "fileDelete");
-            cm15Svc.selectFileAuthCheck(param);
+            if (fileInfo != null) {
+                // 접근 권한 없으면 Exception 발생
+                param.put("comonCd", fileInfo.get("comonCd")); // 삭제할 파일이 보관된 저장 위치 정보
+                param.put("jobType", "fileDelete");
+                cm15Svc.selectFileAuthCheck(param);
+            }
         }
         // ---------------------------------------------------------------
         // 첨부 화일 권한체크 끝
@@ -329,7 +332,7 @@ public class CR50SvcImpl implements CR50Svc {
                         detailMap.put("udtId", "");
                         detailMap.put("udtPgm", "");
                         detailMap.put("udtDttm", "");
-                    } else if (originData.equals(checkData)) { // 변경 안됨
+                    } else if (originData != null && originData.equals(checkData)) { // 변경 안됨
 //                      detailMap.put("creatId", detailMap.get("userId"));
 //                      detailMap.put("creatDttm", detailMap.get("creatDttm"));
 //                      detailMap.put("creatPgm", detailMap.get("pgmId"));;
@@ -377,14 +380,16 @@ public class CR50SvcImpl implements CR50Svc {
         // ---------------------------------------------------------------
         // 첨부 화일 처리 시작
         // ---------------------------------------------------------------
-        if (uploadFileList.size() > 0) {
+        if (uploadFileList != null && uploadFileList.size() > 0) {
             paramMap.put("fileTrgtTyp", paramMap.get("pgmId"));
             paramMap.put("fileTrgtKey", paramMap.get("fileTrgtKey"));
             cm08Svc.uploadFile(paramMap, mRequest);
         }
 
-        for (String fileKey : deleteFileList) {
-            cm08Svc.deleteFile(fileKey);
+        if (deleteFileList != null) {
+            for (String fileKey : deleteFileList) {
+                cm08Svc.deleteFile(fileKey);
+            }
         }
         // ---------------------------------------------------------------
         // 첨부 화일 처리 끝
@@ -403,7 +408,7 @@ public class CR50SvcImpl implements CR50Svc {
 
         paramMap.put("reqNo", fileTrgtKey);
         List<Map<String, String>> sharngChk = QM01Mapper.deleteWbsSharngListChk(paramMap); 
-        if (!sharngChk.isEmpty()) {
+        if (sharngChk != null && !sharngChk.isEmpty()) {
             // QM01Mapper.deleteWbsSharngList(paramMap); 
             QM01Mapper.deleteApprovalList(paramMap); 
         }
