@@ -1,0 +1,763 @@
+<!-- 이 팝업의 부모 체인(PM0701M01 → PM0701P02)은 ax5grid.min.js만 로드하고
+     ax5select.min.js(그리드 select 에디터가 내부적으로 쓰는 $.fn.ax5select 플러그인)는
+     로드하지 않는다 - PM3001M01.html처럼 select 타입 컬럼 에디터를 쓰는 화면은 반드시
+     이 스크립트가 있어야 한다. openModal/openSecondModal은 $.ajax + append()로 fragment를
+     주입하는데, jQuery는 삽입되는 <script src>를 동기적으로(_evalUrl) 로드하므로
+     여기 fragment 안에 직접 include해두면 그리드 초기화 시점엔 이미 로드가 끝나 있다. -->
+<link rel="stylesheet" href="/static/css/ax5/ax5select.css" />
+<script src="/static/js/ax5/ax5select.min.js"></script>
+
+<!-- 사용가능시작일/종료일은 AX5-Grid 자체 date 에디터를 쓰지 않는다. 대신 PM3001M01.html의
+     inDttm/outDttm 컬럼과 동일한 패턴으로 - 이 컬럼들은 editor를 아예 지정하지 않아
+     onDBLClick이 정상 발동하고(§12.3), 더블클릭 시 global.js에 이미 정의된 공용
+     window.DateRangePicker(시작/종료 날짜를 한 팝업에서 같이 선택하고 onApply(sd, ed)로
+     한 번에 반영하는 컴포넌트, PM0701M01.html/PM3001M01.html 등에서 이미 사용 중)를 연다.
+     DateRangePicker는 global.js에 있으므로 이 부모 체인에 이미 로드되어 있어 별도 include 불필요. -->
+
+<style>
+/* ax5grid 셀 텍스트 마우스 드래그 및 Ctrl+C 클립보드 복사 허용 */
+[data-ax5grid="awardGrid"] .ax5grid-cell-content {
+	-webkit-user-select: text !important;
+	-moz-user-select: text !important;
+	-ms-user-select: text !important;
+	user-select: text !important;
+}
+/* 복사된 셀 표시 (점선 테두리, marching ants 스타일) */
+[data-ax5grid="awardGrid"] td.grid-cell-copy-marker {
+	outline: 2px dashed #2563eb !important;
+	outline-offset: -2px !important;
+}
+</style>
+
+<div class="popup_area of_a" style="width: 100%; height: 100%;">
+	<!-- 팝업 헤더 타이틀 -->
+	<div class="tit_contents">
+		<h4 class="tit">포상휴가 등록 (지급관리)</h4>
+	</div>
+
+	<!-- 설명 -->
+	<div style="background-color: #f8f9fa; border: 1px solid #e9ecef; border-left: 4px solid #ffc107; padding: 8px 12px; margin: 5px 0 10px 0; font-size: 12px; line-height: 1.5; color: #333;">
+		<span style="font-weight: bold; color: #ff9800;"><i class="fas fa-info-circle"></i> 포상휴가 등록 안내</span>
+		<ul style="margin: 3px 0 0 15px; padding: 0; list-style-type: disc; color: #555;">
+			<li>이 화면은 포상휴가 <strong>지급(부여) 내역</strong>만 관리합니다</li>
+			<li>실제 사용은 휴가신청서에서 '포상휴가'/'포상휴가반차' 유형으로 신청하며, 지급연도별 유효기간(사용가능시작일~사용가능종료일)을 벗어나거나 잔여일수를 초과하면 신청이 차단됩니다</li>
+			<li>기본 유효기간은 <strong>지급연도 11/20 ~ 다음해 11/19</strong> (하계대체휴가일수는 <strong>등록일자 ~ 지급연도 12/31</strong>)로 자동 설정되며, 날짜 셀을 더블클릭하면 달력에서 직접 선택/수정할 수 있습니다</li>
+			<li>포상휴가종류를 선택하면 휴가일수가 자동으로 채워집니다(공통코드 기본값)</li>
+			<li><strong>엑셀에서 표를 복사하여 붙여넣기</strong>로 일괄 등록 가능합니다</li>
+		</ul>
+	</div>
+
+	<!-- 검색 조건 테이블 영역 -->
+	<div class="popup_table">
+		<table class="table_input">
+			<colgroup>
+				<col width="15%">
+				<col width="25%">
+				<col width="15%">
+				<col width="45%">
+			</colgroup>
+			<tr>
+				<th>지급연도</th>
+				<td>
+					<select id="awardYy" name="awardYy" class="form-control input-sm" style="width: 120px;" onchange="searchAwardGrid();"></select>
+				</td>
+				<th>성명</th>
+				<td>
+					<!-- PM0701P02.html의 사원검색 필드(search_form + 돋보기 아이콘) 패턴 그대로 적용 -->
+					<div class="search_form" style="width: 100%;">
+						<input type="hidden" id="awardEmpNo" name="awardEmpNo">
+						<input type="text" id="awardEmpNm" name="awardEmpNm" placeholder="성명 검색"
+							onkeyup="(event.keyCode == 8 || event.keyCode == 46) ? awardEmpNo.value = '' : event.keyCode == 13 ? searchAwardGrid() : '';">
+						<a onclick="openAwardSearchUserModal();"><i class="i_search_w"></i></a>
+					</div>
+				</td>
+			</tr>
+		</table>
+	</div>
+
+	<!-- 그리드 상단 버튼바 -->
+	<div class="contents no_bg" style="margin-top: 10px;">
+		<div class="contents_tit">
+			<span style="height: 30px; line-height: 30px; font-size: 13px; font-weight: bold; color: blue;">포상휴가 지급 내역</span>
+			<div class="add_btn_small pdl10">
+				<a onclick="searchAwardGrid();" style="height: 28px; line-height: 26px; width: 65px;"><i class="fas fa-search"></i> 조 회</a>
+				<a onclick="addAwardRow();" style="height: 28px; line-height: 26px; width: 75px;"><i class="fas fa-plus"></i> 행추가</a>
+				<a onclick="deleteAwardRow();" style="height: 28px; line-height: 26px; width: 75px;"><i class="fas fa-minus"></i> 행삭제</a>
+				<a onclick="saveAwardList();" style="height: 28px; line-height: 26px; width: 75px;"><i class="fas fa-save"></i> 저 장</a>
+			</div>
+		</div>
+	</div>
+
+	<!-- 그리드 영역 -->
+	<div class="contents" style="padding: 0; margin-top: 5px;">
+		<div class="ax5_grid">
+			<div data-ax5grid="awardGrid" data-ax5grid-config="{}" style="height: 500px; width: 100%;"></div>
+		</div>
+	</div>
+
+	<!-- 하단 버튼 영역 -->
+	<div class="col-xs-12 text-right popup_bottom_btn" style="margin-top: 15px; padding-right: 0;">
+		<button type="button" class="btn btn-default btn-sm" onclick="modalStack.close();">닫 기</button>
+	</div>
+</div>
+
+<script type="text/javascript">
+	var awardGridView = null;
+	var deleteAwardList = []; // 삭제 대기 행 리스트
+	var awardCodeMap = {}; // 포상휴가종류 코드명->코드ID 매핑
+	var awardCodeList = []; // 선택지용 코드 목록
+	var awardCodeEtcMap = {}; // 포상휴가종류 코드ID->CODE_ETC(기본 휴가일수) 매핑
+
+	// 페이지 로드
+	$(document).ready(function() {
+		loadAwardTypeCodeList();
+		initAwardGrid();
+		setAwardGrantYy();
+		searchAwardGrid();
+	});
+
+	// 공통코드 동기 조회
+	function loadAwardTypeCodeList() {
+		var param = {
+			"codeKind": "PM07M04TYPE"
+		};
+		postAjaxSync("/admin/cm/cm05/selectChildCodeList", param, null, function(resp) {
+			if (resp && resp.childCodeList && resp.childCodeList.length > 0) {
+				resp.childCodeList.forEach(function(item) {
+					awardCodeMap[item.codeNm] = item.codeId;
+					awardCodeEtcMap[item.codeId] = item.codeEtc;
+					awardCodeList.push({
+						text: item.codeNm,
+						value: item.codeId
+					});
+				});
+			}
+		});
+	}
+
+	// 지급연도(grantYy) 및 포상휴가종류(awardTypeCd)별 사용가능기간(유효기간) 기본값 계산
+	// 1) 기본 포상휴가: 지급연도 11/20 ~ 다음해 11/19
+	// 2) 하계대체휴가일수(PM07M04TYPE51): 등록일자(오늘) ~ 지급연도 12/31
+	function calcAwardUsablePeriod(grantYy, awardTypeCd) {
+		var yy = parseInt(grantYy, 10);
+		if (!yy || isNaN(yy)) return null;
+
+		if (awardTypeCd === "PM07M04TYPE51") {
+			var todayStr = (window.moment) ? moment().format("YYYY-MM-DD") : new Date().toISOString().substring(0, 10);
+			return {
+				stDt: todayStr,
+				edDt: yy + "-12-31"
+			};
+		} else {
+			var nextYy = yy + 1;
+			return {
+				stDt: yy + "-11-20",
+				edDt: nextYy + "-11-19"
+			};
+		}
+	}
+
+	// AX5-Grid 그리드 초기화
+	function initAwardGrid() {
+		awardGridView = {
+			initView : function() {
+				this.target = new ax5.ui.grid();
+				this.target.setConfig({
+					showLineNumber : true,
+					lineNumberColumnWidth : 40,
+					showRowSelector : true,
+					multipleSelect : true,
+					sortable : true,
+					target : $('[data-ax5grid="awardGrid"]'),
+					header : {
+						align : "center",
+						selector : true
+					},
+					body : {
+						onClick : function() {
+							this.self.select(this.dindex);
+							// 클릭 위치 기억 (복사/잘라내기/붙여넣기 시작 위치용)
+							window.awardGridLastClickRow = this.dindex;
+							window.awardGridLastClickCol = this.colIndex;
+						},
+						onDBLClick : function() {
+							// 사원ID/성명 셀 더블클릭 시 사용자 검색 팝업
+							if (this.column.key === "empNo" || this.column.key === "empNm") {
+								openAwardUserSearch(this.dindex);
+							}
+							// 사용가능시작일/종료일 셀 더블클릭 시 시작~종료를 한 번에 선택하는 날짜피커
+							if (this.column.key === "stDt" || this.column.key === "edDt") {
+								openAwardDatePicker(this.dindex, this.item);
+							}
+						},
+						onDataChanged : function() {
+							if (this.item && this.item.__status !== "C") {
+								this.item.__status = "U";
+							}
+							// 포상휴가종류 선택 시 공통코드(TB_CM05M01)의 CODE_ETC 값으로 휴가일수 자동 설정 및 유효기간 재계산
+							if (this.key === "awardTypeCd") {
+								var etc = awardCodeEtcMap[this.item.awardTypeCd];
+								if (etc !== undefined && etc !== null && etc !== "") {
+									this.self.setValue(this.dindex, "grantDays", etc);
+								}
+								var range = calcAwardUsablePeriod(this.item.grantYy, this.item.awardTypeCd);
+								if (range) {
+									this.self.setValue(this.dindex, "stDt", range.stDt);
+									this.self.setValue(this.dindex, "edDt", range.edDt);
+								}
+							}
+							// 지급연도 입력/변경 시 사용가능기간 자동 재계산
+							if (this.key === "grantYy") {
+								var range = calcAwardUsablePeriod(this.item.grantYy, this.item.awardTypeCd);
+								if (range) {
+									this.self.setValue(this.dindex, "stDt", range.stDt);
+									this.self.setValue(this.dindex, "edDt", range.edDt);
+								}
+							}
+						}
+					},
+					page : {
+						display : false
+					},
+					header: {
+						align : "center",
+						columnHeight: 28
+					},
+					columns : [
+						 {key: "grantYy",     label: "지급연도", width:  90, align: "center", editor: {type: "text"}}
+						// 사번/성명은 일부러 editor를 지정하지 않는다 - AX5-Grid는 editor가 있는 컬럼에서
+						// onDBLClick을 발생시키지 않는다(더블클릭 시 편집모드 진입이 우선, docs/AX5-Grid.md
+						// §12.3). PM0701P02.html의 성명 컬럼과 동일한 이유. 대신 붙여넣기는 setValue()로
+						// 직접 값을 넣으므로 editor 유무와 무관하게 그대로 동작하고, 값 입력은 더블클릭
+						// 사용자검색으로만 하도록 한다.
+						,{key: "empNo",       label: "사번(더블클릭)", width: 110, align: "center"}
+						,{key: "empNm",       label: "성명(더블클릭)", width: 100, align: "center"}
+						,{key: "awardTypeCd", label: "포상휴가종류", width: 120, align: "center", editor: {
+							type: "select",
+							config: {
+								columnKeys: { optionValue: "value", optionText: "text" },
+								options: awardCodeList
+							}
+						}, formatter: function() {
+							// AX5-Grid formatter는 인자로 셀 객체를 넘겨주지 않고 this에 바인딩한다(PM0701P02.html의
+							// zeroEmptyFormatter 등과 동일한 관례) - function(cell){cell.value} 형태로 쓰면
+							// cell이 undefined라서 렌더링 시 TypeError가 난다.
+							var codeId = this.value;
+							for (var codeNm in awardCodeMap) {
+								if (awardCodeMap[codeNm] === codeId) {
+									return codeNm;
+								}
+							}
+							return codeId;
+						}}
+						,{key: "grantDays",   label: "휴가일수",   width:  80, align: "center", editor: {type: "text"}}
+						// 사용가능시작일/종료일도 사번/성명과 같은 이유로 editor를 지정하지 않는다 -
+						// PM3001M01.html의 inDttm/outDttm 컬럼과 동일한 패턴. 더블클릭하면
+						// openAwardDatePicker()가 DateRangePicker(시작+종료 동시 선택)를 연다.
+						,{key: "stDt",        label: "사용가능시작일(더블클릭)", width: 130, align: "center"}
+						,{key: "edDt",        label: "사용가능종료일(더블클릭)", width: 130, align: "center"}
+						,{key: "rmk",         label: "비고",     width: 200, align: "left", editor: {type: "text"}}
+					]
+				});
+				return this;
+			},
+			setData : function(list) {
+				var rawList = list || [];
+				$.each(rawList, function(i, row) {
+					row.__status = "";
+				});
+				this.target.setData({
+					list : rawList,
+					page : { display: false, totalElements: rawList.length }
+				});
+			}
+		};
+		awardGridView.initView();
+	}
+
+	// 지급연도 셀렉트박스 동적 옵션 생성 (기준연도: 2025년 ~ 현재+1년)
+	function setAwardGrantYy() {
+		var now = new Date();
+		var nyear = now.getFullYear();
+		var yy = $("#awardYy");
+
+		yy.empty();
+		for (var sy = 2025; sy <= nyear + 1; sy++) {
+			yy.append("<option value='" + sy + "'>" + sy + "년</option>");
+		}
+
+		yy.val(nyear);
+	}
+
+	// 포상휴가 지급 내역 조회
+	function searchAwardGrid() {
+		var curYy = $('#awardYy').val() || new Date().getFullYear();
+		var formData = {
+			"coCd"     : "GUN",
+			"grantYy"  : curYy,
+			"empNo"    : $('#awardEmpNo').val() || "",
+			"empNm"    : $('#awardEmpNm').val() || ""
+		};
+		postAjax("/user/pm/pm07/selectAwardVacationList", formData, null, function(data) {
+			deleteAwardList = [];
+			var list = data.result || [];
+			$.each(list, function(idx, item) {
+				item.__status = "";
+				// PK(지급연도/사번/포상휴가종류) 원본값 스냅샷 - 사용자가 이 값들을 수정하면
+				// MERGE는 새 키로 인식해서 신규 행이 추가되고 기존 행은 그대로 남는다.
+				// 저장 시 이 스냅샷과 비교해서 키가 바뀐 행은 예전 키를 delete 처리해야 한다.
+				item.__origGrantYy = item.grantYy;
+				item.__origEmpNo = item.empNo;
+				item.__origAwardTypeCd = item.awardTypeCd;
+			});
+			// DB에 없는 빈 입력용 행은 만들지 않는다 - 실제 등록된 지급 내역만 보여주고,
+			// 신규 입력은 "행추가" 버튼으로 필요한 만큼 한 행씩 추가하거나, 붙여넣기 시
+			// 자동으로 행이 늘어나는 방식(awardProcessGridPasteText 참고)을 쓴다.
+			awardGridView.setData(list);
+		});
+	}
+
+	// 행 추가
+	function addAwardRow() {
+		var curYy = $('#awardYy').val() || new Date().getFullYear();
+		var defaultPeriod = calcAwardUsablePeriod(curYy, "") || { stDt: curYy + "-11-20", edDt: (parseInt(curYy, 10) + 1) + "-11-19" };
+		awardGridView.target.addRow({
+			grantYy    : String(curYy),
+			empNo      : "",
+			empNm      : "",
+			awardTypeCd: "",
+			grantDays  : "",
+			stDt       : defaultPeriod.stDt,
+			edDt       : defaultPeriod.edDt,
+			rmk        : "",
+			__status   : "C"
+		}, "last");
+		awardGridView.target.repaint();
+	}
+
+	// 행 선택 삭제
+	function deleteAwardRow() {
+		var list = awardGridView.target.getList("selected");
+		if (!list || list.length < 1) {
+			alert("삭제할 행을 선택하세요.");
+			return;
+		}
+		$.each(list, function(idx, item) {
+			// DB에 이미 저장된 행(원본 PK 스냅샷이 있는 행)만 삭제 대상에 포함하고,
+			// 반드시 원본 키(__orig*)로 삭제한다 - 화면에서 PK를 고친 뒤 바로 삭제를 누르면
+			// 현재(수정된) 키로는 DB에 매칭되는 행이 없어 삭제가 조용히 안 먹는 문제를 방지한다.
+			if (item.__origGrantYy && item.__origEmpNo && item.__origAwardTypeCd) {
+				deleteAwardList.push({
+					grantYy     : item.__origGrantYy,
+					empNo       : item.__origEmpNo,
+					awardTypeCd : item.__origAwardTypeCd
+				});
+			}
+		});
+		awardGridView.target.removeRow("selected");
+	}
+
+	// 일괄 저장
+	function saveAwardList() {
+		var list = awardGridView.target.list || [];
+		var changeList = [];
+
+		$.each(list, function(i, row) {
+			if (row.__status === "C" || row.__status === "U") {
+				if (!row.__status) {
+					row.__status = "C";
+				}
+				// 빈 행 제외
+				if (row.empNo && row.empNo.trim() !== "") {
+					changeList.push(row);
+				}
+			}
+		});
+
+		// PK(지급연도/사번/포상휴가종류)가 수정된 기존 행은 MERGE가 새 키로 인식해서
+		// 신규 행을 추가하고 예전 키의 행은 그대로 남긴다 - 그래서 예전 키를 명시적으로
+		// 삭제 대상에 추가해야 "수정"이 아니라 "늘어나기만" 하는 문제가 안 생긴다.
+		$.each(changeList, function(i, row) {
+			if (row.__status !== "U") return; // 신규행(C)은 원본 키 스냅샷이 없으므로 대상 아님
+			if (!row.__origGrantYy && !row.__origEmpNo && !row.__origAwardTypeCd) return;
+			var keyChanged = (row.grantYy !== row.__origGrantYy)
+				|| (row.empNo !== row.__origEmpNo)
+				|| (row.awardTypeCd !== row.__origAwardTypeCd);
+			if (keyChanged) {
+				deleteAwardList.push({
+					grantYy     : row.__origGrantYy,
+					empNo       : row.__origEmpNo,
+					awardTypeCd : row.__origAwardTypeCd
+				});
+			}
+		});
+
+		if (changeList.length === 0 && deleteAwardList.length === 0) {
+			alert("변경(추가/수정/삭제)된 데이터가 없습니다.");
+			return;
+		}
+
+		// 입력 유효성 검사
+		for (var i = 0; i < changeList.length; i++) {
+			var row = changeList[i];
+			if (!row.grantYy) {
+				alert((i + 1) + "번째 변경 행의 지급연도를 입력하세요.");
+				return;
+			}
+			if (!row.empNo || row.empNo.trim() === "") {
+				alert((i + 1) + "번째 변경 행의 사번을 입력하세요.");
+				return;
+			}
+		}
+
+		var cCnt = changeList.filter(function(r) { return r.__status === "C"; }).length;
+		var uCnt = changeList.filter(function(r) { return r.__status === "U"; }).length;
+		var dCnt = deleteAwardList.length;
+
+		var msg = "포상휴가 변경사항(신규추가 " + cCnt + "건, 수정 " + uCnt + "건, 삭제 " + dCnt + "건)을 저장하시겠습니까?";
+		if (!confirm(msg)) return;
+
+		var paramData = {
+			"saveList"   : changeList,
+			"deleteList" : deleteAwardList
+		};
+
+		postAjax("/user/pm/pm07/saveAwardVacationList", paramData, null, function(data) {
+			alert(data.resultMessage || "저장되었습니다.");
+			if (data.resultCode == 200) {
+				deleteAwardList = [];
+				searchAwardGrid();
+				// 부모 화면 콜백 호출 (팝업 유지)
+				if (modalStack.last() && modalStack.last().callback) {
+					modalStack.last().callback();
+				}
+			}
+		});
+	}
+
+	// ─ 선택된 셀 목록 조회 (드래그 선택 또는 우클릭 스냅샷) ─
+	var awardCopySelectionSnapshot = null;
+	function getAwardActiveSelectionCells() {
+		var cells = [];
+		for (var k in (awardGridView.target.selectedColumn || {})) {
+			if (awardGridView.target.selectedColumn[k]) {
+				cells.push(awardGridView.target.selectedColumn[k]);
+			}
+		}
+		if (cells.length > 1) return cells;
+		if (awardCopySelectionSnapshot && awardCopySelectionSnapshot.length > 1) {
+			return awardCopySelectionSnapshot;
+		}
+		return cells;
+	}
+
+	// ─ 셀 목록을 TSV로 직렬화 ─
+	function awardBuildTsvFromCells(cells) {
+		if (!cells || cells.length === 0) return null;
+		var list = awardGridView.target.getList();
+		var colGroup = awardGridView.target.colGroup || [];
+
+		var rowsMap = {};
+		var minCol = null, maxCol = null;
+		cells.forEach(function(c) {
+			if (!rowsMap[c.dindex]) rowsMap[c.dindex] = {};
+			var colObj = colGroup[c.colIndex];
+			var key = colObj ? colObj.key : null;
+			var val = (key && list[c.dindex]) ? list[c.dindex][key] : '';
+			rowsMap[c.dindex][c.colIndex] = (val !== undefined && val !== null) ? String(val) : '';
+			if (minCol === null || c.colIndex < minCol) minCol = c.colIndex;
+			if (maxCol === null || c.colIndex > maxCol) maxCol = c.colIndex;
+		});
+
+		var dindexes = Object.keys(rowsMap).map(Number).sort(function(a, b) { return a - b; });
+		var lines = dindexes.map(function(di) {
+			var rowCells = [];
+			for (var c = minCol; c <= maxCol; c++) {
+				rowCells.push(rowsMap[di][c] !== undefined ? rowsMap[di][c] : '');
+			}
+			return rowCells.join('\t');
+		});
+		return lines.join('\n');
+	}
+
+	// ─ 지정된 셀 목록에 점선 테두리(엑셀 marching ants) 표시 ─
+	function awardMarkCellsAsCopied(cells) {
+		awardClearCopyMarker();
+		var $grid = $('[data-ax5grid="awardGrid"]');
+		(cells || []).forEach(function(c) {
+			$grid.find('tr[data-ax5grid-tr-data-index="' + c.dindex + '"]')
+				.find('td[data-ax5grid-column-colindex="' + c.colIndex + '"]')
+				.addClass('grid-cell-copy-marker');
+		});
+	}
+
+	// ─ 복사 표시 해제 ─
+	function awardClearCopyMarker() {
+		$('[data-ax5grid="awardGrid"] td.grid-cell-copy-marker').removeClass('grid-cell-copy-marker');
+	}
+
+	// ─ 선택된 셀 목록 중 편집 가능한 셀만 값을 비운다 (Ctrl+X용) ─
+	function awardClearCellsIfEditable(cells) {
+		var list = awardGridView.target.getList();
+		var colGroup = awardGridView.target.colGroup || [];
+		var allEditableKeys = ['grantYy', 'empNo', 'empNm', 'awardTypeCd', 'grantDays', 'stDt', 'edDt', 'rmk'];
+		var touchedRows = {};
+
+		(cells || []).forEach(function(c) {
+			var row = list[c.dindex];
+			var colObj = colGroup[c.colIndex];
+			var key = colObj ? colObj.key : null;
+			if (!row || !key || allEditableKeys.indexOf(key) === -1) return;
+
+			row[key] = '';
+			awardGridView.target.setValue(c.dindex, key, '');
+			touchedRows[c.dindex] = row;
+		});
+
+		Object.keys(touchedRows).forEach(function(di) {
+			awardGridView.target.updateRow(touchedRows[di], Number(di));
+		});
+
+		if (Object.keys(touchedRows).length > 0) {
+			awardGridView.target.repaint();
+		}
+	}
+
+	// ─ 우클릭 mousedown capture 시 선택 범위 스냅샷 (§13.1 함정 대응) ─
+	document.addEventListener('mousedown', function(e) {
+		if (e.button !== 2) return;
+		if (!awardGridView || !$('#awardGrid').find(e.target).length) return;
+
+		var cells = [];
+		for (var k in (awardGridView.target.selectedColumn || {})) {
+			if (awardGridView.target.selectedColumn[k]) {
+				cells.push(awardGridView.target.selectedColumn[k]);
+			}
+		}
+		awardCopySelectionSnapshot = (cells.length > 1) ? cells : null;
+	}, true); // capture 단계 필수
+
+	// 기존 이벤트 리스너 중복 방지 해제
+	$(document).off('.awardGrid');
+
+	// ─ Ctrl+C (복사) - AX5-Grid 자동 처리 + 시각 표시만 ─
+	$(document).on('keydown.awardGrid', function(e) {
+		if (!awardGridView || !awardGridView.target) return;
+		if (!(e.ctrlKey || e.metaKey) || e.which !== 67) return;
+
+		var cells = getAwardActiveSelectionCells();
+		if (cells.length > 1) {
+			awardMarkCellsAsCopied(cells);
+		}
+	});
+
+	// ─ Ctrl+X (잘라내기) ─
+	$(document).on('keydown.awardGrid', function(e) {
+		if (!awardGridView || !awardGridView.target) return;
+		if (!(e.ctrlKey || e.metaKey) || e.which !== 88) return;
+
+		var activeElem = document.activeElement;
+		if (activeElem && (activeElem.tagName === 'INPUT' || activeElem.tagName === 'TEXTAREA' || activeElem.tagName === 'SELECT')) {
+			return;
+		}
+
+		e.preventDefault();
+		var cells = getAwardActiveSelectionCells();
+		if (cells.length > 1) {
+			var tsv = awardBuildTsvFromCells(cells);
+			if (tsv !== null && navigator.clipboard && navigator.clipboard.writeText) {
+				navigator.clipboard.writeText(tsv);
+			}
+			awardClearCellsIfEditable(cells);
+			awardMarkCellsAsCopied(cells);
+		}
+	});
+
+	// ─ Ctrl+V / Paste (붙여넣기) - document 레벨, focused 가드 필수 ─
+	$(document).on('paste.awardGrid', function(e) {
+		if (!awardGridView || !awardGridView.target || !awardGridView.target.focused) return;
+
+		var activeElem = document.activeElement;
+		if (activeElem && (activeElem.tagName === 'INPUT' || activeElem.tagName === 'TEXTAREA' || activeElem.tagName === 'SELECT')) {
+			return;
+		}
+
+		e.preventDefault();
+		var clipboardData = (e.originalEvent && e.originalEvent.clipboardData) || window.clipboardData;
+		var pasteText = clipboardData ? clipboardData.getData('text') : '';
+		if (!pasteText) return;
+
+		awardProcessGridPasteText(pasteText);
+	});
+
+	// ─ 붙여넣은 텍스트를 마우스 클릭 위치 기준으로 순차 반영 ─
+	function awardProcessGridPasteText(pasteData) {
+		awardClearCopyMarker();
+
+		pasteData = (pasteData.charAt(pasteData.length - 1) === '\n') ? pasteData : pasteData + '\n';
+		var pasteRows = pasteData.split('\n').map(function(r) {
+			return r.split('\t');
+		});
+
+		// 더 이상 빈 입력용 행을 미리 깔아두지 않으므로, 그리드가 비어있어도(0행)
+		// 붙여넣기가 가능해야 한다 - 아래에서 필요한 만큼 행을 자동으로 추가한다.
+		var colGroup = awardGridView.target.colGroup || [];
+		var visibleKeys = [];
+		for (var c = 0; c < colGroup.length; c++) {
+			var col = colGroup[c];
+			if (col && col.key && !col.hidden && String(col.key).indexOf('sepBar') === -1) {
+				visibleKeys.push(col.key);
+			}
+		}
+
+		// 클릭된 위치 또는 기본값
+		var startRow = window.awardGridLastClickRow || 0;
+		var startCol = window.awardGridLastClickCol || 0;
+		var clickedColObj = colGroup[startCol];
+		var clickedKey = clickedColObj ? clickedColObj.key : (visibleKeys[0] || 'empNo');
+		var colStartIdx = visibleKeys.indexOf(clickedKey);
+		if (colStartIdx === -1) colStartIdx = 0;
+
+		var curYy = $('#awardYy').val() || new Date().getFullYear();
+		var defaultPeriod = calcAwardUsablePeriod(curYy, "") || { stDt: curYy + "-11-20", edDt: (parseInt(curYy, 10) + 1) + "-11-19" };
+		var numRows = pasteRows.length - 1;
+
+		for (var i = 0; i < numRows; i++) {
+			var calRow = startRow + i;
+
+			// 붙여넣을 행이 현재 그리드 행 수를 넘으면 자동으로 새 행을 추가한다
+			// (DB에 없는 빈 입력용 행을 미리 깔아두지 않는 대신, 붙여넣기 시 필요한 만큼 늘린다).
+			while (calRow >= awardGridView.target.list.length) {
+				awardGridView.target.addRow({
+					grantYy    : String(curYy),
+					empNo      : "",
+					empNm      : "",
+					awardTypeCd: "",
+					grantDays  : "",
+					stDt       : defaultPeriod.stDt,
+					edDt       : defaultPeriod.edDt,
+					rmk        : "",
+					__status   : "C"
+				}, "last");
+			}
+			var list = awardGridView.target.list;
+
+			var rowData = pasteRows[i];
+			for (var j = 0; j < rowData.length; j++) {
+				var targetColIdx = colStartIdx + j;
+				if (targetColIdx >= visibleKeys.length) break;
+
+				var targetKey = visibleKeys[targetColIdx];
+				var cellData = rowData[j].replace(new RegExp('\r', 'ig'), '').trim();
+
+				// awardTypeCd 코드명->코드ID 변환
+				if (targetKey === 'awardTypeCd' && cellData && awardCodeMap[cellData]) {
+					cellData = awardCodeMap[cellData];
+				}
+
+				awardGridView.target.setValue(calRow, targetKey, cellData);
+			}
+
+			if (list[calRow].__status !== "C") {
+				list[calRow].__status = "U";
+			}
+		}
+
+		awardGridView.target.repaint();
+	}
+
+	// 사용자 검색 팝업 (사번/성명 더블클릭)
+	function openAwardUserSearch(dindex) {
+		var paramObj = {
+			"coCd": "GUN",
+			"useYn": "Y"
+		};
+		openSecondModal("/static/html/cmn/modal/userSearch.html", 450, 650, "사용자 검색", paramObj, function(tree) {
+			var checkedId = tree.get_checked()[0];
+			if (!checkedId) return;
+			var checkedNode = tree.get_node(checkedId);
+			if (!checkedNode || checkedNode.type !== 'person') {
+				alert("사원을 선택하세요.");
+				return;
+			}
+			var userId = checkedNode.id;
+			postAjax("/admin/cm/cm06/selectUserInfo", {"userId": userId}, null, function(resp) {
+				var info = (resp && resp.userInfo) ? resp.userInfo : {};
+				var empNo = info.empNo || "";
+				var empNm = info.name || checkedNode.text || "";
+				if (!empNo) {
+					alert("선택한 사원의 사번 정보를 찾을 수 없습니다.");
+					return;
+				}
+				awardGridView.target.setValue(dindex, "empNo", empNo);
+				awardGridView.target.setValue(dindex, "empNm", empNm);
+				var row = awardGridView.target.list[dindex];
+				if (row && row.__status !== "C") {
+					row.__status = "U";
+				}
+			});
+		});
+	}
+
+	// 서버가 아직 재시작 전이라 selectAwardVacationList가 예전처럼 YYYYMMDD(하이픈 없이)를
+	// 내려주는 경우, 붙여넣기로 들어온 값 등도 방어적으로 YYYY-MM-DD로 정규화한다.
+	// DateRangePicker(bootstrap-datepicker, format:'yyyy-mm-dd')는 하이픈 없는 문자열을
+	// 못 읽어서 setDate가 조용히 실패하고 달력이 오늘 날짜로 뜨는 문제가 있었다.
+	function normalizeAwardDt(val) {
+		if (!val) return null;
+		var digits = String(val).replace(/[^0-9]/g, "");
+		if (digits.length !== 8) return val; // 이미 다른 형식이면 그대로 시도
+		return digits.substring(0, 4) + "-" + digits.substring(4, 6) + "-" + digits.substring(6, 8);
+	}
+
+	// 사용가능시작일/종료일 셀 더블클릭 시 시작~종료를 한 팝업에서 같이 선택 (global.js의
+	// 공용 window.DateRangePicker - PM3001M01.html의 openModDateTimePicker()와 동일 패턴)
+	function openAwardDatePicker(dindex, row) {
+		DateRangePicker.open({
+			title: "사용가능시작일 ~ 사용가능종료일",
+			startLabel: "사용가능시작일",
+			endLabel: "사용가능종료일",
+			startDt: normalizeAwardDt(row.stDt),
+			endDt: normalizeAwardDt(row.edDt),
+			onApply: function(sd, ed) {
+				awardGridView.target.setValue(dindex, "stDt", sd);
+				awardGridView.target.setValue(dindex, "edDt", ed);
+				var r = awardGridView.target.list[dindex];
+				if (r && r.__status !== "C") {
+					r.__status = "U";
+				}
+			}
+		});
+	}
+
+	// 상단 돋보기 클릭 시 사용자 검색 팝업(userSearch.html) 오픈 - PM0701P02.html의
+	// openSearchUserModal() 패턴 그대로. 검색조건란은 사번(empNo)으로 정확 필터링해야
+	// 하므로, 선택된 사원의 로그인ID로 selectUserInfo를 한 번 더 호출해 사번을 구한다.
+	function openAwardSearchUserModal() {
+		var paramObj = {
+			"coCd"   : "GUN",
+			"userId" : "",
+			"userNm" : $('#awardEmpNm').val(),
+			"useYn"  : "Y"
+		};
+		openSecondModal("/static/html/cmn/modal/userSearch.html", 450, 650, "사용자 검색", paramObj, function(tree) {
+			var checkedId = tree.get_checked()[0];
+			if (!checkedId) return;
+			var checkedNode = tree.get_node(checkedId);
+			if (!checkedNode || checkedNode.type !== 'person') {
+				alert("사원을 선택하세요.");
+				return;
+			}
+			var userId = checkedNode.id;
+			postAjax("/admin/cm/cm06/selectUserInfo", {"userId": userId}, null, function(resp) {
+				var info = (resp && resp.userInfo) ? resp.userInfo : {};
+				var empNo = info.empNo || "";
+				var empNm = info.name || checkedNode.text || "";
+				$('#awardEmpNo').val(empNo);
+				$('#awardEmpNm').val(empNm);
+				searchAwardGrid();
+			});
+		});
+	}
+
+</script>
