@@ -86,8 +86,7 @@
 				<!-- 2행 -->
 				<tr>
 					<th class="hit">수주일자</th>
-					<td><input type="text" class="input_calendar ordrsDt" autocomplete="off" id="ordrsDt" name="ordrsDt" date class="form-control" required
-						onchange="monthCloseChk(this.value);"></td>
+					<td><input type="text" class="input_calendar ordrsDt" autocomplete="off" id="ordrsDt" name="ordrsDt" date class="form-control" required></td>
 
 					<th class="hit">수주구분</th>
 					<td><select id="ordrsDiv" name="ordrsDiv" data-kind="ORDRSDIV" class="form-control" required msg="수주구분">
@@ -456,6 +455,7 @@
 
 	var actionType = modalStack.last().paramObj.actionType;
 	var paramObj = modalStack.last().paramObj;
+	var isSjEnded = false;
 	const isViewMode = (actionType !== "C" && actionType !== "U") || jwt.userId === 'EMJ8105';
 
 	// 그리드 그룹화(서브토탈) 설정 정보 변수화
@@ -2304,7 +2304,11 @@
 
 								if (inGb > 0 && inCnt == inGb) {
 									// 결재자가 있고 결재가 완료된 경우 (3명 중 3명 완료)
-									$('#createHistory').show();
+									if (isSjEnded) {
+										$('#createHistory').hide();
+									} else {
+										$('#createHistory').show();
+									}
 									$('#actionOrdrsBtn').hide();
 									$('#fileUpBtn').show();		// 파일업로드 버튼 보이기
 									$('#addPaymentButton, #deletePaymentButton, #addDetailButton, #deleteDetailButton, #plus-minus').hide();
@@ -2462,8 +2466,6 @@
 			updateOrdrs();
 		});
 
-		monthCloseChk($('#ordrsDt').val());  //마감일통제
-
 		//회사 비활성화
 		$('#popForm .coCd').removeClass('hit');
 		$('#coCd').css({'background-color':'#e6e6e6', 'pointer-events':'none'});
@@ -2602,7 +2604,23 @@
 			$('#coCd').trigger('change'); //파일트리 새로 그리기
 
 			gridResize(ordrsDetails.length+3); //그리드 높이 조정
-			//monthCloseChk($('#ordrsDt').val());  //마감일통제 원래 위치
+
+			// 해당 수주의 salesCd 기준 TB_WB21M01.END_YN 값이 하나라도 'Y'인 경우 마감 처리
+			isSjEnded = false;
+			if (ordrsDetails && ordrsDetails.length > 0) {
+				for (var i = 0; i < ordrsDetails.length; i++) {
+					if (ordrsDetails[i].endYn === 'Y') {
+						isSjEnded = true;
+						break;
+					}
+				}
+			}
+
+			if (isSjEnded) {
+				customAlert('이 수주과제는 마감되었습니다.');
+				$('#actionOrdrsBtn, #createHistory').hide();
+			}
+
 			gridViewPop7.initView().setData(0);
 			gridViewPop7.target.setHeight((gridViewPop7.target.list.length+1) * 27 + 123 );//그리드 높이 조정
 
@@ -2875,7 +2893,6 @@
 	});
 
 	function insertOrdrs() {
-		if (!monthCloseChk($('#ordrsDt').val(), 'C', $('#coCd').val())) return false;
 		if($('#coCd').val() == 'TRN' && $('#ordrsClntCd').val() == refCode) {
 			if($('#newOrdrsNo').val() == ''){
 				alert('건양ITT 수주번호를 선택해 주십시요.')
@@ -2915,7 +2932,10 @@
 			alert("결재 진행 중이거나 완료된 수주는 수정할 수 없습니다.");
 			return false;
 		}
-		if (!monthCloseChk($('#ordrsDt').val(), 'U', $('#coCd').val())) return false;
+		if (isSjEnded) {
+			customAlert("이 수주과제는 마감되었습니다.");
+			return false;
+		}
 		$("#ordrsAmt").val(pasFloatChk($("#ordrsAmt").val()));
 		if (inputValidation($('.popup_area [required]').not('#frameTable [required], #nonStockTable [required]'))) {
 			var formData = makeFormData();
@@ -3319,6 +3339,10 @@
 
 	//이력생성
 	function createHistory() {
+		if (isSjEnded) {
+			customAlert("이 수주과제는 마감되었습니다.");
+			return false;
+		}
 		if ($("#createHistory").length === 0 || $("#createHistory").is(":hidden")) {
 			alert("결재가 완료된 상태에서만 버전업이 가능합니다.");
 			return false;
@@ -3912,12 +3936,34 @@
 	//과제 팝업
 	function openSecondModalTaskPop() {
 		var row = gridOrdrsDetail.getList("selected")[0];
-		if (!row) return false;
+		if (!row && typeof selectedRowKey2 !== 'undefined' && selectedRowKey2 !== null && selectedRowKey2 !== "") {
+			row = gridOrdrsDetail.getList()[selectedRowKey2];
+		}
+		if (!row && gridOrdrsDetail.selectedDataIndexs && gridOrdrsDetail.selectedDataIndexs.length > 0) {
+			row = gridOrdrsDetail.getList()[gridOrdrsDetail.selectedDataIndexs[0]];
+		}
+		if (!row) {
+			var list = gridOrdrsDetail.getList();
+			if (list && list.length === 1) {
+				row = list[0];
+			}
+		}
+		if (!row) {
+			customAlert("과제관리할 설비 목록의 행을 선택해 주십시오.");
+			return false;
+		}
+
+		var fileTrgtKey = row.wb21FileTrgtKey || row.fileTrgtKey;
+		if (!fileTrgtKey) {
+			customAlert("선택한 설비(" + (row.salesCd || '') + ")에 등록된 과제가 없습니다.");
+			return false;
+		}
+
 		var paramObj = {
-			"sjNo"        : row.ordrsNo,
+			"sjNo"        : row.sjNo || row.ordrsNo,
 			"verNo"       : row.verNo,
-			"fileTrgtKey" : row.wb21FileTrgtKey,
-			"coCd" 	      : row.coCd,
+			"fileTrgtKey" : fileTrgtKey,
+			"coCd" 	      : row.coCd || $("#coCd").val(),
 			"userId"      : jwt.userId,
 			"pgmId"       : "WB2101M02",
 			"actionType"  : "U",

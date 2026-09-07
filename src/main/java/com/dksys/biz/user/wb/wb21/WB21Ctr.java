@@ -357,10 +357,12 @@ public class WB21Ctr {
 		try {
 			if (wb21Svc.endSjNo(paramMap) > 0) {
 				model.addAttribute("resultCode", 200);
-				model.addAttribute("resultMessage", messageUtils.getMessage("update"));
+				String msg = "Y".equals(paramMap.get("endYn")) ? "과제가 마감되었습니다." : "과제 마감이 취소되었습니다.";
+				model.addAttribute("resultMessage", msg);
 			} else {
 				model.addAttribute("resultCode", 500);
-				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+				String msg = "Y".equals(paramMap.get("endYn")) ? "과제 마감에 실패하였습니다." : "과제 마감 취소에 실패하였습니다.";
+				model.addAttribute("resultMessage", msg);
 			}
 		} catch (Exception e) {
 			model.addAttribute("resultCode", 900);
