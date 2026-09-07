@@ -41,6 +41,31 @@ public class PM30SvcImpl implements PM30Svc {
 		@SuppressWarnings("unchecked")
 		List<Map<String, Object>> list = (List<Map<String, Object>>) paramMap.get("list");
 
+		@SuppressWarnings("unchecked")
+		List<Map<String, Object>> rawList = (List<Map<String, Object>>) paramMap.get("rawList");
+
+		// 마감 검증: list와 rawList의 모든 workDt를 수집해서 한 번에 검증 (N+1 쿼리 방지)
+		List<String> allWorkDates = new ArrayList<>();
+		if (list != null && !list.isEmpty()) {
+			for (Map<String, Object> row : list) {
+				Object workDtObj = row.get("workDt");
+				if (workDtObj != null) {
+					allWorkDates.add(String.valueOf(workDtObj));
+				}
+			}
+		}
+		if (rawList != null && !rawList.isEmpty()) {
+			for (Map<String, Object> row : rawList) {
+				Object workDtObj = row.get("workDt");
+				if (workDtObj != null) {
+					allWorkDates.add(String.valueOf(workDtObj));
+				}
+			}
+		}
+		if (!allWorkDates.isEmpty()) {
+			assertNotClosed(allWorkDates.toArray(new String[0]));
+		}
+
 		int resultCount = 0;
 		if (list != null && !list.isEmpty()) {
 			for (Map<String, Object> row : list) {
@@ -53,9 +78,6 @@ public class PM30SvcImpl implements PM30Svc {
 				resultCount += pm30Mapper.mergeAttendance(row);
 			}
 		}
-
-		@SuppressWarnings("unchecked")
-		List<Map<String, Object>> rawList = (List<Map<String, Object>>) paramMap.get("rawList");
 
 		int rawResultCount = 0;
 		if (rawList != null && !rawList.isEmpty()) {
@@ -149,6 +171,12 @@ public class PM30SvcImpl implements PM30Svc {
 		paramMap.put("coCd", coCd);
 		paramMap.put("loginId", loginId);
 
+		// 마감 검증: workYm (YYYYMM) 기준
+		String workYm = (String) paramMap.get("workYm");
+		if (workYm != null && !workYm.isEmpty()) {
+			assertNotClosed(workYm);
+		}
+
 		// 저장 단계에서 변동분 정상시간(normTm) 및 연장시간(otTm)을 사전 계산 및 검증하여 DB에 확정 포맷으로 적재
 		calculateAndValidateChangeHours(paramMap);
 
@@ -169,6 +197,20 @@ public class PM30SvcImpl implements PM30Svc {
 
 		@SuppressWarnings("unchecked")
 		List<Map<String, Object>> list = (List<Map<String, Object>>) paramMap.get("list");
+
+		// 마감 검증: list의 모든 workDt를 수집해서 한 번에 검증
+		List<String> allWorkDates = new ArrayList<>();
+		if (list != null && !list.isEmpty()) {
+			for (Map<String, Object> row : list) {
+				Object workDtObj = row.get("workDt");
+				if (workDtObj != null) {
+					allWorkDates.add(String.valueOf(workDtObj));
+				}
+			}
+		}
+		if (!allWorkDates.isEmpty()) {
+			assertNotClosed(allWorkDates.toArray(new String[0]));
+		}
 
 		int resultCount = 0;
 		if (list != null && !list.isEmpty()) {
@@ -301,6 +343,50 @@ public class PM30SvcImpl implements PM30Svc {
 			row.put(key, String.format(Locale.US, "%.1f", d));
 		} catch (Exception e) {
 			row.put(key, "0");
+		}
+	}
+
+	@Override
+	public String selectAttendanceCloseYm() {
+		return pm30Mapper.selectAttendanceCloseYm();
+	}
+
+	@Override
+	public void saveAttendanceCloseYm(String closeYm, String loginId, String pgmId) {
+		Map<String, Object> paramMap = new HashMap<>();
+		paramMap.put("closeYm", closeYm);
+		paramMap.put("loginId", loginId != null ? loginId : "SYSTEM");
+		paramMap.put("updtPgm", pgmId);
+		pm30Mapper.updateAttendanceCloseYm(paramMap);
+	}
+
+	@Override
+	public void assertNotClosed(String... dateStrs) {
+		String closeYm = pm30Mapper.selectAttendanceCloseYm();
+		if (closeYm == null || closeYm.isEmpty()) {
+			return; // 마감 없음 상태
+		}
+
+		// 입력된 각 날짜에서 숫자만 추출하여 앞 6자리(YYYYMM) 추출 후 비교
+		for (String dateStr : dateStrs) {
+			if (dateStr == null || dateStr.isEmpty()) {
+				continue; // null/empty는 건너뜀
+			}
+
+			// 숫자만 추출 (YYYYMMDD, YYYYMMDDHHMMSS, YYYY-MM-DD 등 다양한 형식 지원)
+			String digitsOnly = dateStr.replaceAll("[^0-9]", "");
+			if (digitsOnly.length() < 6) {
+				continue; // 6자리 미만이면 건너뜀 (유효하지 않은 날짜)
+			}
+
+			String dateYm = digitsOnly.substring(0, 6);
+
+			// dateYm <= closeYm 이면 마감된 기간
+			if (dateYm.compareTo(closeYm) <= 0) {
+				throw new IllegalStateException(
+					"마감된 기간(" + closeYm + " 이하)의 근태 자료는 등록·수정·삭제할 수 없습니다."
+				);
+			}
 		}
 	}
 

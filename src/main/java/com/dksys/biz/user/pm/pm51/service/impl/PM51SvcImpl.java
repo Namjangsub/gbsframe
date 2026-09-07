@@ -16,6 +16,7 @@ import org.springframework.web.multipart.MultipartHttpServletRequest;
 import com.dksys.biz.admin.cm.cm05.service.CM05Svc;
 import com.dksys.biz.admin.cm.cm06.mapper.CM06Mapper;
 import com.dksys.biz.admin.cm.cm08.service.CM08Svc;
+import com.dksys.biz.user.pm.pm30.service.PM30Svc;
 import com.dksys.biz.user.pm.pm51.mapper.PM51Mapper;
 import com.dksys.biz.user.pm.pm51.service.PM51Svc;
 import com.dksys.biz.user.qm.qm01.mapper.QM01Mapper;
@@ -49,6 +50,9 @@ public class PM51SvcImpl implements PM51Svc {
 
 	@Autowired
 	CM05Svc cm05Svc;
+
+	@Autowired
+	PM30Svc pm30Svc;
 
 	@Override
 	public int selectTripReqListCount(Map<String, String> paramMap) {
@@ -113,6 +117,14 @@ public class PM51SvcImpl implements PM51Svc {
 		if (!hasText(paramMap.get("chgReason"))) throw new RuntimeException("변경사유를 입력해주세요.");
 		normalizeTripReqMasterParam(paramMap);
 		validateTripReqMasterParam(paramMap);
+
+		// 마감 검증: tripStDtm, tripEdDtm (14자리 YYYYMMDDHHMMSS)
+		String tripStDtm = paramMap.get("tripStDtm");
+		String tripEdDtm = paramMap.get("tripEdDtm");
+		if ((tripStDtm != null && !tripStDtm.isEmpty()) || (tripEdDtm != null && !tripEdDtm.isEmpty())) {
+			pm30Svc.assertNotClosed(tripStDtm, tripEdDtm);
+		}
+
 		return saveTripReqChgDetail(paramMap, mRequest);
 	}
 
@@ -171,6 +183,14 @@ public class PM51SvcImpl implements PM51Svc {
 		String tripReqNo = pm51Mapper.selectTripReqListCount(paramMap) >= 0 ? "BT" + getCurrentDateString() + "-" : null;
 		normalizeTripReqMasterParam(paramMap);
 		validateTripReqMasterParam(paramMap);
+
+		// 마감 검증: tripStDtm, tripEdDtm (14자리 YYYYMMDDHHMMSS)
+		String tripStDtm = paramMap.get("tripStDtm");
+		String tripEdDtm = paramMap.get("tripEdDtm");
+		if ((tripStDtm != null && !tripStDtm.isEmpty()) || (tripEdDtm != null && !tripEdDtm.isEmpty())) {
+			pm30Svc.assertNotClosed(tripStDtm, tripEdDtm);
+		}
+
 		int result = pm51Mapper.insertTripReqM01(paramMap);
 
 		List<Map<String, String>> travelerArr = gsonDtl.fromJson(paramMap.get("travelerArr"), dtlMap);
@@ -300,6 +320,13 @@ public class PM51SvcImpl implements PM51Svc {
 //			throw new RuntimeException("회계팀 경비 수정은 결재완료 이후 가능합니다.");
 //		}
 		if (!payMode) {
+			// 마감 검증: 날짜가 바뀌는 일반 수정일 때만 (payMode=Y인 경비/지급처리 제외)
+			String tripStDtm = paramMap.get("tripStDtm");
+			String tripEdDtm = paramMap.get("tripEdDtm");
+			if ((tripStDtm != null && !tripStDtm.isEmpty()) || (tripEdDtm != null && !tripEdDtm.isEmpty())) {
+				pm30Svc.assertNotClosed(tripStDtm, tripEdDtm);
+			}
+
 			normalizeTripReqMasterParam(paramMap);
 			validateTripReqMasterParam(paramMap);
 		}
@@ -531,6 +558,13 @@ public class PM51SvcImpl implements PM51Svc {
 		Map<String, String> m01 = pm51Mapper.selectTripReqM01(paramMap);
 		String salesCd = paramMap.get("tripReqNo");
 		if (m01 != null) {
+			// 마감 검증: 기존 DB의 tripStDtm, tripEdDtm
+			String tripStDtm = m01.get("tripStDtm");
+			String tripEdDtm = m01.get("tripEdDtm");
+			if ((tripStDtm != null && !tripStDtm.isEmpty()) || (tripEdDtm != null && !tripEdDtm.isEmpty())) {
+				pm30Svc.assertNotClosed(tripStDtm, tripEdDtm);
+			}
+
 			// 복명서가 작성된 경우 삭제 불가
 			if ("Y".equals(m01.get("tripRptYn")) || hasText(m01.get("tripRptNo"))) {
 				throw new RuntimeException("이미 복명서가 작성된 출장신청서는 삭제할 수 없습니다.");
@@ -786,6 +820,13 @@ public class PM51SvcImpl implements PM51Svc {
 			throw new RuntimeException("이미 복명서가 존재합니다");
 		}
 
+		// 마감 검증: actStDtm, actEdDtm (14자리 YYYYMMDDHHMMSS)
+		String actStDtm = paramMap.get("actStDtm");
+		String actEdDtm = paramMap.get("actEdDtm");
+		if ((actStDtm != null && !actStDtm.isEmpty()) || (actEdDtm != null && !actEdDtm.isEmpty())) {
+			pm30Svc.assertNotClosed(actStDtm, actEdDtm);
+		}
+
 		int result = pm51Mapper.insertTripRptM01(paramMap);
 
 		List<Map<String, String>> rptTravelerArr = gsonDtl.fromJson(paramMap.get("rptTravelerArr"), dtlMap);
@@ -900,6 +941,13 @@ public class PM51SvcImpl implements PM51Svc {
 			if (cnt != null && !"0".equals(cnt)) {
 				throw new RuntimeException("결재가 진행중입니다");
 			}
+		}
+
+		// 마감 검증: actStDtm, actEdDtm (14자리 YYYYMMDDHHMMSS)
+		String actStDtm = paramMap.get("actStDtm");
+		String actEdDtm = paramMap.get("actEdDtm");
+		if ((actStDtm != null && !actStDtm.isEmpty()) || (actEdDtm != null && !actEdDtm.isEmpty())) {
+			pm30Svc.assertNotClosed(actStDtm, actEdDtm);
 		}
 
 		int result = pm51Mapper.updateTripRptM01(paramMap);
@@ -1127,6 +1175,16 @@ public class PM51SvcImpl implements PM51Svc {
 	@Override
 	public int deleteTripRpt(Map<String, String> paramMap) throws Exception {
 		paramMap.put("reqNo", paramMap.get("tripRptNo"));
+
+		// 마감 검증: 기존 DB의 actStDtm, actEdDtm
+		Map<String, String> m01 = pm51Mapper.selectTripRptM01(paramMap);
+		if (m01 != null) {
+			String actStDtm = m01.get("actStDtm");
+			String actEdDtm = m01.get("actEdDtm");
+			if ((actStDtm != null && !actStDtm.isEmpty()) || (actEdDtm != null && !actEdDtm.isEmpty())) {
+				pm30Svc.assertNotClosed(actStDtm, actEdDtm);
+			}
+		}
 
 		List<Map<String, String>> approvalChkList = pm51Mapper.selectApprovalChk(paramMap);
 		if (approvalChkList != null && approvalChkList.size() > 0) {

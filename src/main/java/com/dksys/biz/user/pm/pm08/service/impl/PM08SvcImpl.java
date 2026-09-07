@@ -14,6 +14,7 @@ import org.springframework.web.multipart.MultipartHttpServletRequest;
 import com.dksys.biz.admin.cm.cm08.service.CM08Svc;
 import com.dksys.biz.user.pm.pm08.mapper.PM08Mapper;
 import com.dksys.biz.user.pm.pm08.service.PM08Svc;
+import com.dksys.biz.user.pm.pm30.service.PM30Svc;
 import com.dksys.biz.user.wb.wb20.service.WB20Svc;
 import com.dksys.biz.user.wb.wb24.service.WB24Svc;
 import com.google.gson.Gson;
@@ -35,6 +36,9 @@ public class PM08SvcImpl implements PM08Svc {
 
 	@Autowired
 	CM08Svc cm08Svc;
+
+	@Autowired
+	PM30Svc pm30Svc;
 
 	@Override
 	public int selectSubstituteWorkCount(Map<String, String> paramMap) {
@@ -63,6 +67,12 @@ public class PM08SvcImpl implements PM08Svc {
 	@Transactional(rollbackFor = Exception.class)
 	public Map<String, String> insertSubstituteWork(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
 		Map<String, String> result = new HashMap<String, String>();
+
+		// 마감 검증: holidayDt (하이픈 포함 가능성: YYYY-MM-DD 또는 YYYYMMDD)
+		String holidayDt = paramMap.get("holidayDt");
+		if (holidayDt != null && !holidayDt.isEmpty()) {
+			pm30Svc.assertNotClosed(holidayDt);
+		}
 
 		// 1. 중복 신청 검사: CO_CD, REQ_ID, HOLIDAY_DT 조합 (self 제외)
 		int duplicateCount = pm08Mapper.selectSubstituteWorkDuplicateCheck(paramMap);
@@ -157,6 +167,14 @@ public class PM08SvcImpl implements PM08Svc {
 		Map<String, String> result = new HashMap<String, String>();
 
 		boolean isResultStage = "RESULT".equals(paramMap.get("approvalStage"));
+
+		// 마감 검증: 신청서 수정 시에만 수행 (결과상신은 날짜 안 바뀌므로 제외)
+		if (!isResultStage) {
+			String holidayDt = paramMap.get("holidayDt");
+			if (holidayDt != null && !holidayDt.isEmpty()) {
+				pm30Svc.assertNotClosed(holidayDt);
+			}
+		}
 
 		// 1. 중복 신청 검사 (신청서 수정 시에만 수행, 결과상신 시에는 검사 스킵)
 		if (!isResultStage) {
@@ -300,6 +318,15 @@ public class PM08SvcImpl implements PM08Svc {
 			result.put("resultCode", "200");
 			result.put("resultMessage", "이미 삭제완료된 상태입니다.");
 			return result;
+		}
+
+		// 마감 검증: 기존 DB의 holidayDt
+		String holidayDt = currentDtl.get("holidayDt");
+		if (holidayDt == null || holidayDt.isEmpty()) {
+			holidayDt = currentDtl.get("HOLIDAY_DT");
+		}
+		if (holidayDt != null && !holidayDt.isEmpty()) {
+			pm30Svc.assertNotClosed(holidayDt);
 		}
 
 		// 특별 정책: 휴일대체근무 삭제는 신청자가 결재진행중 또는 완료상태에서도 자료 삭제 허용

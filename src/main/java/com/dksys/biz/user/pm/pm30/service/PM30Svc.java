@@ -21,4 +21,10 @@ public interface PM30Svc {
 
 	Map<String, Object> deleteAttendanceList(Map<String, Object> paramMap) throws Exception;
 
+	String selectAttendanceCloseYm();
+
+	void saveAttendanceCloseYm(String closeYm, String loginId, String pgmId);
+
+	void assertNotClosed(String... dateStrs);
+
 }

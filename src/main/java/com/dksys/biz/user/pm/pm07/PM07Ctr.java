@@ -65,6 +65,9 @@ public class PM07Ctr {
 			model.addAttribute("result", result);
 			model.addAttribute("resultCode", result.get("resultCode"));
 			model.addAttribute("resultMessage", result.get("resultMessage"));
+		} catch (IllegalStateException e) {
+			model.addAttribute("resultCode", 500);
+			model.addAttribute("resultMessage", e.getMessage());
 		} catch (Exception e) {
 			model.addAttribute("resultCode", 500);
 			model.addAttribute("resultMessage", messageUtils.getMessage("insert") + " 실패");
@@ -79,6 +82,9 @@ public class PM07Ctr {
 			model.addAttribute("result", result);
 			model.addAttribute("resultCode", result.get("resultCode"));
 			model.addAttribute("resultMessage", result.get("resultMessage"));
+		} catch (IllegalStateException e) {
+			model.addAttribute("resultCode", 500);
+			model.addAttribute("resultMessage", e.getMessage());
 		} catch (Exception e) {
 			model.addAttribute("resultCode", 500);
 			model.addAttribute("resultMessage", messageUtils.getMessage("update") + " 실패");
@@ -93,6 +99,9 @@ public class PM07Ctr {
 			model.addAttribute("result", result);
 			model.addAttribute("resultCode", result.get("resultCode"));
 			model.addAttribute("resultMessage", result.get("resultMessage"));
+		} catch (IllegalStateException e) {
+			model.addAttribute("resultCode", 500);
+			model.addAttribute("resultMessage", e.getMessage());
 		} catch (Exception e) {
 			model.addAttribute("resultCode", 500);
 			model.addAttribute("resultMessage", messageUtils.getMessage("delete") + " 실패");

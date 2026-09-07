@@ -144,4 +144,39 @@ public class PM30Ctr {
 		return "jsonView";
 	}
 
+	@PostMapping(value = "/selectAttendanceCloseYm")
+	public String selectAttendanceCloseYm(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		try {
+			String closeYm = pm30Svc.selectAttendanceCloseYm();
+			model.addAttribute("resultCode", "0000");
+			model.addAttribute("resultMessage", "성공");
+			model.addAttribute("closeYm", closeYm);
+		} catch (Exception e) {
+			model.addAttribute("resultCode", "9999");
+			model.addAttribute("resultMessage", "조회 실패: " + e.getMessage());
+		}
+		return "jsonView";
+	}
+
+	@PostMapping(value = "/saveAttendanceCloseYm")
+	public String saveAttendanceCloseYm(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		try {
+			String loginId = paramMap.get("loginId");
+			if (loginId == null || loginId.isEmpty()) {
+				loginId = paramMap.get("userId");
+			}
+			if (loginId == null || loginId.isEmpty()) {
+				loginId = "SYSTEM";
+			}
+			String closeYm = paramMap.get("closeYm");
+			pm30Svc.saveAttendanceCloseYm(closeYm, loginId, "PM3003M01");
+			model.addAttribute("resultCode", "0000");
+			model.addAttribute("resultMessage", "저장되었습니다.");
+		} catch (Exception e) {
+			model.addAttribute("resultCode", "9999");
+			model.addAttribute("resultMessage", "저장 실패: " + e.getMessage());
+		}
+		return "jsonView";
+	}
+
 }

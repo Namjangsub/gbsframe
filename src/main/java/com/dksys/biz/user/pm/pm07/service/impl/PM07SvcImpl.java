@@ -17,6 +17,7 @@ import org.springframework.web.multipart.MultipartHttpServletRequest;
 import com.dksys.biz.admin.cm.cm08.service.CM08Svc;
 import com.dksys.biz.user.pm.pm07.mapper.PM07Mapper;
 import com.dksys.biz.user.pm.pm07.service.PM07Svc;
+import com.dksys.biz.user.pm.pm30.service.PM30Svc;
 import com.dksys.biz.user.wb.wb20.service.WB20Svc;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
@@ -34,6 +35,9 @@ public class PM07SvcImpl implements PM07Svc {
 
 	@Autowired
 	CM08Svc cm08Svc;
+
+	@Autowired
+	PM30Svc pm30Svc;
 
 	@Override
 	public int selectVacationCount(Map<String, String> paramMap) {
@@ -265,6 +269,13 @@ public class PM07SvcImpl implements PM07Svc {
 	public Map<String, String> insertVacation(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
 		Map<String, String> result = new HashMap<String, String>();
 
+		// 마감 검증: stDt, edDt
+		String stDt = paramMap.get("stDt");
+		String edDt = paramMap.get("edDt");
+		if ((stDt != null && !stDt.isEmpty()) || (edDt != null && !edDt.isEmpty())) {
+			pm30Svc.assertNotClosed(stDt, edDt);
+		}
+
 		// 백엔드 DB 저장 직전에 차감일수 및 휴가일수 최종 평가/산정
 		evaluateVacationAndDeductDays(paramMap);
 
@@ -444,6 +455,13 @@ public class PM07SvcImpl implements PM07Svc {
 	public Map<String, String> updateVacation(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
 		Map<String, String> result = new HashMap<String, String>();
 
+		// 마감 검증: stDt, edDt
+		String stDt = paramMap.get("stDt");
+		String edDt = paramMap.get("edDt");
+		if ((stDt != null && !stDt.isEmpty()) || (edDt != null && !edDt.isEmpty())) {
+			pm30Svc.assertNotClosed(stDt, edDt);
+		}
+
 		// 백엔드 DB 저장 직전에 차감일수 및 휴가일수 최종 평가/산정
 		evaluateVacationAndDeductDays(paramMap);
 
@@ -578,6 +596,13 @@ public class PM07SvcImpl implements PM07Svc {
 			result.put("resultCode", "200");
 			result.put("resultMessage", "이미 삭제완료된 상태입니다.");
 			return result;
+		}
+
+		// 마감 검증: 기존 DB의 stDt, edDt
+		String stDt = currentDtl.get("stDt");
+		String edDt = currentDtl.get("edDt");
+		if ((stDt != null && !stDt.isEmpty()) || (edDt != null && !edDt.isEmpty())) {
+			pm30Svc.assertNotClosed(stDt, edDt);
 		}
 
 		// 프론트엔드(PC 목록화면/모바일 상세화면)에서 화면 로드 시점에 판단한 삭제가능 여부는

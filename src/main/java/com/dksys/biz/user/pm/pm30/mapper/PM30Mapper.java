@@ -32,4 +32,8 @@ public interface PM30Mapper {
 
 	int deleteAttendance(Map<String, Object> paramMap);
 
+	String selectAttendanceCloseYm();
+
+	int updateAttendanceCloseYm(Map<String, Object> paramMap);
+
 }
