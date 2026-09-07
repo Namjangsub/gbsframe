@@ -127,6 +127,7 @@
 	</form>
 </div>
 
+<script src="/static/js/common/PM07AnnualCommon.js"></script>
 <script type="text/javascript">
 
 	/*****************************************************************************************
@@ -146,6 +147,35 @@
 	 * PM07TYPE13				병가 (무급)
 	 * PM07TYPE14				지각 (시간 기록)
 	 *****************************************************************************************/    
+
+	// 사원별 휴가 잔여현황 캐시 객체
+	var userVacationBalance = null;
+
+	// 사원별 휴가 잔여현황 조회 및 휴가유형(vacTypeCd) 옵션 동적 제어 (공통 모듈 위임)
+	function refreshUserVacationBalance(savedTypeCd) {
+		var reqId = $('#popForm').find('#reqId').val() || jwt.userId;
+		var stDtVal = $('#stDt').val() || "";
+		var stYear = (stDtVal.length >= 4) ? stDtVal.substring(0, 4) : (window.moment ? moment().format("YYYY") : new Date().getFullYear());
+		var coCdVal = $('#coCd').val() || "GUN";
+
+		if (!reqId || !window.PM07Annual || typeof window.PM07Annual.getUserVacationBalance !== "function") {
+			return;
+		}
+
+		var curSaved = savedTypeCd || $('#vacTypeCd').val() || "";
+
+		window.PM07Annual.getUserVacationBalance({
+			coCd: coCdVal,
+			userId: reqId,
+			yy: stYear,
+			baseDate: stDtVal || (window.moment ? moment() : new Date())
+		}, function(balInfo) {
+			userVacationBalance = balInfo;
+			if (typeof window.PM07Annual.applyVacationTypeOptions === "function") {
+				window.PM07Annual.applyVacationTypeOptions($('#vacTypeCd'), userVacationBalance, curSaved);
+			}
+		});
+	}
 
 	// 유형 판정 함수 (코드명 기반 — 코드값 확정 시 교체)
 	var editInitialSnapshot = null;
@@ -242,6 +272,7 @@
 			}
 		}
 		onDateChanged();
+		refreshUserVacationBalance($('#vacTypeCd').val());
 	}
 
 	// 종료일자 수동/피커 변경 시 양방향 동일일자 동기화 (단일일 유형)
@@ -266,6 +297,18 @@
 			$('#reqRmkTh').removeClass("hit");
 			$('#reqRmk').attr("placeholder", "");
 			return;
+		}
+
+		// 잔여일수 검증: 하계휴가, 포상휴가, 포상휴가반차, 대체휴가, 대체휴가반차
+		if (selectedCd && window.PM07Annual && typeof window.PM07Annual.validateVacationBalance === "function" && userVacationBalance) {
+			var deductDays = Number($('#deductDays').val() || 0);
+			var chk = window.PM07Annual.validateVacationBalance(selectedCd, deductDays, userVacationBalance);
+			if (!chk.isValid) {
+				alert(chk.message);
+				$('#vacTypeCd').val('');
+				onVacTypeChanged();
+				return;
+			}
 		}
 
 		// 선택된 옵션의 코드명 취득
@@ -633,6 +676,7 @@
 			});
 
 			setDefaultApprovalLine();
+			refreshUserVacationBalance();
 		});
 	}
 
@@ -917,6 +961,19 @@
 			$('#stDt').focus();
 			return false;
 		}
+
+		// 사용가능 휴가 잔여일수 검증 (하계휴가, 포상휴가, 포상휴가반차, 대체휴가, 대체휴가반차)
+		var vacTypeCd = $('#vacTypeCd').val();
+		var deductDays = Number($('#deductDays').val() || 0);
+		if (vacTypeCd && window.PM07Annual && typeof window.PM07Annual.validateVacationBalance === "function" && userVacationBalance) {
+			var chk = window.PM07Annual.validateVacationBalance(vacTypeCd, deductDays, userVacationBalance);
+			if (!chk.isValid) {
+				alert(chk.message);
+				$('#vacTypeCd').focus();
+				return false;
+			}
+		}
+
 		return true;
 	}
 
@@ -1314,6 +1371,7 @@
 			$('#edDt').val(todayStr);
 
 			setDefaultApprovalLine();
+			refreshUserVacationBalance();
 		} else {
 			var reqNoVal = paramObj.reqNo || paramObj.todoNo || paramObj.todoKey || paramObj.todoFileTrgtKey || (paramObj.gridObj ? (paramObj.gridObj.todoNo || paramObj.gridObj.todoKey || paramObj.gridObj.todoFileTrgtKey) : "") || "";
 			var coCdVal  = paramObj.coCd || (paramObj.gridObj ? paramObj.gridObj.coCd : "") || "GUN";
@@ -1365,6 +1423,7 @@
 				if (dtlData.vacTypeCd) $('#vacTypeCd').val(dtlData.vacTypeCd);
 				if (dtlData.ampmCd) $('#ampmCd').val(dtlData.ampmCd);
 				onVacTypeChanged();
+				refreshUserVacationBalance(dtlData.vacTypeCd);
 			}, 50);
 
 			// 기존 결재선/공유선 표시
@@ -1445,6 +1504,7 @@
 						$('#edDt').val(chosenDt);
 					}
 					onDateChanged();
+					refreshUserVacationBalance($('#vacTypeCd').val());
 				}
 			});
 		});

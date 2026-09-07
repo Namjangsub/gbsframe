@@ -782,39 +782,29 @@
 			});
 		}
 
-		var isTeamMgr = false;
+		// 1) 신청자 본인
 		postAjaxSync("/admin/cm/cm06/selectUserInfo", { "userId": reqId }, null, function(data) {
 			if (data && data.userInfo) {
-				isTeamMgr = (data.userInfo.teamManager === 'TEAM01');
-				if (reqId === jwt.userId) {
-					var uObj = data.userInfo;
-					var key = String(uObj.id).toLowerCase();
-					addedIds[key] = true;
-					autoList.push({
-						gb            : "결재",
-						usrNm         : uObj.id,
-						todoId        : uObj.id,
-						name          : uObj.name || uObj.id,
-						jik           : uObj.levelNm || '',
-						dtNm          : uObj.deptNm || '',
-						telNo         : uObj.telNo || '',
-						email         : uObj.email || '',
-						sanctnSttus   : 'Y',
-						sanctnSttusNm : '승인'
-					});
-				}
+				var uObj = data.userInfo;
+				var key = String(uObj.id).toLowerCase();
+				addedIds[key] = true;
+				autoList.push({
+					gb            : "결재",
+					usrNm         : uObj.id,
+					todoId        : uObj.id,
+					name          : uObj.name || uObj.id,
+					jik           : uObj.levelNm || '',
+					dtNm          : uObj.deptNm || '',
+					telNo         : uObj.telNo || '',
+					email         : uObj.email || '',
+					sanctnSttus   : (typeof jwt !== 'undefined' && reqId === jwt.userId) ? 'Y' : 'N',
+					sanctnSttusNm : (typeof jwt !== 'undefined' && reqId === jwt.userId) ? '승인' : '미승인'
+				});
 			}
 		});
 
-		if (!isTeamMgr) {
-			postAjaxSync("/user/wb/wb24/selectTeamManagerInfo", { "userId": reqId }, null, function(data) {
-				if (data && data.result) {
-					pushApprover(data.result);
-				}
-			});
-		}
-
-		postAjaxSync("/admin/cm/cm05/selectChildCodeList", { "codeId": "SPECRTS17" }, null, function(data) {
+		// 2) 공통코드 SPECRTS19 에 등록된 인원만 자동 추가 (본인 + SPECRTS19)
+		postAjaxSync("/admin/cm/cm05/selectChildCodeList", { "codeId": "SPECRTS19" }, null, function(data) {
 			var list = (data && data.childCodeList) ? data.childCodeList : [];
 			if (list.length === 0) return;
 			var codeEtc = list[0].codeEtc || '';
@@ -861,39 +851,29 @@
 			});
 		}
 
-		var isTeamMgr = false;
+		// 1) 신청자 본인
 		postAjaxSync("/admin/cm/cm06/selectUserInfo", { "userId": reqId }, null, function(data) {
 			if (data && data.userInfo) {
-				isTeamMgr = (data.userInfo.teamManager === 'TEAM01');
-				if (typeof jwt !== 'undefined' && reqId === jwt.userId) {
-					var uObj = data.userInfo;
-					var key = String(uObj.id).toLowerCase();
-					addedIds[key] = true;
-					autoList.push({
-						gb            : "결재",
-						usrNm         : uObj.id,
-						todoId        : uObj.id,
-						name          : uObj.name || uObj.id,
-						jik           : uObj.levelNm || '',
-						dtNm          : uObj.deptNm || '',
-						telNo         : uObj.telNo || '',
-						email         : uObj.email || '',
-						sanctnSttus   : 'Y',
-						sanctnSttusNm : '승인'
-					});
-				}
+				var uObj = data.userInfo;
+				var key = String(uObj.id).toLowerCase();
+				addedIds[key] = true;
+				autoList.push({
+					gb            : "결재",
+					usrNm         : uObj.id,
+					todoId        : uObj.id,
+					name          : uObj.name || uObj.id,
+					jik           : uObj.levelNm || '',
+					dtNm          : uObj.deptNm || '',
+					telNo         : uObj.telNo || '',
+					email         : uObj.email || '',
+					sanctnSttus   : (typeof jwt !== 'undefined' && reqId === jwt.userId) ? 'Y' : 'N',
+					sanctnSttusNm : (typeof jwt !== 'undefined' && reqId === jwt.userId) ? '승인' : '미승인'
+				});
 			}
 		});
 
-		if (!isTeamMgr) {
-			postAjaxSync("/user/wb/wb24/selectTeamManagerInfo", { "userId": reqId }, null, function(data) {
-				if (data && data.result) {
-					pushApprover(data.result);
-				}
-			});
-		}
-
-		postAjaxSync("/admin/cm/cm05/selectChildCodeList", { "codeId": "SPECRTS17" }, null, function(data) {
+		// 2) 공통코드 SPECRTS19 에 등록된 인원만 자동 추가 (본인 + SPECRTS19)
+		postAjaxSync("/admin/cm/cm05/selectChildCodeList", { "codeId": "SPECRTS19" }, null, function(data) {
 			var list = (data && data.childCodeList) ? data.childCodeList : [];
 			if (list.length === 0) return;
 			var codeEtc = list[0].codeEtc || '';
@@ -1616,23 +1596,18 @@
 		var btnText = $.trim($('#btnDelete').text());
 		var isResultDelete = (btnText === '결과삭제');
 
-		// 프론트 사전 검증 1: 신청서 전체 삭제 시 이미 근무결과가 등록되어 있으면 삭제 불가
-		if (!isResultDelete && $.trim($('#workResult').val())) {
-			alert("근무결과가 이미 등록된 건은 신청서를 삭제할 수 없습니다.");
-			return;
-		}
+		// 프론트 사전 검증: 결과삭제 시 이미 결과결재가 승인 진행된 경우에만 차단 (신청서 전체 삭제는 특별 정책에 따라 결재진행/완료여도 허용)
+		if (isResultDelete) {
+			var gridViewObj = approvalGridViewResult;
+			var list = (gridViewObj && gridViewObj.target) ? gridViewObj.target.getList() : [];
+			var isApprovedByOther = list.some(function(item) {
+				return (parseInt(item.sanctnSn, 10) > 1) && item.sanctnSttus === "Y";
+			});
 
-		// 프론트 사전 검증 2: 결재선 중 신청자 본인 외 타 결재자가 이미 승인('Y') 진행한 경우 삭제 불가
-		var gridViewObj = isResultDelete ? approvalGridViewResult : approvalGridViewReq;
-		var list = (gridViewObj && gridViewObj.target) ? gridViewObj.target.getList() : [];
-		var isApprovedByOther = list.some(function(item) {
-			return (parseInt(item.sanctnSn, 10) > 1) && item.sanctnSttus === "Y";
-		});
-
-		if (isApprovedByOther) {
-			var modeName = isResultDelete ? "결과결재" : "신청결재";
-			alert("이미 신청자 외의 " + modeName + "가 진행된 건은 삭제할 수 없습니다.");
-			return;
+			if (isApprovedByOther) {
+				alert("이미 신청자 외의 결과결재가 진행된 건은 삭제할 수 없습니다.");
+				return;
+			}
 		}
 
 		var confirmMsg = isResultDelete

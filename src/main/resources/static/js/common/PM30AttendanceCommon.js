@@ -422,28 +422,49 @@ function updateRowRmk(row) {
 
 	var rmkParts = [];
 
-	// 1. 출장/휴가 연동 유형명 (수주번호 ordrsNo가 있으면 "수주번호-유형명")
+	// 1. 출장 연동 유형명 (수주번호 ordrsNo가 있으면 "수주번호-유형명")
 	if (row.tripApplNo || row.tripReplyNo) {
 		var tripTypeStr = row.workTypeNm || '기타출장';
 		if (row.ordrsNo) {
 			tripTypeStr = row.ordrsNo + '-' + tripTypeStr;
 		}
 		rmkParts.push(tripTypeStr);
-	} else if (row.vacApplNo) {
-		rmkParts.push(row.workTypeNm || '');
 	}
 
-	// 2. 지각/조퇴 시각 정보 (recalcRowAttendanceObject에서 판정된 lateEarlyRmk)
+	// 2. 휴가 연동 (출장과 휴가가 동시에 존재하면 2가지 모두 비고에 표시)
+	if (row.vacApplNo) {
+		var vacRmk = '';
+		var halfType = (typeof getHalfVacationType === 'function') ? getHalfVacationType(row) : null;
+		if (halfType === 'AM') {
+			vacRmk = '반차(오전)';
+		} else if (halfType === 'PM') {
+			vacRmk = '반차(오후)';
+		} else if (row.spclMtr && (row.spclMtr.indexOf('휴가') !== -1 || row.spclMtr.indexOf('반차') !== -1)) {
+			var spParts = row.spclMtr.split(' / ');
+			for (var p = 0; p < spParts.length; p++) {
+				if (spParts[p].indexOf('휴가') !== -1 || spParts[p].indexOf('반차') !== -1) {
+					vacRmk = spParts[p];
+					break;
+				}
+			}
+		}
+		if (!vacRmk) {
+			vacRmk = (row.workTypeNm === '휴가') ? '휴가' : (row.vacTypeNm || '휴가');
+		}
+		rmkParts.push(vacRmk);
+	}
+
+	// 3. 지각/조퇴 시각 정보 (recalcRowAttendanceObject에서 판정된 lateEarlyRmk)
 	if (row.lateEarlyRmk) {
 		rmkParts.push(row.lateEarlyRmk);
 	}
 
-	// 3. 대체근무
+	// 4. 대체근무
 	if (String(row.substWorkYn || '').trim() === '1') {
 		rmkParts.push('대체근무');
 	}
 
-	// 4. 지각/조퇴 자동등록 수동버튼 메시지 보존
+	// 5. 지각/조퇴 자동등록 수동버튼 메시지 보존
 	if (row._autoRegRmk) {
 		rmkParts.push(row._autoRegRmk);
 	}
@@ -540,10 +561,28 @@ function recalcRowAttendanceObject(row) {
 	var isTripType = (wt === '설치시운전' || wt === '설치장애' || wt === 'A/S(무상)' || wt === '기타출장');
 
 	// 1. 출장 유형(설치시운전, 설치장애, A/S(무상), 기타출장) 또는 출장신청서/복명서 확인된 건:
-	// 수정출근일시 08:30 ~ 수정퇴근일시 17:30으로 자동 설정
+	// 수정출근일시 ~ 수정퇴근일시 자동 설정 (단, 반차가 결합된 경우 반차 근무시간과 합치되도록 정밀 산출)
+	// [우선순위 원칙]: 담당자가 최종 수정한 값(isUserEditedInDttm/isUserEditedOutDttm) > DB에서 불러온 저장값(savedInDttm/savedOutDttm) > 자동 설정 기준
 	if ((isTripType || isTrip) && dtFormatted) {
-		row.inDttm = dtFormatted + ' 08:30';
-		row.outDttm = dtFormatted + ' 17:30';
+		var halfType = (typeof getHalfVacationType === 'function') ? getHalfVacationType(row) : null;
+		var defaultIn = dtFormatted + (halfType === 'AM' ? ' 13:30' : ' 08:30');
+		var defaultOut = dtFormatted + (halfType === 'PM' ? ' 12:30' : ' 17:30');
+
+		if (!row.isUserEditedInDttm) {
+			if (row.savedInDttm !== undefined && row.savedInDttm !== null && String(row.savedInDttm).trim() !== '') {
+				row.inDttm = row.savedInDttm;
+			} else if (!row.inDttm) {
+				row.inDttm = defaultIn;
+			}
+		}
+
+		if (!row.isUserEditedOutDttm) {
+			if (row.savedOutDttm !== undefined && row.savedOutDttm !== null && String(row.savedOutDttm).trim() !== '') {
+				row.outDttm = row.savedOutDttm;
+			} else if (!row.outDttm) {
+				row.outDttm = defaultOut;
+			}
+		}
 	}
 
 	// 2. 수정일시(inDttm/outDttm) 및 원시시각(inTm/outTm) 유효 조합 시각 생성 (수정일시 최우선 적용)

@@ -80,4 +80,15 @@ public interface PM07Mapper {
 
 	List<Map<String, String>> selectMobileVacationFileList(Map<String, String> paramMap);
 
+	// 포상휴가 관리
+	List<Map<String, String>> selectAwardVacationList(Map<String, String> paramMap);
+
+	int mergeAwardVacation(Map<String, String> paramMap);
+
+	int deleteAwardVacation(Map<String, String> paramMap);
+
+	Map<String, Object> selectAwardVacationBalanceCheck(Map<String, String> paramMap);
+
+	List<Map<String, String>> selectUserIdByEmpNo(Map<String, String> paramMap);
+
 }

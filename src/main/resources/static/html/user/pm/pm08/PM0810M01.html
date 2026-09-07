@@ -342,7 +342,7 @@
 			return n.toFixed(1);
 		}
 
-		// 백엔드 LISTAGG 결과("일자:REQ_NO,일자:REQ_NO,...")를 호버/더블클릭 가능한 span으로 변환
+		// 백엔드 LISTAGG 결과("일자:REQ_NO:일수,일자:REQ_NO:일수,...")를 호버/더블클릭 가능한 span으로 변환
 		function renderDayCell(cellStr, kind, userId, userNm) {
 			if (!cellStr) return '';
 			var tokens = String(cellStr).split(',');
@@ -350,9 +350,12 @@
 			for (var t = 0; t < tokens.length; t++) {
 				var pair = tokens[t].split(':');
 				var day = pair[0];
-				var reqNo = pair.length > 1 ? pair.slice(1).join(':') : '';
+				var reqNo = pair.length > 1 ? pair[1] : '';
+				var dayVal = pair.length > 2 ? Number(pair[2]) : 1;
+				var isHalf = (dayVal === 0.5);
 				if (!day) continue;
-				htmlParts.push('<span class="day-token" data-kind="' + kind + '" data-reqno="' + reqNo + '" data-userid="' + (userId || '') + '" data-usernm="' + (userNm || '') + '">' + day + '</span>');
+				var halfBadge = isHalf ? '<span style="font-size: 10px; color: #d9534f; font-weight: bold; margin-left: 1px;">(반)</span>' : '';
+				htmlParts.push('<span class="day-token" data-kind="' + kind + '" data-reqno="' + reqNo + '" data-userid="' + (userId || '') + '" data-usernm="' + (userNm || '') + '" title="' + (isHalf ? '반차 (0.5일)' : '전일 (1.0일)') + '">' + day + halfBadge + '</span>');
 			}
 			return htmlParts.join(', ');
 		}
@@ -428,8 +431,27 @@
 					}
 					var dtText = dtl.holidayDt || '';
 					var tmText = (dtl.stTm && dtl.edTm) ? (' (' + dtl.stTm + '~' + dtl.edTm + ')') : '';
-					var reason = dtl.specialReason ? (' [' + $.trim(dtl.specialReason) + ']') : '';
-					var htmlStr = '<div class="popover-item"><i class="fas fa-check-circle" style="color: #337ab7; margin-right: 5px;"></i> ' + dtText + tmText + ' 휴일대체근무' + reason + '</div>';
+
+					var st = String(dtl.realStTm || dtl.stTm || '').replace(/[^0-9]/g, '');
+					var ed = String(dtl.realEdTm || dtl.edTm || '').replace(/[^0-9]/g, '');
+					var reasonRaw = String(dtl.specialReason || '') + ' ' + String(dtl.workResult || '');
+					var isHalf = (reasonRaw.indexOf('반차') !== -1);
+					if (st.length >= 4 && ed.length >= 4) {
+						var mSt = moment(st.substring(0, 4), 'HHmm');
+						var mEd = moment(ed.substring(0, 4), 'HHmm');
+						if (mSt.isValid() && mEd.isValid()) {
+							var diffMin = mEd.diff(mSt, 'minutes');
+							if (diffMin < 0) diffMin += 24 * 60;
+							var diffHrs = diffMin / 60;
+							if (diffHrs > 0 && diffHrs <= 4.5) {
+								isHalf = true;
+							}
+						}
+					}
+					var halfText = isHalf ? ' (반차)' : '';
+					var daysText = isHalf ? ' (0.5일)' : ' (1.0일)';
+					var reason = dtl.specialReason ? (' [' + $.trim(dtl.specialReason) + (isHalf && dtl.specialReason.indexOf('반차') === -1 ? ' - 반차' : '') + ']') : '';
+					var htmlStr = '<div class="popover-item"><i class="fas fa-check-circle" style="color: #337ab7; margin-right: 5px;"></i> ' + dtText + tmText + ' 휴일대체근무' + halfText + daysText + reason + '</div>';
 					$('#popDayContent').html(htmlStr);
 				});
 			} else if (kind === 'vac') {
@@ -451,11 +473,31 @@
 						var stDisp = row.stDt || row.st_dt || '';
 						var edDisp = row.edDt || row.ed_dt || '';
 						var dtText = formatVacationDateRange(stDisp, edDisp);
-						var vDays = row.deductDays || row.deduct_days || row.vacDays || row.vac_days || '';
-						var daysText = vDays ? (' (' + vDays + '일)') : '';
+						var vDays = Number(row.deductDays || row.deduct_days || row.vacDays || row.vac_days || 0);
+						var vacTypeCd = row.vacTypeCd || row.vac_type_cd || '';
+						var rawNm = String(row.vacTypeNm || row.vac_type_nm || '');
+						var ampm = String(row.ampmNm || '').trim();
+
+						var isHalf = (vDays === 0.5) || (vacTypeCd === 'PM07TYPE02') || (vacTypeCd === 'PM07TYPE12') || (rawNm.indexOf('반차') !== -1) || (ampm.length > 0);
+						if (isHalf && vDays === 0) vDays = 0.5;
+						if (!isHalf && vDays === 0) vDays = 1.0;
+
+						var halfBadge = '';
+						if (isHalf) {
+							if (ampm) {
+								halfBadge = ' (' + ampm + '반차)';
+							} else {
+								halfBadge = ' (반차)';
+							}
+						}
+						if (vNm.indexOf('반차') !== -1) {
+							halfBadge = ampm ? (' (' + ampm + ')') : '';
+						}
+
+						var daysText = ' (' + fmt1(vDays) + '일)';
 						var rmk = row.reqRmk || row.req_rmk || row.rmk || '';
-						var rmkText = rmk ? (' [' + $.trim(rmk) + ']') : '';
-						htmlStr += '<div class="popover-item"><i class="fas fa-check-circle" style="color: #337ab7; margin-right: 5px;"></i> ' + dtText + ' ' + vNm + daysText + rmkText + '</div>';
+						var rmkText = rmk ? (' [' + $.trim(rmk) + (isHalf && rmk.indexOf('반차') === -1 ? ' - 반차' : '') + ']') : '';
+						htmlStr += '<div class="popover-item"><i class="fas fa-check-circle" style="color: #337ab7; margin-right: 5px;"></i> ' + dtText + ' ' + vNm + halfBadge + daysText + rmkText + '</div>';
 						return true;
 					});
 					if (!htmlStr) {
@@ -581,7 +623,8 @@
 					var swKey = 'sw' + 'M' + months[m];
 					html += '<td>' + renderDayCell(row[swKey], 'sw', row['userId'], row['userNm']) + '</td>';
 				}
-				html += '<td style="font-weight: 600;">' + (row['swSum'] || 0) + '</td>';
+				var swSum = Number(row['swSum']) || 0;
+				html += '<td style="font-weight: 600;">' + (swSum > 0 ? fmt1(swSum) : '') + '</td>';
 				html += '</tr>';
 
 				// 대체휴가일 행

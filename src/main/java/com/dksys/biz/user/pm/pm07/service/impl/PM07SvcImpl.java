@@ -160,6 +160,106 @@ public class PM07SvcImpl implements PM07Svc {
 		paramMap.put("deductDays", String.format("%.1f", deductDays));
 	}
 
+	/**
+	 * 포상휴가(PM07TYPE07, PM07TYPE08) 신청 시 잔여 검증
+	 * @param paramMap 휴가신청 파라미터 (vacTypeCd, reqId, stDt, deductDays 포함)
+	 * @return 검증 통과 시 null, 실패 시 오류 메시지
+	 */
+	private String validateAwardVacationBalance(Map<String, String> paramMap) {
+		String vacTypeCd = paramMap.get("vacTypeCd");
+
+		// 포상휴가가 아니면 검증 통과
+		if (!("PM07TYPE07".equals(vacTypeCd) || "PM07TYPE08".equals(vacTypeCd))) {
+			return null;
+		}
+
+		String reqId = paramMap.get("reqId");
+		String stDtStr = paramMap.get("stDt");
+		String deductDaysStr = paramMap.get("deductDays");
+		String reqNo = paramMap.get("reqNo"); // 수정 시에만 값이 있음
+
+		if (reqId == null || reqId.isEmpty() || stDtStr == null || stDtStr.isEmpty()) {
+			return "포상휴가 신청자 정보가 부족합니다.";
+		}
+
+		// 시작일자를 YYYYMMDD 형식으로 정규화
+		String normStDt = stDtStr.replaceAll("[^0-9]", "");
+		if (normStDt.length() != 8) {
+			return "신청 시작일자 형식이 올바르지 않습니다.";
+		}
+
+		// 차감일수 파싱
+		double deductDays = 0.0;
+		if (deductDaysStr != null && !deductDaysStr.isEmpty()) {
+			try {
+				deductDays = Double.parseDouble(deductDaysStr);
+			} catch (NumberFormatException e) {
+				return "차감일수 계산 오류: " + deductDaysStr;
+			}
+		}
+
+		// 잔여 검증 쿼리 실행
+		Map<String, String> balanceQuery = new HashMap<>();
+		balanceQuery.put("userId", reqId);
+		balanceQuery.put("reqStDt", normStDt);
+		if (reqNo != null && !reqNo.isEmpty()) {
+			balanceQuery.put("excludeReqNo", reqNo);
+		}
+
+		try {
+			Map<String, Object> balanceInfo = pm07Mapper.selectAwardVacationBalanceCheck(balanceQuery);
+			if (balanceInfo == null || balanceInfo.isEmpty()) {
+				return "유효한 포상휴가 지급 내역이 없거나 신청일자가 지급 유효기간을 벗어났습니다.";
+			}
+
+			// selectAwardVacationBalanceCheck는 resultType="CamelMap"이라 SQL 별칭(TOTAL_GRANTED 등)이
+			// CamelMap.put()에서 camelCase(totalGranted 등)로 자동 변환되어 저장된다. 대문자 키로 조회하면
+			// 항상 null이 되어(=잔여 0으로 오판) 모든 신청이 차단되는 치명적 버그가 되므로 반드시 camelCase로 조회할 것.
+			Object grantedObj = balanceInfo.get("totalGranted");
+			Object usedObj = balanceInfo.get("totalUsed");
+
+			double totalGranted = 0.0;
+			double totalUsed = 0.0;
+
+			if (grantedObj != null) {
+				if (grantedObj instanceof Number) {
+					totalGranted = ((Number) grantedObj).doubleValue();
+				} else {
+					try {
+						totalGranted = Double.parseDouble(grantedObj.toString());
+					} catch (NumberFormatException e) {
+						// 파싱 실패 시 0으로 설정
+					}
+				}
+			}
+
+			if (usedObj != null) {
+				if (usedObj instanceof Number) {
+					totalUsed = ((Number) usedObj).doubleValue();
+				} else {
+					try {
+						totalUsed = Double.parseDouble(usedObj.toString());
+					} catch (NumberFormatException e) {
+						// 파싱 실패 시 0으로 설정
+					}
+				}
+			}
+
+			if (totalGranted == 0) {
+				return "유효한 포상휴가 지급 내역이 없거나 신청일자가 지급 유효기간을 벗어났습니다.";
+			}
+
+			if (totalUsed + deductDays > totalGranted) {
+				double remaining = totalGranted - totalUsed;
+				return "잔여 포상휴가 일수(" + String.format("%.1f", remaining) + "일)를 초과하여 신청할 수 없습니다.";
+			}
+
+			return null; // 통과
+		} catch (Exception e) {
+			return "포상휴가 검증 중 오류 발생: " + e.getMessage();
+		}
+	}
+
 	@Override
 	@Transactional(rollbackFor = Exception.class)
 	public Map<String, String> insertVacation(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
@@ -167,6 +267,14 @@ public class PM07SvcImpl implements PM07Svc {
 
 		// 백엔드 DB 저장 직전에 차감일수 및 휴가일수 최종 평가/산정
 		evaluateVacationAndDeductDays(paramMap);
+
+		// 포상휴가 잔여 검증
+		String awardBalanceError = validateAwardVacationBalance(paramMap);
+		if (awardBalanceError != null) {
+			result.put("resultCode", "409");
+			result.put("resultMessage", awardBalanceError);
+			return result;
+		}
 
 		List<Map<String, String>> overlapList = findVacationOverlap(paramMap, null);
 		if (overlapList != null && !overlapList.isEmpty()) {
@@ -338,6 +446,14 @@ public class PM07SvcImpl implements PM07Svc {
 
 		// 백엔드 DB 저장 직전에 차감일수 및 휴가일수 최종 평가/산정
 		evaluateVacationAndDeductDays(paramMap);
+
+		// 포상휴가 잔여 검증
+		String awardBalanceError = validateAwardVacationBalance(paramMap);
+		if (awardBalanceError != null) {
+			result.put("resultCode", "409");
+			result.put("resultMessage", awardBalanceError);
+			return result;
+		}
 
 		if (!isVacationEditable(paramMap.get("coCd"), paramMap.get("reqNo"))) {
 			result.put("resultCode", "409");
@@ -531,9 +647,26 @@ public class PM07SvcImpl implements PM07Svc {
 
 			if (balanceInfo != null) {
 				result.put("resultCode", "200");
-				result.put("grantDays", balanceInfo.get("grantDays"));
-				result.put("usedDays", balanceInfo.get("usedDays"));
-				result.put("balanceDays", balanceInfo.get("balanceDays"));
+				String autoYn = balanceInfo.get("autoYn");
+				String enterDt = balanceInfo.get("enterDt");
+				int grantDays = 0;
+
+				if ("N".equals(autoYn) && balanceInfo.get("grantDays") != null && Double.parseDouble(String.valueOf(balanceInfo.get("grantDays"))) > 0) {
+					// 관리자 수기 지정인 경우 DB 저장값 사용
+					grantDays = (int) Double.parseDouble(String.valueOf(balanceInfo.get("grantDays")));
+				} else {
+					// 자동계산: TB_PM07M02 존재 여부와 무관하게 1년 미만자 및 일반 사원 실시간 오늘 기준 발생일수 산출
+					grantDays = calcRealtimeAnnualGrantDays(enterDt, yy, LocalDate.now());
+				}
+
+				double usedDays = Double.parseDouble(String.valueOf(balanceInfo.getOrDefault("usedDays", "0")));
+				double workSubstDays = Double.parseDouble(String.valueOf(balanceInfo.getOrDefault("workSubstDays", "0")));
+				double summerVacDays = Double.parseDouble(String.valueOf(balanceInfo.getOrDefault("summerVacDays", "0")));
+				double balanceDays = grantDays - workSubstDays - summerVacDays - usedDays;
+
+				result.put("grantDays", String.valueOf(grantDays));
+				result.put("usedDays", String.valueOf(usedDays));
+				result.put("balanceDays", String.valueOf(balanceDays));
 			} else {
 				result.put("resultCode", "200");
 				result.put("grantDays", "0");
@@ -546,6 +679,69 @@ public class PM07SvcImpl implements PM07Svc {
 		}
 
 		return result;
+	}
+
+	/**
+	 * 실시간 조회 시점 기준 발생 연차일수 산출 (1년 미만자 조회시점 1~11개 및 15 만근 근무자 15~25개 계산)
+	 * TB_PM07M02 데이터 존재 유무와 무관하게 동작
+	 */
+	public int calcRealtimeAnnualGrantDays(String enterDt, String yy, LocalDate baseDate) {
+		if (enterDt == null || enterDt.isEmpty() || yy == null || yy.isEmpty()) {
+			return 0;
+		}
+
+		try {
+			String cleanDt = enterDt.replaceAll("[^0-9]", "");
+			if (cleanDt.length() < 8) return 0;
+
+			int enterYear = Integer.parseInt(cleanDt.substring(0, 4));
+			int enterMonth = Integer.parseInt(cleanDt.substring(4, 6));
+			int enterDay = Integer.parseInt(cleanDt.substring(6, 8));
+			int targetYear = Integer.parseInt(yy);
+
+			LocalDate enterLocalDate = LocalDate.of(enterYear, enterMonth, enterDay);
+			LocalDate now = (baseDate != null) ? baseDate : LocalDate.now();
+
+			// 미래 입사자: 0일
+			if (enterYear > targetYear || enterLocalDate.isAfter(now)) {
+				return 0;
+			}
+
+			// 1. 15 만근 근무자 판별 (15일 발생 대상):
+			// 회계연도(01/01) 기준 직전 1년(전년도 1/1 ~ 12/31) 전체 만근 여부 판별:
+			// -> (targetYear - 2)년 12월 31일 이하 입사자 (즉, 전년도 1월 1일 이전 입사자)
+			//    예) 2026년 기준: 2024-12-31 이하 입사자 (2025년 입사자는 2026년 중 최대 11개 월별 누적)
+			//    예) 2027년 기준: 2025-12-31 이하 입사자 (2025년 입사자 전원 15개 정상 발생)
+			LocalDate cutoffDate = LocalDate.of(targetYear - 2, 12, 31);
+			boolean is15ManKeun = !enterLocalDate.isAfter(cutoffDate);
+
+			if (is15ManKeun) {
+				LocalDate yearStartDate = LocalDate.of(targetYear, 1, 1);
+				long workedYears = ChronoUnit.YEARS.between(enterLocalDate, yearStartDate);
+				int addDays = (int) (workedYears - 1) / 2;
+				return Math.min(15 + addDays, 25);
+			}
+
+			// 2. 15 만근 근무자가 아닌 사람 (부여연도 1월 1일 기준 만 1년 미만자, 예: 2026년 기준 2025-01-01 이후 입사자):
+			//    입사일 기준 만 1개월 넘을 때마다 +1개씩 (최대 11개) 발생하여 12/31까지 유지,
+			//    다음해 1월 1일(부여연도 1월 1일 기준 만 1년 경과 시점)에 15개 발생
+			LocalDate yearEndDate = LocalDate.of(targetYear, 12, 31);
+			LocalDate evalDate = now.isAfter(yearEndDate) ? yearEndDate : now;
+
+			int passedMonths = 0;
+			LocalDate checkDate = enterLocalDate;
+			for (int m = 1; m <= 11; m++) {
+				checkDate = checkDate.plusMonths(1);
+				if (!checkDate.isAfter(evalDate)) {
+					passedMonths++;
+				} else {
+					break;
+				}
+			}
+			return Math.min(passedMonths, 11);
+		} catch (Exception e) {
+			return 0;
+		}
 	}
 
 	@Override
@@ -649,30 +845,42 @@ public class PM07SvcImpl implements PM07Svc {
 
 			int enterYear = Integer.parseInt(cleanDt.substring(0, 4));
 			int enterMonth = Integer.parseInt(cleanDt.substring(4, 6));
+			int enterDay = Integer.parseInt(cleanDt.substring(6, 8));
 			int targetYear = Integer.parseInt(yy);
 
-			if (enterYear > targetYear) {
+			LocalDate enterLocalDate = LocalDate.of(enterYear, enterMonth, enterDay);
+			LocalDate now = LocalDate.now();
+
+			if (enterYear > targetYear || enterLocalDate.isAfter(now)) {
 				return 0; // 미래 입사자
 			}
 
 			int diffYears = targetYear - enterYear;
-			if (diffYears == 0) {
-				// 당해연도 입사자: 회계연도 비례계산 (15 * 잔여근무월수 / 12)
-				int workMonths = 12 - enterMonth + 1;
-				int propDays = Math.round((15.0f * workMonths) / 12.0f);
-				return Math.max(propDays, 1);
-			} else if (diffYears < 3) {
-				return 15;
-			} else {
-				int addDays = (diffYears - 1) / 2;
+
+			// 부여연도 1월 1일 기준 15 만근 근무자 판별:
+			// 회계연도(01/01) 기준 직전 1년(전년도 1/1 ~ 12/31) 전체 만근 여부 판별:
+			// -> (targetYear - 2)년 12월 31일 이하 입사자 (즉, 전년도 1월 1일 이전 입사자)
+			//    예) 2026년 기준: 2024-12-31 이하 입사자 (2025년 입사자는 2026년 중 최대 11개 월별 누적)
+			//    예) 2027년 기준: 2025-12-31 이하 입사자 (2025년 입사자 전원 15개 정상 발생)
+			LocalDate cutoffDate = LocalDate.of(targetYear - 2, 12, 31);
+			boolean is15ManKeun = !enterLocalDate.isAfter(cutoffDate);
+
+			// 1. 15 만근 근무자인 경우: 15일 부여 + 3년차 이상 만 2년마다 1개씩 추가 (최대 25일)
+			if (is15ManKeun) {
+				LocalDate yearStartDate = LocalDate.of(targetYear, 1, 1);
+				long workedYears = ChronoUnit.YEARS.between(enterLocalDate, yearStartDate);
+				int addDays = (int) (workedYears - 1) / 2;
 				return Math.min(15 + addDays, 25);
 			}
+
+			// 2. 15 만근 근무자가 아니면(2025-01-01 이후 입사자): DB에는 0개로 저장됨 (화면 로드 시 자동계산 표출)
+			return 0;
 		} catch (Exception e) {
-			return 15;
+			return 0;
 		}
 	}
 
-	// 미등록 재직자 연차지급기준 자동계산 목록 산출 (임원실: GUN00, 실적관리용: GUN95 부서는 자동계산 대상에서 제외됨)
+	// 미등록 재직자 연차지급기준 자동계산 목록 산출 (15 만근 근무자만 자동계산 목록 대상)
 	@Override
 	public List<Map<String, String>> selectAutoCalcAnnualGrantList(Map<String, String> paramMap) {
 		String yy = paramMap.get("yy");
@@ -683,11 +891,18 @@ public class PM07SvcImpl implements PM07Svc {
 		}
 
 		List<Map<String, String>> unregList = pm07Mapper.selectUnregisteredUserList(paramMap);
+		List<Map<String, String>> resultList = new ArrayList<>();
 		if (unregList != null && !unregList.isEmpty()) {
+			int targetYear = (yy != null && !yy.isEmpty()) ? Integer.parseInt(yy) : LocalDate.now().getYear();
+			LocalDate cutoffDate = LocalDate.of(targetYear - 1, 1, 1);
+
 			for (Map<String, String> user : unregList) {
 				String enterDt = user.get("enterDt");
 				String cleanEnterDt = (enterDt != null) ? enterDt.replaceAll("[^0-9]", "") : "";
-				int grantDays = calcAnnualGrantDays(cleanEnterDt, yy);
+				int grantDays = 0;
+				if (cleanEnterDt.length() >= 8) {
+					grantDays = calcAnnualGrantDays(cleanEnterDt, yy);
+				}
 
 				user.put("coCd", coCd);
 				user.put("yy", yy);
@@ -695,10 +910,11 @@ public class PM07SvcImpl implements PM07Svc {
 				user.put("usedDays", "0");
 				user.put("balanceDays", String.valueOf(grantDays));
 				user.put("autoYn", "Y");
-				user.put("rmk", "연차기준 자동계산");
+				user.put("rmk", (grantDays > 0) ? "1월 1일 기준 만1년이상 자동계산" : "1년미만 (기본0개, 조회시점 자동계산)");
+				resultList.add(user);
 			}
 		}
-		return unregList;
+		return resultList;
 	}
 
 	// 화면에서 삭제한 첨부파일 반영. (CM16SvcImpl 과 동일 패턴)
@@ -1058,6 +1274,93 @@ public class PM07SvcImpl implements PM07Svc {
 	@Override
 	public List<Map<String, String>> selectMobileVacationFileList(Map<String, String> paramMap) {
 		return pm07Mapper.selectMobileVacationFileList(paramMap);
+	}
+
+	@Override
+	public List<Map<String, String>> selectAwardVacationList(Map<String, String> paramMap) {
+		return pm07Mapper.selectAwardVacationList(paramMap);
+	}
+
+	@Override
+	@Transactional(rollbackFor = Exception.class)
+	public Map<String, Object> saveAwardVacationList(Map<String, Object> paramMap) {
+		Map<String, Object> result = new HashMap<>();
+		try {
+			List<Map<String, String>> saveList = (List<Map<String, String>>) paramMap.get("saveList");
+			List<Map<String, String>> deleteList = (List<Map<String, String>>) paramMap.get("deleteList");
+
+			// 삭제 처리
+			if (deleteList != null && !deleteList.isEmpty()) {
+				for (Map<String, String> delItem : deleteList) {
+					pm07Mapper.deleteAwardVacation(delItem);
+				}
+			}
+
+			// 저장 처리 (insert/update 통합)
+			if (saveList != null && !saveList.isEmpty()) {
+				for (Map<String, String> item : saveList) {
+					if (!item.containsKey("coCd") || item.get("coCd") == null || item.get("coCd").toString().isEmpty()) {
+						item.put("coCd", "GUN");
+					}
+
+					String empNo = item.get("empNo");
+					if (empNo == null || empNo.trim().isEmpty()) {
+						continue; // 빈 행 스킵
+					}
+
+					// EMP_NO로 USER_ID 해석
+					Map<String, String> userQuery = new HashMap<>();
+					userQuery.put("coCd", item.get("coCd"));
+					userQuery.put("empNo", empNo.trim());
+					List<Map<String, String>> userList = pm07Mapper.selectUserIdByEmpNo(userQuery);
+
+					if (userList != null && !userList.isEmpty()) {
+						Map<String, String> userInfo = userList.get(0);
+						item.put("userId", userInfo.get("userId"));
+						if (!item.containsKey("empNm") || item.get("empNm") == null || item.get("empNm").toString().isEmpty()) {
+							item.put("empNm", userInfo.get("empNm"));
+						}
+					}
+
+					// 날짜 정규화 (하이픈 제거)
+					String stDt = item.get("stDt");
+					if (stDt != null && !stDt.isEmpty()) {
+						item.put("stDt", stDt.replaceAll("[^0-9]", ""));
+					}
+					String edDt = item.get("edDt");
+					if (edDt != null && !edDt.isEmpty()) {
+						item.put("edDt", edDt.replaceAll("[^0-9]", ""));
+					}
+
+					if (!item.containsKey("creatId")) {
+						item.put("creatId", "SYSTEM");
+					}
+					if (!item.containsKey("creatPgm")) {
+						item.put("creatPgm", "PM0701P04");
+					}
+					if (!item.containsKey("udtId")) {
+						item.put("udtId", item.get("creatId"));
+					}
+					if (!item.containsKey("udtPgm")) {
+						item.put("udtPgm", item.get("creatPgm"));
+					}
+
+					pm07Mapper.mergeAwardVacation(item);
+				}
+			}
+
+			result.put("resultCode", "200");
+			result.put("resultMessage", "저장되었습니다.");
+		} catch (Exception e) {
+			result.put("resultCode", "500");
+			result.put("resultMessage", "저장 중 오류가 발생했습니다: " + e.getMessage());
+		}
+		return result;
+	}
+
+	@Override
+	public int deleteAwardVacation(Map<String, String> paramMap) {
+		return pm07Mapper.deleteAwardVacation(paramMap);
 	}
 
 }

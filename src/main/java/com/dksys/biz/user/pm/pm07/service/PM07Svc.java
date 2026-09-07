@@ -47,4 +47,11 @@ public interface PM07Svc {
 
 	List<Map<String, String>> selectMobileVacationFileList(Map<String, String> paramMap);
 
+	// 포상휴가 관리
+	List<Map<String, String>> selectAwardVacationList(Map<String, String> paramMap);
+
+	Map<String, Object> saveAwardVacationList(Map<String, Object> paramMap);
+
+	int deleteAwardVacation(Map<String, String> paramMap);
+
 }

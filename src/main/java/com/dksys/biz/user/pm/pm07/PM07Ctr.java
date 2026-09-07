@@ -188,4 +188,38 @@ public class PM07Ctr {
 		return "jsonView";
 	}
 
+	// 포상휴가 관리
+	@PostMapping(value = "/selectAwardVacationList")
+	public String selectAwardVacationList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		List<Map<String, String>> result = pm07Svc.selectAwardVacationList(paramMap);
+		model.addAttribute("result", result);
+		return "jsonView";
+	}
+
+	@PostMapping(value = "/saveAwardVacationList")
+	public String saveAwardVacationList(@RequestBody Map<String, Object> paramMap, ModelMap model) {
+		try {
+			Map<String, Object> result = pm07Svc.saveAwardVacationList(paramMap);
+			model.addAttribute("resultCode", result.get("resultCode"));
+			model.addAttribute("resultMessage", result.get("resultMessage"));
+		} catch (Exception e) {
+			model.addAttribute("resultCode", 500);
+			model.addAttribute("resultMessage", "저장 중 오류 발생: " + e.getMessage());
+		}
+		return "jsonView";
+	}
+
+	@PostMapping(value = "/deleteAwardVacation")
+	public String deleteAwardVacation(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		try {
+			int result = pm07Svc.deleteAwardVacation(paramMap);
+			model.addAttribute("resultCode", result > 0 ? 200 : 400);
+			model.addAttribute("resultMessage", result > 0 ? "삭제되었습니다." : "삭제할 데이터가 없습니다.");
+		} catch (Exception e) {
+			model.addAttribute("resultCode", 500);
+			model.addAttribute("resultMessage", "삭제 중 오류 발생: " + e.getMessage());
+		}
+		return "jsonView";
+	}
+
 }

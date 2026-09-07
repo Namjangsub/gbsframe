@@ -546,8 +546,8 @@
 			var item = this.item;
 			if (!item) return val;
 
-			// 만약 특이사항(spclMtr)에 '대체휴가', '대체휴가반차' 등 구체적 휴가명이 존재하면
-			// 기존 val이 generic한 '휴가' 텍스트이거나 비어있을 경우 구체적 휴가명(spclMtr)으로 렌더링 보정
+			// 만약 특이사항(spclMtr)에 구체적 휴가명이나 출장/휴가 복합명이 존재하면
+			// 기존 val이 generic한 '휴가' 텍스트이거나 비어있을 경우 구체적 명칭(spclMtr)으로 렌더링 보정
 			if (item.spclMtr && (val === '' || val === '휴가')) {
 				val = item.spclMtr;
 			}
@@ -568,14 +568,14 @@
 				// 휴가 배지는 초록색 (#16a34a)으로 깔끔하게 표출
 				badgeHtml += '<span style="display:inline-block; padding:1px 5px; margin-right:4px; font-size:10px; font-weight:bold; line-height:14px; color:#ffffff; background-color:#16a34a; border-radius:3px; vertical-align:middle;">휴가</span>';
 
-				// 툴팁이 아닌 뱃지와 함께 보이는 텍스트 뒤에 (오전)/(오후)를 추가
+				// 툴팁이 아닌 뱃지와 함께 보이는 텍스트 뒤에 반차 표기 보정 (이미 오전/오후 텍스트가 포함되어 있지 않은 경우)
 				if (halfType === 'AM') {
 					if (val.indexOf('오전') === -1) {
-						val = val ? (val + '(오전)') : '반차(오전)';
+						val = val ? (val + ' / 반차(오전)') : '반차(오전)';
 					}
 				} else if (halfType === 'PM') {
 					if (val.indexOf('오후') === -1) {
-						val = val ? (val + '(오후)') : '반차(오후)';
+						val = val ? (val + ' / 반차(오후)') : '반차(오후)';
 					}
 				}
 			}
@@ -889,9 +889,17 @@
 					label: '근태 수정 일시 대상',
 					columns: [
 						{ key: 'inDttm',  label: '수정출근일시', width: 110, align: 'center', styleClass: function() {
+							var item = this.item;
+							if (item && item.isUserEditedInDttm) {
+								return 'grid-cell-blue-changed';
+							}
 							return isModDttmPink(this.item, 'inDttm') ? 'grid-cell-skyblue' : '';
 						} },
 						{ key: 'outDttm', label: '수정퇴근일시', width: 110, align: 'center', styleClass: function() {
+							var item = this.item;
+							if (item && item.isUserEditedOutDttm) {
+								return 'grid-cell-blue-changed';
+							}
 							return isModDttmPink(this.item, 'outDttm') ? 'grid-cell-skyblue' : '';
 						} }
 					]
@@ -1159,6 +1167,19 @@
 								item.isUserEditedWorkType = true;
 								item.workTypeNmChanged = true;
 							}
+						}
+
+						// 담당자가 수정출퇴근일시(inDttm, outDttm)를 직접 수정한 경우
+						if (item && key === 'inDttm') {
+							item.isUserEditedInDttm = true;
+						}
+						if (item && key === 'outDttm') {
+							item.isUserEditedOutDttm = true;
+						}
+
+						// 담당자가 특이사항(spclMtr)을 직접 수정한 경우 (내용 삭제 또는 다른 내용 키인 시 자동 채움 영구 방지)
+						if (item && key === 'spclMtr') {
+							item.isUserEditedSpclMtr = true;
 						}
 
 						setTimeout(function() {
@@ -1655,6 +1676,11 @@
 					var targetKey = visibleKeys[targetColIdx];
 					var cellData = rowData[j].replace(new RegExp('\r', 'ig'), '').trim();
 
+					if (targetKey === 'inDttm') list[calRow].isUserEditedInDttm = true;
+					if (targetKey === 'outDttm') list[calRow].isUserEditedOutDttm = true;
+					if (targetKey === 'spclMtr') list[calRow].isUserEditedSpclMtr = true;
+					if (targetKey === 'workTypeNm') list[calRow].isUserEditedWorkType = true;
+
 					attendanceGrid.setValue(calRow, targetKey, cellData);
 				}
 				recalcExcelDetailColumns(list[calRow]);
@@ -1758,6 +1784,10 @@
 				for (var k = 0; k < targetKeys.length; k++) {
 					var key = targetKeys[k];
 					row[key] = ''; // 데이터 직접 지우기
+					if (key === 'inDttm') row.isUserEditedInDttm = true;
+					if (key === 'outDttm') row.isUserEditedOutDttm = true;
+					if (key === 'spclMtr') row.isUserEditedSpclMtr = true;
+					if (key === 'workTypeNm') row.isUserEditedWorkType = true;
 					attendanceGrid.setValue(i, key, '');
 				}
 				recalcExcelDetailColumns(row);
@@ -1876,7 +1906,16 @@
 				var vacNo = item.vacApplNo ? String(item.vacApplNo).trim() : '';
 				var substWorkNo = item.workApplNo ? String(item.workApplNo).trim() : '';
 
-				if (replyNo) {
+				// 사용자가 더블클릭한 컬럼(휴가 컬럼 등)에 따라 우선순위 분기
+				if (col.key === 'vacationTxt' && vacNo) {
+					// '휴가' 컬럼 더블클릭 시 휴가신청 상세 우선 조회
+					openModal("/static/html/user/pm/pm07/PM0701P01.html", 1100, 700, "휴가신청 상세", {
+						actionType: "V",
+						coCd: jwt.coCd || "GUN",
+						reqNo: vacNo,
+						pgmId: "PM0701P01"
+					});
+				} else if (replyNo) {
 					// 출장복명서가 작성된 경우 -> 출장복명서 조회
 					openModal("/static/html/user/pm/pm51/PM5102P01.html", 1500, 860, "출장복명서 상세", {
 						actionType: "V",
@@ -2446,9 +2485,13 @@
 				var matchedVacation = appMatch.matchedVacation;
 				var matchedSubstWork = appMatch.matchedSubstWork;
 
+				var tripSpcl = '';
 				if (matchedTrip) {
 					row.ordrsNo = matchedTrip.ordrsNo || '';
-					row.spclMtr = matchedTrip.tripTypeNm + (matchedTrip.tripPlace ? ('(' + matchedTrip.tripPlace + ')') : '');
+					tripSpcl = matchedTrip.tripTypeNm + (matchedTrip.tripPlace ? ('(' + matchedTrip.tripPlace + ')') : '');
+					if (!row.isUserEditedSpclMtr) {
+						row.spclMtr = tripSpcl;
+					}
 					row.tripWorkPlace = matchedTrip.tripPlace || '';
 					row.tripReplyNo = matchedTrip.tripRptNo || '';
 					row.tripApplNo = matchedTrip.tripReqNo || '';
@@ -2500,9 +2543,15 @@
 					row.ampmCd = matchedVacation.ampmCd || '';
 					row.ampmNm = ampmTxt || '';
 
-					if (!matchedTrip) {
-						row.spclMtr = fullVacNm;
-						row.rmk = fullVacNm; // 휴가 연동 시 기존 텍스트 유무에 상관없이 정제된 구체적 휴가명으로 무조건 덮어쓴다.
+					if (!row.isUserEditedSpclMtr) {
+						if (matchedTrip) {
+							// 출장과 휴가가 동시에 존재하는 경우: 2가지 모두 결합하여 표시 (예: "2026-001-설치시운전(출장지) / 반차(오후)")
+							row.spclMtr = tripSpcl + ' / ' + fullVacNm;
+							row.rmk = tripSpcl + ' / ' + fullVacNm;
+						} else {
+							row.spclMtr = fullVacNm;
+							row.rmk = fullVacNm; // 휴가 연동 시 기존 텍스트 유무에 상관없이 정제된 구체적 휴가명으로 무조건 덮어쓴다.
+						}
 					}
 				}
 
@@ -2646,13 +2695,51 @@
 						row.ordrsNo = matchedTrip.ordrsNo;
 					}
 
-					// 조회 재동기화 시 매칭된 최신 휴가가 있으면 (xx) 괄호 제거 정제된 구체적 휴가명("대체휴가" 등)으로 spclMtr 및 rmk를 즉시 갱신
-					if (matchedVacation) {
-						var rawVacNm = String(matchedVacation.vacTypeNm || matchedVacation.pureVacTypeNm || matchedVacation.vacTypeCdNm || '').trim();
-						var vacNm = rawVacNm.replace(/\s*\(.*?\)/g, '').trim();
-						if (!matchedTrip) {
-							row.spclMtr = vacNm;
-							row.rmk = vacNm;
+					// 특이사항(spclMtr) 제어: DB에 이미 저장된 행은 저장된 값(savedSpclMtr)을 100% 보존하고,
+					// 담당자가 내용을 지웠거나 다른 내용을 키인한 경우(isUserEditedSpclMtr)에도 절대 자동 덮어쓰지 않는다.
+					var isDbSavedRow = (row.savedSpclMtr !== undefined && row.savedSpclMtr !== null);
+					if (isDbSavedRow && !row.isUserEditedSpclMtr) {
+						row.spclMtr = row.savedSpclMtr; // 최종 저장된 값으로 항상 유지/반영 (내용 삭제 및 키인값 보존)
+					} else if (!isDbSavedRow && !row.isUserEditedSpclMtr) {
+						// 최초 변환(DB 미저장 및 미수정) 시점에만 자동 추천값 채움
+						var fullVacNm = '';
+						if (matchedVacation) {
+							var rawVacNm = String(matchedVacation.vacTypeNm || matchedVacation.pureVacTypeNm || matchedVacation.vacTypeCdNm || '').trim();
+							var vacNm = rawVacNm.replace(/\s*\(.*?\)/g, '').trim();
+							var isHalfVac = (Number(matchedVacation.workHour) === 4) || (vacNm.indexOf('반차') !== -1);
+							var ampmTxt = '';
+							var aCode = String(matchedVacation.ampmCd || '').toUpperCase();
+							if (aCode === 'PM07AMPM01' || aCode === 'PM07AMPM10' || aCode.indexOf('AM') !== -1) ampmTxt = '오전';
+							else if (aCode === 'PM07AMPM02' || aCode === 'PM07AMPM20' || aCode.indexOf('PM') !== -1) ampmTxt = '오후';
+
+							fullVacNm = vacNm;
+							if (isHalfVac) {
+								var effIn = row.inDttm ? String(row.inDttm).trim() : (row.inTm ? String(row.inTm).trim() : '');
+								var effOut = row.outDttm ? String(row.outDttm).trim() : (row.outTm ? String(row.outTm).trim() : '');
+								var inTimePart = effIn.indexOf(' ') !== -1 ? effIn.split(' ')[1] : effIn;
+								var outTimePart = effOut.indexOf(' ') !== -1 ? effOut.split(' ')[1] : effOut;
+								var inH = inTimePart ? parseInt(inTimePart.split(':')[0], 10) : 0;
+								var outH = outTimePart ? parseInt(outTimePart.split(':')[0], 10) : 0;
+								if (inH > 0 && inH < 12 && outH > 0 && outH <= 15) {
+									ampmTxt = '오후';
+								} else if (inH >= 12) {
+									ampmTxt = '오전';
+								} else if (!ampmTxt) {
+									ampmTxt = '오후';
+								}
+								var baseNm = (vacNm.indexOf('연차') !== -1 || vacNm === '반차') ? '반차' : vacNm.replace(/반차/g, '');
+								fullVacNm = baseNm + '(' + ampmTxt + ')';
+							}
+						}
+
+						if (matchedTrip && matchedVacation) {
+							var tripSpcl = matchedTrip.tripTypeNm + (matchedTrip.tripPlace ? ('(' + matchedTrip.tripPlace + ')') : '');
+							row.spclMtr = tripSpcl + ' / ' + fullVacNm;
+						} else if (matchedTrip) {
+							var tripSpcl = matchedTrip.tripTypeNm + (matchedTrip.tripPlace ? ('(' + matchedTrip.tripPlace + ')') : '');
+							row.spclMtr = tripSpcl;
+						} else if (matchedVacation) {
+							row.spclMtr = fullVacNm;
 						}
 					}
 
@@ -2754,6 +2841,14 @@
 						// DB에 저장돼 있던 근무형태를 스냅샷으로 보존 — refreshApplicationLinkageNos가
 						// 신청서 재매칭 후 workTypeNm을 덮어쓰면 이 값과 비교해서 판정변경 여부를 표시한다.
 						attendanceData[i].savedWorkTypeNm = attendanceData[i].workTypeNm;
+						// DB에 저장돼 있던 특이사항(spclMtr)도 스냅샷으로 영구 보존 — 이후 자동 채움으로 절대 덮어쓰지 않고 저장된 값 유지
+						attendanceData[i].savedSpclMtr = (attendanceData[i].spclMtr !== undefined && attendanceData[i].spclMtr !== null) ? String(attendanceData[i].spclMtr) : '';
+						attendanceData[i].isUserEditedSpclMtr = false;
+						// DB에 저장돼 있던 수정출퇴근일시(inDttm/outDttm)도 스냅샷으로 보존 및 사용자 수정 플래그 초기화
+						attendanceData[i].savedInDttm = (attendanceData[i].inDttm !== undefined && attendanceData[i].inDttm !== null) ? String(attendanceData[i].inDttm) : '';
+						attendanceData[i].savedOutDttm = (attendanceData[i].outDttm !== undefined && attendanceData[i].outDttm !== null) ? String(attendanceData[i].outDttm) : '';
+						attendanceData[i].isUserEditedInDttm = false;
+						attendanceData[i].isUserEditedOutDttm = false;
 						recalcExcelDetailColumns(attendanceData[i]);
 					}
 					attendanceGrid.setData({
@@ -3149,10 +3244,28 @@
 
 			var isTripType = (wt === '설치시운전' || wt === '설치장애' || wt === 'A/S(무상)' || wt === '기타출장');
 
-			// 출장 유형(설치시운전, 설치장애, A/S(무상), 기타출장)으로 값이 설정되면 수정출근일시 08:30 ~ 수정퇴근일시 17:30 자동 설정
+			// 출장 유형(설치시운전, 설치장애, A/S(무상), 기타출장)으로 값이 설정되면 수정출근일시 ~ 수정퇴근일시 자동 설정 (단, 반차가 결합된 경우 반차 근무시간과 합치되도록 정밀 산출)
+			// [우선순위 원칙]: 담당자가 최종 수정한 값(isUserEditedInDttm/isUserEditedOutDttm) > DB에서 불러온 저장값(savedInDttm/savedOutDttm) > 자동 설정 기준
 			if (isTripType && dtFormatted) {
-				row.inDttm = dtFormatted + ' 08:30';
-				row.outDttm = dtFormatted + ' 17:30';
+				var halfType = (typeof getHalfVacationType === 'function') ? getHalfVacationType(row) : null;
+				var defaultIn = dtFormatted + (halfType === 'AM' ? ' 13:30' : ' 08:30');
+				var defaultOut = dtFormatted + (halfType === 'PM' ? ' 12:30' : ' 17:30');
+
+				if (!row.isUserEditedInDttm) {
+					if (row.savedInDttm !== undefined && row.savedInDttm !== null && String(row.savedInDttm).trim() !== '') {
+						row.inDttm = row.savedInDttm;
+					} else if (!row.inDttm) {
+						row.inDttm = defaultIn;
+					}
+				}
+
+				if (!row.isUserEditedOutDttm) {
+					if (row.savedOutDttm !== undefined && row.savedOutDttm !== null && String(row.savedOutDttm).trim() !== '') {
+						row.outDttm = row.savedOutDttm;
+					} else if (!row.outDttm) {
+						row.outDttm = defaultOut;
+					}
+				}
 			}
 
 			var effectiveInStr = row.inDttm ? String(row.inDttm).trim() : (row.inTm ? String(row.inTm).trim() : '');
@@ -3378,11 +3491,22 @@
 					}
 
 					beginBulkEdit();
+					var rowItem = (attendanceGrid.getList() || [])[dindex] || row;
 					if (applyIn) {
-						attendanceGrid.setValue(dindex, 'inDttm', sd + ' ' + startTime);
+						var fullInDttm = sd + ' ' + startTime;
+						attendanceGrid.setValue(dindex, 'inDttm', fullInDttm);
+						if (rowItem) {
+							rowItem.inDttm = fullInDttm;
+							rowItem.isUserEditedInDttm = true;
+						}
 					}
 					if (applyOut) {
-						attendanceGrid.setValue(dindex, 'outDttm', ed + ' ' + endTime);
+						var fullOutDttm = ed + ' ' + endTime;
+						attendanceGrid.setValue(dindex, 'outDttm', fullOutDttm);
+						if (rowItem) {
+							rowItem.outDttm = fullOutDttm;
+							rowItem.isUserEditedOutDttm = true;
+						}
 					}
 					recalcOtNightTotal(dindex);
 					attendanceGrid.repaint();
@@ -3466,11 +3590,20 @@
 					return;
 				}
 				beginBulkEdit();
+				var rowItem = (attendanceGrid.getList() || [])[dindex] || row;
 				if (applyIn) {
 					attendanceGrid.setValue(dindex, 'inDttm', '');
+					if (rowItem) {
+						rowItem.inDttm = '';
+						rowItem.isUserEditedInDttm = true;
+					}
 				}
 				if (applyOut) {
 					attendanceGrid.setValue(dindex, 'outDttm', '');
+					if (rowItem) {
+						rowItem.outDttm = '';
+						rowItem.isUserEditedOutDttm = true;
+					}
 				}
 				recalcOtNightTotal(dindex);
 				attendanceGrid.repaint();

@@ -302,19 +302,19 @@ public class PM08SvcImpl implements PM08Svc {
 			return result;
 		}
 
-		// 삭제 사전 검증: 근무결과가 이미 작성되었거나 신청자 외 결재가 이미 진행된 경우 삭제 불가
-		if (currentDtl.get("workResult") != null && !currentDtl.get("workResult").toString().trim().isEmpty()) {
-			result.put("resultCode", "500");
-			result.put("resultMessage", "근무결과가 이미 등록된 건은 신청서를 삭제할 수 없습니다.");
-			return result;
+		// 특별 정책: 휴일대체근무 삭제는 신청자가 결재진행중 또는 완료상태에서도 자료 삭제 허용
+		// 단, 타인의 신청건 무단 삭제 방지를 위해 신청자 본인 여부 검증
+		String loginUserId = paramMap.get("userId");
+		String reqId = currentDtl.get("reqId");
+		if (reqId == null) {
+			reqId = currentDtl.get("REQ_ID");
 		}
-		Map<String, String> reqCheckMap = new HashMap<>(paramMap);
-		reqCheckMap.put("todoDiv2CodeId", "TODODIV2410");
-		int approvedCnt = pm08Mapper.selectApprovedCountExceptApplicant(reqCheckMap);
-		if (approvedCnt > 0) {
-			result.put("resultCode", "500");
-			result.put("resultMessage", "이미 신청자 외 결재가 진행된 건은 삭제할 수 없습니다.");
-			return result;
+		if (loginUserId != null && !loginUserId.trim().isEmpty() && reqId != null && !reqId.trim().isEmpty()) {
+			if (!loginUserId.trim().equalsIgnoreCase(reqId.trim())) {
+				result.put("resultCode", "500");
+				result.put("resultMessage", "휴일대체근무 신청자 본인만 삭제할 수 있습니다.");
+				return result;
+			}
 		}
 
 		// 2. 결재선 삭제 (신청결재, 결과결재 모두)
