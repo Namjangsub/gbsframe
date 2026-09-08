@@ -147,6 +147,7 @@ public class PM08SvcImpl implements PM08Svc {
 			}
 
 			// 6. 첨부파일 처리
+			deleteAttachedFiles(paramMap.get("deleteFileArr"));
 			paramMap.put("comonCd", "FITR9902");
 			cm08Svc.uploadFile("PM0801P01", reqNo, mRequest);
 
@@ -168,12 +169,22 @@ public class PM08SvcImpl implements PM08Svc {
 
 		boolean isResultStage = "RESULT".equals(paramMap.get("approvalStage"));
 
-		// 마감 검증: 신청서 수정 시에만 수행 (결과상신은 날짜 안 바뀌므로 제외)
-		if (!isResultStage) {
-			String holidayDt = paramMap.get("holidayDt");
-			if (holidayDt != null && !holidayDt.isEmpty()) {
-				pm30Svc.assertNotClosed(holidayDt);
+		// 마감 검증: holidayDt (신청서 수정 및 결과 상신 모두 마감 검증 수행)
+		String holidayDt = paramMap.get("holidayDt");
+		if (holidayDt == null || holidayDt.isEmpty()) {
+			Map<String, String> dtlQuery = new HashMap<>();
+			dtlQuery.put("coCd", paramMap.get("coCd"));
+			dtlQuery.put("reqNo", paramMap.get("reqNo"));
+			Map<String, String> currentDtl = pm08Mapper.selectSubstituteWorkDtl(dtlQuery);
+			if (currentDtl != null) {
+				holidayDt = currentDtl.get("holidayDt");
+				if (holidayDt == null || holidayDt.isEmpty()) {
+					holidayDt = currentDtl.get("HOLIDAY_DT");
+				}
 			}
+		}
+		if (holidayDt != null && !holidayDt.isEmpty()) {
+			pm30Svc.assertNotClosed(holidayDt);
 		}
 
 		// 1. 중복 신청 검사 (신청서 수정 시에만 수행, 결과상신 시에는 검사 스킵)
@@ -291,6 +302,7 @@ public class PM08SvcImpl implements PM08Svc {
 			}
 
 			// 4. 첨부파일 처리
+			deleteAttachedFiles(paramMap.get("deleteFileArr"));
 			paramMap.put("comonCd", "FITR9902");
 			cm08Svc.uploadFile("PM0801P01", paramMap.get("reqNo"), mRequest);
 
@@ -344,16 +356,29 @@ public class PM08SvcImpl implements PM08Svc {
 			}
 		}
 
-		// 2. 결재선 삭제 (신청결재, 결과결재 모두)
+		// 2. 결재선/공유선 일괄 CASCADE 삭제 (신청결재/신청공유/결과결재/결과공유)
 		Map<String, String> deleteParam1 = new HashMap<>();
 		deleteParam1.put("todoNo", paramMap.get("reqNo"));
 		deleteParam1.put("todoDiv2CodeId", "TODODIV2410");
 		wb20Svc.deleteTodoMasterByTodoNo(deleteParam1);
 
+		Map<String, String> deleteParam1Share = new HashMap<>();
+		deleteParam1Share.put("todoNo", paramMap.get("reqNo"));
+		deleteParam1Share.put("todoDiv2CodeId", "TODODIV1410");
+		wb20Svc.deleteTodoMasterByTodoNo(deleteParam1Share);
+
 		Map<String, String> deleteParam2 = new HashMap<>();
 		deleteParam2.put("todoNo", paramMap.get("reqNo"));
 		deleteParam2.put("todoDiv2CodeId", "TODODIV2420");
 		wb20Svc.deleteTodoMasterByTodoNo(deleteParam2);
+
+		Map<String, String> deleteParam2Share = new HashMap<>();
+		deleteParam2Share.put("todoNo", paramMap.get("reqNo"));
+		deleteParam2Share.put("todoDiv2CodeId", "TODODIV1420");
+		wb20Svc.deleteTodoMasterByTodoNo(deleteParam2Share);
+
+		// 혹시 모를 잔여 결재/공유선까지 REQ_NO 기준으로 100% 일괄 삭제
+		pm08Mapper.deleteApprovalLineByReqNo(paramMap);
 
 		// 3. 참여 프로젝트 목록 삭제
 		pm08Mapper.deleteSubstituteWorkProjectList(paramMap);
@@ -395,6 +420,21 @@ public class PM08SvcImpl implements PM08Svc {
 	@Transactional(rollbackFor = Exception.class)
 	public Map<String, String> deleteSubstituteWorkResult(Map<String, String> paramMap) throws Exception {
 		Map<String, String> result = new HashMap<>();
+
+		// 마감 검증: DB의 holidayDt
+		Map<String, String> dtlQuery = new HashMap<>();
+		dtlQuery.put("coCd", paramMap.get("coCd"));
+		dtlQuery.put("reqNo", paramMap.get("reqNo"));
+		Map<String, String> currentDtl = pm08Mapper.selectSubstituteWorkDtl(dtlQuery);
+		if (currentDtl != null) {
+			String holidayDt = currentDtl.get("holidayDt");
+			if (holidayDt == null || holidayDt.isEmpty()) {
+				holidayDt = currentDtl.get("HOLIDAY_DT");
+			}
+			if (holidayDt != null && !holidayDt.isEmpty()) {
+				pm30Svc.assertNotClosed(holidayDt);
+			}
+		}
 
 		// 결과삭제 사전 검증: 신청자 외 결과 결재(TODODIV2420)가 승인('Y') 진행된 경우 삭제 불가
 		Map<String, String> resCheckMap = new HashMap<>(paramMap);
@@ -560,5 +600,21 @@ public class PM08SvcImpl implements PM08Svc {
 	@Override
 	public List<Map<String, String>> selectSubstituteVacationStatusList(Map<String, String> paramMap) {
 		return pm08Mapper.selectSubstituteVacationStatusList(paramMap);
+	}
+
+	// 화면에서 삭제한 첨부파일 반영 (CM16SvcImpl / PM07SvcImpl 과 동일 패턴)
+	private void deleteAttachedFiles(String deleteFileArrJson) {
+		if (deleteFileArrJson == null || deleteFileArrJson.isEmpty()) return;
+		try {
+			String[] fileKeys = new Gson().fromJson(deleteFileArrJson, String[].class);
+			if (fileKeys == null) return;
+			for (String fileKey : fileKeys) {
+				if (fileKey != null && !fileKey.isEmpty()) {
+					cm08Svc.deleteFile(fileKey);
+				}
+			}
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
 	}
 }

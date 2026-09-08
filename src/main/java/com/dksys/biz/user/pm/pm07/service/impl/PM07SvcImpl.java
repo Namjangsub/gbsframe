@@ -165,6 +165,26 @@ public class PM07SvcImpl implements PM07Svc {
 	}
 
 	/**
+	 * 일자 문자열의 주말(토/일) 여부 판정
+	 */
+	private boolean isWeekend(String dateStr) {
+		if (dateStr == null || dateStr.trim().isEmpty()) {
+			return false;
+		}
+		String digits = dateStr.replaceAll("[^0-9]", "");
+		if (digits.length() < 8) {
+			return false;
+		}
+		try {
+			LocalDate dt = LocalDate.parse(digits.substring(0, 8), DateTimeFormatter.ofPattern("yyyyMMdd"));
+			java.time.DayOfWeek dow = dt.getDayOfWeek();
+			return (dow == java.time.DayOfWeek.SATURDAY || dow == java.time.DayOfWeek.SUNDAY);
+		} catch (Exception e) {
+			return false;
+		}
+	}
+
+	/**
 	 * 포상휴가(PM07TYPE07, PM07TYPE08) 신청 시 잔여 검증
 	 * @param paramMap 휴가신청 파라미터 (vacTypeCd, reqId, stDt, deductDays 포함)
 	 * @return 검증 통과 시 null, 실패 시 오류 메시지
@@ -276,6 +296,13 @@ public class PM07SvcImpl implements PM07Svc {
 			pm30Svc.assertNotClosed(stDt, edDt);
 		}
 
+		// 시작일/종료일 주말(휴일) 검증: 시작일과 종료일이 모두 주말이면 등록 불가
+		if (isWeekend(stDt) && isWeekend(edDt)) {
+			result.put("resultCode", "500");
+			result.put("resultMessage", "시작일자(" + stDt + ")와 종료일자(" + edDt + ")가 모두 휴일(주말)이므로 신청할 수 없습니다.");
+			return result;
+		}
+
 		// 백엔드 DB 저장 직전에 차감일수 및 휴가일수 최종 평가/산정
 		evaluateVacationAndDeductDays(paramMap);
 
@@ -314,6 +341,11 @@ public class PM07SvcImpl implements PM07Svc {
 
 				for (Map<String, String> approval : approvalList) {
 					approval.put("todoNo", reqNo);
+					// WB20 결재선 순차결재 판정(BEFORE_NOT_CONFIRM)은 (TODO_NO, SALES_CD)로 같은 결재선을 묶어서 비교한다.
+					// PM07은 SALES_CD 개념이 없는 모듈이라 문서키(reqNo)를 넣는 것이 관례인데, 신규 등록 시점엔
+					// 프론트가 reqNo를 아직 몰라 빈 값으로 보낸다 - Oracle/Tibero는 빈 문자열을 NULL로 취급해
+					// NULL=NULL 비교가 항상 거짓이 되므로, 서버가 발급한 reqNo로 여기서 강제로 채워야 한다.
+					approval.put("salesCd", reqNo);
 					approval.put("etcField1", reqNo);
 					approval.put("todoTitl", paramMap.get("reqTitl"));
 					if (!approval.containsKey("coCd") || approval.get("coCd") == null || approval.get("coCd").isEmpty()) approval.put("coCd", paramMap.get("coCd"));
@@ -351,6 +383,8 @@ public class PM07SvcImpl implements PM07Svc {
 				paramMap.put("etcField1", reqNo);
 				if (!paramMap.containsKey("todoNo") || paramMap.get("todoNo") == null) paramMap.put("todoNo", reqNo);
 				if (!paramMap.containsKey("todoDiv2CodeId") || paramMap.get("todoDiv2CodeId") == null) paramMap.put("todoDiv2CodeId", "TODODIV2300");
+				// 기안자 본인 자체승인 시 END 오판 방어 로직은 applyVacationApprovedInner 안으로
+				// 이전됨(모든 호출 경로를 보호하고, 실시간 결재선을 직접 조회하는 더 정확한 판정).
 				wb20Svc.insertTodoMaster(paramMap);
 			}
 
@@ -462,6 +496,13 @@ public class PM07SvcImpl implements PM07Svc {
 			pm30Svc.assertNotClosed(stDt, edDt);
 		}
 
+		// 시작일/종료일 주말(휴일) 검증: 시작일과 종료일이 모두 주말이면 수정 불가
+		if (isWeekend(stDt) && isWeekend(edDt)) {
+			result.put("resultCode", "500");
+			result.put("resultMessage", "시작일자(" + stDt + ")와 종료일자(" + edDt + ")가 모두 휴일(주말)이므로 저장할 수 없습니다.");
+			return result;
+		}
+
 		// 백엔드 DB 저장 직전에 차감일수 및 휴가일수 최종 평가/산정
 		evaluateVacationAndDeductDays(paramMap);
 
@@ -498,6 +539,9 @@ public class PM07SvcImpl implements PM07Svc {
 
 				for (Map<String, String> approval : approvalList) {
 					approval.put("todoNo", paramMap.get("reqNo"));
+					// insertVacation과 동일한 이유로 SALES_CD를 문서키(reqNo)로 강제 고정한다
+					// (프론트가 정상적으로 채워 보내는 값이지만, 서버에서도 방어적으로 보정한다).
+					approval.put("salesCd", paramMap.get("reqNo"));
 					approval.put("etcField1", paramMap.get("reqNo"));
 					approval.put("todoTitl", paramMap.get("reqTitl"));
 					if (!approval.containsKey("coCd") || approval.get("coCd") == null || approval.get("coCd").isEmpty()) approval.put("coCd", paramMap.get("coCd"));
@@ -618,8 +662,14 @@ public class PM07SvcImpl implements PM07Svc {
 
 		// 2. 결재선 Master 및 Detail 삭제 (TODO_NO = REQ_NO 매칭)
 		paramMap.put("todoNo", paramMap.get("reqNo"));
+		// 2-1. 결재선 (TODODIV2300) 삭제
 		paramMap.put("todoDiv2CodeId", "TODODIV2300");
 		wb20Svc.deleteTodoMasterByTodoNo(paramMap);
+		// 2-2. 공유선 (TODODIV1300) 삭제
+		paramMap.put("todoDiv2CodeId", "TODODIV1300");
+		wb20Svc.deleteTodoMasterByTodoNo(paramMap);
+		// 2-3. 혹시 다른 결재/공유코드로 등록된 잔여 결재선까지 REQ_NO 기준으로 100% CASCADE 삭제
+		pm07Mapper.deleteApprovalLineByReqNo(paramMap);
 
 		// 3. 휴가 일자 디테일 및 휴가 신청 본체 삭제
 		pm07Mapper.deleteVacationDates(paramMap);
@@ -1206,6 +1256,7 @@ public class PM07SvcImpl implements PM07Svc {
 		if (reqNo == null || reqNo.trim().isEmpty()) {
 			reqNo = paramMap.get("reqNo");
 		}
+		paramMap.put("reqNo", reqNo); // deleteDailyWorkReportByVacation 등 쿼리 바인딩용 필수 주입
 		String coCd = paramMap.get("coCd");
 
 		// double-brace 익명 클래스 제거 (effectively final 제약 해제)
@@ -1218,12 +1269,52 @@ public class PM07SvcImpl implements PM07Svc {
 			return 0;
 		}
 
-		// 중간 결재자가 승인한 시점(todoYn != "Y")에는 진행중(ING)으로만 바꾸고 일일업무일지는 만들지 않는다.
+		// [신규 등록 시점 기안자 자체승인 오판 방어]
+		// todoYn == "Y" 로 넘어왔더라도, 결재선에 상급 결재자(SANCTN_SN > 1, gb != '공유')가 존재하는데
+		// 아직 미승인 상태라면 이는 실제 최종 완료가 아니라 기안자 본인 행만 먼저 들어가서 발생한 오판이다.
+		// 이 경우 END로 확정하지 않고 신청(REQ) 상태를 유지한다.
+		if ("Y".equals(todoYn)) {
+			Map<String, String> apprQuery = new HashMap<>();
+			apprQuery.put("todoNo", reqNo);
+			List<Map<String, String>> currentApprList = wb20Svc.selectGetApprovalList(apprQuery);
+			boolean hasPendingUpperApprover = false;
+			if (currentApprList != null && !currentApprList.isEmpty()) {
+				for (Map<String, String> app : currentApprList) {
+					String snStr = app.get("sanctnSn") != null ? String.valueOf(app.get("sanctnSn")) : String.valueOf(app.get("SANCTN_SN"));
+					int sn = 0;
+					try { sn = Integer.parseInt(snStr); } catch (Exception ignored) {}
+					String div1 = app.get("todoDiv1CodeId") != null ? String.valueOf(app.get("todoDiv1CodeId")) : String.valueOf(app.get("TODO_DIV1_CODE_ID"));
+					boolean isApprover = (div1 == null || div1.isEmpty() || "TODODIV20".equals(div1));
+					if (sn > 1 && isApprover) {
+						String sttus = app.get("sanctnSttus") != null ? String.valueOf(app.get("sanctnSttus")) : String.valueOf(app.get("SANCTN_STTUS"));
+						if (!"Y".equalsIgnoreCase(sttus)) {
+							hasPendingUpperApprover = true;
+							break;
+						}
+					}
+				}
+			}
+			if (hasPendingUpperApprover) {
+				Map<String, String> reqMap = new HashMap<>();
+				reqMap.put("coCd", coCd);
+				reqMap.put("reqNo", reqNo);
+				reqMap.put("sanctnSts", "REQ");
+				pm07Mapper.updateVacationApprovalStatus(reqMap);
+				return 1;
+			}
+		}
+
+		// 중간 결재자가 승인한 시점(todoYn != "Y")에는 상태만 갱신하고 일일업무일지는 만들지 않는다.
+		// selectVacationDtl 이 이미 실시간 결재선(TB_WB20M03) 기준으로 REQ/ING/RTN 을 정확히 계산해서
+		// vacationInfo.sanctnSts 로 내려주므로, 그 값을 그대로 쓴다 (하드코딩된 "ING"를 쓰면 기안자
+		// 본인 자체승인만 된 신규 등록 시점에도 "진행중"으로 앞서가 버리는 문제가 있다 - 실제 상급
+		// 결재자가 한 명도 승인하지 않았다면 여전히 REQ 여야 한다).
 		if (!"Y".equals(todoYn)) {
+			String liveSts = vacationInfo.get("sanctnSts");
 			Map<String, String> ingMap = new HashMap<>();
 			ingMap.put("coCd", coCd);
 			ingMap.put("reqNo", reqNo);
-			ingMap.put("sanctnSts", "ING");
+			ingMap.put("sanctnSts", (liveSts != null && !liveSts.isEmpty()) ? liveSts : "ING");
 			pm07Mapper.updateVacationApprovalStatus(ingMap);
 			return 1;
 		}
@@ -1236,7 +1327,10 @@ public class PM07SvcImpl implements PM07Svc {
 
 			// 결함 3: 기존 일지 삭제 (등록/수정 경로에서 이미 생성되었을 수 있음)
 			try {
-				pm07Mapper.deleteDailyWorkReportByVacation(paramMap);
+				Map<String, String> delMap = new HashMap<>(paramMap);
+				delMap.put("reqNo", reqNo);
+				delMap.put("coCd", coCd);
+				pm07Mapper.deleteDailyWorkReportByVacation(delMap);
 			} catch (Exception e) {
 				e.printStackTrace();
 			}

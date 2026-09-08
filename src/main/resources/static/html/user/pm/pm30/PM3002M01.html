@@ -247,7 +247,8 @@
 				</div>
 			</div>
 
-			<div class="add_btn_small">
+			<div class="add_btn_small" style="display: flex; align-items: center; gap: 8px;">
+				<span id="closedStatusNotice" style="display: none;"></span>
 				<a onclick="loadMonthlyReport();" style="height: 30px; line-height: 28px; padding: 0 12px; cursor: pointer;"><i class="fas fa-search"></i> 검 색</a>
 				<a onclick="window.print();" style="height: 30px; line-height: 28px; padding: 0 12px; background: #475569; color: #fff; cursor: pointer;"><i class="fas fa-print"></i> 인 쇄</a>
 			</div>
@@ -369,6 +370,28 @@
 			return ''; // 한글/영문 등 유효하지 않은 오타 문자는 빈칸으로 정제
 		}
 
+		// 근태마감 전역 변수 및 헬퍼
+		var __attendanceCloseYm = null;
+		var __attendanceCloseYmLoaded = false;
+
+		function loadAttendanceCloseYm() {
+			if (!__attendanceCloseYmLoaded) {
+				postAjaxSync('/user/pm/pm30/selectAttendanceCloseYm', {}, null, function(data) {
+					__attendanceCloseYm = (data && data.closeYm) ? data.closeYm : null;
+					__attendanceCloseYmLoaded = true;
+				});
+			}
+		}
+
+		function isAttendanceClosed(ymStr) {
+			loadAttendanceCloseYm();
+			if (!__attendanceCloseYm || !ymStr) return false;
+			var digits = String(ymStr).replace(/[^0-9]/g, '');
+			if (digits.length < 6) return false;
+			var dtYm = digits.substring(0, 6);
+			return (dtYm <= __attendanceCloseYm);
+		}
+
 		$(document).ready(function() {
 			mainDefaultLoad("생산관리", "월별 근태현황");
 
@@ -387,6 +410,14 @@
 
 			// 변동분내역 입력칸 자동저장 (focusout 위임) - 15개 전체 필드 지원 및 입력 정제
 			$('#monthlyReportTableWrapper').on('focusout', '.pm30-chg-input', function() {
+				if (isAttendanceClosed($('#workYm_S').val())) {
+					var closeYmDisp = __attendanceCloseYm && __attendanceCloseYm.length === 6 ? 
+						(__attendanceCloseYm.substring(0, 4) + '/' + __attendanceCloseYm.substring(4, 6)) : 
+						(__attendanceCloseYm || "");
+					alert('근태마감으로 ' + closeYmDisp + '월 이전 근태 자료는 등록·수정·삭제할 수 없습니다. (조회만 가능합니다.)');
+					return;
+				}
+
 				var seq = parseInt($(this).data('seq'), 10);
 				var $tr = $(this).closest('tr');
 
@@ -575,6 +606,16 @@
 			var ym = $('#workYm_S').val();
 			if (!ym) return;
 
+			var isClosed = isAttendanceClosed(ym);
+			if (isClosed) {
+				var closeYmDisp = __attendanceCloseYm && __attendanceCloseYm.length === 6 ? 
+					(__attendanceCloseYm.substring(0, 4) + '/' + __attendanceCloseYm.substring(4, 6)) : 
+					(__attendanceCloseYm || "");
+				$('#closedStatusNotice').html('<span style="color: #d90429; font-weight: bold; font-size: 12px;"><i class="fas fa-lock"></i> 근태마감 (' + closeYmDisp + '월 이전 자료는 조회 전용)</span>').show();
+			} else {
+				$('#closedStatusNotice').hide().empty();
+			}
+
 			var year = parseInt(ym.substr(0, 4), 10);
 			var month = parseInt(ym.substr(5, 2), 10);
 			var lastDay = new Date(year, month, 0).getDate();
@@ -673,6 +714,8 @@
 
 		// 변동분내역 모든 셀(15개 전체) 입력칸 렌더링
 		function renderAttendanceChangeInputs() {
+			var isClosed = isAttendanceClosed($('#workYm_S').val());
+
 			$('.pm30-chg-row').each(function() {
 				var seq = parseInt($(this).data('seq'), 10);
 				var chgItem = pm30ChangeData[seq];
@@ -681,7 +724,8 @@
 				var cells = $(this).find('td');
 				for (var c = 0; c < cells.length && c < 15; c++) {
 					var val = rowValues[c] || '';
-					var txt = '<input type="text" class="pm30-chg-input" data-seq="' + seq + '" data-col="' + c + '" value="' + val + '">';
+					var readonlyAttr = isClosed ? ' readonly style="background: #fafafa !important; cursor: not-allowed;"' : '';
+					var txt = '<input type="text" class="pm30-chg-input" data-seq="' + seq + '" data-col="' + c + '" value="' + val + '"' + readonlyAttr + '>';
 					cells.eq(c).html(txt);
 				}
 			});

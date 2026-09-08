@@ -196,23 +196,7 @@
 
 <script type="text/javascript">
 
-	// 순차 미결재(순차 결재 전용 문서 중 이전 결재자가 1명 이상 미결인 상태) 여부 판정
-	function checkSequentialPending(item) {
-		if (!item || item.todoDiv1CodeNm !== '결재') return false;
-
-		// 순차 결재 규칙이 명확히 적용된 전용 문서 코드만 지정 (동시/병렬 결재 건 오판 방지)
-		var seqStrictDocCodes = [
-			"TODODIV2190", "TODODIV2191", "TODODIV2200", "TODODIV2201", // 출장신청서 / 출장복명서
-			"TODODIV2100", // 수주복표원가
-			"TODODIV2120"  // PFU 결재
-		];
-
-		if (seqStrictDocCodes.indexOf(item.todoDiv2CodeId) < 0) {
-			return false;
-		}
-
-		return Number(item.beforeNotConfirm || 0) > 0;
-	}
+	// 순차 미결재 뱃지 판정: checkSequentialPending() 은 /static/js/commApproval.js 공용 함수 사용
 
 	var defaultColumns = [
 		{key: "todoDiv1CodeNm",      label: "구분",  align: "center",   width: 50},
@@ -676,6 +660,26 @@ function toDoConfirmApproval(gridObj){
 				return;
 			}
 		} else if( row.todoDiv1CodeNm == "결재" ) {
+			// PM08 휴일대체근무 신청/결과: 더블클릭(openFile)과 동일하게 PM0801P01.html 화면을 직접 연다.
+			// gridObj를 함께 넘기면 fileTree.js가 하단 버튼 영역에 "결재처리" 버튼을 자동 생성하고,
+			// 클릭 시 공통결재창(WB2001P01.html)을 통해 담당팀장 의견 필수입력 + 결재처리가 진행된다
+			// (필수입력 검증은 commApproval.js confirmApproval에 이미 적용됨).
+			if (row.todoDiv2CodeId == 'TODODIV2410' || row.todoDiv2CodeId == 'TODODIV2420') {
+				var pm08ParamObj = {};
+				try { pm08ParamObj = JSON.parse(row.pgParam || '{}'); } catch (e) { pm08ParamObj = {}; }
+				pm08ParamObj.reqNo = row.todoNo;
+				pm08ParamObj.coCd = row.coCd;
+				pm08ParamObj.actionType = pm08ParamObj.actionType || 'U';
+				pm08ParamObj.viewMode = 1;
+				pm08ParamObj.todoView = "INQ";
+				pm08ParamObj.todoKey = row.todoKey;
+				pm08ParamObj.gridObj = row;
+				openSecondModal("/static/html" + row.pgPath, 1100, 800, "", pm08ParamObj, function(){
+					gridView.setData(0);
+				});
+				return;
+			}
+
 			var paramObj = {
 					"coCd":row.coCd
 					, "salesCd":row.salesCd

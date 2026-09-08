@@ -383,8 +383,9 @@ public class PM30SvcImpl implements PM30Svc {
 
 			// dateYm <= closeYm 이면 마감된 기간
 			if (dateYm.compareTo(closeYm) <= 0) {
+				String closeYmDisp = closeYm.length() == 6 ? (closeYm.substring(0, 4) + "/" + closeYm.substring(4, 6)) : closeYm;
 				throw new IllegalStateException(
-					"마감된 기간(" + closeYm + " 이하)의 근태 자료는 등록·수정·삭제할 수 없습니다."
+					"근태마감으로 " + closeYmDisp + "월 이전 근태 자료는 등록·수정·삭제할 수 없습니다."
 				);
 			}
 		}

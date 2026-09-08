@@ -52,6 +52,13 @@
 	<script src="/static/js/vacationColorConfig.js"></script>
 	<!-- 연차휴가 자동계산 공통 모듈 -->
 	<script src="/static/js/common/PM07AnnualCommon.js"></script>
+	<style>
+		/* 퇴사자 행 스타일 (옅은 회색 배경 + 퇴사자 텍스트 구분) */
+		.grid-row-leave {
+			background-color: #fafafa !important;
+			color: #777777 !important;
+		}
+	</style>
 </head>
 
 <body>
@@ -73,17 +80,18 @@
 		<div class="contents search">
 			<input type="hidden" id="pgmId" name="pgmId" value="PM0701M01">
 			<input type="hidden" id="coCd_S" name="coCd_S" data-search="coCd" value="GUN">
+			<input type="hidden" id="sanctnSts_S" name="sanctnSts_S" data-search="sanctnSts" value="">
 			<div class="">
 				<table class="table_input type04">
 					<colgroup>
 						<col width="9%">
 						<col width="23%">
-						<col width="9%">
-						<col width="14%">
 						<col width="8%">
 						<col width="12%">
-						<col width="9%">
-						<col width="16%">
+						<col width="8%">
+						<col width="20%">
+						<col width="8%">
+						<col width="12%">
 					</colgroup>
 					<tr>
 						<th class="hit">신청일자</th>
@@ -94,23 +102,6 @@
 								<input type="text" class="input_calendar" id="reqDtTo_S" name="reqDtTo_S" data-search="reqDtTo" autocomplete="off" onkeyup="dateMask(this);" style="cursor:pointer;" msg="종료일자">
 							</div>
 						</td>
-						<th>휴가유형</th>
-						<td>
-							<select id="vacTypeCd_S" name="vacTypeCd_S" data-kind="PM07TYPE" data-search="vacTypeCd" onchange="DataSearch();">
-								<option value="">전체</option>
-							</select>
-						</td>
-						<th>결재상태</th>
-						<td>
-							<select id="sanctnSts_S" name="sanctnSts_S" data-search="sanctnSts" onchange="DataSearch();">
-								<option value="">전체</option>
-								<option value="TEMP">임시저장</option>
-								<option value="REQ">승인요청</option>
-								<option value="ING">진행중</option>
-								<option value="END">완료</option>
-								<option value="RTN">반려</option>
-							</select>
-						</td>
 						<th>신청자</th>
 						<td>
 							<div class="search_form" style="width: 100%;">
@@ -120,16 +111,20 @@
 								<a onclick="openReqUserTree('S');"><i class="i_search_w"></i></a>
 							</div>
 						</td>
-					</tr>
-					<tr>
 						<th>부서</th>
-						<td colspan="7">
+						<td>
 							<div class="search_form" style="width: 100%;">
 								<input type="hidden" id="reqDeptId_S" name="reqDeptId_S" data-search="reqDeptId">
 								<input type="text" id="reqDeptNm_S" name="reqDeptNm_S" data-search="reqDeptNm"
 									onkeyup="(event.keyCode == 8 || event.keyCode == 46) ? reqDeptId_S.value = '' : event.keyCode == 13 ? DataSearch() : '';">
 								<a onclick="openReqDeptTree('S');"><i class="i_search_w"></i></a>
 							</div>
+						</td>
+						<th>휴가유형</th>
+						<td>
+							<select id="vacTypeCd_S" name="vacTypeCd_S" data-kind="PM07TYPE" data-search="vacTypeCd" onchange="DataSearch();">
+								<option value="">전체</option>
+							</select>
 						</td>
 					</tr>
 				</table>
@@ -151,6 +146,14 @@
 					<a href="/static/html/user/pm/pm07/PM0702M01.html" style="height: 30px; line-height: 28px; width: 85px; background:#3182ce; color:#fff;" title="달력 화면으로 이동"><i class="fas fa-calendar-alt"></i> 달력보기</a>
 					<a onclick="openGridColumnConfig();" style="height: 30px; line-height: 28px; width: 90px;"><i class="fas fa-cog"></i> 그리드설정</a>
 				</div>
+				<select id="recordCnt_S" name="recordCnt_S" class="prae_select" data-search="recordCnt" onchange="gridView.setData(0);">
+					<option value="25">25</option>
+					<option value="50">50</option>
+					<option value="100" selected>100</option>
+					<option value="500">500</option>
+					<option value="1000">1000</option>
+					<option value="9999999">전체</option>
+				</select>
 			</div>
 		</div>
 
@@ -213,11 +216,21 @@
 		return v;
 	};
 
+	// 사원 성명 포맷터 (퇴사일자가 존재하는 퇴사자인 경우 성명 옆에 퇴사 뱃지 시각화)
+	ax5.ui.grid.formatter["empNmFormatter"] = function () {
+		var val = this.value || "";
+		var isLeave = (this.item && (this.item.useYn === 'N' || (this.item.leaveDt && $.trim(this.item.leaveDt) !== '')));
+		if (isLeave) {
+			return '<span style="color: #555555;">' + val + ' <span style="font-size: 10px; background-color: #f2dede; color: #a94442; border: 1px solid #ebccd1; border-radius: 3px; padding: 1px 3px; font-weight: normal;">퇴사</span></span>';
+		}
+		return val;
+	};
+
 	// 기본 컬럼 정의 (사용자별 컬럼설정 병합 대상)
 	var defaultColumns = [
 		 {key: "coCd",        label: "회사코드",     width:  80, align: "center", hidden: true}
 		,{key: "sanctnSts",   label: "결재상태",     width:  80, align: "left", formatter: "sanctnStsFormatter"}
-		,{key: "reqTitl",     label: "신청이름",     width: 80, align: "center"}
+		,{key: "reqTitl",     label: "신청이름",     width: 80, align: "center", formatter: "empNmFormatter"}
 		,{key: "reqDeptId",   label: "부서코드",     width:  90, align: "center", hidden: true}
 		,{key: "reqDeptNm",   label: "부서",        width: 100, align: "left"}
 		,{key: "vacTypeCd",   label: "휴가유형코드", width:  90, align: "center", hidden: true}
@@ -232,7 +245,8 @@
 		,{key: "reqRmk",      label: "신청사유",     width: 240, align: "left"}
 		,{key: "mngRmk",      label: "근태담당자사유", width: 240, align: "left", editor: {type: "text"}}
 		,{key: "reqId",       label: "등록사번",   width:  70, align: "center", hidden: true}
-		,{key: "reqIdNm",     label: "등록",       width:  70, align: "center"}
+		,{key: "reqIdNm",     label: "등록",       width:  85, align: "center"}
+		,{key: "leaveDt",     label: "퇴사일자",   width:  90, align: "center", hidden: true, formatter: "formatDate"}
 		,{key: "creatDttm",   label: "등록일시",     width: 130, align: "center"}
 		,{key: "reqNo",       label: "신청번호",     width: 120, align: "center"}
 	];
@@ -332,6 +346,12 @@
 					selector : false
 				},
 				body : {
+					trStyleClass : function () {
+						if (this.item && (this.item.useYn === 'N' || (this.item.leaveDt && $.trim(this.item.leaveDt) !== ''))) {
+							return "grid-row-leave";
+						}
+						return "";
+					},
 					onClick : function() {
 						this.self.select(this.dindex);
 					},
@@ -393,7 +413,7 @@
 				,"reqDeptId"  : $('#reqDeptId_S').val()
 				,"reqDeptNm"  : $('#reqDeptNm_S').val()
 				,"pageNo"     : pageNo + 1
-				,"recordCnt": 100
+				,"recordCnt"  : ($('#recordCnt_S').val() || 100)
 			};
 			postAjax("/user/pm/pm07/selectVacationList", formData, null, function(data) {
 				try {
@@ -414,9 +434,20 @@
 		}
 	};
 
+	// 근태마감 사전 검증용 전역 변수
+	var __pm07AttendanceCloseYm = null;
+	var __pm07AttendanceCloseYmLoaded = false;
+
 	$(document).ready(function() {
 		// 페이지 타이틀 set
 		mainDefaultLoad("생산관리", "휴가신청");
+
+		// 근태마감년월 사전 로드
+		postAjax('/user/pm/pm30/selectAttendanceCloseYm', {}, null, function(data) {
+			__pm07AttendanceCloseYm = (data && data.closeYm) ? data.closeYm : null;
+			__pm07AttendanceCloseYmLoaded = true;
+		});
+
 		// 공통코드 set (검색영역만 - 모달과 DOM 을 공유하므로 범위 한정)
 		setCommonSelect($("#main_area .contents.search select[data-kind]"));
 
@@ -483,6 +514,7 @@
 		$('#coCd_S').val("GUN");
 		$('#vacTypeCd_S').val("");
 		$('#sanctnSts_S').val("");
+		$('#recordCnt_S').val("100");
 		$('#reqDtFrom_S').val(moment().subtract(3, 'months').startOf('month').format("YYYY-MM-DD"));
 		$('#reqDtTo_S').val(moment().endOf('month').format("YYYY-MM-DD"));
 		gridView.setData(0);
@@ -534,10 +566,43 @@
 		});
 	}
 
+	// 근태 마감 여부 확인 함수
+	function isAttendanceClosed(stDt, edDt) {
+		if (!__pm07AttendanceCloseYmLoaded) {
+			postAjaxSync('/user/pm/pm30/selectAttendanceCloseYm', {}, null, function(data) {
+				__pm07AttendanceCloseYm = (data && data.closeYm) ? data.closeYm : null;
+				__pm07AttendanceCloseYmLoaded = true;
+			});
+		}
+		if (!__pm07AttendanceCloseYm) return false;
+
+		var dateArr = [stDt, edDt];
+		for (var i = 0; i < dateArr.length; i++) {
+			var dt = dateArr[i];
+			if (!dt) continue;
+			var digits = String(dt).replace(/[^0-9]/g, '');
+			if (digits.length < 6) continue;
+			var dtYm = digits.substring(0, 6);
+			if (dtYm <= __pm07AttendanceCloseYm) {
+				return true;
+			}
+		}
+		return false;
+	}
+
 	// 삭제
 	function deleteVacation() {
 		var row = getSelectedRow();
 		if (!row) return;
+
+		// 삭제 확인(confirm) 이전에 근태 마감 여부를 먼저 확인
+		if (isAttendanceClosed(row.stDt, row.edDt)) {
+			var closeYmDisp = __pm07AttendanceCloseYm.length === 6 ? 
+				(__pm07AttendanceCloseYm.substring(0, 4) + '/' + __pm07AttendanceCloseYm.substring(4, 6)) : 
+				__pm07AttendanceCloseYm;
+			alert("근태마감으로 " + closeYmDisp + "월 이전 근태 자료는 등록·수정·삭제할 수 없습니다. (조회만 가능합니다.)");
+			return;
+		}
 
 		if (!confirm("삭제하시겠습니까?")) return;
 

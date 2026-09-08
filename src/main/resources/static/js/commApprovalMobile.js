@@ -291,6 +291,11 @@ function Approval(htmlParam, param, popParam) {
 										approvalParam.todoDiv2CodeId = data.todoDiv2CodeId;
 										approvalParam.todoNo = data.todoNo;
 										html = html.replace(/readonly/gi, "");		//결재의견 input
+										// PM08 휴일대체근무 신청/결과(TODODIV2410/2420) 결재자가 담당팀장 본인이면
+										// 확인의견(담당팀장 의견) 입력을 필수로 만든다 - confirmApproval에서 이 마커를 검사한다.
+										if ((data.todoDiv2CodeId === 'TODODIV2410' || data.todoDiv2CodeId === 'TODODIV2420') && data.deptTeamManager === 'TEAM01') {
+											html = html.replace('</textarea>', '</textarea><input type="hidden" name="requiredOpn" value="YES">');
+										}
 										//팀장 이슈 조치결과 결재일경우 위험성 평가 기능 추가 하기위함   남장섭 240618
 						 				// if( data.todoDiv2CodeId=='TODODIV2090' && data.teamManager == 'TEAM01' ) {
 						 				// 	confrmActDngEval = actDngEval;
@@ -342,6 +347,17 @@ function Approval(htmlParam, param, popParam) {
 							});
 						}
 						$("#appLine").append(htmlTr);
+
+						// 확인의견(담당팀장 의견 등) textarea 높이를 내용 길이에 맞춰 자동 조절한다.
+						// (readonly 해제된 본인 행은 입력 중에도 실시간으로 늘어나도록 input 이벤트도 바인딩)
+						$("#appLine textarea[name='todoCfOpn']").each(function() {
+							this.style.height = 'auto';
+							this.style.height = Math.max(this.scrollHeight, 40) + 'px';
+						});
+						$("#appLine").off('input.autoresizeOpn').on('input.autoresizeOpn', 'textarea[name="todoCfOpn"]', function() {
+							this.style.height = 'auto';
+							this.style.height = Math.max(this.scrollHeight, 40) + 'px';
+						});
 
 						//팀장 이슈 조치결과 결재일경우 위험성 평가 기능 추가 하기위함   남장섭 240618
 						$("#appLine").append(confrmActDngEval);
@@ -395,7 +411,7 @@ function Approval(htmlParam, param, popParam) {
     			<td class="appTd">@@item1@@</td>
     			<td class="appTd">@@bold@@@@item2@@</font></td>
 				<td class="appTd">@@item3@@</td>
-    			<td class="appTd" ><textarea class='form-control' rows='2'  name='todoCfOpn' value="@@item4@@" readonly="readonly"></textarea></td>
+    			<td class="appTd" ><textarea class='form-control' rows='2'  name='todoCfOpn' readonly="readonly">@@item4@@</textarea></td>
     			<td class="appTd">@@item5@@</td>
     			<td class="appTd">@@item6@@</td>
     		</tr>
@@ -479,10 +495,17 @@ function Approval(htmlParam, param, popParam) {
 				var actTeamManager = $tr.find('input[name="actTeamManager"]').val();
 				// var todoCfOpn = $tr.find('textarea[name="todoCfOpn"]').val();
 				var todoCfOpn = ($tr.find('textarea[name="todoCfOpn"]').val() ?? '').trim();
+				var requiredOpn = $tr.find('input[name="requiredOpn"]').val();
 
+				// PM08 휴일대체근무 신청/결과 결재자가 담당팀장 본인이면 확인의견 입력 필수
+				// (todoCfOpn은 아래에서 그대로 insertApprovalLine paramMap에 담겨 결재승인과 함께 저장된다)
+				if (requiredOpn == 'YES' && todoCfOpn == '') {
+					customAlert('담당팀장 의견을 입력해주세요.');
+					return false;
+				}
 
 				//부서코드 영업, 기술연구소, 구매, 생산팀의 팀장이면 결과 등록시 해당팀의 소요공수 입력 필수임
-				// $('#requiredMh').val() == 'YES'   담당팀 투입공수 필수입력 대상임 
+				// $('#requiredMh').val() == 'YES'   담당팀 투입공수 필수입력 대상임
 				if (requiredMh == 'YES') {
 					// 투입공수 150이하 입력만 가능하게 제약
 					if (actMh > 150) {

@@ -125,8 +125,9 @@
 		var enterMom = moment(cleanDt.substring(0, 8), "YYYYMMDD");
 		if (!enterMom.isValid()) return 0;
 
-		// 미래 입사자: 0일
-		if (enterYear > targetYear || enterMom.isAfter(baseMom, 'day')) {
+		// 미래 입사자 또는 부여연도 시작일 이전 퇴사자: 0일
+		var yearStartMom = moment([targetYear, 0, 1]);
+		if (enterYear > targetYear || enterMom.isAfter(baseMom, 'day') || baseMom.isBefore(yearStartMom, 'day')) {
 			return 0;
 		}
 
@@ -221,11 +222,20 @@
 
 			var item = list[0];
 			var enterDt = item.enterDt;
+			var leaveDt = item.leaveDt;
+			var isLeave = (item.useYn === 'N' || (leaveDt && $.trim(leaveDt) !== ''));
+			var empBaseMom = baseMom;
+			if (isLeave && leaveDt) {
+				var cleanLeaveDt = String(leaveDt).replace(/[^0-9]/g, '');
+				if (cleanLeaveDt.length === 8) {
+					empBaseMom = moment(cleanLeaveDt, 'YYYYMMDD');
+				}
+			}
 			var isManual = (item.autoYn === 'N' && Number(item.grantDays || 0) > 0);
 			var gDays = Number(item.grantDays || 0);
 
 			if (!isManual && enterDt) {
-				gDays = PM07Annual.calculateGrantDays(enterDt, curYy, baseMom);
+				gDays = PM07Annual.calculateGrantDays(enterDt, curYy, empBaseMom);
 			}
 
 			var uDays = Number(item.usedDays || 0);

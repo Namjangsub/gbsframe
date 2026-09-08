@@ -625,6 +625,9 @@
 	var originalTripReqSnapshot = null;
 	var originalTravelerSnapshot = [];
 
+	// 근태마감년월 (PM30 관리 값)
+	var pm51AttendanceCloseYm = null;
+
 	// 신청부서(TODODIV2190) 일반결재 순차 재구성용 상태값
 	// - pm51ApplicantIsTeamMgr: 신청인 본인이 팀장(TEAM_MANAGER='TEAM01')인지 여부
 	// - pm51TeamMgrId: 신청인이 팀장이 아닌 경우, 신청인의 담당자팀장 ID (selectTeamManagerInfo 결과)
@@ -699,6 +702,35 @@
 	function isSalesPmUser() {
 		var pmId = $('#pmId').val() || '';
 		return !!pmId && pmId === jwt.userId;
+	}
+
+	// 근태마감년월을 "YYYY/MM" 형식으로 포매팅
+	function pm51FormatCloseYmDisplay(closeYm) {
+		if (!closeYm || !closeYm.trim()) return null;
+		var ym = String(closeYm).replace(/\D/g, '');
+		if (ym.length >= 6) {
+			return ym.substring(0, 4) + '/' + ym.substring(4, 6);
+		}
+		return null;
+	}
+
+	// 근태마감 경고 체크 (여러 날짜 중 하나라도 마감월 이하이면 1번만 경고)
+	var pm51AttendanceCloseWarningShown = false;
+	function pm51CheckAttendanceCloseWarning() {
+		if (!pm51AttendanceCloseYm || pm51AttendanceCloseWarningShown) return;
+		for (var i = 0; i < arguments.length; i++) {
+			var dateStr = arguments[i];
+			if (!dateStr) continue;
+			var dateYm = String(dateStr).replace(/\D/g, '').substring(0, 6);
+			if (!dateYm || dateYm.length < 6) continue;
+			if (dateYm <= pm51AttendanceCloseYm) {
+				pm51AttendanceCloseWarningShown = true;
+				var displayYm = pm51FormatCloseYmDisplay(pm51AttendanceCloseYm);
+				var msg = '근태마감으로 ' + displayYm + '월 이전 근태 자료는 등록·수정·삭제할 수 없습니다. (조회만 가능합니다.)';
+				alert(msg);
+				return;
+			}
+		}
 	}
 
 	// 순차결재 진입 안내: 로그인 사용자가 이 신청서의 결재 대상이면서 아직 본인 차례가 아니면
@@ -905,6 +937,13 @@
 		}
 		popParam = modalStack.last().paramObj;
 
+		// 근태마감년월 조회 및 캐싱
+		postAjaxSync("/user/pm/pm30/selectAttendanceCloseYm", {}, null, function(data) {
+			if (data && data.resultCode === '0000' && data.closeYm && data.closeYm.trim()) {
+				pm51AttendanceCloseYm = data.closeYm;
+			}
+		});
+
 		if (popParam && popParam.actionType === 'C') {
 			$('#tripReqNoTh, #tripReqNoTd, #tripReqNoEmptyTh, #tripReqNoEmptyTd').hide();
 		}
@@ -1023,6 +1062,7 @@
 					$('#tripStDtm').val(sd);
 					$('#tripEdDtm').val(ed);
 					calcDaysCnt();
+					pm51CheckAttendanceCloseWarning(sd, ed);
 				}
 			});
 		});

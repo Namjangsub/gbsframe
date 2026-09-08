@@ -70,6 +70,8 @@ public interface PM07Mapper {
 
 	int deleteDailyWorkReportByVacation(Map<String, String> paramMap);
 
+	int deleteApprovalLineByReqNo(Map<String, String> paramMap);
+
 	List<Map<String, String>> selectVacationDateList(Map<String, String> paramMap);
 
 	int updateVacationDateWorkRptNo(Map<String, String> paramMap);

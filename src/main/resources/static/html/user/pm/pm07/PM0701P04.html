@@ -27,6 +27,24 @@
 	outline: 2px dashed #2563eb !important;
 	outline-offset: -2px !important;
 }
+/* 수정/신규 행 강조 (분홍색) */
+[data-ax5grid="awardGrid"] tr.grid-cell-pink,
+[data-ax5grid="awardGrid"] tr.grid-cell-pink td,
+[data-ax5grid="awardGrid"] tr.grid-cell-pink .ax5grid-cell-content {
+	background-color: #ffdeeb !important;
+	background: #ffdeeb !important;
+	color: #9b2c2c !important;
+	font-weight: bold !important;
+}
+/* 퇴사자 행 스타일 (옅은 회색 배경 + 퇴사자 텍스트 구분) */
+[data-ax5grid="awardGrid"] tr.grid-row-leave,
+[data-ax5grid="awardGrid"] tr.grid-row-leave td {
+	background-color: #fafafa !important;
+	color: #666666;
+}
+[data-ax5grid="awardGrid"] tr.grid-row-leave td.grid-cell-pink {
+	background-color: #ffdeeb !important;
+}
 </style>
 
 <div class="popup_area of_a" style="width: 100%; height: 100%;">
@@ -174,6 +192,19 @@
 						selector : true
 					},
 					body : {
+						trStyleClass : function() {
+							if (this.item) {
+								var st = this.item.__status;
+								if (st === "U" || st === "C") {
+									return "grid-cell-pink";
+								}
+								// 퇴사자 행 식별 (useYn === 'N' 또는 퇴사일자 존재 시 옅은 배경 적용)
+								if (this.item.useYn === 'N' || (this.item.leaveDt && this.item.leaveDt !== '')) {
+									return "grid-row-leave";
+								}
+							}
+							return "";
+						},
 						onClick : function() {
 							this.self.select(this.dindex);
 							// 클릭 위치 기억 (복사/잘라내기/붙여넣기 시작 위치용)
@@ -231,7 +262,21 @@
 						// 직접 값을 넣으므로 editor 유무와 무관하게 그대로 동작하고, 값 입력은 더블클릭
 						// 사용자검색으로만 하도록 한다.
 						,{key: "empNo",       label: "사번(더블클릭)", width: 110, align: "center"}
-						,{key: "empNm",       label: "성명(더블클릭)", width: 100, align: "center"}
+						,{key: "empNm",       label: "성명(더블클릭)", width: 100, align: "center", formatter: function() {
+							var val = this.value || '';
+							var item = this.item || {};
+							var isLeave = (item.useYn === 'N' || (!!item.leaveDt && item.leaveDt !== ''));
+							if (isLeave) {
+								return '<span style="color: #555555;">' + val + ' <span style="font-size: 10px; background-color: #f2dede; color: #a94442; border: 1px solid #ebccd1; border-radius: 3px; padding: 1px 3px; font-weight: normal;">퇴사</span></span>';
+							}
+							return val;
+						}}
+						,{key: "leaveDt",     label: "퇴사일자", width: 95, align: "center", formatter: function() {
+							var val = this.value;
+							if (!val || val === '') return '';
+							var formatted = normalizeAwardDt(val) || val;
+							return '<span style="color: #d9534f; font-weight: bold;">' + formatted + '</span>';
+						}}
 						,{key: "awardTypeCd", label: "포상휴가종류", width: 120, align: "center", editor: {
 							type: "select",
 							config: {
@@ -254,8 +299,8 @@
 						// 사용가능시작일/종료일도 사번/성명과 같은 이유로 editor를 지정하지 않는다 -
 						// PM3001M01.html의 inDttm/outDttm 컬럼과 동일한 패턴. 더블클릭하면
 						// openAwardDatePicker()가 DateRangePicker(시작+종료 동시 선택)를 연다.
-						,{key: "stDt",        label: "사용가능시작일(더블클릭)", width: 130, align: "center"}
-						,{key: "edDt",        label: "사용가능종료일(더블클릭)", width: 130, align: "center"}
+						,{key: "stDt",        label: "사용가능시작일", width: 130, align: "center"}
+						,{key: "edDt",        label: "사용가능종료일", width: 130, align: "center"}
 						,{key: "rmk",         label: "비고",     width: 200, align: "left", editor: {type: "text"}}
 					]
 				});
@@ -325,6 +370,8 @@
 			grantYy    : String(curYy),
 			empNo      : "",
 			empNm      : "",
+			leaveDt    : "",
+			useYn      : "Y",
 			awardTypeCd: "",
 			grantDays  : "",
 			stDt       : defaultPeriod.stDt,
@@ -615,7 +662,15 @@
 		var startCol = window.awardGridLastClickCol || 0;
 		var clickedColObj = colGroup[startCol];
 		var clickedKey = clickedColObj ? clickedColObj.key : (visibleKeys[0] || 'empNo');
-		var colStartIdx = visibleKeys.indexOf(clickedKey);
+
+		// 엑셀에서 복사해온 열 개수가 8개(지급연도, 사번, 성명, 포상휴가종류, 휴가일수, 시작일, 종료일, 비고)인 경우,
+		// 중간의 읽기전용인 'leaveDt'(퇴사일자)를 건너뛰어 열 어긋남을 방지한다.
+		var effectiveKeys = visibleKeys.slice();
+		var pastedColCount = (pasteRows[0] ? pasteRows[0].length : 0);
+		if (pastedColCount === 8 && effectiveKeys.indexOf('leaveDt') !== -1) {
+			effectiveKeys.splice(effectiveKeys.indexOf('leaveDt'), 1);
+		}
+		var colStartIdx = effectiveKeys.indexOf(clickedKey);
 		if (colStartIdx === -1) colStartIdx = 0;
 
 		var curYy = $('#awardYy').val() || new Date().getFullYear();
@@ -632,6 +687,8 @@
 					grantYy    : String(curYy),
 					empNo      : "",
 					empNm      : "",
+					leaveDt    : "",
+					useYn      : "Y",
 					awardTypeCd: "",
 					grantDays  : "",
 					stDt       : defaultPeriod.stDt,
@@ -645,9 +702,9 @@
 			var rowData = pasteRows[i];
 			for (var j = 0; j < rowData.length; j++) {
 				var targetColIdx = colStartIdx + j;
-				if (targetColIdx >= visibleKeys.length) break;
+				if (targetColIdx >= effectiveKeys.length) break;
 
-				var targetKey = visibleKeys[targetColIdx];
+				var targetKey = effectiveKeys[targetColIdx];
 				var cellData = rowData[j].replace(new RegExp('\r', 'ig'), '').trim();
 
 				// awardTypeCd 코드명->코드ID 변환
@@ -666,13 +723,47 @@
 		awardGridView.target.repaint();
 	}
 
+	// 모달 스택 레벨에 맞추어 2차/3차 모달 동적 호출
+	// (PM0701M01에서 직접 열렸을 때는 openSecondModal, PM0701P02에서 2차 모달로 열렸을 때는 openThirdModal 호출)
+	function openAwardUserModal(url, width, height, title, paramObj, callback) {
+		window.deviceType = window.deviceType || 'desktop';
+		var stackDepth = 0;
+		if (typeof modalStack !== 'undefined' && modalStack) {
+			if (typeof modalStack.size === 'function') {
+				stackDepth = modalStack.size();
+			} else if (modalStack.modalArr) {
+				stackDepth = modalStack.modalArr.length;
+			}
+		}
+
+		if (stackDepth >= 2 && typeof openThirdModal === 'function') {
+			if (typeof thirdModal !== 'undefined' && thirdModal && thirdModal.config) {
+				thirdModal.config.zIndex = 2001;
+			}
+			openThirdModal(url, width, height, title, paramObj, function(tree) {
+				if (typeof callback === 'function') callback(tree);
+			});
+			setTimeout(function() {
+				if (typeof thirdModal !== 'undefined' && thirdModal && thirdModal.activeModal) {
+					thirdModal.activeModal.css("z-index", "2001");
+				}
+				$('.ax-mask').last().css("z-index", "2000");
+			}, 50);
+		} else {
+			openSecondModal(url, width, height, title, paramObj, callback);
+		}
+	}
+
 	// 사용자 검색 팝업 (사번/성명 더블클릭)
 	function openAwardUserSearch(dindex) {
+		var row = awardGridView.target.list[dindex] || {};
 		var paramObj = {
 			"coCd": "GUN",
+			"userId": row.userId || "",
+			"userNm": row.empNm || "",
 			"useYn": "Y"
 		};
-		openSecondModal("/static/html/cmn/modal/userSearch.html", 450, 650, "사용자 검색", paramObj, function(tree) {
+		openAwardUserModal("/static/html/cmn/modal/userSearch.html", 450, 650, "사용자 검색", paramObj, function(tree) {
 			var checkedId = tree.get_checked()[0];
 			if (!checkedId) return;
 			var checkedNode = tree.get_node(checkedId);
@@ -685,16 +776,22 @@
 				var info = (resp && resp.userInfo) ? resp.userInfo : {};
 				var empNo = info.empNo || "";
 				var empNm = info.name || checkedNode.text || "";
+				var leaveDt = info.leaveDt || "";
+				var useYn = info.useYn || "Y";
 				if (!empNo) {
 					alert("선택한 사원의 사번 정보를 찾을 수 없습니다.");
 					return;
 				}
 				awardGridView.target.setValue(dindex, "empNo", empNo);
 				awardGridView.target.setValue(dindex, "empNm", empNm);
-				var row = awardGridView.target.list[dindex];
-				if (row && row.__status !== "C") {
-					row.__status = "U";
+				awardGridView.target.setValue(dindex, "userId", userId);
+				awardGridView.target.setValue(dindex, "leaveDt", leaveDt);
+				awardGridView.target.setValue(dindex, "useYn", useYn);
+				var curRow = awardGridView.target.list[dindex];
+				if (curRow && curRow.__status !== "C") {
+					curRow.__status = "U";
 				}
+				awardGridView.target.repaint();
 			});
 		});
 	}
@@ -740,7 +837,7 @@
 			"userNm" : $('#awardEmpNm').val(),
 			"useYn"  : "Y"
 		};
-		openSecondModal("/static/html/cmn/modal/userSearch.html", 450, 650, "사용자 검색", paramObj, function(tree) {
+		openAwardUserModal("/static/html/cmn/modal/userSearch.html", 450, 650, "사용자 검색", paramObj, function(tree) {
 			var checkedId = tree.get_checked()[0];
 			if (!checkedId) return;
 			var checkedNode = tree.get_node(checkedId);

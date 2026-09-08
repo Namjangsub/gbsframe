@@ -150,6 +150,10 @@
 
 	// 사원별 휴가 잔여현황 캐시 객체
 	var userVacationBalance = null;
+	// 근태마감 1차 경고용 전역 변수
+	var __pm07AttendanceCloseYm = null;
+	var __pm07AttendanceCloseYmLoaded = false;
+
 
 	// 사원별 휴가 잔여현황 조회 및 휴가유형(vacTypeCd) 옵션 동적 제어 (공통 모듈 위임)
 	function refreshUserVacationBalance(savedTypeCd) {
@@ -262,7 +266,10 @@
 	}
 
 	// 시작일자 수동/피커 변경 시 양방향 동일일자 동기화 (단일일 유형)
-	function onStDtChanged() {
+		function onStDtChanged() {
+		// 근태마감 1차 경고
+		checkAttendanceClosedWarning('stDt');
+		
 		var selectedOption = $('#vacTypeCd').find('option:selected');
 		var selectedNm = selectedOption.text() || '';
 		if (!isMultiDayType(selectedNm)) {
@@ -276,7 +283,10 @@
 	}
 
 	// 종료일자 수동/피커 변경 시 양방향 동일일자 동기화 (단일일 유형)
-	function onEdDtChanged() {
+		function onEdDtChanged() {
+		// 근태마감 1차 경고
+		checkAttendanceClosedWarning('edDt');
+		
 		var selectedOption = $('#vacTypeCd').find('option:selected');
 		var selectedNm = selectedOption.text() || '';
 		if (!isMultiDayType(selectedNm)) {
@@ -429,7 +439,71 @@
 		return false;
 	}
 
-	// 날짜 변경 이벤트 (휴가일수/차감일수 자동계산)
+	// 근태마감 경고 확인 함수
+	function checkAttendanceClosedWarning(fieldId) {
+		if (!__pm07AttendanceCloseYmLoaded) {
+			// 아직 조회되지 않았으면 동기 방식으로 즉시 조회
+			postAjaxSync('/user/pm/pm30/selectAttendanceCloseYm', {}, null, function(data) {
+				__pm07AttendanceCloseYm = (data && data.closeYm) ? data.closeYm : null;
+				__pm07AttendanceCloseYmLoaded = true;
+			});
+		}
+		
+		if (!__pm07AttendanceCloseYm) return true; // 마감 없음
+		
+		var targets = [];
+		if (fieldId === 'stDt') {
+			targets.push({ id: 'stDt', name: '시작일자', val: $('#stDt').val() });
+		} else if (fieldId === 'edDt') {
+			targets.push({ id: 'edDt', name: '종료일자', val: $('#edDt').val() });
+		} else {
+			targets.push({ id: 'stDt', name: '시작일자', val: $('#stDt').val() });
+			targets.push({ id: 'edDt', name: '종료일자', val: $('#edDt').val() });
+		}
+
+		for (var i = 0; i < targets.length; i++) {
+			var dtVal = targets[i].val;
+			if (!dtVal) continue;
+			var digitsOnly = dtVal.replace(/[^0-9]/g, '');
+			if (digitsOnly.length < 6) continue;
+
+			var dtYm = digitsOnly.substring(0, 6);
+			if (dtYm <= __pm07AttendanceCloseYm) {
+				var closeYmDisp = __pm07AttendanceCloseYm.length === 6 ? 
+					(__pm07AttendanceCloseYm.substring(0, 4) + '/' + __pm07AttendanceCloseYm.substring(4, 6)) : 
+					__pm07AttendanceCloseYm;
+				alert('근태마감으로 ' + closeYmDisp + '월 이전 근태 자료는 등록·수정·삭제할 수 없습니다. (조회만 가능합니다.)');
+				return false;
+			}
+		}
+		return true;
+	}
+
+	// 근태 마감 여부 판정 함수 (순수 boolean 판별용 - alert 없음)
+	function isAttendanceClosed(stDt, edDt) {
+		if (!__pm07AttendanceCloseYmLoaded) {
+			postAjaxSync('/user/pm/pm30/selectAttendanceCloseYm', {}, null, function(data) {
+				__pm07AttendanceCloseYm = (data && data.closeYm) ? data.closeYm : null;
+				__pm07AttendanceCloseYmLoaded = true;
+			});
+		}
+		if (!__pm07AttendanceCloseYm) return false;
+
+		var dateArr = [stDt, edDt];
+		for (var i = 0; i < dateArr.length; i++) {
+			var dt = dateArr[i];
+			if (!dt) continue;
+			var digits = String(dt).replace(/[^0-9]/g, '');
+			if (digits.length < 6) continue;
+			var dtYm = digits.substring(0, 6);
+			if (dtYm <= __pm07AttendanceCloseYm) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+
 	function onDateChanged() {
 		var stDt = $('#stDt').val();
 		var edDt = $('#edDt').val();
@@ -454,7 +528,9 @@
 				alert("선택하신 휴가신청일자(" + stDt + ")는 휴무일(주말/공휴일)입니다.");
 			}
 		} else {
-			if (isHolidayDate(stDt)) {
+			if (isHolidayDate(stDt) && isHolidayDate(edDt)) {
+				alert("선택하신 시작일자(" + stDt + ")와 종료일자(" + edDt + ")가 모두 휴무일(주말/공휴일)입니다.");
+			} else if (isHolidayDate(stDt)) {
 				alert("선택하신 시작일자(" + stDt + ")는 휴무일(주말/공휴일)입니다.");
 			} else if (isHolidayDate(edDt)) {
 				alert("선택하신 종료일자(" + edDt + ")는 휴무일(주말/공휴일)입니다.");
@@ -680,6 +756,19 @@
 		});
 	}
 
+	// SPECRTS17(근태결재라인) 등록 사번 집합 조회 (소문자 키) - 결재선 자동구성/저장시 강제삽입/선택삭제 제한에서 공용으로 사용
+	function getSpecrts17IdSet() {
+		var ids = {};
+		postAjaxSync("/admin/cm/cm05/selectChildCodeList", { "codeId": "SPECRTS17" }, null, function(data) {
+			var codeEtc = (data && data.childCodeList && data.childCodeList[0]) ? (data.childCodeList[0].codeEtc || '') : '';
+			$.each(codeEtc.split(','), function(idx, rawId) {
+				var uId = $.trim(rawId);
+				if (uId) ids[uId.toLowerCase()] = true;
+			});
+		});
+		return ids;
+	}
+
 	// 기본 결재라인 자동 구성 : 담당자 -> 담당자팀장 -> 휴가관리 결재라인(공통코드 SPECRTS17)
 	function setDefaultApprovalLine() {
 		var reqId = $('#popForm').find('#reqId').val() || jwt.userId;
@@ -710,9 +799,11 @@
 		// - 로그인 유저가 자기 휴가를 신청할 때 (reqId === jwt.userId): 1번 결재선에 등록하고 자동 승인(Y)
 		// - 근태/휴가관리담당자가 본인 외 다른 사원을 대리 선택 시 (reqId !== jwt.userId): 신청인 결재라인 스킵
 		var isTeamMgr = false;
+		var isGisulYeonguso = false;	// 기술연구소(GUN40) 소속 여부
 		postAjaxSync("/admin/cm/cm06/selectUserInfo", { "userId": reqId }, null, function(data) {
 			if (data && data.userInfo) {
 				isTeamMgr = (data.userInfo.teamManager === 'TEAM01');
+				isGisulYeonguso = !!(data.userInfo.deptId && data.userInfo.deptId.indexOf('GUN40') === 0);
 				if (reqId === jwt.userId) {
 					var uObj = data.userInfo;
 					var key = String(uObj.id).toLowerCase();
@@ -742,6 +833,15 @@
 			});
 		}
 
+		// 2-1) 기술연구소(GUN40) 소속이면 담당팀장 다음에 kimjhv(김재현) 결재 추가
+		if (isGisulYeonguso) {
+			postAjaxSync("/admin/cm/cm06/selectUserInfo", { "userId": "kimjhv" }, null, function(data) {
+				if (data && data.userInfo) {
+					pushApprover(data.userInfo);
+				}
+			});
+		}
+
 		// 3) 휴가관리 결재라인 (SPECRTS17 의 CODE_ETC 등록 순서대로)
 		postAjaxSync("/admin/cm/cm05/selectChildCodeList", { "codeId": "SPECRTS17" }, null, function(data) {
 			var list = (data && data.childCodeList) ? data.childCodeList : [];
@@ -764,6 +864,96 @@
 		$.each(autoList, function(idx, row) { row.sanctnSn = idx + 1; });
 
 		approvalGridView.setData(autoList);
+	}
+
+	// 저장 시점 필수 결재자 강제 재삽입 :
+	// 1) 기술연구소(GUN40) 소속이면 kimjhv(김재현) 결재가 있어야 하고
+	// 2) SPECRTS17(근태결재라인)에 등록된 결재자는 전원 있어야 한다.
+	// 사용자가 그리드에서 "선택삭제"로 지웠더라도 저장 시점에 누락분만 자동으로 다시 채워 넣는다
+	// (이미 남아있는 행의 sanctnSttus/승인이력은 건드리지 않고, 빠진 결재자만 추가한다).
+	// setDefaultApprovalLine 은 신규 등록/신청자 변경 시에만 호출되므로 저장 직전에는 별도 검증이 필요함.
+	function enforceRequiredApprovalLine() {
+		var reqId = $('#popForm').find('#reqId').val() || jwt.userId;
+		if (!reqId) return;
+
+		var isGisulYeonguso = false;
+		postAjaxSync("/admin/cm/cm06/selectUserInfo", { "userId": reqId }, null, function(data) {
+			if (data && data.userInfo) {
+				isGisulYeonguso = !!(data.userInfo.deptId && data.userInfo.deptId.indexOf('GUN40') === 0);
+			}
+		});
+
+		// SPECRTS17(근태결재라인) 등록 사번 목록 (코드에 등록된 순서 그대로)
+		var specrtsIdList = [];
+		postAjaxSync("/admin/cm/cm05/selectChildCodeList", { "codeId": "SPECRTS17" }, null, function(data) {
+			var codeEtc = (data && data.childCodeList && data.childCodeList[0]) ? (data.childCodeList[0].codeEtc || '') : '';
+			$.each(codeEtc.split(','), function(idx, rawId) {
+				var uId = $.trim(rawId);
+				if (uId) specrtsIdList.push(uId);
+			});
+		});
+
+		var list = (approvalGridView.target.list || []).slice();
+
+		function isPresent(uid) {
+			var key = String(uid).toLowerCase();
+			var found = false;
+			$.each(list, function(idx, item) {
+				if (item.gb === "결재" && String(item.usrNm || item.todoId || '').toLowerCase() === key) {
+					found = true;
+				}
+			});
+			return found;
+		}
+
+		function buildRow(uObj) {
+			return {
+				gb    : "결재",
+				usrNm : uObj.id,
+				todoId: uObj.id,
+				name  : uObj.name || uObj.id,
+				jik   : uObj.levelNm || '',
+				dtNm  : uObj.deptNm || '',
+				telNo : uObj.telNo || '',
+				email : uObj.email || '',
+				sanctnSttusNm : '미승인'
+			};
+		}
+
+		// 채워 넣어야 할 사번 목록 산정 (담당팀장 다음 -> kimjhv(기술연구소만) -> SPECRTS17 순서)
+		var missingIds = [];
+		if (isGisulYeonguso && !isPresent('kimjhv')) {
+			missingIds.push('kimjhv');
+		}
+		$.each(specrtsIdList, function(idx, uid) {
+			if (!isPresent(uid)) {
+				missingIds.push(uid);
+			}
+		});
+		if (missingIds.length === 0) return;
+
+		// 누락된 결재자 순서대로 사용자 정보를 조회해 행을 만든 뒤,
+		// 공유(gb="공유") 행 앞 = 결재 그룹의 맨 끝에 한꺼번에 삽입한다.
+		var newRows = [];
+		$.each(missingIds, function(idx, uid) {
+			postAjaxSync("/admin/cm/cm06/selectUserInfo", { "userId": uid }, null, function(data) {
+				if (data && data.userInfo) {
+					newRows.push(buildRow(data.userInfo));
+				}
+			});
+		});
+		if (newRows.length === 0) return;
+
+		var shareIdx = list.length;
+		$.each(list, function(idx, item) {
+			if (shareIdx === list.length && item.gb === "공유") {
+				shareIdx = idx;
+			}
+		});
+		var args = [shareIdx, 0].concat(newRows);
+		Array.prototype.splice.apply(list, args);
+
+		approvalGridView.setData(list);
 	}
 
 	// 기존 문서의 결재선/공유선을 조회해 그리드에 표시한다. (수정·상세 진입 시)
@@ -811,15 +1001,16 @@
 				|| (sanctnSttusNm.indexOf("반려") > -1);
 		});
 
-		if (!hasOtherApproverActed) {
-			// 상급 결재자가 아직 결재를 안 함 (본인만 승인되었거나 결재 대기중) -> 삭제/수정 버튼 표출 및 UI 해제
+		var isClosed = isAttendanceClosed($('#stDt').val(), $('#edDt').val());
+		if (!hasOtherApproverActed && !isClosed) {
+			// 상급 결재자가 아직 결재를 안 함 & 근태마감 아님 -> 삭제/수정 버튼 표출 및 UI 해제
 			$('#btnDeleteVacation').show();
 			$('#btnSaveVacation').show();
 			$('.popup_area #popForm input, .popup_area #popForm select, .popup_area #popForm textarea')
 				.not('#reqId, #reqDeptId, #reqDeptNm, #reqDays, #deductDays').prop("disabled", false).css("background-color", "#ffffff");
 			$('.popup_area .add_btn_small').show();
 		} else {
-			// 상급 결재자가 결재를 완료함 -> 삭제/수정 버튼 숨김 및 UI 잠금
+			// 상급 결재자가 결재를 완료했거나 근태마감됨 -> 삭제/수정 버튼 숨김 및 UI 잠금
 			$('#btnDeleteVacation').hide();
 			$('#btnSaveVacation').hide();
 			$('.popup_area #popForm input, .popup_area #popForm select, .popup_area #popForm textarea')
@@ -958,6 +1149,33 @@
 			return false;
 		}
 		if (!checkVacationOverlap(true)) {
+			$('#stDt').focus();
+			return false;
+		}
+
+		// 근태마감 검증 (저장 전 최종 점검)
+		if (!checkAttendanceClosedWarning()) {
+			$('#stDt').focus();
+			return false;
+		}
+
+		// 시작일/종료일 휴무일(주말/공휴일) 검증: 시작일과 종료일이 모두 휴일이면 저장 불가
+		var stDtVal = $('#stDt').val();
+		var edDtVal = $('#edDt').val();
+		if (isHolidayDate(stDtVal) && isHolidayDate(edDtVal)) {
+			if (stDtVal === edDtVal) {
+				alert("선택하신 휴가일자(" + stDtVal + ")는 휴무일(주말/공휴일)이므로 신청(저장)할 수 없습니다.");
+			} else {
+				alert("시작일자(" + stDtVal + ")와 종료일자(" + edDtVal + ")가 모두 휴무일(주말/공휴일)이므로 신청(저장)할 수 없습니다.");
+			}
+			$('#stDt').focus();
+			return false;
+		}
+
+		// 근무일(영업일)이 0일 이하인 경우 저장 불가
+		var curVacDays = Number($('#vacDays').val() || 0);
+		if (curVacDays <= 0) {
+			alert("신청 기간 내에 휴가 대상 근무일(영업일)이 존재하지 않아 신청(저장)할 수 없습니다.");
 			$('#stDt').focus();
 			return false;
 		}
@@ -1163,6 +1381,8 @@
 		}
 		if (!validateForm()) return;
 
+		enforceRequiredApprovalLine();
+
 		var stDtVal = $('#stDt').val() || "";
 		var edDtVal = $('#edDt').val() || "";
 		var stDt = stDtVal.replace(/-/g, '');
@@ -1195,8 +1415,8 @@
 		formData.append("ampmCd", $('#ampmCd').val());
 		formData.append("stDt", stDt);
 		formData.append("edDt", edDt);
-		formData.append("stTm", "");
-		formData.append("edTm", "");
+		formData.append("stTm", stTm);
+		formData.append("edTm", edTm);
 		formData.append("vacDays", $('#vacDays').val());
 		formData.append("deductDays", $('#deductDays').val());
 		formData.append("reqRmk", $('#reqRmk').val());
@@ -1260,6 +1480,11 @@
 			return;
 		}
 
+		// 삭제 확인(confirm) 이전에 근태 마감 여부를 먼저 확인
+		if (!checkAttendanceClosedWarning()) {
+			return;
+		}
+
 		if (!confirm("해당 휴가신청건을 삭제하시겠습니까?")) return;
 
 		var formData = {
@@ -1312,6 +1537,12 @@
 		}
 
 		var reqNoVal = paramObj.reqNo || paramObj.todoNo || paramObj.todoKey || paramObj.todoFileTrgtKey || (paramObj.gridObj ? (paramObj.gridObj.todoNo || paramObj.gridObj.todoKey || paramObj.gridObj.todoFileTrgtKey) : "") || "";
+
+		// 근태마감년월 사전 로드
+		postAjax('/user/pm/pm30/selectAttendanceCloseYm', {}, null, function(data) {
+			__pm07AttendanceCloseYm = (data && data.closeYm) ? data.closeYm : null;
+			__pm07AttendanceCloseYmLoaded = true;
+		});
 
 		// 공통코드 set
 		setCommonSelect($('.popup_area select[data-kind]'));
@@ -1437,6 +1668,12 @@
 			var sanctnSts = dtlData.sanctnSts || paramObj.sanctnSts || "";
 			var isEditable = (!sanctnSts || sanctnSts === "TEMP" || sanctnSts === "SANCTN01" || sanctnSts === "0" || sanctnSts === "REQ");
 
+			// 근태마감 여부 확인 (stDt, edDt)
+			var isClosed = isAttendanceClosed(dtlData.stDt, dtlData.edDt);
+			if (isClosed) {
+				isEditable = false;
+			}
+
 			if (isMngUser() && isEditable) {
 				$('#btnReqUserSearch').show();
 				$('#reqTitl').css("cursor", "pointer").on('click', function() {
@@ -1447,15 +1684,25 @@
 			}
 
 			if (!isEditable) {
-				var stsNm = (sanctnSts === "END" || sanctnSts === "SANCTN04" || sanctnSts === "Y") ? "결재완료" : "결재진행중";
-				$('#popupTitle').text("휴가신청 - 상세 (" + stsNm + " - 수정불가)");
+				if (isClosed) {
+					var closeYmDisp = __pm07AttendanceCloseYm && __pm07AttendanceCloseYm.length === 6 ? 
+						(__pm07AttendanceCloseYm.substring(0, 4) + '/' + __pm07AttendanceCloseYm.substring(4, 6)) : 
+						(__pm07AttendanceCloseYm || "");
+					$('#popupTitle').text("휴가신청 - 상세 (" + closeYmDisp + "월 근태마감 - 수정/삭제 불가)");
+				} else {
+					var stsNm = (sanctnSts === "END" || sanctnSts === "SANCTN04" || sanctnSts === "Y") ? "결재완료" : "결재진행중";
+					$('#popupTitle').text("휴가신청 - 상세 (" + stsNm + " - 수정불가)");
+				}
 				// 셀렉터는 .popup_area 로 한정한다 (모달이 목록 화면과 같은 DOM 을 공유하므로 전역 #popForm 금지)
 				$('.popup_area #popForm input, .popup_area #popForm select, .popup_area #popForm textarea')
 					.prop("disabled", true).css("background-color", "#fafafa");
-				// 결재자/공유자 지정·선택삭제 버튼과 저장 버튼 숨김
+				// 결재자/공유자 지정·선택삭제 버튼과 저장/수정/삭제 버튼 숨김
 				$('.popup_area .add_btn_small').hide();
+				$('#btnSaveVacation').hide();
+				$('#btnDeleteVacation').hide();
 				$('.popup_area .popup_bottom_btn button').filter(function() {
-					return $(this).text().replace(/\s/g, '') === "저장";
+					var btnTxt = $(this).text().replace(/\s/g, '');
+					return btnTxt === "저장" || btnTxt === "삭제";
 				}).hide();
 
 				// 첨부 편집 차단 - treeModule 이 fileList_area 안에 그린 파일추가/삭제 컨트롤을 숨긴다.
@@ -1503,6 +1750,8 @@
 						$('#stDt').val(chosenDt);
 						$('#edDt').val(chosenDt);
 					}
+					// 날짜 선택 직후 근태마감 경고 알림 점검 (저장 버튼 클릭 이전에 점검)
+					checkAttendanceClosedWarning();
 					onDateChanged();
 					refreshUserVacationBalance($('#vacTypeCd').val());
 				}

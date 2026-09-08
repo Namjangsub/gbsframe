@@ -437,7 +437,7 @@ public class WB20SvcImpl implements WB20Svc {
 			return;
 		}
 		boolean isGeneralLine = "TODODIV2190".equals(todoDiv2CodeId) || "TODODIV2200".equals(todoDiv2CodeId)
-			|| "TODODIV2300".equals(todoDiv2CodeId);
+			|| "TODODIV2300".equals(todoDiv2CodeId) || "TODODIV2410".equals(todoDiv2CodeId) || "TODODIV2420".equals(todoDiv2CodeId);
 		boolean isMngLine = GENERAL_TO_MNG_TODODIV2.containsKey(todoDiv2CodeId);
 		if (!isGeneralLine && !isMngLine) {
 			return;
@@ -495,7 +495,7 @@ public class WB20SvcImpl implements WB20Svc {
 			return;
 		}
 		boolean isGeneralLine = "TODODIV2190".equals(todoDiv2CodeId) || "TODODIV2200".equals(todoDiv2CodeId)
-			|| "TODODIV2300".equals(todoDiv2CodeId); // PM07 휴가신청서도 대상
+			|| "TODODIV2300".equals(todoDiv2CodeId) || "TODODIV2410".equals(todoDiv2CodeId) || "TODODIV2420".equals(todoDiv2CodeId); // PM07 휴가신청서, PM08 휴일대체근무 신청/결과도 대상
 		boolean isMngLine = GENERAL_TO_MNG_TODODIV2.containsKey(todoDiv2CodeId);
 		if (!isGeneralLine && !isMngLine) {
 			return;
@@ -666,7 +666,7 @@ public class WB20SvcImpl implements WB20Svc {
 				wb20Mapper.deleteAllTodoMaster(dtl);
 			}
 			String sysCreateDttm = wb20Mapper.selectSystemCreateDttm(paramMap);
-			// 결제라인 insert
+			// 1) 결재라인 전체를 먼저 INSERT 한다.
 			for (Map<String, String> dtl : detailMap) {
 				// 입력, 수정
 				String tempKey = dtl.get("todoKey");
@@ -695,7 +695,15 @@ public class WB20SvcImpl implements WB20Svc {
 				}
 
 				result += wb20Mapper.insertTodoMaster(dtl);
+			}
 
+			// 2) 전체 INSERT가 끝난 뒤에 기안자 본인 자체승인 후처리를 진행한다.
+			// (이전에는 위 INSERT 루프 안에서 각 행을 넣자마자 바로 자체승인 처리를 했는데,
+			//  이 시점엔 아직 뒤 순번(상급자) 결재행이 TB_WB20M03에 들어가기 전이라
+			//  selectTodoFinalYn 등 결재선 전체를 다시 조회하는 로직들이 "본인 1명만 있는
+			//  결재선"으로 착각해 전원 승인완료로 오판하는 문제가 있었다. 결재라인 전체가
+			//  DB에 반영된 뒤에 자체승인을 처리하도록 순서를 바꿔서 근본적으로 해결한다.)
+			for (Map<String, String> dtl : detailMap) {
                 // 조치자가 팀장일경우 insertWbsApprovalList 에서 결재완료처리로 등록되므로 상태코드를 진행으로 변경하기 위해 아래 쿼리 실행함
                 // insertWbsApprovalList --> usrNm 을 todoId 에 저장하고 있음
                 if (dtl.get("userId").equals(dtl.get("todoId"))) {

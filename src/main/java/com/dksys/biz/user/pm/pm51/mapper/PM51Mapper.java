@@ -70,6 +70,12 @@ public interface PM51Mapper {
 
 	int deleteTripReqMngApprovalLines(Map<String, String> paramMap);
 
+	int deleteTripReqH(Map<String, String> paramMap);
+
+	int deleteTripReqH02(Map<String, String> paramMap);
+
+	int deleteTripReqH03(Map<String, String> paramMap);
+
 	List<Map<String, String>> selectSignResUserlstInit(Map<String, String> paramMap);
 
 	String selectTripRptSalesCd(Map<String, String> paramMap);

@@ -226,6 +226,10 @@
 
 <script type="text/javascript">
 
+	// 근태마감 1차 경고용 전역 변수
+	var __pm08AttendanceCloseYm = null;
+	var __pm08AttendanceCloseYmLoaded = false;
+
 	var editInitialSnapshot = null;
 
 	// 그리드 동적 높이 조절 (내부 데이터 행 수만큼 유동성 조절 - 안전 탐색 지원)
@@ -320,7 +324,55 @@
 	}
 
 	// 휴일근무일자 변경 이벤트 (반드시 휴일이어야 함 — PM07과 반대)
+	// 근태마감 경고 확인 함수 (검증 실패 시 alert 표출 및 false 반환)
+	function checkAttendanceClosedWarning_PM08(fieldId) {
+		if (!__pm08AttendanceCloseYmLoaded) {
+			postAjaxSync('/user/pm/pm30/selectAttendanceCloseYm', {}, null, function(data) {
+				__pm08AttendanceCloseYm = (data && data.closeYm) ? data.closeYm : null;
+				__pm08AttendanceCloseYmLoaded = true;
+			});
+		}
+		
+		if (!__pm08AttendanceCloseYm) return true; // 마감 없음
+		
+		var dtVal = $('#' + fieldId).val();
+		if (!dtVal) return true; // 입력값 없음
+		
+		var digitsOnly = dtVal.replace(/[^0-9]/g, '');
+		if (digitsOnly.length < 6) return true;
+		
+		var dtYm = digitsOnly.substring(0, 6);
+		if (dtYm <= __pm08AttendanceCloseYm) {
+			var closeYmDisp = __pm08AttendanceCloseYm.length === 6 ? 
+				(__pm08AttendanceCloseYm.substring(0, 4) + '/' + __pm08AttendanceCloseYm.substring(4, 6)) : 
+				__pm08AttendanceCloseYm;
+			alert('근태마감으로 ' + closeYmDisp + '월 이전 근태 자료는 등록·수정·삭제할 수 없습니다. (조회만 가능합니다.)');
+			return false;
+		}
+		return true;
+	}
+
+	// 근태 마감 여부 판정 함수 (순수 boolean 판별용 - alert 없음)
+	function isAttendanceClosed(dtStr) {
+		if (!__pm08AttendanceCloseYmLoaded) {
+			postAjaxSync('/user/pm/pm30/selectAttendanceCloseYm', {}, null, function(data) {
+				__pm08AttendanceCloseYm = (data && data.closeYm) ? data.closeYm : null;
+				__pm08AttendanceCloseYmLoaded = true;
+			});
+		}
+		if (!__pm08AttendanceCloseYm || !dtStr) return false;
+
+		var digits = String(dtStr).replace(/[^0-9]/g, '');
+		if (digits.length < 6) return false;
+		var dtYm = digits.substring(0, 6);
+		return (dtYm <= __pm08AttendanceCloseYm);
+	}
+
+
 	function onHolidayDtChanged() {
+		// 근태마감 1차 경고
+		checkAttendanceClosedWarning_PM08("holidayDt");
+
 		var dtStr = $('#holidayDt').val();
 		if (!dtStr) {
 			$('#holidayCheckWarningRow').hide();
@@ -894,6 +946,7 @@
 		approvalGridViewResult.setData(autoList);
 	}
 
+
 	// 기존 결재선 로드 (신청 결재선 vs 결과 결재선 구분 분리, 결재/공유 모두 포함)
 	function loadApprovalLine(reqNo) {
 		if (!reqNo || $.trim(reqNo) === '') {
@@ -973,6 +1026,11 @@
 		var holidayDt = $('#holidayDt').val();
 		if (!holidayDt) {
 			alert("근무일자를 입력하세요.");
+			$('#holidayDt').focus();
+			return false;
+		}
+		// 근태 마감 여부 검증
+		if (!checkAttendanceClosedWarning_PM08("holidayDt")) {
 			$('#holidayDt').focus();
 			return false;
 		}
@@ -1462,6 +1520,14 @@
 	function submitApproval() {
 		if (!validateForm()) return;
 
+		// 결재자를 모두 선택삭제한 상태로 저장하면, 신청자 본인(등록자) + SPECRTS19(설계팀대체근무 결재라인)을
+		// setDefaultApprovalLine()과 동일한 규칙으로 자동으로 다시 채워 넣는다.
+		var currentReqList = approvalGridViewReq.target.list || [];
+		var hasReqApprover = currentReqList.some(function(item) { return item.gb === "결재"; });
+		if (!hasReqApprover) {
+			setDefaultApprovalLine();
+		}
+
 		var approvalList = processApprovalGrid("REQ");
 		var hasApproval = approvalList.some(function(item) { return item.gb === "결재"; });
 		if (!hasApproval) {
@@ -1498,6 +1564,31 @@
 		formData.append("userId", jwt.userId);
 		formData.append("pgmId", "PM0801P01");
 
+		// 파일 첨부 처리 (treeModule 신규 바이너리 파일 append 및 uploadFileArr 전송)
+		if (typeof treeModule !== 'undefined' && typeof treeModule.getFileArr === 'function') {
+			if (typeof treeModule.setFileNodeId === 'function') {
+				treeModule.setFileNodeId("FITR9902");
+			}
+			formData.append("comonCd", "FITR9902");
+
+			var fileUploadArr = [];
+			var totalFileSize = 0;
+			$.each(treeModule.getFileArr(), function (idx, obj) {
+				if (obj.fileKey == 0 || !obj.fileKey) {
+					formData.append('files', obj.file);
+					if (obj.file && obj.file.size) {
+						totalFileSize += obj.file.size;
+					}
+					var cloneObj = $.extend({}, obj);
+					cloneObj.file = '';
+					fileUploadArr.push(cloneObj);
+				}
+			});
+
+			formData.append('uploadFileArr', JSON.stringify(fileUploadArr));
+			formData.append('deleteFileArr', JSON.stringify(treeModule.getDeleteFileArr()));
+		}
+
 		var apiUrl = ($('#actionType').val() === "C") ? "/user/pm/pm08/insertSubstituteWork" : "/user/pm/pm08/updateSubstituteWork";
 
 		filePostAjax(apiUrl, formData, function(data) {
@@ -1524,6 +1615,9 @@
 			alert("신청건이 먼저 등록되어야 결과를 상신할 수 있습니다.");
 			return;
 		}
+		if (!checkAttendanceClosedWarning_PM08("holidayDt")) {
+			return;
+		}
 		if (!$.trim($('#realStTm').val())) {
 			alert("실제 시작시간을 선택하세요.");
 			$('#realStTm').focus();
@@ -1538,6 +1632,14 @@
 			alert("실제 근무결과를 입력하세요.");
 			$('#workResult').focus();
 			return;
+		}
+
+		// 결재자를 모두 선택삭제한 상태로 저장하면, 신청자 본인(등록자) + SPECRTS19(설계팀대체근무 결재라인)을
+		// setDefaultResultApprovalLine()과 동일한 규칙으로 자동으로 다시 채워 넣는다.
+		var currentResultList = approvalGridViewResult.target.list || [];
+		var hasResultApprover = currentResultList.some(function(item) { return item.gb === "결재"; });
+		if (!hasResultApprover) {
+			setDefaultResultApprovalLine();
 		}
 
 		var approvalList = processApprovalGrid("RESULT");
@@ -1567,6 +1669,31 @@
 		formData.append("approvalStage", "RESULT");
 		formData.append("userId", jwt.userId);
 		formData.append("pgmId", "PM0801P01");
+
+		// 파일 첨부 처리 (treeModule 신규 바이너리 파일 append 및 uploadFileArr 전송)
+		if (typeof treeModule !== 'undefined' && typeof treeModule.getFileArr === 'function') {
+			if (typeof treeModule.setFileNodeId === 'function') {
+				treeModule.setFileNodeId("FITR9902");
+			}
+			formData.append("comonCd", "FITR9902");
+
+			var fileUploadArr = [];
+			var totalFileSize = 0;
+			$.each(treeModule.getFileArr(), function (idx, obj) {
+				if (obj.fileKey == 0 || !obj.fileKey) {
+					formData.append('files', obj.file);
+					if (obj.file && obj.file.size) {
+						totalFileSize += obj.file.size;
+					}
+					var cloneObj = $.extend({}, obj);
+					cloneObj.file = '';
+					fileUploadArr.push(cloneObj);
+				}
+			});
+
+			formData.append('uploadFileArr', JSON.stringify(fileUploadArr));
+			formData.append('deleteFileArr', JSON.stringify(treeModule.getDeleteFileArr()));
+		}
 
 		filePostAjax("/user/pm/pm08/updateSubstituteWork", formData, function(data) {
 			if (data && (data.resultCode == 200 || data.resultCode == "200")) {
@@ -1608,6 +1735,11 @@
 				alert("이미 신청자 외의 결과결재가 진행된 건은 삭제할 수 없습니다.");
 				return;
 			}
+		}
+
+		// 삭제 확인(confirm) 이전에 근태 마감 여부를 먼저 확인
+		if (!checkAttendanceClosedWarning_PM08("holidayDt")) {
+			return;
 		}
 
 		var confirmMsg = isResultDelete
@@ -1793,6 +1925,39 @@
 			$('#secReq, #secResult').find('input, select, textarea').prop('disabled', true).css('background', '#fafafa !important');
 			$('#secReq, #secResult').find('.input_calendar').off('click').css({'cursor': 'default', 'pointer-events': 'none'});
 		}
+
+		// 3) 근태마감 여부 확인 (신규 등록이 아니거나 기존 건인 경우):
+		// 수정, 상신, 삭제 버튼 100% 숨김 및 폼 전체 읽기전용 처리
+		var isClosed = isAttendanceClosed(dtlData.holidayDt || $('#holidayDt').val());
+		if (isClosed && (actionType !== 'C' || hasReq)) {
+			$('#btnSubmitApproval, #btnSubmitResult, #btnDelete').hide();
+			$('#btnProjectArea, #btnReqApprovalArea, #btnResultApprovalArea').hide();
+			$('#secReq, #secResult').find('input, select, textarea').prop('disabled', true).css('background', '#fafafa !important');
+			$('#secReq, #secResult').find('.input_calendar').off('click').css({'cursor': 'default', 'pointer-events': 'none'});
+		}
+
+		// 4) 첨부파일 편집 가능 여부 제어
+		var isFileEditable = true;
+		if (isApprovalMode || !isWriter || isClosed) {
+			isFileEditable = false;
+		} else if (openStage === 'RESULT' || (hasResult && openStage !== 'REQ')) {
+			isFileEditable = isResultEditable;
+		} else if (actionType === 'C' && !hasReq) {
+			isFileEditable = true;
+		} else {
+			isFileEditable = isReqEditable;
+		}
+
+		if (!isFileEditable) {
+			$('.popup_area #fileList_area button').filter(function() {
+				var t = $(this).text().replace(/\s/g, '');
+				return t === "삭제" || t === "파일추가" || t === "추가";
+			}).hide();
+			$('.popup_area #fileList_area input[type="file"]').prop("disabled", true);
+		} else {
+			$('.popup_area #fileList_area button').show();
+			$('.popup_area #fileList_area input[type="file"]').prop("disabled", false);
+		}
 	}
 
 	// 근무일자 단일 데이트 피커 바인딩 헬퍼 (PM0101P01.html 작성일자 데이트피커 방식 100% 이식)
@@ -1840,7 +2005,15 @@
 			tag = (dtlData.reqStatus === 'ING' || dtlData.reqStatus === 'END') ? "[신청상세]" : "[신청수정]";
 		}
 
-		$('#popupTitle').text("휴일대체근무 신청 " + tag);
+		var isClosed = isAttendanceClosed(dtlData.holidayDt || $('#holidayDt').val());
+		if (isClosed && (actionType !== 'C' || hasReq)) {
+			var closeYmDisp = __pm08AttendanceCloseYm && __pm08AttendanceCloseYm.length === 6 ? 
+				(__pm08AttendanceCloseYm.substring(0, 4) + '/' + __pm08AttendanceCloseYm.substring(4, 6)) : 
+				(__pm08AttendanceCloseYm || "");
+			$('#popupTitle').text("휴일대체근무 신청 " + tag + " (" + closeYmDisp + "월 근태마감 - 수정/삭제 불가)");
+		} else {
+			$('#popupTitle').text("휴일대체근무 신청 " + tag);
+		}
 	}
 
 	// 초기화
@@ -2045,6 +2218,7 @@
 			onTimeChanged();
 			$('#specialReason').val(dtlData.specialReason || "");
 			$('#reqMngOpn').val(dtlData.reqMngOpn || "");
+			autoResizeTextareaEl('#reqMngOpn', 50);
 
 			var realStVal = formatTmStr(dtlData.realStTm || dtlData.rawRealStTm);
 			var realEdVal = formatTmStr(dtlData.realEdTm || dtlData.rawRealEdTm);
@@ -2052,7 +2226,9 @@
 			$('#realEdTm').val(realEdVal);
 			onRealTimeChanged();
 			$('#workResult').val(dtlData.workResult || "");
+			autoResizeTextareaEl('#workResult', 70, 500);
 			$('#resultMngOpn').val(dtlData.resultMngOpn || "");
+			autoResizeTextareaEl('#resultMngOpn', 50);
 
 			// 작업 프로젝트 목록 로드
 			var projectList = dtlData.projectList || [];
@@ -2081,28 +2257,39 @@
 		// 신청사유 동적 높이 자동 조절 이벤트 등록 및 최초 수행
 		$('#specialReason').off('input.autoresize keyup.autoresize change.autoresize paste.autoresize').on('input.autoresize keyup.autoresize change.autoresize paste.autoresize', autoResizeSpecialReason);
 		setTimeout(autoResizeSpecialReason, 100);
+
+		// 근무결과 동적 높이 자동 조절 이벤트 등록 및 최초 수행 (신청사유와 동일한 방식)
+		$('#workResult').off('input.autoresize keyup.autoresize change.autoresize paste.autoresize').on('input.autoresize keyup.autoresize change.autoresize paste.autoresize', function() {
+			autoResizeTextareaEl('#workResult', 70, 500);
+		});
+		setTimeout(function() { autoResizeTextareaEl('#workResult', 70, 500); }, 100);
 	});
 
 	// 신청사유 입력 줄 수에 따른 동적 높이 조절 (최소 70px ~ 최대 500px 제한)
 	function autoResizeSpecialReason() {
-		var $el = $('#specialReason');
+		autoResizeTextareaEl('#specialReason', 70, 500);
+	}
+
+	// textarea 내용 길이에 맞춰 높이를 자동 조절하는 공용 함수.
+	// 신청사유/근무결과처럼 사용자가 직접 입력하는 필드와, 담당팀장 의견(reqMngOpn/resultMngOpn)처럼
+	// 결재함에서 자동 반영되는 읽기전용 필드 모두 이 함수 하나로 처리한다.
+	function autoResizeTextareaEl(selector, minHeight, maxHeight) {
+		var $el = $(selector);
 		if (!$el.length) return;
 		var el = $el[0];
 
 		// 스크롤 높이 정밀 측정을 위한 auto 리셋
 		el.style.height = 'auto';
 
-		var minHeight = 70;
-		var maxHeight = 500;
-		var scrollH = el.scrollHeight;
-
-		var newHeight = scrollH;
-		if (newHeight < minHeight) {
-			newHeight = minHeight;
+		var min = minHeight || 50;
+		var max = maxHeight || 99999;
+		var newHeight = el.scrollHeight;
+		if (newHeight < min) {
+			newHeight = min;
 		}
 
-		if (newHeight >= maxHeight) {
-			newHeight = maxHeight;
+		if (newHeight >= max) {
+			newHeight = max;
 			el.style.overflowY = 'auto';
 		} else {
 			el.style.overflowY = 'hidden';

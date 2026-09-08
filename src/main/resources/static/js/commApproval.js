@@ -3,8 +3,28 @@
 // (관리부서 결재는 신청부서 결재가 모두 완료되어야 진행 가능 - 서버 validatePm51SequentialApproval과 동일 기준)
 var PM51_SEQ_GENERAL_OF = {
 	'TODODIV2190': '', 'TODODIV2200': '', 'TODODIV2300': '',		// 신청부서(출장신청서/출장복명서/휴가신청서)
+	'TODODIV2410': '', 'TODODIV2420': '',							// PM08 휴일대체근무 신청/결과 (선행 결재구분 없는 단일 결재선)
 	'TODODIV2191': 'TODODIV2190', 'TODODIV2201': 'TODODIV2200'	// 관리부서(출장신청서/출장복명서)
 };
+
+// 순차 미결재(순차 결재 전용 문서 중 이전 결재자가 1명 이상 미결인 상태) 여부 판정
+// - CM1001M01/CM1002M01/WB2001M01 대시보드가 공통으로 사용하는 [이전결재 미결]/[즉시결재 가능] 뱃지 판정 로직.
+// - 순차 결재 규칙이 명확히 적용된 전용 문서 코드만 지정한다 (동시/병렬 결재 건 오판 방지).
+var SEQ_STRICT_DOC_CODES = [
+	"TODODIV2190", "TODODIV2191", "TODODIV2200", "TODODIV2201", // 출장신청서 / 출장복명서
+	"TODODIV2100", // 수주복표원가
+	"TODODIV2120", // PFU 결재
+	"TODODIV2300", // 휴가신청서
+	"TODODIV2410", "TODODIV2420" // PM08 휴일대체근무 신청/결과
+];
+
+function checkSequentialPending(item) {
+	if (!item || item.todoDiv1CodeNm !== '결재') return false;
+	if (SEQ_STRICT_DOC_CODES.indexOf(item.todoDiv2CodeId) < 0) {
+		return false;
+	}
+	return Number(item.beforeNotConfirm || 0) > 0;
+}
 
 // PM51(출장신청서 TODODIV2190/2191, 출장복명서 TODODIV2200/2201) 순차결재 진입 안내.
 // 본인 차례가 아니면 blocked=true(결재버튼 차단)와 함께 순차 순서상 가장 앞선 미결자를 지목한다.
@@ -263,6 +283,11 @@ function Approval(htmlParam, param, popParam) {
 									approvalParam.todoDiv2CodeId = data.todoDiv2CodeId;
 									approvalParam.todoNo = data.todoNo;
 									html = html.replace(/readonly/gi, "");		//결재의견 input
+									// PM08 휴일대체근무 신청/결과(TODODIV2410/2420) 결재자가 담당팀장 본인이면
+									// 확인의견(담당팀장 의견) 입력을 필수로 만든다 - confirmApproval에서 이 마커를 검사한다.
+									if ((data.todoDiv2CodeId === 'TODODIV2410' || data.todoDiv2CodeId === 'TODODIV2420') && data.deptTeamManager === 'TEAM01') {
+										html = html.replace('</textarea>', '</textarea><input type="hidden" name="requiredOpn" value="YES">');
+									}
 									//팀장 이슈 조치결과 결재일경우 위험성 평가 기능 추가 하기위함   남장섭 240618
 //					 				if( data.todoDiv2CodeId=='TODODIV2090' && data.teamManager == 'TEAM01' ) {
 //					 					confrmActDngEval = actDngEval;
@@ -313,6 +338,17 @@ function Approval(htmlParam, param, popParam) {
 						});
 					}
 					$("#appLine").append(htmlTr);
+
+					// 확인의견(담당팀장 의견 등) textarea 높이를 내용 길이에 맞춰 자동 조절한다.
+					// (readonly 해제된 본인 행은 입력 중에도 실시간으로 늘어나도록 input 이벤트도 바인딩 - 모바일과 동일)
+					$("#appLine textarea[name='todoCfOpn']").each(function() {
+						this.style.height = 'auto';
+						this.style.height = Math.max(this.scrollHeight, 25) + 'px';
+					});
+					$("#appLine").off('input.autoresizeOpn').on('input.autoresizeOpn', 'textarea[name="todoCfOpn"]', function() {
+						this.style.height = 'auto';
+						this.style.height = Math.max(this.scrollHeight, 25) + 'px';
+					});
 
 					//팀장 이슈 조치결과 결재일경우 위험성 평가 기능 추가 하기위함   남장섭 240618
 					$("#appLine").append(confrmActDngEval);
@@ -396,6 +432,14 @@ function Approval(htmlParam, param, popParam) {
 		var actTeamManager = $tr.find('input[name="actTeamManager"]').val();
 //		var todoCfOpn = $tr.find('textarea[name="todoCfOpn"]').val();
 		var todoCfOpn = ($tr.find('textarea[name="todoCfOpn"]').val() ?? '').trim();
+		var requiredOpn = $tr.find('input[name="requiredOpn"]').val();
+
+		// PM08 휴일대체근무 신청/결과 결재자가 담당팀장 본인이면 확인의견 입력 필수
+		// (todoCfOpn은 아래에서 그대로 insertApprovalLine paramMap에 담겨 결재승인과 함께 저장된다)
+		if (requiredOpn == 'YES' && todoCfOpn == '') {
+			customAlert('담당팀장 의견을 입력해주세요.');
+			return false;
+		}
 
         //부서코드 영업, 기술연구소, 구매, 생산팀의 팀장이면 결과 등록시 해당팀의 소요공수 입력 필수임
         // $('#requiredMh').val() == 'YES'   담당팀 투입공수 필수입력 대상임

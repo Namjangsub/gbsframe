@@ -43,26 +43,43 @@
 	<script src="/static/js/vacationColorConfig.js"></script>
 
 	<style>
+		#tableContainer {
+			width: 100%;
+			overflow-x: auto;
+			overflow-y: auto;
+			position: relative;
+			background: #ffffff;
+			border: 1px solid #d0d0d0;
+		}
 		.subst-vac-table {
 			width: 100%;
+			min-width: 1400px;
 			table-layout: fixed;
 			background: #ffffff;
-			border-collapse: collapse;
-			border: 1px solid #d0d0d0;
+			border-collapse: separate;
+			border-spacing: 0;
 			font-size: 12px;
 		}
 		.subst-vac-table thead {
 			background: #f5f5f5;
 		}
-		.subst-vac-table th {
+		.subst-vac-table thead th {
+			position: sticky;
+			top: 0;
+			z-index: 10;
+			background-color: #f5f5f5;
 			padding: 6px 4px;
 			text-align: center;
 			vertical-align: middle;
 			font-weight: 600;
 			color: #333;
 			border-right: 1px solid #d0d0d0;
-			border-bottom: 1px solid #d0d0d0;
+			border-bottom: 2px solid #b0b0b0;
+			box-shadow: inset 0 -1px 0 #b0b0b0;
 			word-break: break-word;
+		}
+		.subst-vac-table thead th:last-child {
+			border-right: none;
 		}
 		.subst-vac-table td {
 			padding: 6px 4px;
@@ -74,6 +91,9 @@
 			word-break: break-word;
 			overflow-wrap: break-word;
 		}
+		.subst-vac-table td:last-child {
+			border-right: none;
+		}
 		.subst-vac-table td.left {
 			text-align: left;
 			padding-left: 8px;
@@ -81,6 +101,10 @@
 		.subst-vac-table .fixed-col {
 			background: #fafafa;
 			font-weight: 500;
+		}
+		.subst-vac-table td.leave-user {
+			background: #fafafa !important;
+			color: #777777;
 		}
 		.subst-vac-table .grant-col {
 			background: #ffffcc;
@@ -166,6 +190,9 @@
 		<!-- 검색 조건 -->
 		<div class="contents search">
 			<input type="hidden" id="pgmId" name="pgmId" value="PM0810M01">
+			<input type="hidden" id="coCd_S" name="coCd_S" data-search="coCd" value="GUN">
+			<input type="hidden" id="deptCd_S" name="deptCd_S" data-search="deptCd" value="GUN40">
+			<input type="hidden" id="deptNm_S" name="deptNm_S" data-search="deptNm" value="기술연구소">
 			<div class="">
 				<table class="table_input type04">
 					<colgroup>
@@ -179,23 +206,9 @@
 						<col width="16%">
 					</colgroup>
 					<tr>
-						<th class="hit">회사</th>
-						<td>
-							<select id="coCd_S" name="coCd_S" data-kind="CO" data-search="coCd" onchange="searchSubstVacationStatus();" required>
-								<option value="">전체</option>
-							</select>
-						</td>
 						<th class="hit">기준연도</th>
 						<td>
 							<select id="yy_S" name="yy_S" data-search="yy" onchange="searchSubstVacationStatus();"></select>
-						</td>
-						<th>부서</th>
-						<td>
-							<div class="search_form" style="width: 100%;">
-								<input type="hidden" id="deptCd_S" name="deptCd_S" data-search="deptCd">
-								<input type="text" id="deptNm_S" name="deptNm_S" data-search="deptNm" onkeyup="(event.keyCode == 8 || event.keyCode == 46) ? (deptCd_S.value = '', deptNm_S.value = '') : event.keyCode == 13 ? searchSubstVacationStatus() : '';">
-								<a onclick="openReqDeptTree('S');"><i class="i_search_w"></i></a>
-							</div>
 						</td>
 						<th>사원검색</th>
 						<td>
@@ -205,8 +218,6 @@
 								<a onclick="openReqUserTree('S');"><i class="i_search_w"></i></a>
 							</div>
 						</td>
-					</tr>
-					<tr>
 						<th>재직구분</th>
 						<td>
 							<select id="useYn_S" name="useYn_S" data-search="useYn" onchange="searchSubstVacationStatus();">
@@ -215,7 +226,7 @@
 								<option value="N">퇴직</option>
 							</select>
 						</td>
-						<th colspan="5"></th>
+						<th colspan="2"></th>
 					</tr>
 				</table>
 			</div>
@@ -234,8 +245,8 @@
 		</div>
 
 		<!-- 메인 테이블 콘텐츠 -->
-		<div class="contents" style="padding-bottom: 0px; overflow-x: auto;">
-			<div id="tableContainer" style="min-height: 500px;">
+		<div class="contents" style="padding-bottom: 0px; overflow: hidden;">
+			<div id="tableContainer">
 				<div class="empty-state">
 					<i class="fas fa-search"></i>
 					<p>검색하여 현황을 확인하세요.</p>
@@ -258,46 +269,50 @@
 		}
 
 		function setDefaultDeptInfo() {
-			if (typeof jwt === "undefined" || !jwt.userId) return;
-
-			$('#userId_S').val(jwt.userId);
-			$('#userNm_S').val(jwt.userNm || "");
-
-			// 로그인 사용자의 백엔드 상세 정보(부서코드) 조회 및 검색조건 자동 세팅
-			postAjax("/admin/cm/cm06/selectUserInfo", { "userId": jwt.userId }, null, function(data) {
-				// CM06Ctr.selectUserInfo()는 model.addAttribute("userInfo", ...)로 응답 (result 아님)
-				var userInfo = (data && data.userInfo) ? data.userInfo : (data || {});
-				var rawDeptId = userInfo.deptId || jwt.deptId || "";
-				var deptId5 = rawDeptId.length > 5 ? rawDeptId.substring(0, 5) : rawDeptId;
-				if (!deptId5) return;
-
-				$('#deptCd_S').val(deptId5);
-
-				// TB_CM06M01.DEPT_ID(사용자 소속)는 5자리보다 긴 세부코드일 수 있어 selectUserInfo의 DEPT_NM(전체 코드 정확일치 조회)이
-				// NULL이 되는 경우가 있음 - 화면의 부서 필터와 동일하게 5자리로 자른 코드로 TB_CM04M01을 직접 조회해서 부서명을 채움
-				postAjax("/admin/cm/cm04/selectDeptInfo", { "deptId": deptId5 }, null, function(deptData) {
-					// CM04Ctr.selectDeptInfo()는 model.addAttribute("deptInfo", ...)로 응답 (result 아님)
-					var deptInfo = (deptData && deptData.deptInfo) ? deptData.deptInfo : (deptData || {});
-					var deptNmVal = deptInfo.deptNm || jwt.deptNm || "";
-					if (deptNmVal && deptNmVal !== "undefined") {
-						$('#deptNm_S').val(deptNmVal);
-					}
-				});
-			});
+			// 부서는 기술연구소(GUN40)로 상시 고정
+			$('#deptCd_S').val('GUN40');
+			$('#deptNm_S').val('기술연구소');
 		}
 
 		function initSearch() {
 			var curYy = moment().format("YYYY");
 			$('#yy_S').val(curYy);
-			$('#deptCd_S').val('');
-			$('#deptNm_S').val('');
+			$('#coCd_S').val('GUN');
+			$('#deptCd_S').val('GUN40');
+			$('#deptNm_S').val('기술연구소');
 			$('#userId_S').val('');
 			$('#userNm_S').val('');
 			$('#useYn_S').val('Y');
 
-			setDefaultDeptInfo();
 			searchSubstVacationStatus();
 		}
+
+		function resizeTableContainer() {
+			var $container = $('#tableContainer');
+			if ($container.length === 0) return;
+			var containerTop = $container.offset().top;
+			var winHeight = $(window).height();
+			var bottomReserve = 15;
+			var targetHeight = Math.max(300, winHeight - containerTop - bottomReserve);
+			$container.css({
+				'height': targetHeight + 'px',
+				'max-height': targetHeight + 'px'
+			});
+		}
+
+		var resizeDebounceTimer = null;
+		$(window).on('resize', function() {
+			clearTimeout(resizeDebounceTimer);
+			resizeDebounceTimer = setTimeout(function() {
+				resizeTableContainer();
+			}, 150);
+		});
+
+		$(document).on('scroll', '#tableContainer', function() {
+			if (typeof hideDayPopoverImmediately === 'function') {
+				hideDayPopoverImmediately();
+			}
+		});
 
 		$(document).ready(function() {
 			mainDefaultLoad("인사관리", "대체휴가 현황");
@@ -306,6 +321,7 @@
 
 			setDefaultDeptInfo();
 			searchSubstVacationStatus();
+			resizeTableContainer();
 		});
 
 		function searchSubstVacationStatus() {
@@ -332,6 +348,7 @@
 				} else {
 					$('#tableContainer').html('<div class="empty-state"><i class="fas fa-inbox"></i><p>조회 결과가 없습니다.</p></div>');
 				}
+				resizeTableContainer();
 			});
 		}
 
@@ -600,9 +617,13 @@
 				var balanceDays = grantDays - usedDays;
 
 				// 연차휴가일 행
+				var isLeave = (row['useYn'] === 'N' || (row['leaveDt'] && $.trim(row['leaveDt']) !== ''));
+				var leaveBadge = isLeave ? ' <span style="font-size: 10px; background-color: #f2dede; color: #a94442; border: 1px solid #ebccd1; border-radius: 3px; padding: 1px 3px; font-weight: normal;">퇴사</span>' : '';
+				var leaveDtText = (isLeave && row['leaveDt']) ? ('<br><span style="font-size: 10px; color: #c9302c;">(' + moment(row['leaveDt'], 'YYYYMMDD').format('YYYY-MM-DD') + ')</span>') : '';
+
 				html += '<tr>';
 				html += '<td rowspan="5" class="fixed-col">' + rowNum + '</td>';
-				html += '<td rowspan="5" class="fixed-col left">' + (row['userNm'] || '') + '</td>';
+				html += '<td rowspan="5" class="fixed-col left ' + (isLeave ? 'leave-user' : '') + '">' + (row['userNm'] || '') + leaveBadge + leaveDtText + '</td>';
 				html += '<td rowspan="5" class="fixed-col">' + (row['levelNm'] || '') + '</td>';
 				html += '<td rowspan="5" class="grant-col" style="background-color: #ffffcc;"><strong>' + fmt1(grantDays) + '</strong></td>';
 				html += '<td rowspan="5" class="used-col" style="background-color: #ffffcc;"><strong>' + fmt1(usedDays) + '</strong></td>';
@@ -688,10 +709,69 @@
 
 			html += '</tbody></table>';
 			$('#tableContainer').html(html);
+			resizeTableContainer();
 		}
 
 		function excelDown() {
-			alert('엑셀다운로드 기능은 준비 중입니다.');
+			var $table = $('#tableContainer table.subst-vac-table');
+			if ($table.length === 0 || $table.find('tbody tr').length === 0) {
+				alert("출력할 목록이 없습니다.");
+				return;
+			}
+
+			var curYy = $('#yy_S').val() || moment().format("YYYY");
+			var fileName = curYy + "년도_대체휴가_현황.xls";
+
+			var $clone = $table.clone();
+			$clone.find('script').remove();
+
+			var tableHtml = $clone[0].outerHTML;
+
+			var excelTemplate = 
+				'<html xmlns:o="urn:schemas-microsoft-com:office:office" ' +
+				'xmlns:x="urn:schemas-microsoft-com:office:excel" ' +
+				'xmlns="http://www.w3.org/TR/REC-html40">' +
+				'<head>' +
+				'<meta http-equiv="Content-Type" content="text/html; charset=utf-8">' +
+				'<!--[if gte mso 9]><xml>' +
+				'<x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet>' +
+				'<x:Name>' + curYy + '년 대체휴가현황</x:Name>' +
+				'<x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions>' +
+				'</x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook>' +
+				'</xml><![endif]-->' +
+				'<style>' +
+				'  table { border-collapse: collapse; font-family: 맑은 고딕, Malgun Gothic, sans-serif; font-size: 10pt; }' +
+				'  th { background-color: #f2f2f2; border: 0.5pt solid #a0a0a0; text-align: center; vertical-align: middle; font-weight: bold; padding: 6px 4px; }' +
+				'  td { border: 0.5pt solid #c0c0c0; text-align: center; vertical-align: middle; padding: 4px; mso-number-format: "\\@"; }' +
+				'  td.left { text-align: left; padding-left: 6px; }' +
+				'  .grant-col, .used-col { background-color: #ffffcc !important; }' +
+				'  .balance-col { font-weight: bold; }' +
+				'  .balance-col.highlight { color: #d9534f; }' +
+				'  .fixed-col { background-color: #fafafa; font-weight: 500; }' +
+				'  .leave-user { background-color: #fafafa; color: #777777; }' +
+				'  br { mso-data-placement: same-cell; }' +
+				'</style>' +
+				'</head>' +
+				'<body>' +
+				'<table><tr><td colspan="19" style="font-size: 14pt; font-weight: bold; text-align: left; height: 35px; border: none; background: #ffffff;">' + 
+				curYy + '년도 대체휴가 현황' + 
+				'</td></tr></table><br>' +
+				tableHtml +
+				'</body></html>';
+
+			var blob = new Blob(['\uFEFF' + excelTemplate], { type: 'application/vnd.ms-excel;charset=utf-8;' });
+
+			if (window.navigator && window.navigator.msSaveOrOpenBlob) {
+				window.navigator.msSaveOrOpenBlob(blob, fileName);
+			} else {
+				var link = document.createElement('a');
+				link.href = URL.createObjectURL(blob);
+				link.download = fileName;
+				document.body.appendChild(link);
+				link.click();
+				document.body.removeChild(link);
+				URL.revokeObjectURL(link.href);
+			}
 		}
 
 		function openReqUserTree(gbn) {

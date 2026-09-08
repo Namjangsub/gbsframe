@@ -382,6 +382,8 @@
 		var attendanceData = [];
 		var rawDataList = [];	// 붙여넣은 원본 22컬럼 보존 (TB_PM30M02 저장용)
 		var defaultColumnDefs = null;
+		var __attendanceCloseYm = null;
+		var __attendanceCloseYmLoaded = false;
 
 		// ─ 개인별 그리드 설정 모달 팝업 호출 ─
 		function openGridConfig() {
@@ -437,6 +439,10 @@
 			initEvent();
 			initSearch();
 
+			postAjax('/user/pm/pm30/selectAttendanceCloseYm', {}, null, function(data) {
+				__attendanceCloseYm = (data && data.closeYm) ? data.closeYm : null;
+				__attendanceCloseYmLoaded = true;
+			});
 
 			// 임시 테스트용
 			$('#searchStDt').val('2026-07-01');
@@ -2928,6 +2934,20 @@
 				return;
 			}
 
+			// 근태마감 검증 (마감월 이전 데이터 포함 시 저장 즉시 차단)
+			if (__attendanceCloseYmLoaded && __attendanceCloseYm) {
+				for (var m = 0; m < gridData.length; m++) {
+					var wDt = String(gridData[m].workDt || '').replace(/[^0-9]/g, '');
+					if (wDt.length >= 6 && wDt.substring(0, 6) <= __attendanceCloseYm) {
+						var closeYmDisp = __attendanceCloseYm.length === 6 ? 
+							(__attendanceCloseYm.substring(0, 4) + '/' + __attendanceCloseYm.substring(4, 6)) : 
+							__attendanceCloseYm;
+						alert('근태마감으로 ' + closeYmDisp + '월 이전 근태 자료는 등록·수정·삭제할 수 없습니다. (조회만 가능합니다.)');
+						return;
+					}
+				}
+			}
+
 			// 저장 전 수정퇴근일시 유효성 전수 검사 (근무일 다음날 08:30 이후 등록 차단)
 			for (var k = 0; k < gridData.length; k++) {
 				var rItem = gridData[k];
@@ -3014,6 +3034,20 @@
 			if (!selectedList || selectedList.length === 0) {
 				alert('삭제할 행을 체크박스로 선택하세요.');
 				return;
+			}
+
+			// 삭제 확인(confirm) 전 근태마감 검증
+			if (__attendanceCloseYmLoaded && __attendanceCloseYm) {
+				for (var d = 0; d < selectedList.length; d++) {
+					var swDt = String(selectedList[d].workDt || '').replace(/[^0-9]/g, '');
+					if (swDt.length >= 6 && swDt.substring(0, 6) <= __attendanceCloseYm) {
+						var closeYmDisp = __attendanceCloseYm.length === 6 ? 
+							(__attendanceCloseYm.substring(0, 4) + '/' + __attendanceCloseYm.substring(4, 6)) : 
+							__attendanceCloseYm;
+						alert('근태마감으로 ' + closeYmDisp + '월 이전 근태 자료는 등록·수정·삭제할 수 없습니다. (조회만 가능합니다.)');
+						return;
+					}
+				}
 			}
 
 			if (!confirm('선택된 ' + selectedList.length + '건의 행을 삭제하시겠습니까?')) {
@@ -3479,6 +3513,31 @@
 					}
 					var startTime = $('#modDttmStartHour').val() + ':' + $('#modDttmStartMin').val();
 					var endTime = $('#modDttmEndHour').val() + ':' + $('#modDttmEndMin').val();
+					// 근태마감 1차 경고 (프론트엔드 사전 안내)
+					if (__attendanceCloseYmLoaded && __attendanceCloseYm) {
+						function extractDateYm(dateStr) {
+							var digitsOnly = String(dateStr || '').replace(/[^0-9]/g, '');
+							return digitsOnly.length >= 6 ? digitsOnly.substring(0, 6) : null;
+						}
+						function formatCloseYmDisplay(closeYm) {
+							return closeYm.length === 6 ? (closeYm.substring(0, 4) + '/' + closeYm.substring(4, 6)) : closeYm;
+						}
+						if (applyIn && sd) {
+							var inYm = extractDateYm(sd);
+							if (inYm && inYm <= __attendanceCloseYm) {
+								alert('근태마감으로 ' + formatCloseYmDisplay(__attendanceCloseYm) + '월 이전 근태 자료는 등록·수정·삭제할 수 없습니다. (조회만 가능합니다.)');
+								return false;
+							}
+						}
+						if (applyOut && ed) {
+							var outYm = extractDateYm(ed);
+							if (outYm && outYm <= __attendanceCloseYm) {
+								alert('근태마감으로 ' + formatCloseYmDisplay(__attendanceCloseYm) + '월 이전 근태 자료는 등록·수정·삭제할 수 없습니다. (조회만 가능합니다.)');
+								return false;
+							}
+						}
+					}
+
 
 					// 수정퇴근일시 다음날 08:30 이후 등록 불가 방어 검증
 					if (applyOut) {

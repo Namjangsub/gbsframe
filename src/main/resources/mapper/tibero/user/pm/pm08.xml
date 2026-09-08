@@ -41,7 +41,7 @@
 		SELECT COUNT(*)
 		FROM TB_PM08M01 M
 		LEFT JOIN TB_CM06M01 U ON U.ID = M.REQ_ID
-		LEFT JOIN TB_CM04M01 D ON D.DEPT_ID = M.DEPT_ID
+		LEFT JOIN TB_CM04M01 D ON D.DEPT_ID = SUBSTR(M.DEPT_ID, 1, 5)
 		WHERE 1=1
 		<if test="holidayDtFrom != null and !holidayDtFrom.equals('') and holidayDtTo != null and !holidayDtTo.equals('')">
 		AND M.HOLIDAY_DT &lt;= REPLACE(#{holidayDtTo}, '-', '')
@@ -60,7 +60,7 @@
 		AND (U.NAME LIKE '%' || #{reqNm} || '%' OR M.REQ_NM LIKE '%' || #{reqNm} || '%')
 		</if>
 		<if test="deptId != null and !deptId.equals('')">
-		AND M.DEPT_ID = #{deptId}
+		AND SUBSTR(M.DEPT_ID, 1, 5) = SUBSTR(#{deptId}, 1, 5)
 		</if>
 		<if test="deptNm != null and !deptNm.equals('')">
 		AND D.DEPT_NM LIKE '%' || #{deptNm} || '%'
@@ -95,10 +95,12 @@
 					<include refid="calcReqStatusExpr"/> AS REQ_STATUS,
 					<include refid="calcResultStatusExpr"/> AS RESULT_STATUS,
 					M.CREAT_ID,
-					TO_CHAR(M.CREAT_DTTM, 'YYYY-MM-DD HH24:MI:SS') AS CREAT_DTTM
+					TO_CHAR(M.CREAT_DTTM, 'YYYY-MM-DD HH24:MI:SS') AS CREAT_DTTM,
+					TO_CHAR(U.LEAVE_DT, 'YYYYMMDD') AS LEAVE_DT,
+					U.USE_YN
 				FROM TB_PM08M01 M
 				LEFT JOIN TB_CM06M01 U ON U.ID = M.REQ_ID
-				LEFT JOIN TB_CM04M01 D ON D.DEPT_ID = M.DEPT_ID
+				LEFT JOIN TB_CM04M01 D ON D.DEPT_ID = SUBSTR(M.DEPT_ID, 1, 5)
 				LEFT JOIN (
 					SELECT
 						REQ_NO,
@@ -120,7 +122,7 @@
 				AND (U.NAME LIKE '%' || #{reqNm} || '%' OR M.REQ_NM LIKE '%' || #{reqNm} || '%')
 				</if>
 				<if test="deptId != null and !deptId.equals('')">
-				AND M.DEPT_ID = #{deptId}
+				AND SUBSTR(M.DEPT_ID, 1, 5) = SUBSTR(#{deptId}, 1, 5)
 				</if>
 				<if test="deptNm != null and !deptNm.equals('')">
 				AND D.DEPT_NM LIKE '%' || #{deptNm} || '%'
@@ -170,7 +172,7 @@
 			TO_CHAR(M.CREAT_DTTM, 'YYYY-MM-DD HH24:MI:SS') AS CREAT_DTTM
 		FROM TB_PM08M01 M
 		LEFT JOIN TB_CM06M01 U ON U.ID = M.REQ_ID
-		LEFT JOIN TB_CM04M01 D ON D.DEPT_ID = M.DEPT_ID
+		LEFT JOIN TB_CM04M01 D ON D.DEPT_ID = SUBSTR(M.DEPT_ID, 1, 5)
 		WHERE M.REQ_NO = #{reqNo, jdbcType=VARCHAR}
 	</select>
 
@@ -390,7 +392,11 @@
 				SUBSTR(NVL(U.VIEW_DEPT_ID, U.DEPT_ID), 1, 5) AS DEPT_ID,
 				D.DEPT_NM,
 				NVL(D.SORT_NO, 999) AS SORT_NO,
-				L.LEVEL_NM
+				U.TEAM_MANAGER,
+				U.LEVEL_CD,
+				L.LEVEL_NM,
+				TO_CHAR(U.LEAVE_DT, 'YYYYMMDD') AS LEAVE_DT,
+				U.USE_YN
 			FROM TB_CM06M01 U
 			LEFT JOIN TB_CM04M01 D ON D.DEPT_ID = SUBSTR(NVL(U.VIEW_DEPT_ID, U.DEPT_ID), 1, 5)
 			LEFT JOIN TB_CM07M01 L ON L.LEVEL_CD = U.LEVEL_CD
@@ -399,7 +405,17 @@
 			  AND (D.DEPT_NM IS NULL OR D.DEPT_NM NOT LIKE '%임원실%')
 			  AND (U.SALES_AREA IS NULL OR U.SALES_AREA != 'SALESAREA00')
 			<if test="useYn_S != null and !useYn_S.equals('')">
-			  AND U.USE_YN = #{useYn_S}
+			  <choose>
+			    <when test="useYn_S.equals('Y')">
+			      AND U.USE_YN = 'Y' AND U.LEAVE_DT IS NULL
+			    </when>
+			    <when test="useYn_S.equals('N')">
+			      AND (U.USE_YN = 'N' OR U.LEAVE_DT IS NOT NULL)
+			    </when>
+			    <otherwise>
+			      AND U.USE_YN = #{useYn_S}
+			    </otherwise>
+			  </choose>
 			</if>
 			<if test="deptCd_S != null and !deptCd_S.equals('')">
 			  AND (U.VIEW_DEPT_ID LIKE SUBSTR(#{deptCd_S}, 1, 5) || '%' OR U.DEPT_ID LIKE SUBSTR(#{deptCd_S}, 1, 5) || '%')
@@ -427,7 +443,11 @@
 			A.USER_ID,
 			A.USER_NM,
 			A.DEPT_NM,
+			A.TEAM_MANAGER,
+			A.LEVEL_CD,
 			A.LEVEL_NM,
+			A.LEAVE_DT,
+			A.USE_YN,
 			NVL(V.SW_SUM, 0) AS GRANT_DAYS,
 			(NVL(U.VAC_M01,0)+NVL(U.VAC_M02,0)+NVL(U.VAC_M03,0)+NVL(U.VAC_M04,0)+NVL(U.VAC_M05,0)+NVL(U.VAC_M06,0)+
 			 NVL(U.VAC_M07,0)+NVL(U.VAC_M08,0)+NVL(U.VAC_M09,0)+NVL(U.VAC_M10,0)+NVL(U.VAC_M11,0)+NVL(U.VAC_M12,0)) AS USED_DAYS,
@@ -748,7 +768,13 @@
 			)
 			GROUP BY WORK_RPT_ID
 		) X ON A.USER_ID = X.WORK_RPT_ID
-		ORDER BY A.SORT_NO ASC, A.DEPT_NM ASC, A.USER_NM ASC
+		ORDER BY DECODE(A.TEAM_MANAGER, 'TEAM01', 0, 1) ASC, A.LEVEL_CD DESC, A.USER_NM ASC
 	</select>
+
+	<delete id="deleteApprovalLineByReqNo" parameterType="Map">
+		/* 휴일대체근무 삭제 시 TB_WB20M03에 등록된 해당 문서(REQ_NO)의 모든 결재/공유선 CASCADE 삭제 */
+		DELETE FROM TB_WB20M03
+		WHERE TODO_NO = #{reqNo, jdbcType=VARCHAR}
+	</delete>
 
 </mapper>

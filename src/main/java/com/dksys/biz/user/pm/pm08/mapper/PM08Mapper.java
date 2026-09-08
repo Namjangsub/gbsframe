@@ -48,4 +48,6 @@ public interface PM08Mapper {
 
 	List<Map<String, String>> selectSubstituteVacationStatusList(Map<String, String> paramMap);
 
+	int deleteApprovalLineByReqNo(Map<String, String> paramMap);
+
 }

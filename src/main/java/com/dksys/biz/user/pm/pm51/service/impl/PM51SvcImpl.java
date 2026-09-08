@@ -597,14 +597,43 @@ public class PM51SvcImpl implements PM51Svc {
 		delParam.put("reqNo", paramMap.get("tripReqNo"));
 		delParam.put("salesCd", salesCd);
 
+		// 1. 공유선 및 결재선 CASCADE 삭제
 		List<Map<String, String>> sharngChk = qm01Mapper.deleteWbsSharngListChk(delParam);
 		if (sharngChk.size() > 0) {
 			qm01Mapper.deleteWbsSharngList(delParam);
 		}
+		pm51Mapper.deleteTripReqApprovalLines(delParam);
+		pm51Mapper.deleteTripReqMngApprovalLines(delParam);
 
+		// 2. 출장 디테일 및 변경이력 CASCADE 삭제
 		pm51Mapper.deleteTripReqD01(delParam);
 		pm51Mapper.deleteTripReqD02(delParam);
 		pm51Mapper.deleteTripReqD03(delParam);
+		pm51Mapper.deleteTripReqH(delParam);
+		pm51Mapper.deleteTripReqH02(delParam);
+		pm51Mapper.deleteTripReqH03(delParam);
+
+		// 3. 첨부파일 CASCADE 삭제 (FILE_TRGT_TYP = 'PM5101P01')
+		try {
+			Map<String, String> fileSearchMap = new HashMap<>();
+			fileSearchMap.put("fileTrgtTyp", "PM5101P01");
+			fileSearchMap.put("fileTrgtKey", paramMap.get("tripReqNo"));
+			List<Map<String, String>> deleteFileList = cm08Svc.selectFileListAll(fileSearchMap);
+			if (deleteFileList != null && !deleteFileList.isEmpty()) {
+				for (Map<String, String> delFile : deleteFileList) {
+					String fKey = delFile.get("fileKey");
+					if (fKey == null || fKey.isEmpty()) fKey = delFile.get("file_key");
+					if (fKey == null || fKey.isEmpty()) fKey = delFile.get("FILE_KEY");
+					if (fKey != null && !fKey.isEmpty()) {
+						cm08Svc.deleteFile(fKey);
+					}
+				}
+			}
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+
+		// 4. 출장신청서 마스터 삭제
 		int result = pm51Mapper.deleteTripReqM01(delParam);
 		return result;
 	}
@@ -1198,13 +1227,42 @@ public class PM51SvcImpl implements PM51Svc {
 		Map<String, String> delParam = new HashMap<>();
 		delParam.put("tripRptNo", paramMap.get("tripRptNo"));
 		delParam.put("reqNo", paramMap.get("tripRptNo"));
+		delParam.put("salesCd", pm51Mapper.selectTripRptSalesCd(paramMap));
 
 		pm51Mapper.deleteTripReqApprovalLines(delParam);
+
+		// 공유선(WBS) CASCADE 삭제 - deleteTripReq/updateTripRpt 와 동일한 관례
+		// (기존에 여기 누락되어 복명서에 등록된 공유자가 삭제 후에도 TB_WB20M03 에 고아로 남는 문제가 있었음)
+		List<Map<String, String>> sharngChk = qm01Mapper.deleteWbsSharngListChk(delParam);
+		if (sharngChk.size() > 0) {
+			qm01Mapper.deleteWbsSharngList(delParam);
+		}
 
 		pm51Mapper.deleteTripRptD02(delParam);
 		pm51Mapper.deleteTripRptD03(delParam);
 		pm51Mapper.deleteTripRptD04(delParam);
 		pm51Mapper.deleteTripRptD01(delParam);
+
+		// 첨부파일 CASCADE 삭제 (FILE_TRGT_TYP = 'PM5102P01')
+		try {
+			Map<String, String> fileSearchMap = new HashMap<>();
+			fileSearchMap.put("fileTrgtTyp", "PM5102P01");
+			fileSearchMap.put("fileTrgtKey", paramMap.get("tripRptNo"));
+			List<Map<String, String>> deleteFileList = cm08Svc.selectFileListAll(fileSearchMap);
+			if (deleteFileList != null && !deleteFileList.isEmpty()) {
+				for (Map<String, String> delFile : deleteFileList) {
+					String fKey = delFile.get("fileKey");
+					if (fKey == null || fKey.isEmpty()) fKey = delFile.get("file_key");
+					if (fKey == null || fKey.isEmpty()) fKey = delFile.get("FILE_KEY");
+					if (fKey != null && !fKey.isEmpty()) {
+						cm08Svc.deleteFile(fKey);
+					}
+				}
+			}
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+
 		int result = pm51Mapper.deleteTripRptM01(delParam);
 		return result;
 	}

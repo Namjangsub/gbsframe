@@ -132,6 +132,9 @@
 		<div class="contents search">
 			<input type="hidden" id="pgmId" name="pgmId" value="PM0711M01">
 			<div class="">
+				<!-- 회사코드 및 직종구분 숨김 처리 (기본값 GUN, 필요 시 연동) -->
+				<input type="hidden" id="coCd_S" name="coCd_S" data-search="coCd" value="GUN">
+				<input type="hidden" id="salesArea_S" name="salesArea_S" data-search="salesArea" value="">
 				<table class="table_input type04">
 					<colgroup>
 						<col width="9%">
@@ -144,13 +147,6 @@
 						<col width="16%">
 					</colgroup>
 					<tr>
-						<th class="hit">회사</th>
-						<td>
-							<!-- PM0103M01.html 회사 셀렉트박스 패턴 (data-kind="CO") -->
-							<select id="coCd_S" name="coCd_S" data-kind="CO" data-search="coCd" onchange="searchAnnualUseStatusGrid();" required>
-								<option value="">전체</option>
-							</select>
-						</td>
 						<th class="hit">기준연도</th>
 						<td>
 							<!-- 조회연도 셀렉트박스 동적 옵션 생성 (기준연도 : 2025년 ~ 현재+1년) -->
@@ -174,22 +170,12 @@
 								<a onclick="openReqUserTree('S');"><i class="i_search_w"></i></a>
 							</div>
 						</td>
-					</tr>
-					<tr>
 						<th>재직구분</th>
 						<td>
 							<select id="useYn_S" name="useYn_S" data-search="useYn" onchange="searchAnnualUseStatusGrid();">
 								<option value="">전체</option>
 								<option value="Y" selected>재직</option>
 								<option value="N">퇴직</option>
-							</select>
-						</td>
-						<th>직종구분</th>
-						<td colspan="5">
-							<select id="salesArea_S" name="salesArea_S" data-search="salesArea" onchange="searchAnnualUseStatusGrid();">
-								<option value="">전체</option>
-								<option value="OFFICE">사무직</option>
-								<option value="SALESAREA60">생산직</option>
 							</select>
 						</td>
 					</tr>
@@ -236,7 +222,7 @@
 							{key: "no",           label: "NO",       rowspan: 2, width: 45},
 							{key: "deptNm",       label: "부서",     rowspan: 2, width: 120},
 							{key: "userNm",       label: "이름",     rowspan: 2, width: 90},
-							{label: "근무기간",   colspan: 3},
+							{label: "근무기간",   colspan: 2},
 							{key: "grantDays",    label: "연차휴가<br>발생일수", rowspan: 2, width: 75},
 							{key: "prevDays",     label: "전년<br>연차",     rowspan: 2, width: 60},
 							{label: "연차휴가사용내역", colspan: 12},
@@ -249,7 +235,7 @@
 						mergeCells: ['deptNm'],
 						columnHeight: 26,
 						trStyleClass: function() {
-							if (this.item && this.item.useYn === 'N') {
+							if (this.item && (this.item.useYn === 'N' || (this.item.leaveDt && $.trim(this.item.leaveDt) !== ''))) {
 								return "grid-font-red-strikethrough";
 							}
 							return "";
@@ -270,10 +256,17 @@
 					},
 					columns: [
 						 {key: "no",           label: "NO",       width:  45, align: "center", formatter: function() { return this.dindex + 1; }}
-						,{key: "deptNm",       label: "부서",     width: 120, align: "left"}
-						,{key: "userNm",       label: "이름",     width:  90, align: "center"}
+						,{key: "deptNm",       label: "부서",     width: 100, align: "left"}
+						,{key: "userNm",       label: "이름",     width:  95, align: "center", formatter: function() {
+							var val = this.value || "";
+							var isLeave = (this.item && (this.item.useYn === 'N' || (this.item.leaveDt && $.trim(this.item.leaveDt) !== '')));
+							if (isLeave) {
+								return '<span style="color: #555555;">' + val + ' <span style="font-size: 10px; background-color: #f2dede; color: #a94442; border: 1px solid #ebccd1; border-radius: 3px; padding: 1px 3px; font-weight: normal;">퇴사</span></span>';
+							}
+							return val;
+						}}
+						,{key: "leaveDt",      label: "퇴사일자", width:  95, align: "center", hidden: true}
 						,{key: "enterDt",      label: "입사일자", width: 100, align: "center"}
-						,{key: "baseDt",       label: "기준일자", width: 100, align: "center"}
 						,{key: "workYears",    label: "근속연수", width: 100, align: "center"}
 						,{key: "grantDays",    label: "발생일수", width:  75, align: "center", formatter: "zeroEmptyFormatter"}
 						,{key: "prevDays",     label: "전년연차", width:  60, align: "center", formatter: "zeroEmptyFormatter"}
@@ -291,7 +284,7 @@
 						,{key: "m12",          label: "12월",     width:  50, align: "center", formatter: makeMonthCellFormatter("m12"), styleClass: makeMonthCellStyleClass(12)}
 						,{key: "usedDaysSum",  label: "사용일수", width:  75, align: "center", styleClass: "grid-font-bold", formatter: "zeroEmptyFormatter"}
 						,{key: "balanceDays",  label: "미사용일수",width: 70, align: "center", styleClass: "grid-font-blue-bold", formatter: "zeroEmptyFormatter"}
-						,{key: "rmk",          label: "비고",     width: 110, align: "left"}
+						,{key: "rmk",          label: "비고",     width: "*", align: "left"}
 					]
 				});
 				return this;
@@ -639,11 +632,20 @@
 
 			postAjax("/user/pm/pm07/selectAnnualUseStatusList", paramObj, null, function(data) {
 				if (data && data.result) {
-					var baseMom = moment();
+					var todayMom = moment();
 					$.each(data.result, function(idx, item) {
+						var isLeave = (item.useYn === 'N' || (item.leaveDt && $.trim(item.leaveDt) !== ''));
+						var empBaseMom = todayMom;
+						if (isLeave && item.leaveDt) {
+							var cleanLeaveDt = String(item.leaveDt).replace(/[^0-9]/g, '');
+							if (cleanLeaveDt.length === 8) {
+								empBaseMom = moment(cleanLeaveDt, 'YYYYMMDD');
+							}
+						}
+						item.baseDt = (isLeave && item.leaveDt) ? item.leaveDt : (curYy + "-01-01");
 						if (item.enterDt) {
 							var autoDays = (typeof calculateAnnualGrantDays === "function")
-								? calculateAnnualGrantDays(item.enterDt, curYy, baseMom)
+								? calculateAnnualGrantDays(item.enterDt, curYy, empBaseMom)
 								: Number(item.grantDays || 0);
 							item.grantDays = autoDays;
 							var wsDays   = Number(item.workSubstDays || 0);
@@ -756,6 +758,11 @@
 
 			// PM0701P02.html 패턴의 부여연도 셀렉트박스 동적 생성을 통한 초기화
 			setGrantYm();
+
+			// 회사코드 초기화 (기본값 GUN, jwt.coCd 연동)
+			if (typeof jwt !== "undefined" && jwt.coCd) {
+				$('#coCd_S').val(jwt.coCd);
+			}
 
 			// 처음 화면 진입 시 로그인 유저(jwt.userId, jwt.userNm)로 초기 검색 조건 설정
 			if (typeof jwt !== "undefined" && jwt.userId) {

@@ -693,6 +693,35 @@
 		return Math.max(0, dayCnt * mealsPerDay - 1);
 	}
 
+	// 근태마감년월을 "YYYY/MM" 형식으로 포매팅
+	function pm51FormatCloseYmDisplay(closeYm) {
+		if (!closeYm || !closeYm.trim()) return null;
+		var ym = String(closeYm).replace(/\D/g, '');
+		if (ym.length >= 6) {
+			return ym.substring(0, 4) + '/' + ym.substring(4, 6);
+		}
+		return null;
+	}
+
+	// 근태마감 경고 체크 (여러 날짜 중 하나라도 마감월 이하이면 1번만 경고)
+	var pm51AttendanceCloseWarningShown = false;
+	function pm51CheckAttendanceCloseWarning() {
+		if (!pm51AttendanceCloseYm || pm51AttendanceCloseWarningShown) return;
+		for (var __i = 0; __i < arguments.length; __i++) {
+			var dateStr = arguments[__i];
+			if (!dateStr) continue;
+			var dateYm = String(dateStr).replace(/\D/g, '').substring(0, 6);
+			if (!dateYm || dateYm.length < 6) continue;
+			if (dateYm <= pm51AttendanceCloseYm) {
+				pm51AttendanceCloseWarningShown = true;
+				var displayYm = pm51FormatCloseYmDisplay(pm51AttendanceCloseYm);
+				var msg = '근태마감으로 ' + displayYm + '월 이전 근태 자료는 등록·수정·삭제할 수 없습니다. (조회만 가능합니다.)';
+				alert(msg);
+				return;
+			}
+		}
+	}
+
 	// 통화값을 공통코드로 정규화 (CURR01=원화, CURR02=달러) - 'WON'/'KRW' 등 문자열 저장 방지
 	function toCurrCode(value) {
 		if (value) {
@@ -727,6 +756,9 @@
 	var currentTripRptD03 = [];
 	var currentReqExpItems = null; // 신청서 예상경비 상세(TB_PM51D02, KRW/USD 분리) - 일비정산 선지급분 산출용
 
+	// 근태마감년월 (PM30 관리 값)
+	var pm51AttendanceCloseYm = null;
+
 	$(document).ready(function () {
 		setTimeout(function () {
 		// 공통 fileTree.js의 JSON.parse("") 크래시를 회피하기 위한 파라미터 선제 보정
@@ -740,6 +772,13 @@
 		if (popParam && !popParam.tripRptNo && popParam.todoNo) {
 			popParam.tripRptNo = popParam.todoNo;
 		}
+
+		// 근태마감년월 조회 및 캐싱
+		postAjaxSync("/user/pm/pm30/selectAttendanceCloseYm", {}, null, function(data) {
+			if (data && data.resultCode === '0000' && data.closeYm && data.closeYm.trim()) {
+				pm51AttendanceCloseYm = data.closeYm;
+			}
+		});
 
 		initTripReqTravelerGrid();
 		initRptTravelerGrid();
@@ -2585,6 +2624,11 @@
 		$('#actTripPeriodText').text(periodText);
 		onActDateChange();
 		loadTripExpenseStatusGrid();
+		// 근태마감 경고 체크 (시작일/종료일 중 하나라도 마감월 이하면 경고)
+		pm51CheckAttendanceCloseWarning(
+			minStart && minStart.length >= 8 ? minStart.substring(0, 8) : '',
+			maxEnd && maxEnd.length >= 8 ? maxEnd.substring(0, 8) : ''
+		);
 	}
 
 	function buildComparableDateTime(dateText, timeText) {
