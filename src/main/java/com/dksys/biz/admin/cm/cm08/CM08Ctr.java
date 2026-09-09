@@ -47,6 +47,7 @@ import org.springframework.web.multipart.MultipartHttpServletRequest;
 import com.dksys.biz.admin.cm.cm08.mapper.CM08Mapper;
 import com.dksys.biz.admin.cm.cm08.service.CM08Svc;
 import com.dksys.biz.admin.cm.cm15.service.CM15Svc;
+import com.dksys.biz.admin.cm.cm25.service.CM25Svc;
 import com.dksys.biz.cmn.vo.PaginationInfo;
 import com.dksys.biz.config.RequestUtils;
 import com.dksys.biz.util.MessageUtils;
@@ -63,6 +64,9 @@ public class CM08Ctr {
 	
 	@Autowired
 	CM08Svc cm08Svc;
+
+	@Autowired
+	CM25Svc cm25Svc;
 
 	@Autowired
     CM08Mapper cm08Mapper;
@@ -301,8 +305,44 @@ public class CM08Ctr {
      */
 	@GetMapping(value = "/ubiReportImage")
 	public void ubiReportImage(@RequestParam String fileKey,
+                               @RequestParam(required = false) String coCd,
+                               @RequestParam(required = false) String expendNo,
+                               @RequestParam(required = false) String pageNo,
                                HttpServletRequest request,
                                HttpServletResponse response) throws Exception {
+	    if (pageNo != null && !pageNo.trim().isEmpty()) {
+	        Map<String, String> pdfImageParam = new HashMap<>();
+	        pdfImageParam.put("coCd", coCd);
+	        pdfImageParam.put("expendNo", expendNo);
+	        pdfImageParam.put("fileKey", fileKey);
+	        pdfImageParam.put("pageNo", pageNo);
+
+	        Map<String, String> pdfImageInfo = cm25Svc.selectExpendPdfImageInfo(pdfImageParam);
+	        if (pdfImageInfo == null
+	                || pdfImageInfo.get("imageFileName") == null
+	                || pdfImageInfo.get("imageFilePath") == null) {
+	            response.sendError(HttpServletResponse.SC_NOT_FOUND);
+	            return;
+	        }
+
+	        Path baseDir = Paths.get(uploadDir).toAbsolutePath().normalize();
+	        Path imageDir = Paths.get(pdfImageInfo.get("imageFilePath")).toAbsolutePath().normalize();
+	        Path imagePath = imageDir.resolve(pdfImageInfo.get("imageFileName")).normalize();
+	        if (!imageDir.startsWith(baseDir)
+	                || !imagePath.startsWith(imageDir)
+	                || !Files.isRegularFile(imagePath)) {
+	            response.sendError(HttpServletResponse.SC_NOT_FOUND);
+	            return;
+	        }
+
+	        response.setContentType("image/jpeg");
+	        response.setHeader("Content-Disposition", "inline");
+	        response.setHeader("Cache-Control", "no-store");
+	        response.setContentLengthLong(Files.size(imagePath));
+	        Files.copy(imagePath, response.getOutputStream());
+	        return;
+	    }
+
         Map<String, String> fileInfo = cm08Svc.selectFileInfo(fileKey);
         if (fileInfo == null
                 || fileInfo.get("fileName") == null

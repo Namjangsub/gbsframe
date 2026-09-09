@@ -1,0 +1,277 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.dksys.biz.admin.cm.cm25.mapper.CM25Mapper">
+
+    <sql id="expendWhere">
+        WHERE 1 = 1
+        <if test="coCd != null and !coCd.equals('')">
+            AND M.CO_CD = #{coCd}
+        </if>
+        <if test="expendDtFrom != null and !expendDtFrom.equals('')">
+            AND M.EXPEND_DT <![CDATA[>=]]> TO_DATE(#{expendDtFrom}, 'YYYY-MM-DD')
+        </if>
+        <if test="expendDtTo != null and !expendDtTo.equals('')">
+            AND M.EXPEND_DT <![CDATA[<]]> TO_DATE(#{expendDtTo}, 'YYYY-MM-DD') + 1
+        </if>
+        <if test="reqDeptId != null and !reqDeptId.equals('')">
+            AND M.REQ_DEPT_ID = #{reqDeptId}
+        </if>
+        <if test="reqId != null and !reqId.equals('')">
+            AND M.REQ_ID = #{reqId}
+        </if>
+        <if test="pmntDiv != null and !pmntDiv.equals('')">
+            AND INSTR(',' || M.PMNT_DIV || ',', ',' || #{pmntDiv} || ',') > 0
+        </if>
+        <if test="payClntCd != null and !payClntCd.equals('')">
+            AND M.PAY_CLNT_CD = #{payClntCd}
+        </if>
+        <if test="expendSts != null and !expendSts.equals('')">
+            AND M.EXPEND_STS = #{expendSts}
+        </if>
+    </sql>
+
+    <select id="selectExpendListCount" parameterType="Map" resultType="int">
+        SELECT COUNT(*)
+          FROM TB_CM25M01 M
+        <include refid="expendWhere"/>
+    </select>
+
+    <select id="selectExpendList" parameterType="Map" resultType="CamelMap">
+        SELECT *
+          FROM (
+                SELECT Q.*, ROWNUM AS RN
+                  FROM (
+                        SELECT M.CO_CD
+                             , FN_CM05M01_CD_TO_NM(M.CO_CD) AS CO_NM
+                             , M.EXPEND_NO
+                             , TO_CHAR(M.EXPEND_DT, 'YYYY-MM-DD') AS EXPEND_DT
+                             , M.REQ_DEPT_ID
+                             , D.DEPT_NM AS REQ_DEPT_NM
+                             , M.REQ_ID
+                             , U.NAME AS REQ_NM
+                             , L.LEVEL_NM AS REQ_JIK
+                             , M.PMNT_DIV
+                             , (SELECT LISTAGG(C.CODE_NM, ', ')
+                                       WITHIN GROUP (ORDER BY C.SORT_NO)
+                                  FROM TB_CM05M01 C
+                                 WHERE C.CODE_KIND = 'PMNTDIV'
+                                   AND C.USE_YN = 'Y'
+                                   AND INSTR(',' || M.PMNT_DIV || ',', ',' || C.CODE_ID || ',') > 0
+                               ) AS PMNT_DIV_NM
+                             , M.PAY_DUE_DIV
+                             , M.PAY_DUE_DT
+                             , CASE
+                                   WHEN M.PAY_DUE_DIV = 'REGULAR' THEN M.PAY_DUE_DT || '일'
+                                   ELSE M.PAY_DUE_DT
+                               END AS PAY_DUE_NM
+                             , M.COST_INFO
+                             , M.EXPEND_CONTENTS
+                             , M.PAY_CLNT_CD
+                             , C.CLNT_NM AS PAY_CLNT_NM
+                             , M.CURR_CD
+                             , FN_CM05M01_CD_TO_NM(M.CURR_CD) AS CURR_CD_NM
+                             , M.PAY_AMT
+                             , M.VAT_YN
+                             , M.ATCH_DOC_DIV
+                             , M.ATCH_DOC_ETC
+                             , M.EXPEND_STS
+                             , CASE M.EXPEND_STS
+                                   WHEN 'expendSts01' THEN '미결재'
+                                   WHEN 'expendSts02' THEN '결재진행중'
+                                   WHEN 'expendSts03' THEN '결재완료'
+                                   ELSE M.EXPEND_STS
+                               END AS EXPEND_STS_NM
+                             , M.CREAT_ID
+                             , TO_CHAR(M.CREAT_DTTM, 'YYYY-MM-DD HH24:MI:SS') AS CREAT_DTTM
+                             , M.UDT_ID
+                             , TO_CHAR(M.UDT_DTTM, 'YYYY-MM-DD HH24:MI:SS') AS UDT_DTTM
+                          FROM TB_CM25M01 M
+                               LEFT OUTER JOIN TB_CM04M01 D
+                                 ON D.DEPT_ID = M.REQ_DEPT_ID
+                               LEFT OUTER JOIN TB_CM06M01 U
+                                 ON U.CO_CD = M.CO_CD
+                                AND U.ID = M.REQ_ID
+                               LEFT OUTER JOIN TB_CM07M01 L
+                                 ON L.LEVEL_CD = U.LEVEL_CD
+                               LEFT OUTER JOIN TB_BM02M01 C
+                                 ON C.CLNT_CD = M.PAY_CLNT_CD
+                        <include refid="expendWhere"/>
+                         ORDER BY M.EXPEND_DT DESC, M.EXPEND_NO DESC
+                       ) Q
+                 WHERE ROWNUM <![CDATA[<=]]> ${lastIndex}
+               )
+         WHERE RN <![CDATA[>=]]> ${firstIndex}
+    </select>
+
+    <select id="selectExpendInfo" parameterType="Map" resultType="CamelMap">
+        SELECT M.CO_CD
+             , M.EXPEND_NO
+             , TO_CHAR(M.EXPEND_DT, 'YYYY-MM-DD') AS EXPEND_DT
+             , M.REQ_DEPT_ID
+             , D.DEPT_NM AS REQ_DEPT_NM
+             , M.REQ_ID
+             , U.NAME AS REQ_NM
+             , L.LEVEL_NM AS REQ_JIK
+             , M.PMNT_DIV
+             , M.PAY_DUE_DIV
+             , M.PAY_DUE_DT
+             , M.COST_INFO
+             , M.EXPEND_CONTENTS
+             , M.PAY_CLNT_CD
+             , C.CLNT_NM AS PAY_CLNT_NM
+             , M.CURR_CD
+             , FN_CM05M01_CD_TO_NM(M.CURR_CD) AS CURR_CD_NM
+             , M.PAY_AMT
+             , M.VAT_YN
+             , M.ATCH_DOC_DIV
+             , M.ATCH_DOC_ETC
+             , M.EXPEND_STS
+          FROM TB_CM25M01 M
+               LEFT OUTER JOIN TB_CM04M01 D
+                 ON D.DEPT_ID = M.REQ_DEPT_ID
+               LEFT OUTER JOIN TB_CM06M01 U
+                 ON U.CO_CD = M.CO_CD
+                AND U.ID = M.REQ_ID
+               LEFT OUTER JOIN TB_CM07M01 L
+                 ON L.LEVEL_CD = U.LEVEL_CD
+               LEFT OUTER JOIN TB_BM02M01 C
+                 ON C.CLNT_CD = M.PAY_CLNT_CD
+         WHERE M.CO_CD = #{coCd}
+           AND M.EXPEND_NO = #{expendNo}
+    </select>
+
+    <select id="selectExpendNoNext" parameterType="Map" resultType="String">
+        SELECT 'EXP' || TO_CHAR(SYSDATE, 'YY') || '-'
+               || LPAD(NVL(MAX(TO_NUMBER(SUBSTR(EXPEND_NO, -5))), 0) + 1, 5, '0')
+          FROM TB_CM25M01
+         WHERE CO_CD = #{coCd}
+           AND EXPEND_NO LIKE 'EXP' || TO_CHAR(SYSDATE, 'YY') || '-%'
+    </select>
+
+    <insert id="insertExpend" parameterType="Map">
+        INSERT INTO TB_CM25M01 (
+               CO_CD, EXPEND_NO, EXPEND_DT, REQ_DEPT_ID, REQ_ID
+             , PMNT_DIV, PAY_DUE_DIV, PAY_DUE_DT, COST_INFO, EXPEND_CONTENTS
+             , PAY_CLNT_CD, CURR_CD, PAY_AMT, VAT_YN, ATCH_DOC_DIV, ATCH_DOC_ETC
+             , EXPEND_STS, CREAT_ID, CREAT_DTTM, CREAT_PGM
+        ) VALUES (
+               #{coCd}, #{expendNo}, TO_DATE(#{expendDt}, 'YYYY-MM-DD'), #{reqDeptId}, #{reqId}
+             , #{pmntDiv}, #{payDueDiv}, #{payDueDt}, #{costInfo}, #{expendContents}
+             , #{payClntCd}, #{currCd}, #{payAmt}, #{vatYn}, #{atchDocDiv}, #{atchDocEtc}
+             , #{expendSts}, #{userId}, SYSDATE, #{pgmId}
+        )
+    </insert>
+
+    <update id="updateExpend" parameterType="Map">
+        UPDATE TB_CM25M01
+           SET EXPEND_DT       = TO_DATE(#{expendDt}, 'YYYY-MM-DD')
+             , REQ_DEPT_ID     = #{reqDeptId}
+             , REQ_ID          = #{reqId}
+             , PMNT_DIV        = #{pmntDiv}
+             , PAY_DUE_DIV     = #{payDueDiv}
+             , PAY_DUE_DT      = #{payDueDt}
+             , COST_INFO       = #{costInfo}
+             , EXPEND_CONTENTS = #{expendContents}
+             , PAY_CLNT_CD     = #{payClntCd}
+             , CURR_CD         = #{currCd}
+             , PAY_AMT         = #{payAmt}
+             , VAT_YN          = #{vatYn}
+             , ATCH_DOC_DIV    = #{atchDocDiv}
+             , ATCH_DOC_ETC    = #{atchDocEtc}
+             , UDT_ID          = #{userId}
+             , UDT_DTTM        = SYSDATE
+             , UDT_PGM         = #{pgmId}
+         WHERE CO_CD = #{coCd}
+           AND EXPEND_NO = #{expendNo}
+    </update>
+
+    <delete id="deleteExpend" parameterType="Map">
+        DELETE FROM TB_CM25M01
+         WHERE CO_CD = #{coCd}
+           AND EXPEND_NO = #{expendNo}
+    </delete>
+
+    <select id="selectApprovedCount" parameterType="Map" resultType="int">
+        SELECT COUNT(*)
+          FROM TB_WB20M03
+         WHERE CO_CD = #{coCd}
+           AND TODO_NO = #{expendNo}
+           AND TODO_DIV1_CODE_ID = 'TODODIV20'
+           AND TODO_DIV2_CODE_ID = 'TODODIV2202'
+           AND SANCTN_STTUS = 'Y'
+    </select>
+
+    <delete id="deleteExpendApprovalList" parameterType="Map">
+        DELETE FROM TB_WB20M03
+         WHERE CO_CD = #{coCd}
+           AND TODO_NO = #{expendNo}
+           AND TODO_DIV2_CODE_ID IN ('TODODIV1202', 'TODODIV2202', 'TODODIV1203', 'TODODIV2204')
+    </delete>
+
+    <update id="updateExpendSts" parameterType="Map">
+        UPDATE TB_CM25M01 M
+           SET M.EXPEND_STS = (
+                   SELECT CASE
+                              WHEN COUNT(*) = 0
+                                OR SUM(CASE WHEN W.SANCTN_STTUS = 'Y' THEN 1 ELSE 0 END) = 0
+                              THEN 'expendSts01'
+                              WHEN SUM(CASE WHEN W.SANCTN_STTUS = 'Y' THEN 1 ELSE 0 END) = COUNT(*)
+                              THEN 'expendSts03'
+                              ELSE 'expendSts02'
+                          END
+                     FROM TB_WB20M03 W
+                    WHERE W.CO_CD = M.CO_CD
+                      AND W.TODO_NO = M.EXPEND_NO
+                      AND W.TODO_DIV1_CODE_ID = 'TODODIV20'
+                      AND W.TODO_DIV2_CODE_ID = 'TODODIV2202'
+               )
+         WHERE M.CO_CD = #{coCd}
+           AND M.EXPEND_NO = #{expendNo}
+    </update>
+
+    <select id="selectExpendPdfImageList" parameterType="Map" resultType="CamelMap">
+        SELECT CO_CD
+             , EXPEND_NO
+             , FILE_KEY
+             , FILE_TRGT_KEY
+             , PAGE_NO
+             , IMAGE_FILE_NAME
+             , IMAGE_FILE_PATH
+             , IMAGE_FILE_SIZE
+          FROM TB_CM25D01
+         WHERE CO_CD = #{coCd}
+           AND EXPEND_NO = #{expendNo}
+         ORDER BY FILE_KEY, PAGE_NO
+    </select>
+
+    <select id="selectExpendPdfImageInfo" parameterType="Map" resultType="CamelMap">
+        SELECT D.IMAGE_FILE_NAME
+             , D.IMAGE_FILE_PATH
+             , D.IMAGE_FILE_SIZE
+          FROM TB_CM25D01 D
+         WHERE D.CO_CD = #{coCd}
+           AND D.EXPEND_NO = #{expendNo}
+           AND D.FILE_KEY = #{fileKey}
+           AND D.PAGE_NO = #{pageNo}
+    </select>
+
+    <insert id="insertExpendPdfImage" parameterType="Map">
+        INSERT INTO TB_CM25D01 (
+               CO_CD, EXPEND_NO, FILE_KEY, FILE_TRGT_KEY, PAGE_NO
+             , IMAGE_FILE_NAME, IMAGE_FILE_PATH, IMAGE_FILE_SIZE
+             , CREAT_ID, CREAT_DTTM, CREAT_PGM
+        ) VALUES (
+               #{coCd}, #{expendNo}, #{fileKey}, #{fileTrgtKey}, #{pageNo}
+             , #{imageFileName}, #{imageFilePath}, #{imageFileSize}
+             , #{userId}, SYSDATE, #{pgmId}
+        )
+    </insert>
+
+    <delete id="deleteExpendPdfImages" parameterType="Map">
+        DELETE FROM TB_CM25D01
+         WHERE CO_CD = #{coCd}
+           AND EXPEND_NO = #{expendNo}
+    </delete>
+
+</mapper>

@@ -11,6 +11,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.dksys.biz.admin.cm.cm16.mapper.CM16Mapper;
+import com.dksys.biz.admin.cm.cm25.mapper.CM25Mapper;
 import com.dksys.biz.user.im.im01.mapper.IM01Mapper;
 import com.dksys.biz.user.pm.pm07.service.PM07Svc;
 import com.dksys.biz.user.pm.pm08.service.PM08Svc;
@@ -39,6 +40,9 @@ public class WB20SvcImpl implements WB20Svc {
 
 	@Autowired
 	CM16Mapper cm16Mapper;
+
+	@Autowired
+	CM25Mapper cm25Mapper;
 
     @Autowired
     IM01Mapper im01Mapper;
@@ -321,6 +325,10 @@ public class WB20SvcImpl implements WB20Svc {
 
 		// 최종결재 완료시 알림톡 발송 대상인지 확인
 		Map<String, String> resultMap = wb20Mapper.selectTodoFinalYn(paramMap);
+		if ("TODODIV2202".equals(todoDiv2CodeId)) {
+			paramMap.put("expendNo", paramMap.get("todoNo"));
+			cm25Mapper.updateExpendSts(paramMap);
+		}
 		if ("TODODIV2190".equals(todoDiv2CodeId)) {
 			updatePm51AprvSts(paramMap, (resultMap != null && "Y".equals(resultMap.get("todoYn"))) ? "APRVSTS03" : "APRVSTS02");
 		}
@@ -424,9 +432,11 @@ public class WB20SvcImpl implements WB20Svc {
 	static {
 		GENERAL_TO_MNG_TODODIV2.put("TODODIV2191", "TODODIV2190");
 		GENERAL_TO_MNG_TODODIV2.put("TODODIV2201", "TODODIV2200");
+		GENERAL_TO_MNG_TODODIV2.put("TODODIV2204", "TODODIV2202");
 
 		GENERAL_TO_MNG_TODODIV2_REVERSE.put("TODODIV2190", "TODODIV2191");
 		GENERAL_TO_MNG_TODODIV2_REVERSE.put("TODODIV2200", "TODODIV2201");
+		GENERAL_TO_MNG_TODODIV2_REVERSE.put("TODODIV2202", "TODODIV2204");
 	}
 
 	// 순차결재 취소 검증: 다음 차례 결재자가 이미 승인한 상태에서는 이전 결재자가 결재를 취소할 수 없다 (역순 취소 원칙)
@@ -437,6 +447,7 @@ public class WB20SvcImpl implements WB20Svc {
 			return;
 		}
 		boolean isGeneralLine = "TODODIV2190".equals(todoDiv2CodeId) || "TODODIV2200".equals(todoDiv2CodeId)
+			|| "TODODIV2202".equals(todoDiv2CodeId)
 			|| "TODODIV2300".equals(todoDiv2CodeId) || "TODODIV2410".equals(todoDiv2CodeId) || "TODODIV2420".equals(todoDiv2CodeId);
 		boolean isMngLine = GENERAL_TO_MNG_TODODIV2.containsKey(todoDiv2CodeId);
 		if (!isGeneralLine && !isMngLine) {
@@ -495,6 +506,7 @@ public class WB20SvcImpl implements WB20Svc {
 			return;
 		}
 		boolean isGeneralLine = "TODODIV2190".equals(todoDiv2CodeId) || "TODODIV2200".equals(todoDiv2CodeId)
+			|| "TODODIV2202".equals(todoDiv2CodeId)
 			|| "TODODIV2300".equals(todoDiv2CodeId) || "TODODIV2410".equals(todoDiv2CodeId) || "TODODIV2420".equals(todoDiv2CodeId); // PM07 휴가신청서, PM08 휴일대체근무 신청/결과도 대상
 		boolean isMngLine = GENERAL_TO_MNG_TODODIV2.containsKey(todoDiv2CodeId);
 		if (!isGeneralLine && !isMngLine) {
@@ -794,6 +806,10 @@ public class WB20SvcImpl implements WB20Svc {
 		}
 		if ("TODODIV2130".equals(paramMap.get("todoDiv2CodeId"))) {
 			result += cm16Mapper.updateItoaIssueStCancelChk(paramMap);
+		}
+		if ("TODODIV2202".equals(paramMap.get("todoDiv2CodeId"))) {
+			paramMap.put("expendNo", paramMap.get("todoNo"));
+			result += cm25Mapper.updateExpendSts(paramMap);
 		}
 		/***************************************************************************************
 		 * 결재 취소 처리시 팀장인경우에만 투입공수 Clear 처리 가능함 -- 처리종료
