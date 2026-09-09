@@ -346,6 +346,7 @@
 			<form id="popForm" onSubmit="return false;">
 				<input type="hidden" id="coCd" name="coCd" value="">
 				<input type="hidden" id="reqNo" name="reqNo" value="">
+				<input type="hidden" id="reqId" name="reqId" value="">
 				<input type="hidden" id="pgmId" name="pgmId" value="PM0701P01_M">
 
 				<div class="pm07p-page">
@@ -528,12 +529,12 @@
 		var userVacationBalance = null;
 
 		// 사원별 휴가 잔여현황 조회 및 휴가유형(vacTypeCd) 옵션 동적 제어 (공통 모듈 위임)
-		function refreshUserVacationBalance(savedTypeCd) {
-			// 모바일 환경: 로그인 유저(jwt.userId) 기준 단독 처리 (대리신청 불가 원칙)
-			var reqId = (typeof jwt !== 'undefined' && jwt.userId) ? jwt.userId : "";
+		function refreshUserVacationBalance(savedTypeCd, targetReqId) {
+			// 모바일 환경: 신규 등록은 로그인 유저(jwt.userId), 결재/조회 모드에서는 결재신청자(reqId) 기준 반영
+			var reqId = targetReqId || $("#popForm #reqId").val() || (paramObj && (paramObj.reqId || paramObj.userId)) || (window.__pm07DetailRow && (window.__pm07DetailRow.reqId || window.__pm07DetailRow.userId)) || ((typeof jwt !== 'undefined' && jwt.userId) ? jwt.userId : "");
 			var stDtVal = $("#stDt").val() || "";
 			var stYear = (stDtVal.length >= 4) ? stDtVal.substring(0, 4) : (window.moment ? moment().format("YYYY") : new Date().getFullYear());
-			var coCdVal = $("#coCd").val() || (typeof jwt !== 'undefined' ? jwt.coCd : "") || "GUN";
+			var coCdVal = $("#popForm #coCd").val() || (paramObj && paramObj.coCd) || (window.__pm07DetailRow && window.__pm07DetailRow.coCd) || (typeof jwt !== 'undefined' ? jwt.coCd : "") || "GUN";
 
 			if (!reqId || !window.PM07Annual || typeof window.PM07Annual.getUserVacationBalance !== "function") {
 				return;
@@ -757,11 +758,15 @@
 
 			$("#popForm #coCd").val(jwt.coCd);
 
+			// 공통코드 셀렉트박스 먼저 동기 생성 (휴가유형 옵션 준비)
+			setCommonSelect($(".popup_area select[data-kind]"));
+
 			const hasParamValue = (paramObj !== null && paramObj !== undefined);
 			if (hasParamValue) {
 				actionType = paramObj.actionType;
 
 				if (actionType == "C") {
+					$("#popForm #reqId").val(jwt.userId);
 					$("#reqTitl").val(jwt.userNm || '');
 					var todayStr = moment().format("YYYY-MM-DD");
 					$("#stDt").val(todayStr);
@@ -799,9 +804,6 @@
 			} else {
 				goBack();
 			}
-
-			setCommonSelect($(".popup_area select[data-kind]"));
-			refreshUserVacationBalance();
 		});
 
 		// 메뉴 작업 권한 확인 (localStorage authArr)
@@ -1121,7 +1123,9 @@
 					window.__pm07DetailRow = row;
 					paramObj = $.extend({}, paramObj, row);
 
-					$("#reqTitl").val(row.reqTitl || '');
+					$("#popForm #coCd").val(row.coCd || jwt.coCd || "GUN");
+					$("#popForm #reqId").val(row.reqId || row.userId || "");
+					$("#reqTitl").val(row.reqTitl || row.reqIdNm || '');
 					$("#vacTypeCd").val(row.vacTypeCd || '');
 					$("#ampmCd").val(row.ampmCd || '');
 					$("#stDt").val(toDashDate(row.stDt));
@@ -1134,7 +1138,7 @@
 
 					onVacTypeChanged();
 					onDateChanged();
-					refreshUserVacationBalance(row.vacTypeCd);
+					refreshUserVacationBalance(row.vacTypeCd, row.reqId || row.userId);
 
 					loadApprovalLine(reqNo);
 					loadMobileFileList(reqNo);
