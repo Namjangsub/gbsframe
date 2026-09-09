@@ -67,10 +67,18 @@ public class CustomLoginSuccessHandler implements AuthenticationSuccessHandler {
         String accessToken = tokenService.createAccessToken(claims);
         String refreshToken = tokenService.createRefreshToken(claims);
 
-        // grant_type 확인
+        // grant_type 및 client_id 확인
         String grantType = null;
+        String clientId = null;
         Object details = authentication.getDetails();
-        if (details instanceof String) {
+        if (details instanceof Map) {
+            Map<?, ?> detailsMap = (Map<?, ?>) details;
+            grantType = (String) detailsMap.get("grant_type");
+            clientId = (String) detailsMap.get("client_id");
+            if (clientId == null) {
+                clientId = (String) detailsMap.get("clientId");
+            }
+        } else if (details instanceof String) {
             grantType = (String) details;
         }
 
@@ -103,9 +111,16 @@ public class CustomLoginSuccessHandler implements AuthenticationSuccessHandler {
         response.setHeader(HttpHeaders.SET_COOKIE, cookie.toString());
         response.setHeader("Authorization", "Bearer " + accessToken);
 
+        String redirectUri = "";
+        if ("GBS_ERP".equals(clientId)) {
+            redirectUri = "https://gbs.gunyangitt.co.kr/static/index.html";
+        } else if ("GBS_AI".equals(clientId)) {
+            redirectUri = "https://gbsAi.gunyangitt.co.kr/";
+        }
+
         response.setStatus(HttpServletResponse.SC_OK);
         response.setContentType("application/json;charset=UTF-8");
-        response.getWriter().write("{\"msg\":\"success\"}");
+        response.getWriter().write("{\"msg\":\"success\",\"redirect_uri\":\"" + redirectUri + "\"}");
     }
     
 

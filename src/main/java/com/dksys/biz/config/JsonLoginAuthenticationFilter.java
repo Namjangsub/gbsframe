@@ -1,6 +1,8 @@
 package com.dksys.biz.config;
 
 import java.io.IOException;
+import java.util.HashMap;
+import java.util.Map;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
@@ -30,8 +32,12 @@ public class JsonLoginAuthenticationFilter extends UsernamePasswordAuthenticatio
             UsernamePasswordAuthenticationToken authRequest =
                 new UsernamePasswordAuthenticationToken(loginRequest.getUsername(), loginRequest.getPassword());
 
-            // grant_type 을 details 에 저장 --> CustomLoginSuccessHandler에서 사용하기 위함.
-            authRequest.setDetails(loginRequest.getGrant_type());
+            // grant_type 및 client_id 를 details 에 저장 --> CustomLoginSuccessHandler에서 사용
+            Map<String, String> details = new HashMap<>();
+            details.put("grant_type", loginRequest.getGrant_type());
+            String clientId = loginRequest.getClient_id() != null ? loginRequest.getClient_id() : loginRequest.getClientId();
+            details.put("client_id", clientId);
+            authRequest.setDetails(details);
 
 //            setDetails(request, authRequest);
             return this.getAuthenticationManager().authenticate(authRequest);
@@ -46,5 +52,7 @@ public class JsonLoginAuthenticationFilter extends UsernamePasswordAuthenticatio
         private String password;
         private String id; // 클라이언트에서 보낸 id도 수용
         private String grant_type; // grant_type: password 도 수용
+        private String client_id;
+        private String clientId;
     }
 }

@@ -3,6 +3,7 @@ package com.dksys.biz.main;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 import javax.servlet.http.Cookie;
@@ -85,10 +86,27 @@ public class LoginController {
     				model.addAttribute("msg", "비밀번호를 확인해주세요.");
     	    		param.put("isPwErr", "Y");
     	    		param.put("userId", param.get("id"));
-    	    		model.addAttribute("usrInfo", cm06Svc.updatePwErrCnt(param));
+    	    		Map<String, String> rawUsrInfo = cm06Svc.updatePwErrCnt(param);
+    	    		Map<String, Object> usrInfo = new LinkedHashMap<String, Object>();
+    	    		if (rawUsrInfo != null) {
+    	    			usrInfo.put("id", rawUsrInfo.get("id"));
+    	    			usrInfo.put("passErrCnt", rawUsrInfo.get("passErrCnt") != null ? String.valueOf(rawUsrInfo.get("passErrCnt")) : null);
+    	    			usrInfo.put("passYn", rawUsrInfo.get("passYn") != null ? String.valueOf(rawUsrInfo.get("passYn")) : null);
+    	    			usrInfo.put("passChg", rawUsrInfo.get("passChg") != null ? String.valueOf(rawUsrInfo.get("passChg")) : null);
+    	    			usrInfo.put("passChkCnt", rawUsrInfo.get("passChkCnt") != null ? String.valueOf(rawUsrInfo.get("passChkCnt")) : null);
+    	    		}
+    	    		model.addAttribute("usrInfo", usrInfo);
     	    	} else {
     	    		loginService.insertUserHistory(user);
     	    		model.addAttribute("msg", "success");
+    	    		String clientId = param.get("client_id") != null ? param.get("client_id") : param.get("clientId");
+    	    		String redirectUri = "";
+    	    		if ("GBS_ERP".equals(clientId)) {
+    	    			redirectUri = "https://gbs.gunyangitt.co.kr/static/index.html";
+    	    		} else if ("GBS_AI".equals(clientId)) {
+    	    			redirectUri = "https://gbsAi.gunyangitt.co.kr/";
+    	    		}
+    	    		model.addAttribute("redirect_uri", redirectUri);
     	    		param.put("isPwErr", "N");
     	    		param.put("userId", param.get("id"));
 					Map<String, String> usrInfo = cm06Svc.updatePwErrCnt(param);

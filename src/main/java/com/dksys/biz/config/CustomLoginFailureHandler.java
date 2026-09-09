@@ -48,7 +48,16 @@ public class CustomLoginFailureHandler implements AuthenticationFailureHandler {
                 Map<String,String> param = new HashMap<String,String>();
                 param.put("isPwErr","Y"); 
                 param.put("userId", user.getId());
-                body.put("usrInfo", cm06Svc.updatePwErrCnt(param));
+                Map<String, String> rawUsrInfo = cm06Svc.updatePwErrCnt(param);
+                Map<String, Object> usrInfo = new LinkedHashMap<String, Object>();
+                if (rawUsrInfo != null) {
+                    usrInfo.put("id", rawUsrInfo.get("id"));
+                    usrInfo.put("passErrCnt", rawUsrInfo.get("passErrCnt") != null ? String.valueOf(rawUsrInfo.get("passErrCnt")) : null);
+                    usrInfo.put("passYn", rawUsrInfo.get("passYn") != null ? String.valueOf(rawUsrInfo.get("passYn")) : null);
+                    usrInfo.put("passChg", rawUsrInfo.get("passChg") != null ? String.valueOf(rawUsrInfo.get("passChg")) : null);
+                    usrInfo.put("passChkCnt", rawUsrInfo.get("passChkCnt") != null ? String.valueOf(rawUsrInfo.get("passChkCnt")) : null);
+                }
+                body.put("usrInfo", usrInfo);
             }
         } else {
             body.put("msg","인증 실패");
