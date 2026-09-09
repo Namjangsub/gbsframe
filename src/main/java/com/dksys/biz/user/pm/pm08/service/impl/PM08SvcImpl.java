@@ -107,14 +107,26 @@ public class PM08SvcImpl implements PM08Svc {
 		if (insertResult > 0) {
 			// 4. 참여 프로젝트 목록 등록
 			Gson gsonDtl = new GsonBuilder().disableHtmlEscaping().create();
+			// 4. 프로젝트 목록 등록
 			Type dtlMap = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
 			List<Map<String, String>> projectArr = gsonDtl.fromJson(paramMap.get("projectArr"), dtlMap);
+			String firstSalesCd = null;
 			if (projectArr != null && !projectArr.isEmpty()) {
 				for (Map<String, String> projectMap : projectArr) {
 					projectMap.put("reqNo", reqNo);
 					projectMap.put("coCd", paramMap.get("coCd"));
 					pm08Mapper.insertSubstituteWorkProjectList(projectMap);
 				}
+				firstSalesCd = projectArr.get(0).get("salesCd");
+				if (firstSalesCd == null || firstSalesCd.trim().isEmpty()) {
+					firstSalesCd = projectArr.get(0).get("SALES_CD");
+				}
+			}
+			if (firstSalesCd == null || firstSalesCd.trim().isEmpty()) {
+				firstSalesCd = paramMap.get("salesCd");
+			}
+			if (firstSalesCd == null || firstSalesCd.trim().isEmpty()) {
+				firstSalesCd = reqNo;
 			}
 
 			// 5. 결재선 등록 (TODODIV2410: 신청결재, 공통 모듈 호출 규격 100% 주입)
@@ -125,7 +137,10 @@ public class PM08SvcImpl implements PM08Svc {
 				if (approvalList != null && !approvalList.isEmpty()) {
 					for (Map<String, String> apprItem : approvalList) {
 						apprItem.put("todoNo", reqNo);
-						apprItem.put("salesCd", reqNo);
+						String itemSalesCd = apprItem.get("salesCd");
+						if (itemSalesCd == null || itemSalesCd.trim().isEmpty() || reqNo.equals(itemSalesCd)) {
+							apprItem.put("salesCd", firstSalesCd);
+						}
 
 						String curCodeId = apprItem.get("todoDiv2CodeId");
 						if (curCodeId == null || curCodeId.isEmpty()) {
@@ -144,6 +159,7 @@ public class PM08SvcImpl implements PM08Svc {
 						apprItem.put("pgParam", gsonDtl.toJson(pgMap));
 					}
 					paramMap.put("approvalArr", gsonDtl.toJson(approvalList));
+					paramMap.put("salesCd", firstSalesCd);
 					paramMap.put("todoNo", reqNo);
 					paramMap.put("todoDiv2CodeId", "TODODIV2410");
 					paramMap.put("etcField1", reqNo);
@@ -256,10 +272,30 @@ public class PM08SvcImpl implements PM08Svc {
 				Type dtlMap = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
 				List<Map<String, String>> approvalList = gsonDtl.fromJson(approvalArrStr, dtlMap);
 
+				// 첫 번째 프로젝트의 salesCd 추출 (TB_WB20M03.SALES_CD 대입용)
+				String firstSalesCd = null;
+				if (paramMap.get("salesCd") != null && !paramMap.get("salesCd").trim().isEmpty() && !reqNoVal.equals(paramMap.get("salesCd"))) {
+					firstSalesCd = paramMap.get("salesCd");
+				} else {
+					List<Map<String, String>> dbProjectList = pm08Mapper.selectSubstituteWorkProjectList(paramMap);
+					if (dbProjectList != null && !dbProjectList.isEmpty()) {
+						firstSalesCd = dbProjectList.get(0).get("salesCd");
+						if (firstSalesCd == null || firstSalesCd.trim().isEmpty()) {
+							firstSalesCd = dbProjectList.get(0).get("SALES_CD");
+						}
+					}
+				}
+				if (firstSalesCd == null || firstSalesCd.trim().isEmpty()) {
+					firstSalesCd = reqNoVal;
+				}
+
 				if (approvalList != null && !approvalList.isEmpty()) {
 					for (Map<String, String> apprItem : approvalList) {
 						apprItem.put("todoNo", reqNoVal);
-						apprItem.put("salesCd", reqNoVal);
+						String itemSalesCd = apprItem.get("salesCd");
+						if (itemSalesCd == null || itemSalesCd.trim().isEmpty() || reqNoVal.equals(itemSalesCd)) {
+							apprItem.put("salesCd", firstSalesCd);
+						}
 
 						String curCodeId = apprItem.get("todoDiv2CodeId");
 						if (curCodeId == null || curCodeId.isEmpty()) {
@@ -278,6 +314,7 @@ public class PM08SvcImpl implements PM08Svc {
 						apprItem.put("pgParam", gsonDtl.toJson(pgMap));
 					}
 					paramMap.put("approvalArr", gsonDtl.toJson(approvalList));
+					paramMap.put("salesCd", firstSalesCd);
 
 					// 기존 결재선 삭제
 					Map<String, String> deleteParam = new HashMap<>();
@@ -288,6 +325,7 @@ public class PM08SvcImpl implements PM08Svc {
 					// 신규 결재선 등록
 					paramMap.put("todoNo", reqNoVal);
 					paramMap.put("todoDiv2CodeId", todoDiv2CodeId);
+					paramMap.put("salesCd", firstSalesCd);
 					paramMap.put("etcField1", reqNoVal);
 					wb20Svc.insertTodoMaster(paramMap);
 

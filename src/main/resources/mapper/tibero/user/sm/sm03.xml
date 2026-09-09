@@ -1274,12 +1274,20 @@
 		)
 
 		SELECT T.*
+		     -- 화면표시용 코드명 변환은 페이징(ROWNUM)으로 건수를 잘라낸 뒤, 실제 반환되는 행에 대해서만 계산한다.
+		     -- (기존에는 ORDER BY 대상 전체 행에 대해 계산되어 페이지당 건수와 무관하게 비용이 들었음)
+		     , (SELECT FN_CM05M01_CD_TO_NM(T.CLNT_PJT) FROM DUAL) AS CLNT_PJT_NM
+		     , (SELECT FN_CM05M01_CD_TO_NM(T.CLNT_DIV_CD) FROM DUAL) AS CLNT_DIV_NM
+		     , (SELECT FN_CM05M01_CD_TO_NM(T.PART_CD) FROM DUAL) AS PART_CD_NM
 			FROM
 			(
-			SELECT ROWNUM AS RN
-					, T.*
+			SELECT T.*
 				FROM
 				(
+				SELECT ROWNUM AS RN
+						, T.*
+					FROM
+					(
 					SELECT   NVL(CT.TOT_IN_QTY,0) AS TOT_IN_QTY
 							, ORDRG_QTY - NVL(CT.TOT_IN_QTY,0)  AS REAMIN_IN_QTY
 							, BJM.MATR_CD   			AS MATR_CD
@@ -1290,15 +1298,12 @@
 							, BJM.CREAT_ID    			AS ORDRG_MNG_ID
 							, M.NAME 		  			AS ORDRG_MNG_NM
 				            , SUJU.CLNT_PJT             AS CLNT_PJT      --고객사PJT
-							, FN_CM05M01_CD_TO_NM(SUJU.CLNT_PJT)    AS CLNT_PJT_NM
 							, SUJU.EQP_NM
 							, SUJU.ORDRS_CLNT_CD
 				            , C.CLNT_NM                 AS ORDRS_CLNT_NM --고객명
 					        , C.CLNT_DIV_CD             AS CLNT_DIV_CD    --거래처 분류
-					        , (SELECT FN_CM05M01_CD_TO_NM(C.CLNT_DIV_CD) FROM DUAL) AS CLNT_DIV_NM  --거래처 분류명
 							, BJM.*
 							, INO.*
-	              			, (SELECT FN_CM05M01_CD_TO_NM(BJM.PART_CD) FROM DUAL) AS PART_CD_NM
 					  FROM BJM														        --발주내역
 					   				LEFT OUTER JOIN INO          ON BJM.ORDRG_NO = INO.ORDRG_NO		--입고내역
 					   											AND BJM.ORDRG_SEQ = INO.ORDRG_SEQ
@@ -1308,7 +1313,7 @@
 				              		LEFT OUTER JOIN TB_BM02M01 C ON SUJU.ORDRS_CLNT_CD = C.CLNT_CD --거래처정보
 				              		LEFT OUTER JOIN CTOT       CT ON CT.ORDRG_NO =  BJM.ORDRG_NO
 					   											AND  CT.ORDRG_SEQ = BJM.ORDRG_SEQ
-				              		LEFT OUTER JOIN TB_BM05M01 J ON BJM.MATR_CD = J.MATR_CD --자재정보
+				              		LEFT OUTER JOIN TB_BM05M01 J ON BJM.CO_CD = J.CO_CD AND BJM.MATR_CD = J.MATR_CD --자재정보
 					 WHERE 1=1
 						<!-- 프로젝트 -->
 				        <if test="clntPjt != null and !clntPjt.equals('')">
@@ -1330,9 +1335,10 @@
 				        </if>
 					ORDER BY BJM.SALES_CD, BJM.DSGN_NO,  BJM.MATR_CD, BJM.REQ_NO, BJM.ORDRG_NO, PCHS_CLNT_NM
 					) T
-		) T
-		WHERE 1=1
-		AND RN BETWEEN ${firstIndex} AND ${lastIndex}
+			) T
+			WHERE 1=1
+			AND RN BETWEEN ${firstIndex} AND ${lastIndex}
+			) T
 	</select>
 
 
