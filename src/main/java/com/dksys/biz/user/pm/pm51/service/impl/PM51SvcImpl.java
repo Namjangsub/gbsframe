@@ -1096,6 +1096,8 @@ public class PM51SvcImpl implements PM51Svc {
 
 	@Override
 	public int updateTripRptMngEval(Map<String, String> paramMap) throws Exception {
+		paramMap.put("reqNo", paramMap.get("tripRptNo"));
+
 		Map<String, String> m02 = pm51Mapper.selectTripRptM01(paramMap);
 		if (m02 == null) {
 			throw new RuntimeException("출장복명서 정보를 찾을 수 없습니다.");
@@ -1593,6 +1595,7 @@ public class PM51SvcImpl implements PM51Svc {
 		}
 		Map<String, String> chkParam = new HashMap<>();
 		chkParam.put("tripRptNo", tripRptNo);
+		chkParam.put("reqNo", tripRptNo);
 		if (hasCompletedApproval(chkParam, true)) {
 			throw new RuntimeException("최종 결재 완료된 출장복명서는 수정할 수 없습니다.");
 		}
