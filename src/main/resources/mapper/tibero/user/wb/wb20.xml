@@ -38,7 +38,7 @@
 		<if test="salesCd != null and !salesCd.equals('')">
 		 	AND T.SALES_CD LIKE '%'||#{salesCd}||'%'
 		</if>
-		<if test="!salesMngId != null and !salesMngId.equals('')">
+		<if test="salesMngId != null and !salesMngId.equals('')">
 		 	AND T.TODO_ID = #{salesMngId}				--공유대상자
 		</if>
 		<if test="salesMngNm != null and !salesMngNm.equals('')">
@@ -1007,27 +1007,38 @@
 
 	<!-- ToDo List  메인 화면 조회 카운터  -->
 	<select id="M08selectToDoCount" parameterType="Map" resultType="int">
-		SELECT COUNT(*)
-		 FROM (SELECT 	T.*
-						, NVL((
-							  SELECT COUNT(*) CNT
-							  FROM TB_WB20M03 S
-							  WHERE S.TODO_DIV1_CODE_ID = T.TODO_DIV1_CODE_ID
-							    AND S.TODO_DIV2_CODE_ID = T.TODO_DIV2_CODE_ID
-							    AND S.SALES_CD = T.SALES_CD
-							    AND S.TODO_NO = T.TODO_NO
-							    AND S.SANCTN_STTUS = 'N'
-							    AND S.TODO_ID != T.TODO_ID
-							    AND S.SANCTN_SN <![CDATA[ < ]]> T.SANCTN_SN
-		 				), 0) AS BEFORE_NOT_CONFIRM  --이전미결자료 존재여부
+		<choose>
+			<when test="beforeNotConfirm != null and !beforeNotConfirm.equals('')">
+				SELECT COUNT(*)
+				 FROM (SELECT 	T.TODO_KEY
+								, NVL((
+									  SELECT COUNT(*) CNT
+									  FROM TB_WB20M03 S
+									  WHERE S.TODO_DIV1_CODE_ID = T.TODO_DIV1_CODE_ID
+									    AND S.TODO_DIV2_CODE_ID = T.TODO_DIV2_CODE_ID
+									    AND S.SALES_CD = T.SALES_CD
+									    AND S.TODO_NO = T.TODO_NO
+									    AND S.SANCTN_STTUS = 'N'
+									    AND S.TODO_ID != T.TODO_ID
+									    AND S.SANCTN_SN <![CDATA[ < ]]> T.SANCTN_SN
+				 				), 0) AS BEFORE_NOT_CONFIRM  --이전미결자료 존재여부
+						FROM TB_WB20M03 T
+								LEFT OUTER JOIN TB_CM05M01 X ON  X.CODE_ID = T.TODO_DIV2_CODE_ID
+								LEFT OUTER JOIN TB_CM06M01 B ON  T.TODO_ID = B.ID
+						WHERE 1 = 1
+							<include refid="selectToDoListCondition"></include>
+						) T
+				WHERE BEFORE_NOT_CONFIRM = 0 --이전 미결자료 존재 여부 (전무님만 해당되게 변경 처리함 2025.03.06)
+			</when>
+			<otherwise>
+				SELECT COUNT(*)
 				FROM TB_WB20M03 T
 						LEFT OUTER JOIN TB_CM05M01 X ON  X.CODE_ID = T.TODO_DIV2_CODE_ID
-				) T
-		WHERE 1=1
-		<if test="beforeNotConfirm != null and !beforeNotConfirm.equals('')">
-		  AND BEFORE_NOT_CONFIRM = 0 --이전 미결자료 존재 여부 (전무님만 해당되게 변경 처리함 2025.03.06)
-		</if>
-		<include refid="selectToDoListCondition"></include>
+						LEFT OUTER JOIN TB_CM06M01 B ON  T.TODO_ID = B.ID
+				WHERE 1 = 1
+					<include refid="selectToDoListCondition"></include>
+			</otherwise>
+		</choose>
 	</select>
 
 	<!-- ToDo List 메인 화면 조회 리스트  -->
@@ -1043,7 +1054,7 @@
 					    , T.TODO_KEY  --TO DO KEY
 						, T.TODO_DIV1_CODE_ID --TO DO 구분(공유-결재)
 						, T.TODO_DIV2_CODE_ID
-						, FN_CM05M01_CD_TO_NM(T.TODO_DIV1_CODE_ID) AS TODO_DIV1_CODE_NM --TO DO 구분(공유-결재) 명
+						, X1.CODE_NM 			AS TODO_DIV1_CODE_NM --TO DO 구분(공유-결재) 명
 						, X.CODE_NM  			AS TODO_DIV2_CODE_NM 	 --발생프로그램 명
 						, T.SALES_CD --Sales Code
 						, T.TODO_NO  --관리번호
@@ -1053,9 +1064,28 @@
 						/* 결재요청자와 결재자가 같은 팀이면 팀장구분을 리턴하고 그외는 공백으로 처리함(이슈 결재처리시 위험도평가에서 사용함
 						 * 계획이슈 조치결과,  실적이슈 조치결과는 팀장이 위험도 평가를 해야함 */
 						, CASE
-							    WHEN (T.TODO_DIV2_CODE_ID = 'TODODIV2090'                              	AND C.MNG_ID = B.ID AND B.TEAM_MANAGER = 'TEAM01') THEN '평가'
-								WHEN (T.TODO_DIV2_CODE_ID = 'TODODIV2020' AND QP.SAME_TIME_RESULT = 'Y' AND CASE WHEN QM.ORDRG_ID LIKE 'gyrsult%' THEN (SELECT REG.MNG_ID FROM TB_CM06M01 REG WHERE REG.ID = QM.REG_ID) ELSE D.MNG_ID END = B.ID AND B.TEAM_MANAGER = 'TEAM01') THEN '평가'
-								WHEN (T.TODO_DIV2_CODE_ID = 'TODODIV2030'                              	AND D.MNG_ID = B.ID AND B.TEAM_MANAGER = 'TEAM01') THEN '평가'
+							    WHEN (T.TODO_DIV2_CODE_ID = 'TODODIV2090' AND C.MNG_ID = B.ID AND B.TEAM_MANAGER = 'TEAM01') THEN '평가'
+								WHEN (T.TODO_DIV2_CODE_ID = 'TODODIV2020' AND B.TEAM_MANAGER = 'TEAM01') THEN
+									NVL((
+										SELECT '평가'
+										  FROM TB_QM01P01 QP
+										       INNER JOIN TB_QM01M01 QM ON QP.REQ_NO = QM.REQ_NO
+										       LEFT OUTER JOIN TB_CM06M01 D ON QM.ORDRG_ID = D.ID
+										 WHERE (QP.REQ_NO = T.TODO_NO OR QP.RSLT_NO = T.TODO_NO)
+										   AND QP.SAME_TIME_RESULT = 'Y'
+										   AND (CASE WHEN QM.ORDRG_ID LIKE 'gyrsult%' THEN (SELECT REG.MNG_ID FROM TB_CM06M01 REG WHERE REG.ID = QM.REG_ID) ELSE D.MNG_ID END) = B.ID
+										   AND ROWNUM = 1
+									), '')
+								WHEN (T.TODO_DIV2_CODE_ID = 'TODODIV2030' AND B.TEAM_MANAGER = 'TEAM01') THEN
+									NVL((
+										SELECT '평가'
+										  FROM TB_QM01P01 QP
+										       INNER JOIN TB_QM01M01 QM ON QP.REQ_NO = QM.REQ_NO
+										       LEFT OUTER JOIN TB_CM06M01 D ON QM.ORDRG_ID = D.ID
+										 WHERE (QP.REQ_NO = T.TODO_NO OR QP.RSLT_NO = T.TODO_NO)
+										   AND D.MNG_ID = B.ID
+										   AND ROWNUM = 1
+									), '')
 							    ELSE ''
 						  END 					AS TEAM_MANAGER --작성자 담당팀장인경우에 평가
 						, T.SANCTN_STTUS
@@ -1072,12 +1102,7 @@
 						, C.NAME      AS CREAT_NM	/*생성자명 */
 						, TO_CHAR(T.CREAT_DTTM, 'YYYY-MM-DD') AS CREAT_DTTM  --생성일시
 						, T.UDT_ID  --최종변경자
-						,
-						(
-							SELECT A.NAME
-								FROM TB_CM06M01 AS A
-							WHERE A.ID = T.UDT_ID
-						) AS UDT_NM	/*변경자명 */
+						, U.NAME      AS UDT_NM	/*변경자명 */
 						, TO_CHAR(T.UDT_DTTM, 'YYYY-MM-DD') AS UDT_DTTM  --최종변경일자
 						, T.TODO_TITL AS TODO_TITL
 						, T.CREAT_PGM
@@ -1094,12 +1119,11 @@
 							    AND S.SANCTN_SN <![CDATA[ < ]]> T.SANCTN_SN
 		 				), 0) AS BEFORE_NOT_CONFIRM  --이전미결자료 존재여부
 					FROM TB_WB20M03 T
+							LEFT OUTER JOIN TB_CM05M01 X1 ON X1.CODE_ID = T.TODO_DIV1_CODE_ID
 							LEFT OUTER JOIN TB_CM05M01 X  ON X.CODE_ID = T.TODO_DIV2_CODE_ID
 							LEFT OUTER JOIN TB_CM06M01 B  ON T.TODO_ID = B.ID
 							LEFT OUTER JOIN TB_CM06M01 C  ON T.CREAT_ID = C.ID
-							LEFT OUTER JOIN TB_QM01P01 QP ON T.TODO_NO = QP.REQ_NO OR T.TODO_NO = QP.RSLT_NO
-							LEFT OUTER JOIN TB_QM01M01 QM ON QP.REQ_NO = QM.REQ_NO
-							LEFT OUTER JOIN TB_CM06M01 D  ON QM.ORDRG_ID = D.ID
+							LEFT OUTER JOIN TB_CM06M01 U  ON T.UDT_ID = U.ID
 					WHERE 1 = 1
 						<include refid="selectToDoListCondition"></include>
 						/* ORDER BY T.SALES_CD DESC, T.TODO_NO DESC, T.SANCTN_SN DESC */
@@ -1469,7 +1493,7 @@
 		<if test="salesMngNm != null and !salesMngNm.equals('')">
 			AND B.NAME LIKE '%' || #{salesMngNm} || '%'
 		</if>
-		<if test="!salesMngId != null and !salesMngId.equals('')">
+		<if test="salesMngId != null and !salesMngId.equals('')">
 			AND T.TODO_ID = #{salesMngId}				--공유대상자
 		</if>
 		<if test="todoNo != null and !todoNo.equals('')">
@@ -1809,7 +1833,7 @@
 			<if test="salesMngNm != null and !salesMngNm.equals('')">
 			  AND B.NAME LIKE '%' || #{salesMngNm} || '%' --공유대상자
 			</if>
-			<if test="!salesMngId != null and !salesMngId.equals('')">
+			<if test="salesMngId != null and !salesMngId.equals('')">
 			  AND T.TODO_ID = #{salesMngId}				--공유대상자
 			</if>
 			<if test="todoDiv != null and !todoDiv.equals('')">

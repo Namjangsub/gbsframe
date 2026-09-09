@@ -58,16 +58,32 @@ public class WB20Ctr {
 
 	  @PostMapping(value = "/M08selectToDoList")
 	  public String M08selectToDoList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		  String recordCntStr = paramMap.get("recordCnt");
+		  int recordCnt = 20;
+		  if (recordCntStr != null && !recordCntStr.isEmpty()) {
+			  try {
+				  recordCnt = Integer.parseInt(recordCntStr);
+			  } catch (NumberFormatException e) {
+				  recordCnt = 20;
+			  }
+		  }
 
-		  int totalCnt = wb20Svc.M08selectToDoCount(paramMap);
-		  PaginationInfo paginationInfo = new PaginationInfo(paramMap, totalCnt);
-		  model.addAttribute("paginationInfo", paginationInfo);
-
-		  List<Map<String, String>> resultList = wb20Svc.M08selectToDoList(paramMap);
-		  model.addAttribute("resultList", resultList);
+		  // 모바일 M08 전체 조회(recordCnt >= 99999) 시 불필요한 COUNT 쿼리 중복 실행을 배제하여 1회 왕복으로 단축
+		  if (recordCnt >= 99999) {
+			  paramMap.put("firstIndex", "1");
+			  paramMap.put("lastIndex", String.valueOf(recordCnt));
+			  List<Map<String, String>> resultList = wb20Svc.M08selectToDoList(paramMap);
+			  PaginationInfo paginationInfo = new PaginationInfo(paramMap, resultList != null ? resultList.size() : 0);
+			  model.addAttribute("paginationInfo", paginationInfo);
+			  model.addAttribute("resultList", resultList);
+		  } else {
+			  int totalCnt = wb20Svc.M08selectToDoCount(paramMap);
+			  PaginationInfo paginationInfo = new PaginationInfo(paramMap, totalCnt);
+			  model.addAttribute("paginationInfo", paginationInfo);
+			  List<Map<String, String>> resultList = wb20Svc.M08selectToDoList(paramMap);
+			  model.addAttribute("resultList", resultList);
+		  }
 		  return "jsonView";
-
-
 	  }
 
 	  @PutMapping(value = "/toDoCfDtUpdate")

@@ -44,6 +44,14 @@ public class PM08Ctr {
 		return "jsonView";
 	}
 
+	@PostMapping(value = "/selectMobileSubstituteWorkFileList")
+	public String selectMobileSubstituteWorkFileList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		List<Map<String, String>> fileList = pm08Svc.selectMobileSubstituteWorkFileList(paramMap);
+		model.addAttribute("fileList", fileList);
+		model.addAttribute("resultCode", 200);
+		return "jsonView";
+	}
+
 	@PostMapping(value = "/insertSubstituteWork")
 	public String insertSubstituteWork(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) {
 		try {

@@ -14,6 +14,8 @@ public interface PM08Mapper {
 
 	Map<String, String> selectSubstituteWorkDtl(Map<String, String> paramMap);
 
+	List<Map<String, String>> selectMobileSubstituteWorkFileList(Map<String, String> paramMap);
+
 	int insertSubstituteWork(Map<String, String> paramMap);
 
 	int updateSubstituteWork(Map<String, String> paramMap);

@@ -98,6 +98,9 @@
 			<input type="hidden" id="tripRptNo" name="tripRptNo">
 			<input type="hidden" id="tripReqNo" name="tripReqNo">
 			<input type="hidden" id="fileTrgtKey" name="fileTrgtKey">
+			<input type="hidden" id="fileTrgtTyp" name="fileTrgtTyp" value="PM5102P01">
+			<input type="hidden" id="coCd" name="coCd" value="GUN">
+			<input type="hidden" id="userId" name="userId">
 			<input type="hidden" id="actionType" name="actionType">
 			<input type="hidden" id="reqTripPeriod" name="reqTripPeriod">
 			<input type="hidden" id="reqViewReqId" name="reqViewReqId">
@@ -628,6 +631,7 @@
 	<br>
 	<!-- 하단 버튼 -->
 	<div class="popup_bottom_btn">
+		<button type="button" id="fileUpBtn" form="popForm" onclick="fileUpload($(this.form));" authchk style="display:none; background-color: #f0ad4e; color: white; border-color: #eea236;">첨부파일저장</button>
 		<button type="button" id="saveBtn" onclick="saveTripRpt();" authchk>저장</button>
 		<button type="button" id="printBtn" onclick="printTripRptP01();" style="display:none; background-color: #337ab7; color: white; border-color: #2e6da4;">출력</button>
 		<button type="button" id="deleteBtn" onclick="deleteTripRpt();" authchk style="display:none;">삭제</button>
@@ -636,6 +640,21 @@
 </div>
 
 <script type="text/javascript">
+
+	// fileTree.js의 selectedNodeId ReferenceError 방어
+	window.selectedNodeId = window.selectedNodeId || "";
+
+	// fileTree.js의 selectedNodeId 미정의 방어용 안전 노드 ID 취득 함수
+	function safeGetFileNodeId() {
+		try {
+			if (typeof treeModule !== 'undefined' && typeof treeModule.getFileNodeId === 'function') {
+				return treeModule.getFileNodeId() || "";
+			}
+		} catch (e) {
+			console.warn("safeGetFileNodeId exception handled:", e);
+		}
+		return (typeof window.selectedNodeId !== 'undefined' && window.selectedNodeId) ? window.selectedNodeId : "";
+	}
 
 
 	function setComboOptionCode(selectComobo) {
@@ -817,6 +836,24 @@
 
 		setCommonSelect($("#popForm select[data-kind]"));
 		initAutoResizeTextareas();
+
+		// 첨부파일 변경 실시간 감지 바인딩 (파일 추가/삭제/드롭 시 첨부파일저장 버튼 즉시 표출)
+		$(document).off('change.pm5102FileOnly').on('change.pm5102FileOnly', 'input[type="file"]', function() {
+			setTimeout(checkFileOnlyChangePM5102, 200);
+		});
+		$(document).off('drop.pm5102FileOnly').on('drop.pm5102FileOnly', '#fileList_area, [data-ax5grid="file-grid"]', function() {
+			setTimeout(checkFileOnlyChangePM5102, 300);
+		});
+		$(document).off('click.pm5102FileOnly').on('click.pm5102FileOnly', '#fileList_area button, #fileList_area a, [data-ax5grid="file-grid"] button', function() {
+			setTimeout(checkFileOnlyChangePM5102, 300);
+		});
+		var _pm5102FileCheckInterval = setInterval(function() {
+			if (!$('#popForm').length) {
+				clearInterval(_pm5102FileCheckInterval);
+				return;
+			}
+			checkFileOnlyChangePM5102();
+		}, 300);
 
 		// 카드사 명세 Ctrl+V 붙여넣기: 모달 루트에만 바인딩(전역 셀렉터 회피, 모달 종료 시 함께 소멸)
 		var $cardPasteRoot = $('#popForm').closest('.popup_area');
@@ -2119,7 +2156,7 @@
 
 	function appendFileUploadData(formData) {
 		var fileUploadArr = [];
-		formData.append('comonCd', treeModule.getFileNodeId());
+		formData.append('comonCd', safeGetFileNodeId() || 'FILETREE');
 		$.each(treeModule.getFileArr(), function (idx, obj) {
 			if (obj.fileKey == 0) {
 				formData.append('files', obj.file);
@@ -4455,6 +4492,10 @@
 			$popArea.find('#saveBtn, #deleteBtn').hide();
 			$popArea.find('.add_btn_small a').hide();
 			setRptGridEditable(false);
+			// 첨부파일 편집 허용
+			$popArea.find('#fileList_area button').show();
+			$popArea.find('#fileList_area input[type="file"]').prop("disabled", false);
+			$popArea.find('#fileUpBtn').hide();
 			// 회계담당자 예외: locked 상태에서도 영역 2 활성화
 			if (isAccountingActive) {
 				setArea2Enabled(true);
@@ -5116,4 +5157,37 @@
 		}
 	}
 
+	// 파일이 변경되었는지 확인
+	function isFileChangedPM5102() {
+		if (typeof treeModule === 'undefined') return false;
+		var fileArr = treeModule.getFileArr ? treeModule.getFileArr() : [];
+		var deleteFileArr = treeModule.getDeleteFileArr ? treeModule.getDeleteFileArr() : [];
+
+		// 새 파일이 있거나 삭제할 파일이 있으면 변경됨
+		var hasNewFile = $.grep(fileArr || [], function(f) { return f.fileKey == 0 || !f.fileKey || f.file; }).length > 0;
+		var hasDeleteFile = (deleteFileArr || []).length > 0;
+
+		return hasNewFile || hasDeleteFile;
+	}
+
+	function checkFileOnlyChangePM5102() {
+		var reqNo = $('#popForm #tripRptNo').val() || $('#popForm #fileTrgtKey').val();
+		if (!reqNo && typeof modalStack !== 'undefined' && modalStack.last && modalStack.last().paramObj) {
+			reqNo = modalStack.last().paramObj.tripRptNo || modalStack.last().paramObj.todoNo || "";
+		}
+
+		var actionType = $('#actionType').val();
+		// 신규 등록(C) 상태에서 tripRptNo가 없는 경우 본문 저장 시 함께 처리되므로 버튼 숨김
+		if (actionType === 'C' && !$('#popForm #tripRptNo').val()) {
+			$('#fileUpBtn').hide();
+			return;
+		}
+
+		// 첨부파일 내용이 변경(추가)되거나 삭제되었을 때만 활성화(표출), 그 외에는 항상 숨김
+		if (isFileChangedPM5102()) {
+			$('#fileUpBtn').show();
+		} else {
+			$('#fileUpBtn').hide();
+		}
+	}
 </script>

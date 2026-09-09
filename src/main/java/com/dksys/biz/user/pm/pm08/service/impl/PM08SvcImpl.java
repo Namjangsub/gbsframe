@@ -64,6 +64,11 @@ public class PM08SvcImpl implements PM08Svc {
 	}
 
 	@Override
+	public List<Map<String, String>> selectMobileSubstituteWorkFileList(Map<String, String> paramMap) {
+		return pm08Mapper.selectMobileSubstituteWorkFileList(paramMap);
+	}
+
+	@Override
 	@Transactional(rollbackFor = Exception.class)
 	public Map<String, String> insertSubstituteWork(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
 		Map<String, String> result = new HashMap<String, String>();

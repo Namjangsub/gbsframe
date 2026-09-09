@@ -106,6 +106,9 @@
 		<div class="form-group popup_table">
 			<input type="hidden" id="pgmId" name="pgmId" value="PM5101P01">
 			<input type="hidden" id="fileTrgtKey" name="fileTrgtKey">
+			<input type="hidden" id="fileTrgtTyp" name="fileTrgtTyp" value="PM5101P01">
+			<input type="hidden" id="coCd" name="coCd" value="GUN">
+			<input type="hidden" id="userId" name="userId">
 			<input type="hidden" id="actionType" name="actionType">
 			<input type="hidden" id="clntCd" name="clntCd">
 			<input type="hidden" id="clntPjt" name="clntPjt">
@@ -579,6 +582,7 @@
 
 	<!-- 하단 버튼 -->
 	<div class="popup_bottom_btn">
+		<button type="button" id="fileUpBtn" form="popForm" onclick="fileUpload($(this.form));" authchk style="display:none; background-color: #f0ad4e; color: white; border-color: #eea236;">첨부파일저장</button>
 		<button type="button" id="saveBtn" onclick="saveTripReq();" authchk>저장</button>
 		<button type="button" id="printBtn" onclick="printTripReqP01();" style="display:none; background-color: #337ab7; color: white; border-color: #2e6da4;">출력</button>
 		<button type="button" id="payBtn" onclick="payTripReq();" authchk style="display:none; background-color: #5cb85c; color: white; border-color: #5cb85c;">지급완료처리</button>
@@ -589,6 +593,21 @@
 </div>
 
 <script type="text/javascript">
+
+	// fileTree.js의 selectedNodeId ReferenceError 방어
+	window.selectedNodeId = window.selectedNodeId || "";
+
+	// fileTree.js의 selectedNodeId 미정의 방어용 안전 노드 ID 취득 함수
+	function safeGetFileNodeId() {
+		try {
+			if (typeof treeModule !== 'undefined' && typeof treeModule.getFileNodeId === 'function') {
+				return treeModule.getFileNodeId() || "";
+			}
+		} catch (e) {
+			console.warn("safeGetFileNodeId exception handled:", e);
+		}
+		return (typeof window.selectedNodeId !== 'undefined' && window.selectedNodeId) ? window.selectedNodeId : "";
+	}
 
 	// 출장여비규정 GIM-050-02 기준 단가
 	const PM51_RATE = {
@@ -1007,6 +1026,24 @@
 				recalculatePaymentByTravelerGrid();
 			}
 		});
+
+		// 첨부파일 변경 실시간 감지 바인딩 (파일 추가/삭제/드롭 시 첨부파일저장 버튼 즉시 표출)
+		$(document).off('change.pm5101FileOnly').on('change.pm5101FileOnly', 'input[type="file"]', function() {
+			setTimeout(checkFileOnlyChangePM5101, 200);
+		});
+		$(document).off('drop.pm5101FileOnly').on('drop.pm5101FileOnly', '#fileList_area, [data-ax5grid="file-grid"]', function() {
+			setTimeout(checkFileOnlyChangePM5101, 300);
+		});
+		$(document).off('click.pm5101FileOnly').on('click.pm5101FileOnly', '#fileList_area button, #fileList_area a, [data-ax5grid="file-grid"] button', function() {
+			setTimeout(checkFileOnlyChangePM5101, 300);
+		});
+		var _pm5101FileCheckInterval = setInterval(function() {
+			if (!$('#popForm').length) {
+				clearInterval(_pm5101FileCheckInterval);
+				return;
+			}
+			checkFileOnlyChangePM5101();
+		}, 300);
 
 		setCommonSelect($("#popForm select[data-kind]"));
 
@@ -1438,7 +1475,7 @@
 	function appendFileUploadData(formData) {
 		var fileUploadArr = [];
 		var totalFileSize = 0;
-		formData.append('comonCd', treeModule.getFileNodeId());
+		formData.append('comonCd', safeGetFileNodeId() || 'FILETREE');
 		$.each(treeModule.getFileArr(), function (idx, obj) {
 			if (obj.fileKey == 0) {
 				formData.append('files', obj.file);
@@ -2911,10 +2948,31 @@
 		var deleteFileArr = treeModule.getDeleteFileArr ? treeModule.getDeleteFileArr() : [];
 
 		// 새 파일이 있거나 삭제할 파일이 있으면 변경됨
-		var hasNewFile = $.grep(fileArr || [], function(f) { return f.fileKey == 0; }).length > 0;
+		var hasNewFile = $.grep(fileArr || [], function(f) { return f.fileKey == 0 || !f.fileKey || f.file; }).length > 0;
 		var hasDeleteFile = (deleteFileArr || []).length > 0;
 
 		return hasNewFile || hasDeleteFile;
+	}
+
+	function checkFileOnlyChangePM5101() {
+		var reqNo = $('#popForm #tripReqNo').val() || $('#popForm #fileTrgtKey').val();
+		if (!reqNo && typeof modalStack !== 'undefined' && modalStack.last && modalStack.last().paramObj) {
+			reqNo = modalStack.last().paramObj.tripReqNo || modalStack.last().paramObj.todoNo || "";
+		}
+
+		var actionType = $('#actionType').val();
+		// 신규 등록(C) 상태에서는 상신/저장 시 파일이 함께 저장되므로 첨부파일저장 버튼은 숨김
+		if (actionType === 'C' && !$('#popForm #tripReqNo').val()) {
+			$('#fileUpBtn, #fileSaveBtn').hide();
+			return;
+		}
+
+		// 첨부파일 내용이 변경(추가)되거나 삭제되었을 때만 활성화(표출), 그 외에는 항상 숨김
+		if (isFileChanged()) {
+			$('#fileUpBtn, #fileSaveBtn').show();
+		} else {
+			$('#fileUpBtn, #fileSaveBtn').hide();
+		}
 	}
 
 	// 첨부파일만 저장

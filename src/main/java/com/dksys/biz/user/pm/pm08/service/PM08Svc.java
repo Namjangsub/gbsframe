@@ -13,6 +13,8 @@ public interface PM08Svc {
 
 	Map<String, Object> selectSubstituteWorkDtl(Map<String, String> paramMap);
 
+	List<Map<String, String>> selectMobileSubstituteWorkFileList(Map<String, String> paramMap);
+
 	Map<String, String> insertSubstituteWork(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
 
 	Map<String, String> updateSubstituteWork(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;

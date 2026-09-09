@@ -8,6 +8,10 @@
 			<input type="hidden" id="coCd" name="coCd" value="GUN">
 			<input type="hidden" id="actionType" name="actionType" value="C">
 			<input type="hidden" id="reqNo" name="reqNo" value="">
+			<input type="hidden" id="fileTrgtKey" name="fileTrgtKey" value="">
+			<input type="hidden" id="fileTrgtTyp" name="fileTrgtTyp" value="PM0701P01">
+			<input type="hidden" id="pgmId" name="pgmId" value="PM0701P01">
+			<input type="hidden" id="userId" name="userId" value="">
 
 			<!-- 기본정보 및 휴가기간 입력 테이블 -->
 			<table class="popup_table" style="margin-bottom: 15px;">
@@ -119,6 +123,7 @@
 
 			<!-- 하단 버튼 영역 -->
 			<div class="col-xs-12 text-right popup_bottom_btn" style="margin-top: 15px; padding-right: 0;">
+				<button type="button" class="btn btn-warning btn-sm" id="fileUpBtn" form="popForm" onclick="fileUpload($(this.form));" style="display: none;">첨부파일저장</button>
 				<button type="button" class="btn btn-primary btn-sm" id="btnSaveVacation" onclick="saveVacation();">저 장</button>
 				<button type="button" class="btn btn-danger btn-sm" id="btnDeleteVacation" onclick="deleteVacationInModal();" style="display: none;">삭 제</button>
 				<button type="button" class="btn btn-default btn-sm" onclick="modalStack.close();">닫 기</button>
@@ -129,6 +134,21 @@
 
 <script src="/static/js/common/PM07AnnualCommon.js"></script>
 <script type="text/javascript">
+
+	// fileTree.js의 selectedNodeId ReferenceError 방어
+	window.selectedNodeId = window.selectedNodeId || "";
+
+	// fileTree.js의 selectedNodeId 미정의 방어용 안전 노드 ID 취득 함수
+	function safeGetFileNodeId() {
+		try {
+			if (typeof treeModule !== 'undefined' && typeof treeModule.getFileNodeId === 'function') {
+				return treeModule.getFileNodeId() || "";
+			}
+		} catch (e) {
+			console.warn("safeGetFileNodeId exception handled:", e);
+		}
+		return (typeof window.selectedNodeId !== 'undefined' && window.selectedNodeId) ? window.selectedNodeId : "";
+	}
 
 	/*****************************************************************************************
 	 * 휴가코드     차감일수  구분	분류 유형
@@ -1426,10 +1446,12 @@
 		formData.append("pgmId", "PM0701P01");
 		// 파일 첨부 처리 (treeModule 신규 바이너리 파일 append 및 uploadFileArr 전송)
 		if (typeof treeModule !== 'undefined' && typeof treeModule.getFileArr === 'function') {
+			var selectedNode = safeGetFileNodeId();
+			var comonCdVal = (selectedNode && selectedNode !== "FILETREE") ? selectedNode : "FITR9902";
 			if (typeof treeModule.setFileNodeId === 'function') {
-				treeModule.setFileNodeId("FITR9902");
+				treeModule.setFileNodeId(comonCdVal);
 			}
-			formData.append("comonCd", "FITR9902");
+			formData.append("comonCd", comonCdVal);
 
 			var fileUploadArr = [];
 			var totalFileSize = 0;
@@ -1551,23 +1573,20 @@
 		approvalGridView.initView();
 
 		// 파일첨부 초기화 (treeModule은 전역, 부모 PM0701M01이 fileTree.js 로드)
+		var fileReqNo = reqNoVal || "";
+		$('#popForm #fileTrgtKey').val(fileReqNo);
+		$('#popForm #fileTrgtTyp').val("PM0701P01");
+		$('#popForm #pgmId').val("PM0701P01");
+		$('#popForm #userId').val((typeof jwt !== 'undefined' ? jwt.userId : ""));
+
 		if (typeof treeModule !== 'undefined') {
-			var fileReqNo = reqNoVal || "";
+			var curCoCd = paramObj.coCd || (typeof jwt !== 'undefined' ? jwt.coCd : "GUN") || "GUN";
 			var fileParam = {
-				fileTrgtTyp : "PM0701P01",
+				fileTrgtTyp : $("#popForm #fileTrgtTyp").val() || "PM0701P01",
 				fileTrgtKey : fileReqNo,
-				todoNo      : fileReqNo,
-				comonCd     : "FITR9902"
+				coCd        : curCoCd
 			};
-			treeModule.initAll('deptTreeOrdars', 'file-grid', 'FILETREE', fileParam, 'fileList_area');
-			if (typeof treeModule.setFileNodeId === 'function') {
-				treeModule.setFileNodeId("FITR9902");
-			}
-			setTimeout(function() {
-				if (typeof treeModule.selectDeptTree === 'function') {
-					treeModule.selectDeptTree("FITR9902");
-				}
-			}, 300);
+			treeModule.initAll('deptTreeOrdars', 'file-grid', 'FILETREE', fileParam, 'fileList_area', curCoCd);
 		}
 
 		// 팝업 제목 및 데이터 설정
@@ -1624,6 +1643,10 @@
 
 			$('#coCd').val(dtlData.coCd || coCdVal);
 			$('#reqNo').val(dtlData.reqNo || reqNoVal);
+			$('#popForm #fileTrgtKey').val(dtlData.reqNo || reqNoVal);
+			$('#popForm #fileTrgtTyp').val("PM0701P01");
+			$('#popForm #pgmId').val("PM0701P01");
+			$('#popForm #userId').val(jwt ? jwt.userId : "");
 			$('#popForm').find('#reqId').val(dtlData.reqId || dtlData.userId || jwt.userId);
 			$('#popForm').find('#reqDeptId').val(dtlData.reqDeptId || jwt.deptId);
 			$('#reqTitl').val(dtlData.reqIdNm || dtlData.reqTitl || dtlData.userNm || "");
@@ -1705,13 +1728,20 @@
 					return btnTxt === "저장" || btnTxt === "삭제";
 				}).hide();
 
-				// 첨부 편집 차단 - treeModule 이 fileList_area 안에 그린 파일추가/삭제 컨트롤을 숨긴다.
-				// (다운로드는 그대로 가능해야 하므로 영역 전체를 숨기지 않는다.)
-				$('.popup_area #fileList_area button').filter(function() {
-					var t = $(this).text().replace(/\s/g, '');
-					return t === "삭제" || t === "파일추가" || t === "추가";
-				}).hide();
-				$('.popup_area #fileList_area input[type="file"]').prop("disabled", true);
+				// 첨부파일 편집 가능 여부 제어:
+				// 결재 진행 중이거나 자료 수정 권한이 없어도 파일은 언제나 첨부 가능하도록 항시 활성화
+				$('.popup_area #fileList_area button').show();
+				$('.popup_area #fileList_area input[type="file"]').prop("disabled", false);
+
+				// 첨부파일저장 버튼은 기본적으로 숨김 처리 (파일 변경/삭제 감지 시 checkFileOnlyChangePM07에서 활성화)
+				$('#fileUpBtn').hide();
+			}
+
+			// 상세 데이터 로드 후 파일 파라미터 최신화 및 파일 목록 조회
+			syncFileTreeParamPM07();
+			if (typeof treeModule !== 'undefined' && typeof treeModule.getAllFilesForNodes === 'function') {
+				var activeNode = safeGetFileNodeId() || "FILETREE";
+				treeModule.getAllFilesForNodes(activeNode);
 			}
 		}
 
@@ -1757,6 +1787,82 @@
 				}
 			});
 		});
+
+		// 첨부파일 변경 실시간 감지 바인딩 (파일 추가/삭제/드롭 시 첨부파일저장 버튼 즉시 표출)
+		$(document).off('change.pm07FileOnly').on('change.pm07FileOnly', 'input[type="file"]', function() {
+			setTimeout(checkFileOnlyChangePM07, 200);
+		});
+		$(document).off('drop.pm07FileOnly').on('drop.pm07FileOnly', '#fileList_area, [data-ax5grid="file-grid"]', function() {
+			setTimeout(checkFileOnlyChangePM07, 300);
+		});
+		$(document).off('click.pm07FileOnly').on('click.pm07FileOnly', '#fileList_area button, #fileList_area a, [data-ax5grid="file-grid"] button', function() {
+			setTimeout(checkFileOnlyChangePM07, 300);
+		});
+		var _pm07FileCheckInterval = setInterval(function() {
+			if (!$('#popForm').length) {
+				clearInterval(_pm07FileCheckInterval);
+				return;
+			}
+			checkFileOnlyChangePM07();
+		}, 300);
 	});
 
+	// 파일 변경사항(신규 추가/삭제)을 감지하여 [첨부파일저장] 버튼 표시 여부 결정
+	function isPm07FileChanged() {
+		if (typeof treeModule === 'undefined') return false;
+
+		// 1) 새로 추가된 파일(fileKey == 0 이거나 파일 객체가 존재하는 항목) 확인
+		var hasNewFiles = false;
+		if (typeof treeModule.getFileArr === 'function') {
+			var arr = treeModule.getFileArr() || [];
+			for (var i = 0; i < arr.length; i++) {
+				var f = arr[i];
+				if (f && (f.fileKey == 0 || !f.fileKey || f.file)) {
+					hasNewFiles = true;
+					break;
+				}
+			}
+		}
+
+		// 2) 삭제 대기 중인 파일 확인
+		var hasDeleteFiles = false;
+		if (typeof treeModule.getDeleteFileArr === 'function') {
+			var dArr = treeModule.getDeleteFileArr() || [];
+			hasDeleteFiles = (dArr.length > 0);
+		}
+
+		return hasNewFiles || hasDeleteFiles;
+	}
+
+	function checkFileOnlyChangePM07() {
+		var reqNo = $('#popForm #reqNo').val() || $('#popForm #fileTrgtKey').val();
+		if (!reqNo && typeof modalStack !== 'undefined' && modalStack.last && modalStack.last().paramObj) {
+			reqNo = modalStack.last().paramObj.reqNo || modalStack.last().paramObj.todoNo || "";
+		}
+
+		// 신청서 번호가 없는 신규 등록(C) 상태에서는 상신 시 파일이 함께 저장되므로 첨부파일저장 버튼은 숨김
+		if (!reqNo) {
+			$('#fileUpBtn').hide();
+			return;
+		}
+
+		// 첨부파일 내용이 변경(추가)되거나 삭제되었을 때만 활성화(표출), 그 외에는 항상 숨김
+		if (isPm07FileChanged()) {
+			$('#fileUpBtn').show();
+		} else {
+			$('#fileUpBtn').hide();
+		}
+	}
+
+	// 파일트리 전역 파라미터 최신 동기화 헬퍼
+	function syncFileTreeParamPM07() {
+		var curReqNo = $('#reqNo').val() || $('#fileTrgtKey').val() || "";
+		var curCoCd = $('#coCd').val() || (typeof jwt !== 'undefined' ? jwt.coCd : "GUN") || "GUN";
+		var curUserId = (typeof jwt !== 'undefined' ? jwt.userId : "");
+
+		$('#popForm #fileTrgtKey').val(curReqNo);
+		$('#popForm #fileTrgtTyp').val("PM0701P01");
+		$('#popForm #pgmId').val("PM0701P01");
+		$('#popForm #userId').val(curUserId);
+	}
 </script>

@@ -234,16 +234,21 @@
 		$.each(groupOrder, function(gIdx, groupKey) {
 			var groupItems = groups[groupKey];
 			var groupId = 'todoGroup_' + gIdx;
+			// 아코디언 접기/펼치기 상태를 sessionStorage에 그룹명(groupKey) 기준으로 저장해두고,
+			// 목록을 다시 그릴 때(상세조회 후 복귀 등) 그 상태를 그대로 복원한다.
+			var isCollapsed = getTodoGroupCollapsedMap()[groupKey] === true;
+			var bodyDisplay = isCollapsed ? 'none' : 'block';
+			var iconChar = isCollapsed ? '▶' : '▼';
 			var groupHeaderHtml = `
 				<div class="todo_group_container" style="margin-bottom: 12px; border: 1px solid #d1d5db; border-radius: 8px; overflow: hidden; background: #fff;">
-					<div class="todo_group_header" onclick="toggleTodoGroup(this)" style="display: flex; justify-content: space-between; align-items: center; background: #f3f4f6; padding: 10px 14px; font-weight: bold; cursor: pointer; border-bottom: 1px solid #e5e7eb; user-select: none;">
+					<div class="todo_group_header" data-group-key="${groupKey}" onclick="toggleTodoGroup(this)" style="display: flex; justify-content: space-between; align-items: center; background: #f3f4f6; padding: 10px 14px; font-weight: bold; cursor: pointer; border-bottom: 1px solid #e5e7eb; user-select: none;">
 						<span style="font-size: 14px; color: #1f2937;">
-							<i class="group_icon" style="display: inline-block; margin-right: 6px; font-style: normal; font-weight: bold; color: #0275d8;">▼</i>
+							<i class="group_icon" style="display: inline-block; margin-right: 6px; font-style: normal; font-weight: bold; color: #0275d8;">${iconChar}</i>
 							${groupKey}
 						</span>
 						<span class="badge" style="background: #0275d8; color: #ffffff; font-size: 11px; padding: 3px 8px; border-radius: 10px;">${groupItems.length}건</span>
 					</div>
-					<div class="todo_group_body" style="padding: 10px 10px 2px 10px; display: block;">
+					<div class="todo_group_body" style="padding: 10px 10px 2px 10px; display: ${bodyDisplay};">
 			`;
 
 			var groupBodyCardsHtml = '';
@@ -314,16 +319,37 @@
 		});
 	}
 
+	// 아코디언 접기/펼치기 상태 저장소 (sessionStorage) - 상세조회 화면 갔다 돌아와도 유지되고,
+	// 새로 로그인해서 새 세션이 시작되면(브라우저가 sessionStorage를 새로 시작하므로) 자연히 초기화된다.
+	var TODO_GROUP_COLLAPSE_KEY = 'm08_todoGroupCollapsed';
+	function getTodoGroupCollapsedMap() {
+		try {
+			return JSON.parse(sessionStorage.getItem(TODO_GROUP_COLLAPSE_KEY) || '{}');
+		} catch (e) {
+			return {};
+		}
+	}
+	function setTodoGroupCollapsed(groupKey, collapsed) {
+		try {
+			var map = getTodoGroupCollapsedMap();
+			map[groupKey] = collapsed;
+			sessionStorage.setItem(TODO_GROUP_COLLAPSE_KEY, JSON.stringify(map));
+		} catch (e) {
+			// sessionStorage 접근 불가 환경이면 상태 저장 없이 접기/펼치기 동작만 유지
+		}
+	}
+
 	// 아코디언 그룹 접기/펼치기
 	function toggleTodoGroup(headerElem) {
 		var $header = $(headerElem);
 		var $body = $header.next('.todo_group_body');
 		var $icon = $header.find('.group_icon');
+		var groupKey = $header.attr('data-group-key');
 		$body.slideToggle(150, function() {
-			if ($body.is(':visible')) {
-				$icon.text('▼');
-			} else {
-				$icon.text('▶');
+			var isVisible = $body.is(':visible');
+			$icon.text(isVisible ? '▼' : '▶');
+			if (groupKey) {
+				setTodoGroupCollapsed(groupKey, !isVisible);
 			}
 		});
 	}
@@ -533,6 +559,15 @@
 			paramObj.todoDiv2CodeId = gridList.todoDiv2CodeId || "TODODIV2300";
 			paramObj.sanctnSn = gridList.sanctnSn;
 			nextUrl = '/static/mobile/html/user/pm/pm07/PM0701P01_M.html';
+		} else if(gridList.todoDiv2CodeId == 'TODODIV2410' || gridList.todoDiv2CodeId == 'TODODIV2420') {
+			//todo 결재 구분 : 휴일대체근무 신청/결과 결재
+			paramObj.actionType = "A";
+			paramObj.reqNo = gridList.todoNo || gridList.todoFileTrgtKey;
+			paramObj.pgmId = "M08";
+			paramObj.todoDiv1CodeId = gridList.todoDiv1CodeId || "TODODIV20";
+			paramObj.todoDiv2CodeId = gridList.todoDiv2CodeId;
+			paramObj.sanctnSn = gridList.sanctnSn;
+			nextUrl = '/static/mobile/html/user/pm/pm08/PM0801P01_M.html';
 		}
       	//세션에 파라미터 저장후 전달하고 모달 팝업 또는 URL redirect 처리
         sessionStorage.setItem('paramObj', JSON.stringify(paramObj));

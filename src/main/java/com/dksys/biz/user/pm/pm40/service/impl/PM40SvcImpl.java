@@ -247,6 +247,24 @@ public class PM40SvcImpl implements PM40Svc{
 
     @Override
     public int delete_pm40(Map<String, String> paramMap) throws Exception {
+        if (!paramMap.containsKey("reqNo") && paramMap.containsKey("workNo")) {
+            paramMap.put("reqNo", paramMap.get("workNo"));
+        }
+        List<Map<String, String>> approvalChk = QM01Mapper.selectApprovalChk(paramMap);
+        if (approvalChk != null && !approvalChk.isEmpty()) {
+            Object obj = approvalChk.get(0);
+            String status = null;
+            if (obj instanceof Map) {
+                Map m = (Map) obj;
+                status = (String) (m.get("SANCTN_STTUS") != null ? m.get("SANCTN_STTUS") : m.get("sanctnSttus"));
+            } else if (obj instanceof String) {
+                status = (String) obj;
+            }
+            if ("Y".equals(status)) {
+                throw new Exception("결재가 1명 이상 완료(진행)되어 삭제할 수 없습니다.");
+            }
+        }
+
         int result = 0;
         result = pm40Mapper.delete_pm40(paramMap);
 

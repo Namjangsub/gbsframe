@@ -267,10 +267,10 @@ function Approval(htmlParam, param, popParam) {
 									} else if( data.sanctnSn == "1" && typeof(data.preSttus)=="undefined" ) {
 										applyBtn = true;
 									}
-									//PM51(출장신청서 TODODIV2190/2191, 출장복명서 TODODIV2200/2201)은 순차결재 문서이므로
+									//PM51(출장신청서 TODODIV2190/2191, 출장복명서 TODODIV2200/2201) 및 PM08(휴일대체근무 TODODIV2410/2420)은 순차결재 문서이므로
 									//차례가 아닌 결재자에게는 결재버튼을 노출하지 않는다(서버 validatePm51SequentialApproval과 동일 기준).
 									//단, 본인이 이미 승인한 건은 결재의견 수정을 위해 버튼을 유지한다.
-									var pm51SeqDivs = ["TODODIV2190", "TODODIV2191", "TODODIV2200", "TODODIV2201"];
+									var pm51SeqDivs = ["TODODIV2190", "TODODIV2191", "TODODIV2200", "TODODIV2201", "TODODIV2410", "TODODIV2420"];
 									var isPm51Seq = ($.inArray(data.todoDiv2CodeId, pm51SeqDivs) > -1);
 									if (isPm51Seq) {
 										if (data.sanctnSttus == "Y") applyBtn = true;	//의견수정
@@ -565,7 +565,7 @@ function Approval(htmlParam, param, popParam) {
 					this.applyBtn = false;
 					this.applyBtnCtrl();
 				}
-				return true;
+				return confirmYn;
 			} //결재 END
 	}
 
