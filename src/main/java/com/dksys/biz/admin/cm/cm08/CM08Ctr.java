@@ -1,10 +1,17 @@
 package com.dksys.biz.admin.cm.cm08;
 
 import java.io.BufferedInputStream;
+import java.io.DataInputStream;
+import java.io.EOFException;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.OutputStream;
+import java.awt.Graphics2D;
+import java.awt.RenderingHints;
+import java.awt.geom.AffineTransform;
+import java.awt.image.BufferedImage;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -15,6 +22,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+import javax.imageio.IIOImage;
+import javax.imageio.ImageIO;
+import javax.imageio.ImageWriteParam;
+import javax.imageio.ImageWriter;
+import javax.imageio.stream.ImageOutputStream;
 import javax.servlet.ServletOutputStream;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
@@ -42,6 +54,9 @@ import com.dksys.biz.util.MessageUtils;
 @Controller
 @RequestMapping("/admin/cm/cm08")
 public class CM08Ctr {
+
+	private static final int REPORT_IMAGE_MAX_LENGTH = 2000;
+	private static final float REPORT_JPEG_QUALITY = 0.9f;
 	
 	@Autowired
 	MessageUtils messageUtils;
@@ -284,8 +299,8 @@ public class CM08Ctr {
      * UbiReport HTML5 뷰어에서 영수증 이미지를 렌더링할 때 사용하는 스트리밍 엔드포인트.
      * WAS가 DB서버의 공유 스토리지(D:/gunyang/upload)에서 파일을 읽어 브라우저로 스트리밍한다.
      */
-    @GetMapping(value = "/ubiReportImage")
-    public void ubiReportImage(@RequestParam String fileKey,
+	@GetMapping(value = "/ubiReportImage")
+	public void ubiReportImage(@RequestParam String fileKey,
                                HttpServletRequest request,
                                HttpServletResponse response) throws Exception {
         Map<String, String> fileInfo = cm08Svc.selectFileInfo(fileKey);
@@ -330,12 +345,249 @@ public class CM08Ctr {
             }
         }
 
-        response.setContentType(contentType);
-        response.setContentLengthLong(Files.size(imagePath));
-        response.setHeader("Content-Disposition", "inline");
-        response.setHeader("Cache-Control", "no-store");
-        Files.copy(imagePath, response.getOutputStream());
-    }
+	        response.setHeader("Content-Disposition", "inline");
+	        response.setHeader("Cache-Control", "no-store");
+
+	        // UbiReport PDF 엔진은 JPEG의 EXIF Orientation을 적용하지 않고 원본 픽셀을 사용한다.
+	        // 원본 파일은 변경하지 않고, 보고서에 전달하는 응답에만 방향을 적용해 반환한다.
+	        if ("image/jpeg".equalsIgnoreCase(contentType)) {
+	            int orientation = readExifOrientation(imagePath);
+	            if (orientation >= 2 && orientation <= 8) {
+	                BufferedImage sourceImage = ImageIO.read(imagePath.toFile());
+	                if (sourceImage != null) {
+	                    BufferedImage orientedImage = applyExifOrientation(sourceImage, orientation);
+	                    response.setContentType("image/jpeg");
+	                    writeJpeg(orientedImage, response.getOutputStream(), REPORT_JPEG_QUALITY);
+	                    return;
+	                }
+	            }
+	        }
+
+	        response.setContentType(contentType);
+	        response.setContentLengthLong(Files.size(imagePath));
+	        Files.copy(imagePath, response.getOutputStream());
+	    }
+
+	    private int readExifOrientation(Path imagePath) throws IOException {
+	        try (DataInputStream input = new DataInputStream(
+	                new BufferedInputStream(Files.newInputStream(imagePath)))) {
+	            if (input.readUnsignedShort() != 0xFFD8) {
+	                return 1;
+	            }
+
+	            while (true) {
+	                int markerPrefix;
+	                do {
+	                    markerPrefix = input.readUnsignedByte();
+	                } while (markerPrefix != 0xFF);
+
+	                int marker;
+	                do {
+	                    marker = input.readUnsignedByte();
+	                } while (marker == 0xFF);
+
+	                if (marker == 0xD9 || marker == 0xDA) {
+	                    return 1;
+	                }
+	                if (marker == 0x01 || (marker >= 0xD0 && marker <= 0xD7)) {
+	                    continue;
+	                }
+
+	                int segmentLength = input.readUnsignedShort();
+	                if (segmentLength < 2) {
+	                    return 1;
+	                }
+	                int dataLength = segmentLength - 2;
+
+	                if (marker == 0xE1) {
+	                    byte[] app1Data = new byte[dataLength];
+	                    input.readFully(app1Data);
+	                    int orientation = parseExifOrientation(app1Data);
+	                    if (orientation != 1) {
+	                        return orientation;
+	                    }
+	                } else {
+	                    skipFully(input, dataLength);
+	                }
+	            }
+	        } catch (EOFException e) {
+	            return 1;
+	        }
+	    }
+
+	    private int parseExifOrientation(byte[] data) {
+	        if (data.length < 14
+	                || data[0] != 'E' || data[1] != 'x' || data[2] != 'i' || data[3] != 'f'
+	                || data[4] != 0 || data[5] != 0) {
+	            return 1;
+	        }
+
+	        int tiffStart = 6;
+	        boolean littleEndian;
+	        if (data[tiffStart] == 'I' && data[tiffStart + 1] == 'I') {
+	            littleEndian = true;
+	        } else if (data[tiffStart] == 'M' && data[tiffStart + 1] == 'M') {
+	            littleEndian = false;
+	        } else {
+	            return 1;
+	        }
+
+	        if (readUnsignedShort(data, tiffStart + 2, littleEndian) != 42) {
+	            return 1;
+	        }
+
+	        long ifdOffset = readUnsignedInt(data, tiffStart + 4, littleEndian);
+	        long ifdPositionLong = tiffStart + ifdOffset;
+	        if (ifdPositionLong < 0 || ifdPositionLong + 2 > data.length) {
+	            return 1;
+	        }
+	        int ifdPosition = (int) ifdPositionLong;
+	        int entryCount = readUnsignedShort(data, ifdPosition, littleEndian);
+
+	        for (int i = 0; i < entryCount; i++) {
+	            int entryPosition = ifdPosition + 2 + (i * 12);
+	            if (entryPosition < 0 || entryPosition + 12 > data.length) {
+	                return 1;
+	            }
+
+	            int tag = readUnsignedShort(data, entryPosition, littleEndian);
+	            if (tag == 0x0112) {
+	                int type = readUnsignedShort(data, entryPosition + 2, littleEndian);
+	                long count = readUnsignedInt(data, entryPosition + 4, littleEndian);
+	                if (type == 3 && count >= 1) {
+	                    int orientation = readUnsignedShort(data, entryPosition + 8, littleEndian);
+	                    return orientation >= 1 && orientation <= 8 ? orientation : 1;
+	                }
+	                return 1;
+	            }
+	        }
+
+	        return 1;
+	    }
+
+	    private int readUnsignedShort(byte[] data, int offset, boolean littleEndian) {
+	        if (offset < 0 || offset + 2 > data.length) {
+	            return 0;
+	        }
+	        int first = data[offset] & 0xFF;
+	        int second = data[offset + 1] & 0xFF;
+	        return littleEndian ? first | (second << 8) : (first << 8) | second;
+	    }
+
+	    private long readUnsignedInt(byte[] data, int offset, boolean littleEndian) {
+	        if (offset < 0 || offset + 4 > data.length) {
+	            return -1;
+	        }
+	        long first = data[offset] & 0xFFL;
+	        long second = data[offset + 1] & 0xFFL;
+	        long third = data[offset + 2] & 0xFFL;
+	        long fourth = data[offset + 3] & 0xFFL;
+	        return littleEndian
+	                ? first | (second << 8) | (third << 16) | (fourth << 24)
+	                : (first << 24) | (second << 16) | (third << 8) | fourth;
+	    }
+
+	    private void skipFully(InputStream input, int length) throws IOException {
+	        int remaining = length;
+	        while (remaining > 0) {
+	            long skipped = input.skip(remaining);
+	            if (skipped > 0) {
+	                remaining -= (int) skipped;
+	            } else if (input.read() == -1) {
+	                throw new EOFException();
+	            } else {
+	                remaining--;
+	            }
+	        }
+	    }
+
+	    private BufferedImage applyExifOrientation(BufferedImage source, int orientation) {
+	        int width = source.getWidth();
+	        int height = source.getHeight();
+	        boolean swapDimensions = orientation >= 5 && orientation <= 8;
+	        int orientedWidth = swapDimensions ? height : width;
+	        int orientedHeight = swapDimensions ? width : height;
+	        double scale = Math.min(1.0,
+	                (double) REPORT_IMAGE_MAX_LENGTH / Math.max(orientedWidth, orientedHeight));
+	        int targetWidth = Math.max(1, (int) Math.round(orientedWidth * scale));
+	        int targetHeight = Math.max(1, (int) Math.round(orientedHeight * scale));
+
+	        int imageType = source.getColorModel().hasAlpha()
+	                ? BufferedImage.TYPE_INT_ARGB
+	                : BufferedImage.TYPE_INT_RGB;
+	        BufferedImage target = new BufferedImage(targetWidth, targetHeight, imageType);
+	        AffineTransform transform = new AffineTransform();
+
+	        switch (orientation) {
+	        case 2:
+	            transform.scale(-1.0, 1.0);
+	            transform.translate(-width, 0);
+	            break;
+	        case 3:
+	            transform.translate(width, height);
+	            transform.rotate(Math.PI);
+	            break;
+	        case 4:
+	            transform.scale(1.0, -1.0);
+	            transform.translate(0, -height);
+	            break;
+	        case 5:
+	            transform.rotate(-Math.PI / 2.0);
+	            transform.scale(-1.0, 1.0);
+	            break;
+	        case 6:
+	            transform.translate(height, 0);
+	            transform.rotate(Math.PI / 2.0);
+	            break;
+	        case 7:
+	            transform.scale(-1.0, 1.0);
+	            transform.translate(-height, 0);
+	            transform.translate(0, width);
+	            transform.rotate(3.0 * Math.PI / 2.0);
+	            break;
+	        case 8:
+	            transform.translate(0, width);
+	            transform.rotate(3.0 * Math.PI / 2.0);
+	            break;
+	        default:
+	            return source;
+	        }
+
+	        Graphics2D graphics = target.createGraphics();
+	        try {
+	            graphics.setRenderingHint(RenderingHints.KEY_INTERPOLATION,
+	                    RenderingHints.VALUE_INTERPOLATION_BICUBIC);
+	            graphics.setRenderingHint(RenderingHints.KEY_RENDERING,
+	                    RenderingHints.VALUE_RENDER_QUALITY);
+	            AffineTransform outputTransform = AffineTransform.getScaleInstance(scale, scale);
+	            outputTransform.concatenate(transform);
+	            graphics.drawImage(source, outputTransform, null);
+	        } finally {
+	            graphics.dispose();
+	        }
+	        return target;
+	    }
+
+	    private void writeJpeg(BufferedImage image, OutputStream output, float quality) throws IOException {
+	        java.util.Iterator<ImageWriter> writers = ImageIO.getImageWritersByFormatName("jpeg");
+	        if (!writers.hasNext()) {
+	            throw new IOException("JPEG 이미지 인코더를 찾을 수 없습니다.");
+	        }
+
+	        ImageWriter writer = writers.next();
+	        try (ImageOutputStream imageOutput = ImageIO.createImageOutputStream(output)) {
+	            writer.setOutput(imageOutput);
+	            ImageWriteParam writeParam = writer.getDefaultWriteParam();
+	            if (writeParam.canWriteCompressed()) {
+	                writeParam.setCompressionMode(ImageWriteParam.MODE_EXPLICIT);
+	                writeParam.setCompressionQuality(quality);
+	            }
+	            writer.write(null, new IIOImage(image, null, null), writeParam);
+	            imageOutput.flush();
+	        } finally {
+	            writer.dispose();
+	        }
+	    }
     
 	@GetMapping(value="/excelDownload")
 	public void excelDownload(@RequestParam String fileName, HttpServletRequest request, HttpServletResponse response) throws Exception {
