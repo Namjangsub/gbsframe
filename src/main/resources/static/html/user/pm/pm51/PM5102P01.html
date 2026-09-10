@@ -87,6 +87,27 @@
 			opacity: 0.45 !important;
 			cursor: default !important;
 		}
+
+		/* 파일첨부 공통 영역(#fileList_area)의 버튼은 공통 기본 소형 크기 유지 */
+		#fileList_area .add_btn_small {
+			display: inline-block !important;
+			height: auto !important;
+		}
+		#fileList_area .add_btn_small a {
+			display: inline-block !important;
+			width: auto !important;
+			min-height: 20px !important;
+			height: 20px !important;
+			line-height: 18px !important;
+			padding: 0 5px !important;
+			font-size: 11px !important;
+			font-weight: normal !important;
+			box-sizing: content-box !important;
+		}
+		#fileList_area .add_btn_small a i {
+			font-size: 11px !important;
+			margin-right: 3px !important;
+		}
 	</style>
 	<div class="tit_contents">
 		<h4 class="tit" id="popTitle">출장복명서</h4>
@@ -3134,9 +3155,11 @@
 		return auth;
 	}
 
-	// 현재 사용자가 출장신청인인지 판정
+	// 현재 사용자가 출장신청인(작성자)인지 판정
 	function isRptApplicant() {
-		return $('#reqViewReqId').val() === jwt.userId;
+		var reqId = String($('#reqViewReqId').val() || $('#userId').val() || (currentTripRptMaster ? (currentTripRptMaster.userId || currentTripRptMaster.creatId) : '') || '').trim().toLowerCase();
+		var loginId = String(jwt.userId || '').trim().toLowerCase();
+		return !!(reqId && loginId && reqId === loginId);
 	}
 
 	function checkFormValidation() {
@@ -3840,18 +3863,19 @@
 		// 결재선 배열
 		setApplicantDefaultApprovalLine($('#reqViewReqId').val() || jwt.userId,
 			$('#reqViewReqNm').val() || jwt.userNm || jwt.userId);
-		var approvalList = gridViewApproval.target.list || [];
+		var rawApprovalList = gridViewApproval.target.getList() || [];
+		var approvalList = reorderRptGeneralApprovalLine(rawApprovalList);
 		var approvalArr = [];
 		var sanctnSnApproval = 0;
 		var sanctnSnShare = 0;
 
 		if(approvalList.length > 0) {
-			for(var i = approvalList.length - 1; i >= 0; i--) {
+			for(var i = 0; i < approvalList.length; i++) {
 				var elem = approvalList[i];
-				if (elem.usrNm.includes('gyrsult')) {
+				if (elem.usrNm && elem.usrNm.includes('gyrsult')) {
 					// gyrsult 제외
 				} else {
-					var approvalListObj = elem;
+					var approvalListObj = $.extend({}, elem);
 					if (elem.gb == '공유') {
 						sanctnSnShare += 1;
 						approvalListObj["sanctnSn"] = sanctnSnShare;
@@ -3861,24 +3885,25 @@
 						approvalListObj["sanctnSn"] = sanctnSnApproval;
 						approvalListObj["todoDiv2CodeId"] = "TODODIV2200";
 					}
-					approvalArr.unshift(approvalListObj);
+					approvalArr.push(approvalListObj);
 				}
 			}
 		}
 		formData.append('approvalArr', JSON.stringify(approvalArr));
 
 		// 관리부서 결재선 배열
-		var mngApprovalList = gridViewApprovalMng.target.list || [];
+		var rawMngApprovalList = gridViewApprovalMng.target.getList() || [];
+		var mngApprovalList = reorderRptMngApprovalLine(rawMngApprovalList);
 		var mngApprovalArr = [];
 		var mngSanctnSnApproval = 0;
 		var mngSanctnSnShare = 0;
 
 		if(mngApprovalList.length > 0) {
-			for(var i = mngApprovalList.length - 1; i >= 0; i--) {
+			for(var i = 0; i < mngApprovalList.length; i++) {
 				var elem = mngApprovalList[i];
-				if (elem.usrNm.includes('gyrsult')) {
+				if (elem.usrNm && elem.usrNm.includes('gyrsult')) {
 				} else {
-					var approvalListObj = elem;
+					var approvalListObj = $.extend({}, elem);
 					if (elem.gb == '공유') {
 						mngSanctnSnShare += 1;
 						approvalListObj["sanctnSn"] = mngSanctnSnShare;
@@ -3888,7 +3913,7 @@
 						approvalListObj["sanctnSn"] = mngSanctnSnApproval;
 						approvalListObj["todoDiv2CodeId"] = "TODODIV2201";
 					}
-					mngApprovalArr.unshift(approvalListObj);
+					mngApprovalArr.push(approvalListObj);
 				}
 			}
 		}
@@ -4364,10 +4389,22 @@
 	function hasCompletedRptApproval() {
 		var hasCompleted = false;
 		if (gridViewApproval && gridViewApproval.target && gridViewApproval.target.getList) {
+			var reqId = String($('#reqViewReqId').val() || $('#userId').val() || (currentTripRptMaster ? (currentTripRptMaster.userId || currentTripRptMaster.creatId) : '') || jwt.userId || '').trim().toLowerCase();
+			var approvalCount = 0;
 			$.each(gridViewApproval.target.getList(), function(idx, elem) {
-				if (elem.gb === '결재' && ($.trim(elem.todoCfDt || '') || elem.sanctnSttus === 'Y')) {
-					hasCompleted = true;
-					return false;
+				if (elem.gb === '결재') {
+					approvalCount++;
+					var sanctnSn = parseInt(elem.sanctnSn, 10);
+					var userId = String(elem.todoId || elem.usrNm || elem.empNo || '').trim().toLowerCase();
+					// 결재선의 첫 번째 결재자(신청자 본인), 순번 1번, 또는 신청자 ID 일치 행은 본인 결재이므로 타인 승인 완료 판정에서 제외
+					if (approvalCount === 1 || sanctnSn === 1 || (reqId && userId === reqId)) {
+						return true;
+					}
+
+					if ($.trim(elem.todoCfDt || '') || elem.sanctnSttus === 'Y') {
+						hasCompleted = true;
+						return false;
+					}
 				}
 			});
 		}
@@ -4495,7 +4532,11 @@
 			// 첨부파일 편집 허용
 			$popArea.find('#fileList_area button').show();
 			$popArea.find('#fileList_area input[type="file"]').prop("disabled", false);
-			$popArea.find('#fileUpBtn').hide();
+			if (isFileChangedPM5102()) {
+				$popArea.find('#fileUpBtn').show();
+			} else {
+				$popArea.find('#fileUpBtn').hide();
+			}
 			// 회계담당자 예외: locked 상태에서도 영역 2 활성화
 			if (isAccountingActive) {
 				setArea2Enabled(true);
@@ -4731,6 +4772,11 @@
 				pendingList.push({ lineNm: '신청부서', row: row });
 			});
 			$.each(pendingRowsAsc(mngRows, Number(myMngRow.sanctnSn || 0)), function(idx, row) {
+				// 관리부서(1번 최정민, 2번 이영만)는 병행 결재가 가능하므로,
+				// 2번 결재자(이영만)에게는 1번(최정민) 미결을 차단 사유로 잡지 않는다.
+				if (Number(myMngRow.sanctnSn || 0) === 2 && Number(row.sanctnSn || 0) === 1) {
+					return true;
+				}
 				pendingList.push({ lineNm: '관리부서', row: row });
 			});
 		} else {
@@ -4791,6 +4837,10 @@
 						coCd: item.coCd || jwt.coCd
 					};
 				});
+				mappedList.sort(function(a, b) {
+					if (a.gb !== b.gb) return (a.gb === '결재') ? -1 : 1;
+					return Number(a.sanctnSn || 0) - Number(b.sanctnSn || 0);
+				});
 				gridViewApproval.setData2(mappedList);
 				applyRptEditPolicy();
 				gridResize(gridViewApproval, mappedList.length);
@@ -4836,6 +4886,10 @@
 						flag: 'U',
 						coCd: item.coCd || jwt.coCd
 					};
+				});
+				mappedList.sort(function(a, b) {
+					if (a.gb !== b.gb) return (a.gb === '결재') ? -1 : 1;
+					return Number(a.sanctnSn || 0) - Number(b.sanctnSn || 0);
 				});
 				gridViewApprovalMng.setData2(mappedList);
 				applyRptEditPolicy();

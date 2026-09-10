@@ -75,13 +75,13 @@
 .section-body-2 { background: #f4fbf4; border: 1px solid #b8e0b8; border-top: none; }
 .section-body-3 { background: #fffaf3; border: 1px solid #ffd89a; border-top: none; }
 
-/* +, - 버튼 높이를 tr/td 높이 내에서 최대 크기로 유지 */
-.add_btn_small {
+/* +, - 버튼 높이를 tr/td 높이 내에서 최대 크기로 유지 (#popForm 내부 테이블에만 국한) */
+#popForm .add_btn_small {
 	display: inline-flex !important;
 	align-items: center !important;
 	height: 100% !important;
 }
-.add_btn_small a {
+#popForm .add_btn_small a {
 	display: inline-flex !important;
 	align-items: center !important;
 	justify-content: center !important;
@@ -92,6 +92,27 @@
 	font-size: 16px !important;
 	font-weight: bold !important;
 	box-sizing: border-box !important;
+}
+
+/* 파일첨부 공통 영역(#fileList_area)의 버튼은 공통 기본 소형 크기 유지 */
+#fileList_area .add_btn_small {
+	display: inline-block !important;
+	height: auto !important;
+}
+#fileList_area .add_btn_small a {
+	display: inline-block !important;
+	width: auto !important;
+	min-height: 20px !important;
+	height: 20px !important;
+	line-height: 18px !important;
+	padding: 0 5px !important;
+	font-size: 11px !important;
+	font-weight: normal !important;
+	box-sizing: content-box !important;
+}
+#fileList_area .add_btn_small a i {
+	font-size: 11px !important;
+	margin-right: 3px !important;
 }
 </style>
 
@@ -573,7 +594,7 @@
 		</div>
 	</form>
 
-	<div class="contents">
+	<div class="contents" style="padding-bottom: 40px;">
 		<!-- 공통 파일 영역 -->
 		<div id="fileList_area" style="width: 100%;"></div>
 	</div>
@@ -822,6 +843,11 @@
 				pendingList.push({ lineNm: '신청부서', row: row });
 			});
 			$.each(pendingRowsAsc(mngRows, Number(myMngRow.sanctnSn || 0)), function(idx, row) {
+				// 관리부서(1번 최정민, 2번 이영만)는 병행 결재가 가능하므로,
+				// 2번 결재자(이영만)에게는 1번(최정민) 미결을 차단 사유로 잡지 않는다.
+				if (Number(myMngRow.sanctnSn || 0) === 2 && Number(row.sanctnSn || 0) === 1) {
+					return true;
+				}
 				pendingList.push({ lineNm: '관리부서', row: row });
 			});
 		} else {
@@ -1975,7 +2001,9 @@
 
 	function isTravelerGridEditBlocked() {
 		var actionType = (popParam && popParam.actionType) || $('#actionType').val();
-		var isAuthor = (jwt.userId === $('#reqId').val());
+		var reqUserId = String($('#reqId').val() || (currentTripReqMaster ? (currentTripReqMaster.userId || currentTripReqMaster.creatId) : '') || '').trim().toLowerCase();
+		var loginUserId = String(jwt.userId || '').trim().toLowerCase();
+		var isAuthor = !!(reqUserId && loginUserId && reqUserId === loginUserId);
 		var isEditableByAuthor = (actionType === 'U' || actionType === 'CHG') && isAuthor && !hasCompletedApproval();
 		var isSavedGen = hasSavedGeneralApprovalLine() && !isEditableByAuthor;
 
@@ -2427,7 +2455,9 @@
 			saveTripReqSalesInfo();
 			return;
 		}
-		var isAuthor = (jwt.userId === $('#reqId').val());
+		var reqUserId = String($('#reqId').val() || (currentTripReqMaster ? (currentTripReqMaster.userId || currentTripReqMaster.creatId) : '') || '').trim().toLowerCase();
+		var loginUserId = String(jwt.userId || '').trim().toLowerCase();
+		var isAuthor = !!(reqUserId && loginUserId && reqUserId === loginUserId);
 		var actionType = $('#actionType').val();
 		if (!isPaymentFlow && hasSavedGeneralApprovalLine() && !hasCompletedApproval() && !(actionType === 'U' && isAuthor)) {
 			alert("결재가 진행중입니다.");
@@ -2703,7 +2733,8 @@
 		// 결재선 배열
 		// getList()를 써야 한다: setData2()로 재정렬(예: reorderPayMngApprovalLine)한 결과가 반영된다.
 		// target.list는 그리드 내부 원시 속성으로 setData() 이후에도 갱신되지 않을 수 있어 재정렬 전 순서가 그대로 제출되는 문제가 있었다.
-		var approvalList = gridViewApproval.target.getList() || [];
+		var rawApprovalList = gridViewApproval.target.getList() || [];
+		var approvalList = reorderGeneralApprovalLine(rawApprovalList);
 		var approvalArr = [];
 		var sanctnSnApproval = 0;
 		var sanctnSnShare = 0;
@@ -2742,7 +2773,8 @@
 		if (isPaymentFlow || (popParam && popParam.actionType === 'CHG')) ensurePayMngApprovalUsers();
 		// getList()를 써야 한다: 바로 위 ensurePayMngApprovalUsers()가 reorderPayMngApprovalLine()으로 순서를
 		// 재정렬한 뒤 setData2()로 반영한 결과는 getList()에서만 확인되고, target.list(원시 속성)는 갱신되지 않는다.
-		var mngApprovalList = gridViewApprovalMng.target.getList() || [];
+		var rawMngApprovalList = gridViewApprovalMng.target.getList() || [];
+		var mngApprovalList = reorderPayMngApprovalLine(rawMngApprovalList);
 		var mngApprovalArr = [];
 		var mngSanctnSnApproval = 0;
 		var mngSanctnSnShare = 0;
@@ -2969,15 +3001,14 @@
 
 		// 첨부파일 내용이 변경(추가)되거나 삭제되었을 때만 활성화(표출), 그 외에는 항상 숨김
 		if (isFileChanged()) {
-			$('#fileUpBtn, #fileSaveBtn').show();
+			$('#fileSaveBtn').show();
 		} else {
-			$('#fileUpBtn, #fileSaveBtn').hide();
+			$('#fileSaveBtn').hide();
 		}
 	}
 
-	// 첨부파일만 저장
+	// 첨부파일만 저장 (수정 불가 상태나 결재 진행 상태에서도 별도 처리 가능하도록 보장)
 	function saveFileOnly() {
-		if (blockApprovalEntryEdit()) return;
 		var tripReqNo = $('#tripReqNo').val();
 		if (!tripReqNo) {
 			alert("출장신청서 번호가 없습니다.");
@@ -2989,23 +3020,35 @@
 			return;
 		}
 
-		var formData = new FormData();
-		formData.append('tripReqNo', tripReqNo);
+		var formData = new FormData($('#popForm')[0]);
+		formData.append('userId', jwt.userId);
 		formData.append('fileTrgtKey', $('#fileTrgtKey').val());
 		formData.append('pgmId', $('#pgmId').val());
-		formData.append('userId', jwt.userId);
+		formData.append('comonCd', safeGetFileNodeId() || 'FILETREE');
 
-		if (appendFileUploadData(formData) === false) {
-			return;
-		}
+		var fileUploadArr = [];
+		var totalFileSize = 0;
+		$.each(treeModule.getFileArr(), function (idx, obj) {
+			if (obj.fileKey == 0) {
+				formData.append('files', obj.file);
+				if (obj.file && obj.file.size) {
+					totalFileSize += obj.file.size;
+				}
+				var cloneObj = $.extend({}, obj);
+				cloneObj.file = '';
+				fileUploadArr.push(cloneObj);
+			}
+		});
+
+		formData.append('uploadFileArr', JSON.stringify(fileUploadArr));
+		formData.append('deleteFileArr', JSON.stringify(treeModule.getDeleteFileArr()));
 
 		openProgress(true);
-		filePostAjax("/user/pm/pm51/updateTripReqFile", formData, function (data) {
+		filePostAjax("/admin/cm/cm08/fileUpload", formData, function (data) {
 			openProgress(false);
 			if (data.resultCode === 200) {
 				alert("파일이 저장되었습니다.");
-				$('#fileSaveBtn').hide();
-				// 파일 트리 새로고침
+				$('#fileSaveBtn, #fileUpBtn').hide();
 				initFileTree();
 			} else if (data.resultCode === 900) {
 				alert(data.resultMessage);
@@ -3227,19 +3270,28 @@
 		return false;
 	}
 
-	// 일반 결재자 중 1명이라도 확인일자가 있는 경우 확인 (기안자 본인은 결재 완료 판정에서 제외)
+	// 일반 결재자 중 기안자 본인 외에 1명이라도 확인일자(승인)가 있는 경우 확인
+	// (결재선 1번째 행 또는 sanctnSn 1번 또는 신청자 본인 결재만 진행된 상태는 제외하여 본인결재 상태에서 수정 가능하도록 보장)
 	function hasCompletedApproval() {
 		var hasCompleted = false;
-		if (gridViewApproval.target && gridViewApproval.target.getList) {
+		if (gridViewApproval && gridViewApproval.target && gridViewApproval.target.getList) {
 			var list = gridViewApproval.target.getList();
-			var reqId = $('#reqId').val() || '';
+			var reqId = String($('#reqId').val() || (currentTripReqMaster ? (currentTripReqMaster.userId || currentTripReqMaster.creatId) : '') || jwt.userId || '').trim().toLowerCase();
+			var approvalCount = 0;
 			$.each(list, function(idx, elem) {
-				var userId = elem.usrNm || elem.todoId || '';
-				if (userId === reqId) return true; // 기안자 본인 행은 패스
+				if (elem.gb === '결재') {
+					approvalCount++;
+					var sanctnSn = parseInt(elem.sanctnSn, 10);
+					var userId = String(elem.todoId || elem.usrNm || elem.empNo || '').trim().toLowerCase();
+					// 결재선의 첫 번째 결재자(신청자 본인), 순번 1번, 또는 신청자 ID 일치 행은 본인 결재이므로 타인 승인 완료 판정에서 제외
+					if (approvalCount === 1 || sanctnSn === 1 || (reqId && userId === reqId)) {
+						return true;
+					}
 
-				if (elem.gb === '결재' && ($.trim(elem.todoCfDt || '') || elem.sanctnSttus === 'Y')) {
-					hasCompleted = true;
-					return false;
+					if ($.trim(elem.todoCfDt || '') || elem.sanctnSttus === 'Y') {
+						hasCompleted = true;
+						return false;
+					}
 				}
 			});
 		}
@@ -3505,7 +3557,7 @@
 
 			if ($('#actionType').val() === 'C') return;
 		}
-		var $editButtons = $popArea.find('#autoCalcBtn, .add_btn_small a, #salesCdBtn, #reqNmBtn, #pmNmBtn');
+		var $editButtons = $popForm.find('#autoCalcBtn, .add_btn_small a, #salesCdBtn, #reqNmBtn, #pmNmBtn');
 		var $actionButtons = $popArea.find('#saveBtn, #payBtn, #deleteBtn, #fileSaveBtn');
 		var aprvStsCd = master ? (master.aprvStsCd || master.APRV_STS_CD || '') : '';
 		var paid = !!master.payDt;
@@ -3590,7 +3642,12 @@
 			// 내가 결재선상 미승인 결재 대기 중인 상태가 아니라면 전체 폼 잠금 (조회 전용)
 			if (!isMyApprovalPending()) {
 				setFormDisabled(true);
-				$actionButtons.add($editButtons).hide();
+				$actionButtons.filter(':not(#fileSaveBtn)').add($editButtons).hide();
+				if (isFileChanged()) {
+					$popArea.find('#fileSaveBtn').show();
+				} else {
+					$popArea.find('#fileSaveBtn').hide();
+				}
 				$('#popTitle').text('출장신청서 조회만가능');
 				return;
 			}
@@ -3633,7 +3690,7 @@
 		if (actionType === 'PAY') {
 			setFormDisabled(true);
 			$actionButtons.add($editButtons).hide();
-			$popArea.find('.add_btn_small a').hide();
+			$popForm.find('.add_btn_small a').hide();
 
 			if (!hasCompletedMng && checkUserAccountingAuth() && isGeneralApprovalDone(master)) {
 				$popArea.find('#payBtn').show();
@@ -3652,8 +3709,10 @@
 		}
 
 		// 5) 일반 모드: 일반 결재선이 저장된 후에는 결재 대상 내용을 잠근다.
-		// 단, 아무도 결재를 진행하지 않은 상태(hasCompletedGen === false)에서 기안자가 수정(U) 모드로 접근한 경우는 개방한다.
-		var isAuthor = (jwt.userId === $('#reqId').val());
+		// 단, 본인 외에 아무도 결재를 진행하지 않은 상태(hasCompletedGen === false)에서 기안자가 수정(U) 모드로 접근한 경우는 개방한다.
+		var reqUserId = String($('#reqId').val() || (master ? (master.userId || master.creatId) : '') || '').trim().toLowerCase();
+		var loginUserId = String(jwt.userId || '').trim().toLowerCase();
+		var isAuthor = !!(reqUserId && loginUserId && reqUserId === loginUserId);
 		var lockForm = hasCompletedGen || (hasStartedGen && !(actionType === 'U' && isAuthor));
 
 		if (actionType !== 'PAY' && lockForm) {
@@ -3681,14 +3740,15 @@
 				applyPayAmtUsd2CurrencyLock();
 				$popArea.find('a[onclick="insertShareUserModalMng();"], a[onclick="deleteShareUserMng();"]').show();
 				$('#popTitle').text('출장신청서 수정 [지급처리]');
-			} else if (actionType === 'PAY' && hasCompletedGen && checkUserAccountingAuth() && aprvStsCd === 'APRVSTS03' && hasCompletedMng && isFileChanged()) {
-				$popArea.find('#saveBtn').hide();
-				$popArea.find('#payBtn').hide();
-				$popArea.find('#fileSaveBtn').show();
-				$('#popTitle').text('출장신청서 조회만가능');
 			} else {
 				$popArea.find('#saveBtn').hide();
 				$popArea.find('#payBtn').hide();
+				// 수정 불가 상태에서도 첨부파일 변경 시 파일저장 버튼 표출
+				if (isFileChanged()) {
+					$popArea.find('#fileSaveBtn').show();
+				} else {
+					$popArea.find('#fileSaveBtn').hide();
+				}
 				$('#popTitle').text('출장신청서 조회만가능');
 			}
 
@@ -3804,6 +3864,10 @@
 						coCd: item.coCd || jwt.coCd
 					};
 				});
+				mappedList.sort(function(a, b) {
+					if (a.gb !== b.gb) return (a.gb === '결재') ? -1 : 1;
+					return Number(a.sanctnSn || 0) - Number(b.sanctnSn || 0);
+				});
 				gridViewApproval.setData2(mappedList);
 				gridResize(gridViewApproval, mappedList.length);
 				reapplyEditPolicyAfterApprovalLoad();
@@ -3849,6 +3913,10 @@
 						coCd: item.coCd || jwt.coCd
 					};
 				});
+				mappedList.sort(function(a, b) {
+					if (a.gb !== b.gb) return (a.gb === '결재') ? -1 : 1;
+					return Number(a.sanctnSn || 0) - Number(b.sanctnSn || 0);
+				});
 				gridViewApprovalMng.setData2(mappedList);
 				gridResize(gridViewApprovalMng, mappedList.length);
 				ensurePayMngApprovalUsers();
@@ -3871,7 +3939,8 @@
 		}
 		var $popArea = $('#popForm').closest('.popup_area');
 		setFormDisabled(true);
-		$popArea.find('#deleteBtn, #autoCalcBtn, .add_btn_small a, #salesCdBtn, #reqNmBtn, #pmNmBtn').hide();
+		$popArea.find('#deleteBtn, #salesCdBtn, #reqNmBtn, #pmNmBtn').hide();
+		$('#popForm').find('#autoCalcBtn, .add_btn_small a').hide();
 	}
 
 

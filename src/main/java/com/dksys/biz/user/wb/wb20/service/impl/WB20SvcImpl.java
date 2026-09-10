@@ -535,10 +535,10 @@ public class WB20SvcImpl implements WB20Svc {
 				}
 			}
 		}
-		// 지급처리 등록자가 관리부서 1번 결재자(cjm)인 경우에는 결재선 생성 직후
+		// 지급처리 등록자가 관리부서 1번(최정민) 또는 2번(이영만)인 경우에는 결재선 생성 직후
 		// 동일 문서의 이전 관리부서 이력이 남아 있어도 자동승인을 막지 않는다.
 		// 신청부서 결재 완료 검증은 위에서 그대로 수행된다.
-		if (isMngLine && currentSn == 1 && "자동승인".equals(paramMap.get("todoCfOpn"))) {
+		if (isMngLine && (currentSn == 1 || currentSn == 2) && "자동승인".equals(paramMap.get("todoCfOpn"))) {
 			return;
 		}
 
@@ -552,6 +552,12 @@ public class WB20SvcImpl implements WB20Svc {
 			try {
 				sn = Integer.parseInt(String.valueOf(line.get("sanctnSn")));
 			} catch (Exception e) {
+				continue;
+			}
+			// 관리부서(1번 최정민, 2번 이영만)는 상호 병행 결재가 가능해야 하므로,
+			// 2번 결재자(이영만)가 결재할 때 1번(최정민)의 미승인은 차단 사유가 되지 않는다.
+			// 단, 3번 이상(부사장 등)은 1번과 2번이 모두 승인되어야만 결재 가능하다.
+			if (isMngLine && currentSn == 2 && sn == 1) {
 				continue;
 			}
 			if (sn < currentSn && !"Y".equals(line.get("sanctnSttus"))) {

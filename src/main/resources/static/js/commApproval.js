@@ -56,6 +56,11 @@ function pm51SequentialNotice(list, colSpan) {
 	var ownRows = pm51FetchApprovalLine(myRow.todoNo, myRow.todoDiv2CodeId);
 	if (ownRows.length === 0) ownRows = list;
 	$.each(pm51PendingRowsAsc(ownRows, Number(myRow.sanctnSn || 0)), function(idx, row) {
+		// 관리부서(1번 최정민, 2번 이영만)는 병행 결재가 가능하므로,
+		// 2번 결재자(이영만)에게는 1번(최정민) 미결을 차단 사유로 잡지 않는다.
+		if (isMngApprover && Number(myRow.sanctnSn || 0) === 2 && Number(row.sanctnSn || 0) === 1) {
+			return true;
+		}
 		pendingList.push({ lineNm: isMngApprover ? '관리부서' : '신청부서', row: row });
 	});
 	if (pendingList.length === 0) return result;
@@ -251,14 +256,17 @@ function Approval(htmlParam, param, popParam) {
 								html = html.replace(/@@bold@@/gi, boldFont);
 								todoId = data.todoId;
 								//applyBtn SHOW - 순번이 1이거나 이전 결재 상태가 Y일 경우
-								if( data.sanctnSttus != "undefined" && data.sanctnSttus == "N"  ) {
-									if( data.sanctnSn == "1" || data.preSttus=="Y") {
+									if( data.sanctnSttus != "undefined" && data.sanctnSttus == "N"  ) {
+										// 관리부서(TODODIV2191/2201) 결재선에서 1번(최정민)과 2번(이영만)은 병행 결재이므로
+										// 2번 결재자(이영만)도 1번 승인 여부와 관계없이 바로 결재할 수 있다.
+										var isMngLine1or2 = (data.todoDiv2CodeId === "TODODIV2191" || data.todoDiv2CodeId === "TODODIV2201") && (data.sanctnSn == "1" || data.sanctnSn == "2");
+										if( data.sanctnSn == "1" || data.preSttus=="Y" || isMngLine1or2) {
+											applyBtn = true;
+										}
+									//결재가 1건일 경우
+									} else if( data.sanctnSn == "1" && typeof(data.preSttus)=="undefined" ) {
 										applyBtn = true;
 									}
-								//결재가 1건일 경우
-								} else if( data.sanctnSn == "1" && typeof(data.preSttus)=="undefined" ) {
-									applyBtn = true;
-								}
 								//PM51(출장신청서 TODODIV2190/2191, 출장복명서 TODODIV2200/2201)은 순차결재 문서이므로
 								//차례가 아닌 결재자에게는 결재버튼을 노출하지 않는다(서버 validatePm51SequentialApproval과 동일 기준).
 								//단, 본인이 이미 승인한 건은 결재의견 수정을 위해 버튼을 유지한다.

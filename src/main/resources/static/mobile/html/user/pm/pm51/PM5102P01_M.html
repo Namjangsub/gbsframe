@@ -236,6 +236,36 @@
 			padding: 0;
 			margin-top: 10px;
 		}
+		.popup_area .project_table,
+		.project_table {
+			width: 100% !important;
+			border-collapse: collapse !important;
+			font-size: 11px !important;
+			margin-top: 6px;
+			table-layout: fixed;
+		}
+		.popup_area .project_table thead th,
+		.project_table th {
+			background-color: #f1f3f5 !important;
+			border: 1px solid #dee2e6 !important;
+			padding: 6px 2px !important;
+			text-align: center !important;
+			font-size: 11px !important;
+			font-weight: bold !important;
+			color: #333 !important;
+			white-space: nowrap !important;
+			line-height: 1.2 !important;
+		}
+		.popup_area .project_table tbody td,
+		.project_table td {
+			border: 1px solid #dee2e6 !important;
+			padding: 5px 3px !important;
+			font-size: 11px !important;
+			color: #555 !important;
+			vertical-align: middle !important;
+			line-height: 1.3 !important;
+			word-break: break-all;
+		}
 	</style>
 </head>
 <body>
@@ -354,6 +384,14 @@
 					</div>
 				</div>
 
+				<!-- 프로젝트 정보 -->
+				<div class="view-section" id="projectSection" style="display:none;">
+					<div class="view-section-header">프로젝트</div>
+					<div class="view-section-body" id="projectListArea" style="font-size: 13px; color: #333; line-height: 1.6;">
+						-
+					</div>
+				</div>
+
 				<!-- 4. 결재선 현황 -->
 				<div class="view-section">
 					<div class="view-section-header">결재선 현황</div>
@@ -416,6 +454,15 @@
 		var tripTypeCdMap = {};
 		var tripDivCdMap = {};
 		var commApproval = null; // commApprovalMobile.js의 전역 approvalConfirm()/approvalMemoComment()가 참조하는 이름이므로 반드시 이 스코프에 선언한다.
+
+		function formatToDotDate(dtm) {
+			if (!dtm) return '';
+			var clean = String(dtm).replace(/[^0-9]/g, '');
+			if (clean.length >= 8) {
+				return clean.substring(0, 4) + '.' + clean.substring(4, 6) + '.' + clean.substring(6, 8);
+			}
+			return dtm;
+		}
 
 		function formatToDate(dtm) {
 			if (!dtm || dtm.length < 8) return '';
@@ -515,14 +562,36 @@
 				var m02 = data.result.m02 || {};
 				var d02 = data.result.d02 || [];	// selectTripRptD02: 복명서 자체 출장자 목록(TB_PM52D02)
 				var m01 = data.result.m01 || {};
+				var projectList = (data.result.rptProjectList && data.result.rptProjectList.length > 0)
+					? data.result.rptProjectList
+					: (data.result.reqProjectList || []);
 				currentTripRptMaster = m02;
 				rptTravelerList = d02;
+
+				// 복수 프로젝트 데이터 추출
+				var clntNmList = [];
+				var pjtNmList = [];
+				var salesCdList = [];
+				if (projectList.length > 0) {
+					projectList.forEach(function(p) {
+						var cNm = p.clntNm || '';
+						if (cNm && clntNmList.indexOf(cNm) === -1) clntNmList.push(cNm);
+						var pNm = p.clntPjtNm || '';
+						if (pNm && pjtNmList.indexOf(pNm) === -1) pjtNmList.push(pNm);
+						var sCd = p.salesCd || p.ordrsNo || '';
+						if (sCd && salesCdList.indexOf(sCd) === -1) salesCdList.push(sCd);
+					});
+				}
+
+				var displayTripPlace = clntNmList.length > 0 ? clntNmList.join(', ') : (m01.tripPlace || '');
+				var displayClntPjtNm = pjtNmList.length > 0 ? pjtNmList.join(', ') : (m01.clntPjtNm || '');
+				var displaySalesCd = salesCdList.length > 0 ? salesCdList.join(', ') : (m01.salesCd || '-');
 
 				// 기본정보 표시 (원본 출장신청서 m01 데이터 활용)
 				$('#reqViewReqId').val(m01.userId || '');
 				$('#reqViewReqNm').text(m01.userNm || '');
 				$('#reqViewReqDeptNm').text(m01.userDeptNm || m01.reqDeptNm || '-');
-				$('#reqViewSalesCd').text(m01.salesCd || '-');
+				$('#reqViewSalesCd').text(displaySalesCd);
 				$('#reqViewPmNm').text(m01.pmNm || '-');
 
 				var tripDivName = tripDivCdMap[m01.tripDiv] || m01.tripDivNm || m01.tripDiv || '-';
@@ -535,8 +604,8 @@
 					$('#reqViewTripNationNmRow').hide();
 				}
 
-				$('#reqViewTripPlace').text(m01.tripPlace || '');
-				$('#reqViewClntPjtNm').text(m01.clntPjtNm || '');
+				$('#reqViewTripPlace').text(displayTripPlace);
+				$('#reqViewClntPjtNm').text(displayClntPjtNm);
 				$('#reqViewTripTypeNm').text(tripTypeCdMap[(m01.tripTypeCds || '').split(',')[0]] || (m01.tripTypeCds || '').split(',')[0] || '');
 				$('#reqTripPeriodView').text(formatToDate(m01.tripStDtm) + ' ~ ' + formatToDate(m01.tripEdDtm));
 				$('#actTripPeriodView').text(formatToDateTime(m02.actStDtm) + ' ~ ' + formatToDateTime(m02.actEdDtm));
@@ -601,15 +670,18 @@
 				bindDeptEvalData();
 
 				// 출장자 목록 채우기
-				renderRptTravelerTable();
+				renderRptTravelerTable(projectList);
+
+				// 프로젝트 목록 채우기
+				renderRptProjectTable(projectList);
 
 				// 결재선 로드
 				loadApprovalLine(tripRptNo);
 			});
 		}
 
-		// 출장자 정보 한 줄 표기 렌더링
-		function renderRptTravelerTable() {
+		// 출장자 정보 렌더링
+		function renderRptTravelerTable(projectList) {
 			var $container = $('#travelerInfoList');
 			if (!rptTravelerList || rptTravelerList.length === 0) {
 				$container.html('-');
@@ -618,9 +690,62 @@
 			var travelerStrs = rptTravelerList.map(function(row) {
 				var nameStr = (row.userNm || '') + (row.positionNm ? ' ' + row.positionNm : '');
 				var periodStr = formatToDate(row.tripStDtm) + ' ~ ' + formatToDate(row.tripEdDtm);
-				return nameStr + ' (' + periodStr + ')';
+
+				if (projectList && projectList.length > 1) {
+					var lines = [];
+					lines.push('<b>' + nameStr + '</b>' + (periodStr ? ' : ' + periodStr : ''));
+					projectList.forEach(function(p) {
+						var pSt = formatToDate(p.stDt);
+						var pEd = formatToDate(p.edDt);
+						var pPeriod = (pSt && pEd) ? (pSt + '~' + pEd) : (pSt || pEd || '');
+						var pClnt = p.clntNm || '';
+						var pPjt = p.clntPjtNm || '';
+						var pEq = p.equipNm || '';
+						var subEquip = '';
+						if (pPjt && pEq) subEquip = ' (' + pPjt + ', ' + pEq + ')';
+						else if (pPjt || pEq) subEquip = ' (' + (pPjt || pEq) + ')';
+
+						lines.push('&nbsp;· ' + (pPeriod ? pPeriod + ' ' : '') + pClnt + subEquip);
+					});
+					return lines.join('<br>');
+				} else {
+					return nameStr + ' (' + periodStr + ')';
+				}
 			});
 			$container.html(travelerStrs.join('<br>'));
+		}
+
+		// 프로젝트 전용 테이블 렌더링
+		function renderRptProjectTable(projectList) {
+			if (projectList && projectList.length > 0) {
+				var pHtml = '<table class="project_table">';
+				pHtml += '<colgroup><col width="17%"><col width="22%"><col width="31%"><col width="22%"><col width="8%"></colgroup>';
+				pHtml += '<thead><tr>';
+				pHtml += '<th style="font-size: 11px !important; padding: 6px 2px !important; white-space: nowrap !important; text-align: center;">수주번호</th>';
+				pHtml += '<th style="font-size: 11px !important; padding: 6px 2px !important; white-space: nowrap !important; text-align: center;">프로젝트명</th>';
+				pHtml += '<th style="font-size: 11px !important; padding: 6px 2px !important; white-space: nowrap !important; text-align: center;">고객사</th>';
+				pHtml += '<th style="font-size: 11px !important; padding: 6px 2px !important; white-space: nowrap !important; text-align: center;">기간</th>';
+				pHtml += '<th style="font-size: 11px !important; padding: 6px 2px !important; white-space: nowrap !important; text-align: center;">M/D</th>';
+				pHtml += '</tr></thead><tbody>';
+
+				projectList.forEach(function(p) {
+					var st = p.stDt ? formatToDotDate(p.stDt) : '';
+					var ed = p.edDt ? formatToDotDate(p.edDt) : '';
+					var pPeriod = (st && ed) ? (st + '<br>~' + ed) : (st || ed || '-');
+					pHtml += '<tr>';
+					pHtml += '<td style="text-align: center; font-weight: bold; font-size: 11px; padding: 5px 2px;">' + (p.ordrsNo || p.salesCd || '-') + '</td>';
+					pHtml += '<td style="font-size: 11px; padding: 5px 3px;">' + (p.clntPjtNm || '-') + '</td>';
+					pHtml += '<td style="font-size: 11px; padding: 5px 3px;">' + (p.clntNm || '-') + '</td>';
+					pHtml += '<td style="text-align: center; font-size: 10px; line-height: 1.2; padding: 5px 2px;">' + pPeriod + '</td>';
+					pHtml += '<td style="text-align: right; font-size: 11px; padding: 5px 2px;">' + (p.md || '0') + '</td>';
+					pHtml += '</tr>';
+				});
+				pHtml += '</tbody></table>';
+				$('#projectListArea').html(pHtml);
+				$('#projectSection').show();
+			} else {
+				$('#projectSection').hide();
+			}
 		}
 
 		// 결재선 로드
@@ -706,18 +831,26 @@
 
 			var htmlParam = { htmlArea: 'approval_area' };
 			var approvalParam = {
-				coCd: popParam.coCd,
+				coCd: popParam.coCd || jwt.coCd,
 				todoDiv1CodeId: popParam.todoDiv1CodeId,
 				todoDiv2CodeId: popParam.todoDiv2CodeId,
+				todoNo: popParam.todoNo || popParam.fileTrgtKey || popParam.todoFileTrgtKey || popParam.tripRptNo,
+				todoKey: popParam.todoKey || '',
 				pgmId: popParam.pgmId
 			};
 			var widgetParam = Object.assign({}, popParam);
+			widgetParam.todoNo = widgetParam.todoNo || widgetParam.fileTrgtKey || widgetParam.todoFileTrgtKey || widgetParam.tripRptNo;
 			delete widgetParam.sanctnSn;
 			delete widgetParam.pgmId;
 
 			$('#approvalActionSection').show();
 			commApproval = new Approval(htmlParam, approvalParam, widgetParam);
 			commApproval.makeHtml();
+
+			if (commApproval && !commApproval.applyBtn) {
+				$('#approval_area .mobile_mid_btn').hide().css('display', 'none');
+				$('#approval_area .mobile_mid_btn button').not('.close_btn').hide();
+			}
 		}
 
 		// 역할별 UI 표시 (부서장 평가)
