@@ -244,6 +244,456 @@
 				FROM req
 	</select>
 
+	<select id="selectMindMapByUserList" parameterType="Map" resultType="CamelMap">
+		WITH act_agg AS (
+			SELECT ISS_NO
+				 , SUM(TO_NUMBER(NVL(ACT_MH, '0'))) AS ACT_MH
+				 , MAX(TO_NUMBER(NULLIF(SALE_TEAM_MD, ''))) AS SALE_TEAM_MD
+				 , MAX(TO_NUMBER(NULLIF(DSGN_TEAM_MD, ''))) AS DSGN_TEAM_MD
+				 , MAX(TO_NUMBER(NULLIF(MATR_TEAM_MD, ''))) AS MATR_TEAM_MD
+				 , MAX(TO_NUMBER(NULLIF(PROD_TEAM_MD, ''))) AS PROD_TEAM_MD
+			FROM TB_WB24M03
+			GROUP BY ISS_NO
+		)
+		, qp_agg AS (
+			SELECT REQ_NO
+				 , MAX(TO_NUMBER(NULLIF(SALE_TEAM_MD, ''))) AS SALE_TEAM_MD
+				 , MAX(TO_NUMBER(NULLIF(DSGN_TEAM_MD, ''))) AS DSGN_TEAM_MD
+				 , MAX(TO_NUMBER(NULLIF(MATR_TEAM_MD, ''))) AS MATR_TEAM_MD
+				 , MAX(TO_NUMBER(NULLIF(PROD_TEAM_MD, ''))) AS PROD_TEAM_MD
+			FROM TB_QM01P01
+			GROUP BY REQ_NO
+		)
+		, iss AS (
+			SELECT W.ISS_NO
+				 , W.ISS_SJ
+				 , W.ISS_STS
+				 , W.ACT_ID
+				 , W.REQ_NO
+				 , W.FILE_TRGT_KEY
+				 , W.ISS_CNTS
+				 , W.SALES_CD
+				 , W.CO_CD
+				 , W.SUB_CD
+				 , W.CREAT_DTTM
+				 , M.NAME			AS ACT_NM
+				 , S.CODE_NM		AS SUB_CD_NM
+				 , S.CODE_KIND		AS GRP_CD
+				 , G.CODE_NM		AS GRP_CD_NM
+				 , D.EQP_NM
+				 , D.MCTYPE
+				 , D.ORDRS_NO
+				 , M2.CODE_NM		AS MCTYPE_NM
+				 , C.ORDRS_CLNT_CD
+				 , B.CLNT_NM		AS ORDRS_CLNT_NM
+				 , C.CLNT_PJT
+				 , M3.CODE_NM		AS CLNT_PJT_NM
+				 , Q.REQ_ST
+				 , Q.REQ_RMK
+				 , Q.REG_ID
+				 , M4.CODE_NM		AS REQ_ST_NM
+				 , CASE WHEN ((W.ISS_STS = 'ISSSTS03') OR (Q.REQ_ST = 'REQST03')) THEN 'ISSSTS03'
+					    WHEN ((W.ISS_STS = 'ISSSTS02') OR (W.REQ_NO IS NOT NULL)) THEN 'ISSSTS02'
+					    ELSE 'ISSSTS01'
+				   END AS ISS_STS_CALC
+				 , NVL(
+					CASE
+					  WHEN W.REQ_NO IS NOT NULL THEN (SELECT SUM(ME.PCHS_AMT) FROM TB_SM12D01 ME WHERE ME.REQ_NO = W.REQ_NO)
+					  ELSE (SELECT SUM(TO_NUMBER(NVL(A.ACT_AMT, '0'))) FROM TB_WB24M03 A WHERE A.ISS_NO = W.ISS_NO)
+					END
+				  , 0) AS ISS_AMT
+				 , NVL(ACT.ACT_MH, 0) AS ACT_MH
+				 , NVL(ACT.SALE_TEAM_MD, NVL(QP.SALE_TEAM_MD, 0)) AS SALE_TEAM_MD
+				 , NVL(ACT.DSGN_TEAM_MD, NVL(QP.DSGN_TEAM_MD, 0)) AS DSGN_TEAM_MD
+				 , NVL(ACT.MATR_TEAM_MD, NVL(QP.MATR_TEAM_MD, 0)) AS MATR_TEAM_MD
+				 , NVL(ACT.PROD_TEAM_MD, NVL(QP.PROD_TEAM_MD, 0)) AS PROD_TEAM_MD
+				 , (COALESCE(ACT.SALE_TEAM_MD, QP.SALE_TEAM_MD, 0)
+					+ COALESCE(ACT.DSGN_TEAM_MD, QP.DSGN_TEAM_MD, 0)
+					+ COALESCE(ACT.MATR_TEAM_MD, QP.MATR_TEAM_MD, 0)
+					+ COALESCE(ACT.PROD_TEAM_MD, QP.PROD_TEAM_MD, 0)) AS SUM_TEAM_MD
+			FROM TB_WB24M02 W
+			LEFT JOIN TB_CM06M01 M ON M.ID = W.ACT_ID
+			LEFT JOIN TB_CM05M01 S ON S.CODE_ID = W.SUB_CD
+			LEFT JOIN TB_CM05M01 G ON G.CODE_ID = S.CODE_KIND
+			LEFT JOIN TB_CR02D02 D ON D.CO_CD = W.CO_CD AND D.SALES_CD = W.SALES_CD
+			LEFT JOIN TB_CM05M01 M2 ON M2.CODE_ID = D.MCTYPE
+			LEFT JOIN TB_CR02M01 C ON C.CO_CD = D.CO_CD AND C.ORDRS_NO = D.ORDRS_NO
+			LEFT JOIN TB_BM02M01 B ON B.CLNT_CD = C.ORDRS_CLNT_CD
+			LEFT JOIN TB_CM05M01 M3 ON M3.CODE_ID = C.CLNT_PJT
+			LEFT JOIN TB_QM01M01 Q ON Q.REQ_NO = W.REQ_NO
+			LEFT JOIN TB_CM05M01 M4 ON M4.CODE_ID = Q.REQ_ST
+			LEFT JOIN act_agg ACT ON ACT.ISS_NO = W.ISS_NO
+			LEFT JOIN qp_agg QP ON QP.REQ_NO = W.REQ_NO
+			WHERE W.ACT_ID = #{actId, jdbcType=VARCHAR}
+			<if test="coCd != null and coCd != ''">
+				AND W.CO_CD = #{coCd, jdbcType=VARCHAR}
+			</if>
+			<if test="fromDt != null and fromDt != ''">
+				AND W.CREAT_DTTM &gt;= TO_DATE(#{fromDt, jdbcType=VARCHAR},'YYYY-MM-DD')
+			</if>
+			<if test="toDt != null and toDt != ''">
+				AND W.CREAT_DTTM &lt; TO_DATE(#{toDt, jdbcType=VARCHAR},'YYYY-MM-DD') + 1
+			</if>
+		)
+		SELECT
+			   'ROOT_MASTER'		AS ID
+			 , '' 					AS PARENTID
+			 , 'ROOT' 				AS ISROOT
+			 , (SELECT NVL(M.NAME, #{actId}) FROM TB_CM06M01 M WHERE M.ID = #{actId, jdbcType=VARCHAR})	AS TOPIC
+			 , '' 					AS FILE_TRGT_KEY
+			 , '' 					AS CO_CD
+			 , '' 					AS ORDRS_NO
+			 , '' 					AS ORDRS_CLNT_NM
+			 , '' 					AS CLNT_PJT_NM
+			 , '' 					AS SALES_CD
+			 , '' 					AS MCTYPE_NM
+			 , '' 					AS ISS_NO
+			 , '' 					AS REQ_NO
+			 , '' 					AS ISS_STS
+			 , '' 					AS ISS_STS_NM
+			 , '' 					AS ACT_ID
+			 , '' 					AS ACT_NM
+			 , '' 					AS SUB_CD
+			 , '' 					AS SUB_CD_NM
+			 , '' 					AS GRP_CD
+			 , '' 					AS GRP_CD_NM
+			 , '' 					AS REG_ID
+			 , '' 					AS REQ_ST
+			 , '' 					AS REQ_ST_NM
+			 , '' 					AS ISS_CNTS
+			 , '' 					AS REQ_RMK
+			 , 0 					AS ISS_AMT
+			 , 0 					AS ACT_MH
+			 , 0 					AS SALE_TEAM_MD
+			 , 0 					AS DSGN_TEAM_MD
+			 , 0 					AS MATR_TEAM_MD
+			 , 0 					AS PROD_TEAM_MD
+			 , 0 					AS SUM_TEAM_MD
+			 , '1' 					AS DATA_TYPE
+			 , 'right' 				AS DIRECTION
+		FROM DUAL
+		UNION ALL
+		SELECT DISTINCT
+			   'G_' || NVL(GRP_CD,'NONE')	AS ID
+			 , 'ROOT_MASTER'		AS PARENTID
+			 , '' 					AS ISROOT
+			 , NVL(GRP_CD_NM,'미지정')	AS TOPIC
+			 , '' 					AS FILE_TRGT_KEY
+			 , '' 					AS CO_CD
+			 , '' 					AS ORDRS_NO
+			 , '' 					AS ORDRS_CLNT_NM
+			 , '' 					AS CLNT_PJT_NM
+			 , '' 					AS SALES_CD
+			 , '' 					AS MCTYPE_NM
+			 , '' 					AS ISS_NO
+			 , '' 					AS REQ_NO
+			 , '' 					AS ISS_STS
+			 , '' 					AS ISS_STS_NM
+			 , '' 					AS ACT_ID
+			 , '' 					AS ACT_NM
+			 , '' 					AS SUB_CD
+			 , '' 					AS SUB_CD_NM
+			 , GRP_CD
+			 , GRP_CD_NM
+			 , '' 					AS REG_ID
+			 , '' 					AS REQ_ST
+			 , '' 					AS REQ_ST_NM
+			 , '' 					AS ISS_CNTS
+			 , '' 					AS REQ_RMK
+			 , 0 					AS ISS_AMT
+			 , 0 					AS ACT_MH
+			 , 0 					AS SALE_TEAM_MD
+			 , 0 					AS DSGN_TEAM_MD
+			 , 0 					AS MATR_TEAM_MD
+			 , 0 					AS PROD_TEAM_MD
+			 , 0 					AS SUM_TEAM_MD
+			 , '7' 					AS DATA_TYPE
+			 , 'right' 				AS DIRECTION
+		FROM iss
+		UNION ALL
+		SELECT DISTINCT
+			   'T_' || NVL(SUB_CD,'NONE')	AS ID
+			 , 'G_' || NVL(GRP_CD,'NONE')	AS PARENTID
+			 , '' 					AS ISROOT
+			 , NVL(SUB_CD_NM,'미지정')	AS TOPIC
+			 , '' 					AS FILE_TRGT_KEY
+			 , '' 					AS CO_CD
+			 , '' 					AS ORDRS_NO
+			 , '' 					AS ORDRS_CLNT_NM
+			 , '' 					AS CLNT_PJT_NM
+			 , '' 					AS SALES_CD
+			 , '' 					AS MCTYPE_NM
+			 , '' 					AS ISS_NO
+			 , '' 					AS REQ_NO
+			 , '' 					AS ISS_STS
+			 , '' 					AS ISS_STS_NM
+			 , '' 					AS ACT_ID
+			 , '' 					AS ACT_NM
+			 , SUB_CD
+			 , SUB_CD_NM
+			 , GRP_CD
+			 , GRP_CD_NM
+			 , '' 					AS REG_ID
+			 , '' 					AS REQ_ST
+			 , '' 					AS REQ_ST_NM
+			 , '' 					AS ISS_CNTS
+			 , '' 					AS REQ_RMK
+			 , 0 					AS ISS_AMT
+			 , 0 					AS ACT_MH
+			 , 0 					AS SALE_TEAM_MD
+			 , 0 					AS DSGN_TEAM_MD
+			 , 0 					AS MATR_TEAM_MD
+			 , 0 					AS PROD_TEAM_MD
+			 , 0 					AS SUM_TEAM_MD
+			 , '8' 					AS DATA_TYPE
+			 , 'right' 				AS DIRECTION
+		FROM iss
+		UNION ALL
+		SELECT
+			   ISS_NO || 'T'		AS ID
+			 , 'T_' || NVL(SUB_CD,'NONE')	AS PARENTID
+			 , '' 					AS ISROOT
+			 , ISS_SJ	            AS TOPIC
+			 , FILE_TRGT_KEY
+			 , CO_CD
+			 , ORDRS_NO
+			 , ORDRS_CLNT_NM
+			 , CLNT_PJT_NM
+			 , SALES_CD
+			 , MCTYPE_NM
+			 , ISS_NO
+			 , REQ_NO
+			 , ISS_STS_CALC			AS ISS_STS
+			 , CASE WHEN ISS_STS_CALC='ISSSTS03' THEN (SELECT CODE_NM FROM TB_CM05M01 WHERE CODE_ID = 'ISSSTS03')
+					WHEN ISS_STS_CALC='ISSSTS02' THEN (SELECT CODE_NM FROM TB_CM05M01 WHERE CODE_ID = 'ISSSTS02')
+					ELSE (SELECT CODE_NM FROM TB_CM05M01 WHERE CODE_ID = 'ISSSTS01')
+			   END						AS ISS_STS_NM
+			 , ACT_ID
+			 , ACT_NM
+			 , SUB_CD
+			 , SUB_CD_NM
+			 , GRP_CD
+			 , GRP_CD_NM
+			 , '' 					AS REG_ID
+			 , '' 					AS REQ_ST
+			 , '' 					AS REQ_ST_NM
+			 , ISS_CNTS
+			 , '' 					AS REQ_RMK
+			 , ISS_AMT
+			 , ACT_MH
+			 , SALE_TEAM_MD
+			 , DSGN_TEAM_MD
+			 , MATR_TEAM_MD
+			 , PROD_TEAM_MD
+			 , SUM_TEAM_MD
+			 , '4' 					AS DATA_TYPE
+			 , 'right' 				AS DIRECTION
+		FROM iss
+		UNION ALL
+		SELECT
+			   REQ_NO || 'T'		AS ID
+			 , ISS_NO || 'T'		AS PARENTID
+			 , '' 					AS ISROOT
+			 , REQ_NO	            AS TOPIC
+			 , FILE_TRGT_KEY
+			 , CO_CD
+			 , ORDRS_NO
+			 , ORDRS_CLNT_NM
+			 , CLNT_PJT_NM
+			 , SALES_CD
+			 , MCTYPE_NM
+			 , ISS_NO
+			 , REQ_NO
+			 , ISS_STS_CALC			AS ISS_STS
+			 , CASE WHEN ISS_STS_CALC='ISSSTS03' THEN (SELECT CODE_NM FROM TB_CM05M01 WHERE CODE_ID = 'ISSSTS03')
+					WHEN ISS_STS_CALC='ISSSTS02' THEN (SELECT CODE_NM FROM TB_CM05M01 WHERE CODE_ID = 'ISSSTS02')
+					ELSE (SELECT CODE_NM FROM TB_CM05M01 WHERE CODE_ID = 'ISSSTS01')
+			   END						AS ISS_STS_NM
+			 , ACT_ID
+			 , ACT_NM
+			 , SUB_CD
+			 , SUB_CD_NM
+			 , GRP_CD
+			 , GRP_CD_NM
+			 , REG_ID
+			 , REQ_ST
+			 , REQ_ST_NM
+			 , '' 					AS ISS_CNTS
+			 , REQ_RMK
+			 , ISS_AMT
+			 , ACT_MH
+			 , SALE_TEAM_MD
+			 , DSGN_TEAM_MD
+			 , MATR_TEAM_MD
+			 , PROD_TEAM_MD
+			 , SUM_TEAM_MD
+			 , '5' 					AS DATA_TYPE
+			 , 'right' 				AS DIRECTION
+		FROM iss
+		WHERE REQ_NO IS NOT NULL
+		UNION ALL
+		SELECT DISTINCT
+			   NVL(ORDRS_NO,'NONE') || 'E'	AS ID
+			 , 'ROOT_MASTER'		AS PARENTID
+			 , '' 					AS ISROOT
+			 , CASE WHEN ORDRS_CLNT_NM IS NULL AND CLNT_PJT_NM IS NULL THEN '미지정'
+					ELSE NVL(ORDRS_CLNT_NM,'') || '_' || NVL(CLNT_PJT_NM,'')
+			   END						AS TOPIC
+			 , '' 					AS FILE_TRGT_KEY
+			 , CO_CD
+			 , ORDRS_NO
+			 , ORDRS_CLNT_NM
+			 , CLNT_PJT_NM
+			 , '' 					AS SALES_CD
+			 , '' 					AS MCTYPE_NM
+			 , '' 					AS ISS_NO
+			 , '' 					AS REQ_NO
+			 , '' 					AS ISS_STS
+			 , '' 					AS ISS_STS_NM
+			 , '' 					AS ACT_ID
+			 , '' 					AS ACT_NM
+			 , '' 					AS SUB_CD
+			 , '' 					AS SUB_CD_NM
+			 , '' 					AS GRP_CD
+			 , '' 					AS GRP_CD_NM
+			 , '' 					AS REG_ID
+			 , '' 					AS REQ_ST
+			 , '' 					AS REQ_ST_NM
+			 , '' 					AS ISS_CNTS
+			 , '' 					AS REQ_RMK
+			 , 0 					AS ISS_AMT
+			 , 0 					AS ACT_MH
+			 , 0 					AS SALE_TEAM_MD
+			 , 0 					AS DSGN_TEAM_MD
+			 , 0 					AS MATR_TEAM_MD
+			 , 0 					AS PROD_TEAM_MD
+			 , 0 					AS SUM_TEAM_MD
+			 , '2' 					AS DATA_TYPE
+			 , 'left' 				AS DIRECTION
+		FROM iss
+		UNION ALL
+		SELECT DISTINCT
+			   NVL(SALES_CD,'NONE') || 'E'	AS ID
+			 , NVL(ORDRS_NO,'NONE') || 'E'	AS PARENTID
+			 , '' 					AS ISROOT
+			 , COALESCE(EQP_NM, SALES_CD, '미지정')	AS TOPIC
+			 , '' 					AS FILE_TRGT_KEY
+			 , CO_CD
+			 , ORDRS_NO
+			 , ORDRS_CLNT_NM
+			 , CLNT_PJT_NM
+			 , SALES_CD
+			 , MCTYPE_NM
+			 , '' 					AS ISS_NO
+			 , '' 					AS REQ_NO
+			 , '' 					AS ISS_STS
+			 , '' 					AS ISS_STS_NM
+			 , '' 					AS ACT_ID
+			 , '' 					AS ACT_NM
+			 , '' 					AS SUB_CD
+			 , '' 					AS SUB_CD_NM
+			 , '' 					AS GRP_CD
+			 , '' 					AS GRP_CD_NM
+			 , '' 					AS REG_ID
+			 , '' 					AS REQ_ST
+			 , '' 					AS REQ_ST_NM
+			 , '' 					AS ISS_CNTS
+			 , '' 					AS REQ_RMK
+			 , 0 					AS ISS_AMT
+			 , 0 					AS ACT_MH
+			 , 0 					AS SALE_TEAM_MD
+			 , 0 					AS DSGN_TEAM_MD
+			 , 0 					AS MATR_TEAM_MD
+			 , 0 					AS PROD_TEAM_MD
+			 , 0 					AS SUM_TEAM_MD
+			 , '3' 					AS DATA_TYPE
+			 , 'left' 				AS DIRECTION
+		FROM iss
+		UNION ALL
+		SELECT
+			   ISS_NO || 'E'		AS ID
+			 , NVL(SALES_CD,'NONE') || 'E'	AS PARENTID
+			 , '' 					AS ISROOT
+			 , ISS_SJ	            AS TOPIC
+			 , FILE_TRGT_KEY
+			 , CO_CD
+			 , ORDRS_NO
+			 , ORDRS_CLNT_NM
+			 , CLNT_PJT_NM
+			 , SALES_CD
+			 , MCTYPE_NM
+			 , ISS_NO
+			 , REQ_NO
+			 , ISS_STS_CALC			AS ISS_STS
+			 , CASE WHEN ISS_STS_CALC='ISSSTS03' THEN (SELECT CODE_NM FROM TB_CM05M01 WHERE CODE_ID = 'ISSSTS03')
+					WHEN ISS_STS_CALC='ISSSTS02' THEN (SELECT CODE_NM FROM TB_CM05M01 WHERE CODE_ID = 'ISSSTS02')
+					ELSE (SELECT CODE_NM FROM TB_CM05M01 WHERE CODE_ID = 'ISSSTS01')
+			   END						AS ISS_STS_NM
+			 , ACT_ID
+			 , ACT_NM
+			 , SUB_CD
+			 , SUB_CD_NM
+			 , GRP_CD
+			 , GRP_CD_NM
+			 , '' 					AS REG_ID
+			 , '' 					AS REQ_ST
+			 , '' 					AS REQ_ST_NM
+			 , ISS_CNTS
+			 , '' 					AS REQ_RMK
+			 , ISS_AMT
+			 , ACT_MH
+			 , SALE_TEAM_MD
+			 , DSGN_TEAM_MD
+			 , MATR_TEAM_MD
+			 , PROD_TEAM_MD
+			 , SUM_TEAM_MD
+			 , '4' 					AS DATA_TYPE
+			 , 'left' 				AS DIRECTION
+		FROM iss
+		UNION ALL
+		SELECT
+			   REQ_NO || 'E'		AS ID
+			 , ISS_NO || 'E'		AS PARENTID
+			 , '' 					AS ISROOT
+			 , REQ_NO	            AS TOPIC
+			 , FILE_TRGT_KEY
+			 , CO_CD
+			 , ORDRS_NO
+			 , ORDRS_CLNT_NM
+			 , CLNT_PJT_NM
+			 , SALES_CD
+			 , MCTYPE_NM
+			 , ISS_NO
+			 , REQ_NO
+			 , ISS_STS_CALC			AS ISS_STS
+			 , CASE WHEN ISS_STS_CALC='ISSSTS03' THEN (SELECT CODE_NM FROM TB_CM05M01 WHERE CODE_ID = 'ISSSTS03')
+					WHEN ISS_STS_CALC='ISSSTS02' THEN (SELECT CODE_NM FROM TB_CM05M01 WHERE CODE_ID = 'ISSSTS02')
+					ELSE (SELECT CODE_NM FROM TB_CM05M01 WHERE CODE_ID = 'ISSSTS01')
+			   END						AS ISS_STS_NM
+			 , ACT_ID
+			 , ACT_NM
+			 , SUB_CD
+			 , SUB_CD_NM
+			 , GRP_CD
+			 , GRP_CD_NM
+			 , REG_ID
+			 , REQ_ST
+			 , REQ_ST_NM
+			 , '' 					AS ISS_CNTS
+			 , REQ_RMK
+			 , ISS_AMT
+			 , ACT_MH
+			 , SALE_TEAM_MD
+			 , DSGN_TEAM_MD
+			 , MATR_TEAM_MD
+			 , PROD_TEAM_MD
+			 , SUM_TEAM_MD
+			 , '5' 					AS DATA_TYPE
+			 , 'left' 				AS DIRECTION
+		FROM iss
+		WHERE REQ_NO IS NOT NULL
+	</select>
+
     <select id="selectAgendaList" parameterType="Map" resultType="CamelMap">
         WITH agenda AS (
             SELECT M.FILE_TRGT_KEY

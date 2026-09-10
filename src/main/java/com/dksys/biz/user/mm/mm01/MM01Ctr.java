@@ -52,4 +52,18 @@ public class MM01Ctr {
 		}
 		return "jsonView";
 	}
+
+	@PostMapping(value = "/selectMindMapByUserList")
+	public String selectMindMapByUserList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		try {
+			List<Map<String, String>> mindMapData = mm01Svc.selectMindMapByUserList(paramMap);
+			model.addAttribute("mindMapData", mindMapData);
+			model.addAttribute("resultCode", 200);
+			model.addAttribute("resultMessage", messageUtils.getMessage("select"));
+		} catch (Exception e) {
+			model.addAttribute("resultCode", 500);
+			model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+		}
+		return "jsonView";
+	}
 }

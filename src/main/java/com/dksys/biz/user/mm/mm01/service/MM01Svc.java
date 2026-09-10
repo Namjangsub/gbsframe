@@ -7,6 +7,8 @@ public interface MM01Svc {
 
 	List<Map<String, String>> selectMindMapList(Map<String, String> paramMap);
 
+	List<Map<String, String>> selectMindMapByUserList(Map<String, String> paramMap);
+
 	List<Map<String, String>> selectAgendaList(Map<String, String> paramMap);
 
 }
