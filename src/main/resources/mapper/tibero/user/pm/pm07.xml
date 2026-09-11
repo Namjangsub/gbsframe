@@ -808,19 +808,21 @@
 			LEFT OUTER JOIN TB_PM07M02 M ON M.YY = #{yy} AND M.USER_ID = U.ID
 			LEFT OUTER JOIN TB_CM04M01 D ON D.DEPT_ID = SUBSTR(NVL(U.VIEW_DEPT_ID, U.DEPT_ID), 1, 5)
 			<include refid="joinAnnualSubstAndUsage"/>
-			/* 포상휴가 지급 합계 (하계휴가대체 PM07M04TYPE51 제외) */
+			/* 포상휴가 발생(지급) 합계 : GRANT_YY(지급연도) 가 아니라 유효기간(ST_DT~ED_DT) 기준.
+			   현재일자(SYSDATE)가 사용가능시작일~사용가능종료일 사이인 지급건의 GRANT_DAYS 만 합산한다.
+			   (하계휴가대체 PM07M04TYPE51 제외) */
 			LEFT OUTER JOIN (
 				SELECT
 					AWD.USER_ID,
 					SUM(AWD.GRANT_DAYS) AS AWARD_GRANT_DAYS
 				FROM TB_PM07M04 AWD
 				WHERE AWD.AWARD_TYPE_CD != 'PM07M04TYPE51'
-				<if test="yy != null and !yy.equals('')">
-				  AND AWD.GRANT_YY = #{yy}
-				</if>
+				  AND AWD.ST_DT IS NOT NULL AND AWD.ED_DT IS NOT NULL
+				  AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN REPLACE(AWD.ST_DT, '-', '') AND REPLACE(AWD.ED_DT, '-', '')
 				GROUP BY AWD.USER_ID
 			) AW_CNT ON AW_CNT.USER_ID = U.ID
-			/* 포상휴가 실사용 합계 (PM07TYPE07/08, 승인완료(END) 건만, 포상휴가 지급건의 유효기간 내 사용분만 인정) */
+			/* 포상휴가 실사용 합계 (PM07TYPE07/08) : 현재일자 기준으로 유효한 지급건의 유효기간(ST_DT~ED_DT) 내
+			   사용분만 인정. 발생과 동일하게 지급연도가 아니라 현재일자 유효기간 기준으로 집계한다. */
 			LEFT OUTER JOIN (
 				SELECT V.REQ_ID, SUM(V.DEDUCT_DAYS) AS AWARD_USED_DAYS
 				FROM TB_PM07M01 V
@@ -829,9 +831,8 @@
 					  SELECT 1 FROM TB_PM07M04 G2
 					  WHERE G2.USER_ID = V.REQ_ID
 					    AND G2.AWARD_TYPE_CD != 'PM07M04TYPE51'
-					  <if test="yy != null and !yy.equals('')">
-						AND G2.GRANT_YY = #{yy}
-					  </if>
+					    AND G2.ST_DT IS NOT NULL AND G2.ED_DT IS NOT NULL
+					    AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN REPLACE(G2.ST_DT, '-', '') AND REPLACE(G2.ED_DT, '-', '')
 					    AND REPLACE(V.ST_DT, '-', '') BETWEEN REPLACE(G2.ST_DT, '-', '') AND REPLACE(G2.ED_DT, '-', '')
 				  )
 				GROUP BY V.REQ_ID
