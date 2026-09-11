@@ -130,9 +130,40 @@
 	$(document).ready(function() {
 		loadAwardTypeCodeList();
 		initAwardGrid();
+		bindAwardGridDblClick();
 		setAwardGrantYy();
 		searchAwardGrid();
 	});
+
+	// 그리드 컨테이너에 직접 건 더블클릭 처리 (AX5-Grid body.onDBLClick 우회 - PM3001M01의
+	// bindDetailGroupDblClick 과 동일 패턴). 사번/성명 셀은 사용자검색, 사용가능시작/종료일 셀은
+	// 날짜피커를 연다. 컨테이너에 위임(delegate)으로 걸어 그리드 재렌더 후에도 유지된다.
+	function bindAwardGridDblClick() {
+		var $grid = $('[data-ax5grid="awardGrid"]');
+		$grid.off('dblclick.awardGrid').on('dblclick.awardGrid', '[data-ax5grid-column-attr]', function() {
+			var colIndexAttr = this.getAttribute('data-ax5grid-column-colIndex');
+			// 정렬(sortable:true) 시 data-ax5grid-data-index 는 정렬본(proxyList) 기준이라
+			// 원본 list 와 어긋난다. 원본 기준 인덱스인 data-ax5grid-data-o-index 를 써야 한다.
+			var oIndexAttr = this.getAttribute('data-ax5grid-data-o-index');
+			if (colIndexAttr === null || oIndexAttr === null) return;
+			var colIndex = Number(colIndexAttr);
+			var dindex = Number(oIndexAttr);
+			if (isNaN(colIndex) || isNaN(dindex)) return;
+
+			var colGroup = awardGridView.target.colGroup || [];
+			var col = colGroup[colIndex];
+			if (!col || !col.key) return;
+
+			var item = awardGridView.target.list && awardGridView.target.list[dindex];
+			if (!item) return;
+
+			if (col.key === "empNo" || col.key === "empNm") {
+				openAwardUserSearch(dindex);
+			} else if (col.key === "stDt" || col.key === "edDt") {
+				openAwardDatePicker(dindex, item);
+			}
+		});
+	}
 
 	// 공통코드 동기 조회
 	function loadAwardTypeCodeList() {
@@ -211,16 +242,13 @@
 							window.awardGridLastClickRow = this.dindex;
 							window.awardGridLastClickCol = this.colIndex;
 						},
-						onDBLClick : function() {
-							// 사원ID/성명 셀 더블클릭 시 사용자 검색 팝업
-							if (this.column.key === "empNo" || this.column.key === "empNm") {
-								openAwardUserSearch(this.dindex);
-							}
-							// 사용가능시작일/종료일 셀 더블클릭 시 시작~종료를 한 번에 선택하는 날짜피커
-							if (this.column.key === "stDt" || this.column.key === "edDt") {
-								openAwardDatePicker(this.dindex, this.item);
-							}
-						},
+						// 더블클릭(사원검색·날짜피커)은 AX5-Grid의 body.onDBLClick 이 아니라
+						// 그리드 컨테이너에 직접 건 jQuery dblclick(bindAwardGridDblClick)으로 처리한다.
+						// AX5-Grid의 onDBLClick 이 특정 환경/셀에서 발동하지 않는 사례가 있어(PM3001M01
+						// 동일 이슈, docs/AX5-Grid.md §12.3 각주), 렌더된 <td> 에 직접 건 dblclick 이
+						// 훨씬 안정적이다. onDBLClick 을 여기 두면 두 경로가 동시에 발동해 모달이 이중으로
+						// 열릴 수 있으므로 일부러 비워둔다.
+						onDBLClick : function() {},
 						onDataChanged : function() {
 							if (this.item && this.item.__status !== "C") {
 								this.item.__status = "U";
