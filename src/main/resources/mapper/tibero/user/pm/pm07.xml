@@ -1282,11 +1282,47 @@
 			M.GRANT_DAYS,
 			TO_CHAR(TO_DATE(M.ST_DT, 'YYYYMMDD'), 'YYYY-MM-DD') AS ST_DT,
 			TO_CHAR(TO_DATE(M.ED_DT, 'YYYYMMDD'), 'YYYY-MM-DD') AS ED_DT,
+			NVL(U_STAT.USED_DAYS, 0) AS USED_DAYS,
+			U_STAT.VAC_INFO_LIST,
 			M.RMK,
 			M.CREAT_ID,
 			TO_CHAR(M.CREAT_DTTM, 'YYYY-MM-DD HH24:MI:SS') AS CREAT_DTTM
 		FROM TB_PM07M04 M
 		LEFT JOIN TB_CM05M01 C ON M.AWARD_TYPE_CD = C.CODE_ID
+		LEFT OUTER JOIN (
+			SELECT
+				M2.GRANT_YY,
+				M2.EMP_NO,
+				M2.AWARD_TYPE_CD,
+				SUM(V.DEDUCT_DAYS) AS USED_DAYS,
+				LISTAGG(
+					SUBSTR(REPLACE(V.ST_DT, '-', ''), 1, 4) || '-' ||
+					SUBSTR(REPLACE(V.ST_DT, '-', ''), 5, 2) || '-' ||
+					SUBSTR(REPLACE(V.ST_DT, '-', ''), 7, 2) ||
+					CASE
+						WHEN V.ED_DT IS NOT NULL AND REPLACE(V.ED_DT, '-', '') != REPLACE(V.ST_DT, '-', '')
+						THEN '~' || SUBSTR(REPLACE(V.ED_DT, '-', ''), 5, 2) || '-' || SUBSTR(REPLACE(V.ED_DT, '-', ''), 7, 2)
+						ELSE ''
+					END ||
+					' (' || NVL(VC.CODE_NM, V.VAC_TYPE_CD) || ' ' || V.DEDUCT_DAYS || '일)',
+					'; '
+				) WITHIN GROUP (ORDER BY V.ST_DT ASC) AS VAC_INFO_LIST
+			FROM TB_PM07M04 M2
+			JOIN TB_PM07M01 V ON V.REQ_ID = NVL(M2.USER_ID, (SELECT ID FROM TB_CM06M01 WHERE EMP_NO = M2.EMP_NO AND ROWNUM = 1))
+			                 AND (
+			                     (M2.AWARD_TYPE_CD = 'PM07M04TYPE51' AND V.VAC_TYPE_CD = 'PM07TYPE09')
+			                     OR
+			                     (M2.AWARD_TYPE_CD != 'PM07M04TYPE51' AND V.VAC_TYPE_CD IN ('PM07TYPE07','PM07TYPE08'))
+			                 )
+			                 AND REPLACE(V.ST_DT, '-', '') BETWEEN REPLACE(M2.ST_DT, '-', '') AND REPLACE(M2.ED_DT, '-', '')
+			                 AND (V.SANCTN_STS IS NULL OR (V.SANCTN_STS != 'N' AND V.SANCTN_STS != 'RTN'))
+			LEFT JOIN TB_CM05M01 VC ON V.VAC_TYPE_CD = VC.CODE_ID
+			WHERE 1=1
+			<if test="grantYy != null and !grantYy.equals('')">
+			  AND M2.GRANT_YY = #{grantYy}
+			</if>
+			GROUP BY M2.GRANT_YY, M2.EMP_NO, M2.AWARD_TYPE_CD
+		) U_STAT ON U_STAT.GRANT_YY = M.GRANT_YY AND U_STAT.EMP_NO = M.EMP_NO AND U_STAT.AWARD_TYPE_CD = M.AWARD_TYPE_CD
 		WHERE 1=1
 		<if test="coCd != null and !coCd.equals('')">
 		  AND M.CO_CD = #{coCd}
