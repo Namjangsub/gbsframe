@@ -127,7 +127,7 @@
 					<div class="search_form" style="display: flex; align-items: center;">
 						<input type="hidden" id="actId_S" name="actId_S" data-search="actId">
 						<input type="text" id="actNm_S" name="actNm_S" readonly style="flex:1;">
-						<a onclick="userSearch();"><i class="i_search_w"></i></a>
+						<a id="actSearchBtn" onclick="userSearch();"><i class="i_search_w"></i></a>
 					</div>
                 </td>
 				<th>기간</th>
@@ -151,7 +151,7 @@
     <div style="position: relative; height: 100%;">
         <!-- 마인드맵 조작 안내 가이드 -->
         <div id="jsmind_guide" style="position: absolute; top: 10px; left: 10px; z-index: 1; color: #888; font-size: 11px; font-weight: normal; pointer-events: none; background: rgba(244, 244, 244, 0.85); padding: 3px 6px; border-radius: 3px; border: 1px solid #ddd; line-height: 1.2;">
-            <i class="fa fa-info-circle" style="color: #bbb; margin-right: 4px;"></i>사용법: ctrl+마우스스크롤(확대/축소), SpaceBar+마우스왼쪽클릭(마인드맵이동), 더블클릭(접기/펼치기), Ctrl+더블클릭(상세팝업)
+            <i class="fa fa-info-circle" style="color: #bbb; margin-right: 4px;"></i>사용법: ctrl+마우스스크롤(확대/축소), SpaceBar+마우스왼쪽클릭(마인드맵이동), 더블클릭(하위노드 접기/펼치기, 말단노드는 상세조회)
         </div>
         <div id="jsmind_container" style="height: calc(100% - 40px);"></div>
     </div>
@@ -259,26 +259,18 @@
  		$('#main_area').toggleClass('on');
 
 
- 		// Load Parameters (Prioritize LocalStorage, Fallback to URL)
-        var storedParams = localStorage.getItem("MM0104M01_PARAMS");
-        var hasStoredParams = false;
+ 		// [권한] AUTH001 권한이 있어야 담당자 선택/변경 가능. 그 외에는 로그인 사용자로 고정.
+        var canChangeAct = !!(jwt.authInfo && jwt.authInfo.indexOf('AUTH001') > -1);
 
-        if (storedParams) {
-            try {
-                var params = JSON.parse(storedParams);
-                if (params.actId) {
-                    $('#actId_S').val(params.actId);
-                    $('#actNm_S').val(params.actNm || '');
-                    hasStoredParams = true;
-                }
-                if (params.coCd) $('#coCd_S').val(params.coCd);
-            } catch(e) {
-                console.error("Param Parse Error", e);
-            }
-        }
-
-        if (!hasStoredParams) {
-            // Fallback to URL Params
+        if (!canChangeAct) {
+            // 담당자 변경 불가: 검색 아이콘 숨기고 로그인 사용자로 고정
+            $('#actSearchBtn').hide();
+            $('#actId_S').val(jwt.userId);
+            $('#actNm_S').val(jwt.userNm);
+        } else {
+            // 담당자 변경 가능: 다른 화면에서 명시적으로 전달한 URL 파라미터가 있으면 그 담당자를 사용.
+            // (브라우저에 남아있는 이전 검색 이력(localStorage)은 로그인 사용자가 바뀌어도 그대로 남아
+            //  화면을 열 때마다 엉뚱한 담당자가 기본값으로 보이는 문제가 있어 초기 로딩에는 사용하지 않는다.)
     		const urlParams = new URLSearchParams(window.location.search);
     		const actId = urlParams.get('actId') || "";
     		const actNm = urlParams.get('actNm') || "";
@@ -288,6 +280,12 @@
     		    $('#actNm_S').val(actNm);
     		}
     		if (coCd) $('#coCd_S').val(coCd);
+
+            // Set default user if not already set
+            if (!$('#actId_S').val()) {
+                $('#actId_S').val(jwt.userId);
+                $('#actNm_S').val(jwt.userNm);
+            }
         }
 
         // Set default dates if not already set
@@ -296,12 +294,6 @@
         }
         if (!$('#toDt_S').val()) {
             $('#toDt_S').val(moment().format('YYYY-MM-DD'));
-        }
-
-        // Set default user if not already set
-        if (!$('#actId_S').val()) {
-            $('#actId_S').val(jwt.userId);
-            $('#actNm_S').val(jwt.userNm);
         }
 
         // Initial load
@@ -345,11 +337,10 @@
             // Ensure dataType matches robustly
             var dataType = (data && data.dataType) ? String(data.dataType) : "";
 
-            // [접기/펼치기] 일반 더블클릭은 하위 노드 토글, 팝업은 Ctrl+더블클릭
-            if (!e.ctrlKey) {
-                if (node.children && node.children.length > 0) {
-                    jm.toggle_node(nodeid);
-                }
+            // [접기/펼치기 vs 상세조회] 자식이 있는 노드는 더블클릭 시 접기/펼치기,
+            // 마지막(자식이 없는 말단) 노드는 더블클릭 시 해당 자료 상세 팝업을 연다.
+            if (node.children && node.children.length > 0) {
+                jm.toggle_node(nodeid);
                 return;
             }
 
@@ -1082,6 +1073,8 @@
 
      // User Search Modal
      function userSearch() {
+         // [권한] AUTH001 권한이 없으면 담당자 변경 불가
+         if (!(jwt.authInfo && jwt.authInfo.indexOf('AUTH001') > -1)) { return; }
          openSecondModal("/static/html/cmn/modal/userSearch.html", 450, 650, "담당자 검색", {
              coCd: $('#coCd_S').val() || jwt.coCd,
              userId: $('#actId_S').val(),
@@ -1092,13 +1085,6 @@
              var node = tree.get_node(id);
              $('#actId_S').val(node.id);
              $('#actNm_S').val(node.text);
-
-             // Save to localStorage
-             localStorage.setItem("MM0104M01_PARAMS", JSON.stringify({
-                 actId: node.id,
-                 actNm: node.text,
-                 coCd: $('#coCd_S').val() || jwt.coCd
-             }));
 
              load_jsmind();
          });
