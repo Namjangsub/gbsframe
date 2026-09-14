@@ -637,7 +637,9 @@ function loadWbsData(opt, callback){
         wbsPlanCodeKind: item.wbsPlanCodeKind,
         wbsRsltsNo: item.wbsRsltsNo || item.wbsPlanCodeId, // 기본값은 PlanCodeId 사용
         _originalTitle: item.wbsPlanCodeNm || item.title || item.WBS_PLAN_CODE_NM || "Untitled",
-        endYn: item.endYn || 'N'
+        endYn: item.endYn || 'N',
+        closeYn: item.closeYn || item.CLOSE_YN || 'N',
+        rsltsCloseYn: item.rsltsCloseYn || item.RSLTS_CLOSE_YN || 'N'
       };
       STATE.tasks.set(t.id, t);
     });
@@ -1881,6 +1883,7 @@ function renderDetail(){
       <input class="inp" id="wbsPlanCodeNm" type="text" value="${escapeHtml(t.title)}" style="font-weight:900; font-size:15px; width:100%; border:1px solid transparent; background:transparent; padding:4px;" placeholder="TASK명 입력" />
       <div class="badges">
         <span class="${t.wbsPlanStsCodeId === 'WBSPLANSTS40' ? 'badge danger' : 'badge primary'}">${escapeHtml((t.status||"TODO")+" "+(t.progress||0)+"%")}</span>
+        ${t.parentId !== null ? (t.rsltsCloseYn === "Y" ? `<span class="badge ok" style="background:#059669; color:#fff;">실적확정</span>` : `<span class="badge" style="background:#6b7280; color:#fff;">실적미확정</span>`) : ``}
         ${t.planOverdueYn==="Y" ? `<span class="badge danger">기한경과(PLAN)</span>` : ``}
         ${t.planWarnYn==="Y" ? `<span class="badge warn">${escapeHtml(warnLabelPlan(t))}</span>` : ``}
       </div>
@@ -1991,8 +1994,12 @@ function renderDetail(){
       <textarea class="ta" id="wbsRsltsCnts" placeholder="특이사항을 입력하세요">${t.resultsCnts || ""}</textarea>
     </div>
 
-    <div style="display:flex; gap:8px;">
+    <div style="display:flex; flex-wrap:wrap; gap:6px; margin-top:8px;">
       <button class="btn primary ${(t._planDirty && (t._actDirty || t._metaDirty)) ? 'highlight-blue' : ''}" id="btnSaveMeta" ${!(t._planDirty && (t._actDirty || t._metaDirty)) ? 'disabled' : ''}>공통 저장</button>
+      ${t.parentId !== null ? `
+        <button class="btn primary" id="btnConfirmAct" ${t.rsltsCloseYn === 'Y' ? 'disabled' : ''} style="background-color: #2563eb; color: #fff;">실적확정</button>
+        <button class="btn" id="btnCancelConfirmAct" ${t.rsltsCloseYn !== 'Y' ? 'disabled' : ''} style="background-color: #4b5563; color: #fff;">확정취소</button>
+      ` : ``}
       <button class="btn" id="btnFocus">간트에서 보기</button>
     </div>
 
@@ -2520,6 +2527,164 @@ function renderDetail(){
     setToast("공통 저장 완료", {type:"ok", canUndo:true, autoHideMs:3000});
   }).catch(e => setToast("공통 저장 실패: " + e.message, {type:"err"}));
 });
+
+  // 실적확정
+  $("#btnConfirmAct").on("click", async () => {
+    if (t.parentId === null) {
+      alert("최상위 단계는 실적을 확정할 수 없습니다.");
+      return false;
+    }
+
+    if (t.rsltsCloseYn === "Y") {
+      alert("이미 실적이 확정된 상태입니다.");
+      return false;
+    }
+
+    // 화면의 현재 입력값 수집
+    const ns = $("#wbsPlanStsCodeId").val();
+    const nap = Math.min(100, Math.max(0, Number($("#actProgress").val() || 0)));
+    const nr = $("#wbsRsltsCnts").val();
+    const nem = $("#wbsRsltsMh").val();
+    const nrf = $("#revisedFinishDt").val();
+    const rsDt = $("#wbsRsltsSDt").val() || t.actStartAt;
+    const reDt = $("#wbsRsltsEDt").val() || t.actEndAt;
+
+    // 진척률 100% 필수 검사
+    if (nap < 100) {
+      alert("진척율이 100% 미만일 경우 실적 확정이 불가합니다.");
+      return;
+    }
+
+    // 실적 시작일자 필수 검사
+    if (!rsDt) {
+      alert("실적 시작일자가 입력되어야 확정 가능합니다.");
+      return;
+    }
+
+    // 상태가 지연인 경우 완료예정일 검사
+    if (ns === "WBSPLANSTS30" && !nrf) {
+      alert("상태가 '지연'인 경우 완료예정일은 필수입니다.");
+      return;
+    }
+
+    if (!confirm("실적 내용을 저장하고 확정하시겠습니까?")) {
+      return;
+    }
+
+    pushUndoSnapshot();
+
+    // 입력값 로컬 반영
+    t.status = STS_NAME[ns] || t.status;
+    t.wbsPlanStsCodeId = ns || t.wbsPlanStsCodeId;
+    t.actProgress = nap;
+    t.progress = nap;
+    t.resultsCnts = nr;
+    t.wbsRsltsMh = nem;
+    t.revisedFinishDt = nrf;
+    t.actStartAt = rsDt;
+    t.actEndAt = reDt || toYmd(new Date());
+
+    try {
+      setToast("실적 저장 및 확정 처리 중...", { type: "ok", autoHideMs: 1500 });
+      
+      // 1) 공통 실적/메타 정보 서버 저장 (신규 실적인 경우 실적번호 및 키 채번됨)
+      await saveToServer({
+        taskId: t.id,
+        barType: "META",
+        editType: "DETAIL_META",
+        status: t.status,
+        progress: t.actProgress,
+        resultsCnts: t.resultsCnts,
+        expectMh: t.expectMh,
+        wbsRsltsMh: t.wbsRsltsMh
+      });
+
+      // 2) 실적확정 API 호출
+      const formData = new FormData();
+      formData.append("flag", "Y");
+      formData.append("coCd", t.coCd || $("#coCd").val() || "GUN");
+      formData.append("salesCd", $("#salesCd_H").val() || $("#salesCd_S").val());
+      formData.append("wbsPlanVerNo", t.verNo || "1");
+      formData.append("wbsRsltsNo", t.wbsRsltsNo || t.wbsPlanNo || "");
+      formData.append("rsltsFileTrgtKey", t.rsltsFileTrgtKey || "");
+      formData.append("userId", jwt.userId || $("#userId").val());
+      formData.append("pgmId", "WB0604M01");
+      formData.append("dwgNo", $("#salesCd_H").val() || $("#salesCd_S").val());
+      formData.append("wbsPlanCodeKind", t.wbsPlanCodeKind || "");
+      formData.append("prdtGrp", t.prdtGrp || "");
+      formData.append("equipNm", t.equipNm || t.eqpNm || "");
+      formData.append("clntCd", t.clntCd || "");
+      formData.append("clntNm", t.clntNm || "");
+      formData.append("dsgnEmpCd", t.wbsPlanMngId || "");
+      formData.append("dsgnEmpNm", t.wbsPlanMngNm || "");
+      formData.append("startDt", t.actStartAt || "");
+      formData.append("relDt", t.actEndAt || "");
+      formData.append("remark", "일정관리에서 자동생성");
+      formData.append("codeId", "SPECRTS05");
+
+      filePostAjax("/user/wb/wb22/wbsRsltsconfirm", formData, function(data) {
+        if (data && data.resultCode == 200) {
+          t.rsltsCloseYn = "Y";
+          t._metaDirty = false;
+          t._actDirty = false;
+          t._planDirty = false;
+          setToast("실적확정이 완료되었습니다.", { type: "ok", autoHideMs: 2500 });
+          loadWbsData({ keepZoom: true });
+        } else {
+          const msg = (data && (data.resultMessage || data.msg)) || "확정 처리에 실패하였습니다.";
+          setToast("실적확정 실패: " + msg, { type: "err" });
+        }
+      });
+    } catch (e) {
+      setToast("실적확정 처리 실패: " + e.message, { type: "err" });
+    }
+  });
+
+  // 확정취소
+  $("#btnCancelConfirmAct").on("click", () => {
+    if (t.parentId === null) {
+      alert("최상위 단계는 확정 취소할 수 없습니다.");
+      return;
+    }
+
+    if (t.rsltsCloseYn !== "Y") {
+      alert("미확정 상태입니다.");
+      return;
+    }
+
+    if (!t.rsltsFileTrgtKey || t.rsltsFileTrgtKey === 0) {
+      alert("실적정보가 존재하지 않습니다.");
+      return;
+    }
+
+    if (!confirm("확정 취소하시겠습니까?")) {
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append("flag", "N");
+    formData.append("coCd", t.coCd || $("#coCd").val() || "GUN");
+    formData.append("wbsPlanVerNo", t.verNo || "1");
+    formData.append("wbsRsltsNo", t.wbsRsltsNo || t.wbsPlanNo || "");
+    formData.append("rsltsFileTrgtKey", t.rsltsFileTrgtKey);
+    formData.append("userId", jwt.userId || $("#userId").val());
+    formData.append("pgmId", "WB0604M01");
+    formData.append("dwgNo", $("#salesCd_H").val() || $("#salesCd_S").val());
+    formData.append("salesCd", $("#salesCd_H").val() || $("#salesCd_S").val());
+    formData.append("wbsPlanCodeKind", t.wbsPlanCodeKind || "");
+    formData.append("relDt", t.actEndAt || "");
+
+    filePostAjax("/user/wb/wb22/wbsRsltsconfirm", formData, function(data) {
+      if (data && data.resultCode == 200) {
+        t.rsltsCloseYn = "N";
+        setToast("확정 취소되었습니다.", { type: "ok", autoHideMs: 2500 });
+        loadWbsData({ keepZoom: true });
+      } else {
+        const msg = (data && (data.resultMessage || data.msg)) || "확정 취소 처리에 실패하였습니다.";
+        setToast("확정 취소 실패: " + msg, { type: "err" });
+      }
+    });
+  });
 
   $("#btnFocus").on("click", () => focusOnGanttTask(t.id));
 }
