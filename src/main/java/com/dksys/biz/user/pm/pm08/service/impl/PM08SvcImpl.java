@@ -134,9 +134,15 @@ public class PM08SvcImpl implements PM08Svc {
 			if (approvalArrStr != null && !approvalArrStr.isEmpty()) {
 				List<Map<String, String>> approvalList = gsonDtl.fromJson(approvalArrStr, dtlMap);
 
-				if (approvalList != null && !approvalList.isEmpty()) {
 					for (Map<String, String> apprItem : approvalList) {
 						apprItem.put("todoNo", reqNo);
+						apprItem.put("todoFileTrgtKey", reqNo);
+						if (apprItem.get("pgPath") == null || apprItem.get("pgPath").isEmpty()) {
+							apprItem.put("pgPath", "/user/pm/pm08/PM0801P01.html");
+						}
+						if (apprItem.get("todoTitl") == null || apprItem.get("todoTitl").isEmpty()) {
+							apprItem.put("todoTitl", "휴일대체근무 신청서");
+						}
 						String itemSalesCd = apprItem.get("salesCd");
 						if (itemSalesCd == null || itemSalesCd.trim().isEmpty() || reqNo.equals(itemSalesCd)) {
 							apprItem.put("salesCd", firstSalesCd);
@@ -151,6 +157,7 @@ public class PM08SvcImpl implements PM08Svc {
 						Map<String, Object> pgMap = new HashMap<>();
 						pgMap.put("coCd", paramMap.get("coCd") != null ? paramMap.get("coCd") : "GUN");
 						pgMap.put("reqNo", reqNo);
+						pgMap.put("todoFileTrgtKey", reqNo);
 						pgMap.put("actionType", "A");
 						pgMap.put("openStage", "REQ");
 						pgMap.put("todoDiv2CodeId", curCodeId);
@@ -161,11 +168,11 @@ public class PM08SvcImpl implements PM08Svc {
 					paramMap.put("approvalArr", gsonDtl.toJson(approvalList));
 					paramMap.put("salesCd", firstSalesCd);
 					paramMap.put("todoNo", reqNo);
+					paramMap.put("todoFileTrgtKey", reqNo);
 					paramMap.put("todoDiv2CodeId", "TODODIV2410");
 					paramMap.put("etcField1", reqNo);
 					wb20Svc.insertTodoMaster(paramMap);
 				}
-			}
 
 			// 6. 첨부파일 처리
 			deleteAttachedFiles(paramMap.get("deleteFileArr"));
@@ -292,6 +299,13 @@ public class PM08SvcImpl implements PM08Svc {
 				if (approvalList != null && !approvalList.isEmpty()) {
 					for (Map<String, String> apprItem : approvalList) {
 						apprItem.put("todoNo", reqNoVal);
+						apprItem.put("todoFileTrgtKey", reqNoVal);
+						if (apprItem.get("pgPath") == null || apprItem.get("pgPath").isEmpty()) {
+							apprItem.put("pgPath", "/user/pm/pm08/PM0801P01.html");
+						}
+						if (apprItem.get("todoTitl") == null || apprItem.get("todoTitl").isEmpty()) {
+							apprItem.put("todoTitl", isResultStage ? "휴일대체근무 결과보고서" : "휴일대체근무 신청서");
+						}
 						String itemSalesCd = apprItem.get("salesCd");
 						if (itemSalesCd == null || itemSalesCd.trim().isEmpty() || reqNoVal.equals(itemSalesCd)) {
 							apprItem.put("salesCd", firstSalesCd);
@@ -306,6 +320,7 @@ public class PM08SvcImpl implements PM08Svc {
 						Map<String, Object> pgMap = new HashMap<>();
 						pgMap.put("coCd", paramMap.get("coCd") != null ? paramMap.get("coCd") : "GUN");
 						pgMap.put("reqNo", reqNoVal);
+						pgMap.put("todoFileTrgtKey", reqNoVal);
 						pgMap.put("actionType", "A");
 						pgMap.put("openStage", isResultStage ? "RESULT" : "REQ");
 						pgMap.put("todoDiv2CodeId", curCodeId);
@@ -316,14 +331,20 @@ public class PM08SvcImpl implements PM08Svc {
 					paramMap.put("approvalArr", gsonDtl.toJson(approvalList));
 					paramMap.put("salesCd", firstSalesCd);
 
-					// 기존 결재선 삭제
+					// 기존 결재선 삭제 (결재 및 공유선 모두 삭제)
 					Map<String, String> deleteParam = new HashMap<>();
 					deleteParam.put("todoNo", reqNoVal);
 					deleteParam.put("todoDiv2CodeId", todoDiv2CodeId);
 					wb20Svc.deleteTodoMasterByTodoNo(deleteParam);
 
+					Map<String, String> deleteShareParam = new HashMap<>();
+					deleteShareParam.put("todoNo", reqNoVal);
+					deleteShareParam.put("todoDiv2CodeId", isResultStage ? "TODODIV1420" : "TODODIV1410");
+					wb20Svc.deleteTodoMasterByTodoNo(deleteShareParam);
+
 					// 신규 결재선 등록
 					paramMap.put("todoNo", reqNoVal);
+					paramMap.put("todoFileTrgtKey", reqNoVal);
 					paramMap.put("todoDiv2CodeId", todoDiv2CodeId);
 					paramMap.put("salesCd", firstSalesCd);
 					paramMap.put("etcField1", reqNoVal);
@@ -529,44 +550,42 @@ public class PM08SvcImpl implements PM08Svc {
 			String coCd = paramMap.get("coCd");
 			String todoId = paramMap.get("todoId");
 			String todoCfOpn = paramMap.get("todoCfOpn");
-
-			// 의견이 없으면 저장할 내용 없음
-			if (todoCfOpn == null || todoCfOpn.trim().isEmpty()) {
-				return 1;
-			}
+			String todoYn = paramMap.get("todoYn");
 
 			// 신청건 조회 - 신청자 ID 추출
 			Map<String, String> queryParam = new HashMap<>();
 			queryParam.put("coCd", coCd);
 			queryParam.put("reqNo", reqNo);
 			Map<String, String> reqDetail = pm08Mapper.selectSubstituteWorkDtl(queryParam);
-			if (reqDetail == null || reqDetail.isEmpty()) {
-				return 1;
+
+			// 의견이 있을 경우 담당팀장 의견 저장
+			if (todoCfOpn != null && !todoCfOpn.trim().isEmpty() && reqDetail != null && !reqDetail.isEmpty()) {
+				String reqId = reqDetail.get("reqId");
+				Map<String, String> managerParam = new HashMap<>();
+				managerParam.put("userId", reqId);
+				Map<String, String> managerInfo = wb24Svc.selectTeamManagerInfo(managerParam);
+
+				if (managerInfo != null && !managerInfo.isEmpty()) {
+					String managerId = managerInfo.get("id");
+					if (managerId != null && managerId.equals(todoId)) {
+						Map<String, String> updateParam = new HashMap<>();
+						updateParam.put("coCd", coCd);
+						updateParam.put("reqNo", reqNo);
+						updateParam.put("reqMngOpn", todoCfOpn);
+						pm08Mapper.updateSubstituteWorkReqMngOpn(updateParam);
+					}
+				}
 			}
 
-			String reqId = reqDetail.get("reqId");
-
-			// 신청자의 담당팀장 정보 조회
-			Map<String, String> managerParam = new HashMap<>();
-			managerParam.put("userId", reqId);
-			Map<String, String> managerInfo = wb24Svc.selectTeamManagerInfo(managerParam);
-
-			// 담당팀장이 결재승인한 본인이 맞는지 확인
-			if (managerInfo == null || managerInfo.isEmpty()) {
-				return 1;
+			// 최종 결재 완료 시 REQ_STATUS 갱신
+			if ("Y".equals(todoYn)) {
+				Map<String, String> statusParam = new HashMap<>();
+				statusParam.put("coCd", coCd);
+				statusParam.put("reqNo", reqNo);
+				statusParam.put("reqStatus", "END");
+				statusParam.put("udtId", todoId);
+				pm08Mapper.updateSubstituteWorkReqStatus(statusParam);
 			}
-
-			String managerId = managerInfo.get("id");
-			if (managerId == null || !managerId.equals(todoId)) {
-				return 1;
-			}
-
-			// 담당팀장이 맞으면 의견 저장
-			Map<String, String> updateParam = new HashMap<>();
-			updateParam.put("coCd", coCd);
-			updateParam.put("reqNo", reqNo);
-			updateParam.put("reqMngOpn", todoCfOpn);
-			pm08Mapper.updateSubstituteWorkReqMngOpn(updateParam);
 
 			return 1;
 		} catch (Exception e) {
@@ -589,44 +608,42 @@ public class PM08SvcImpl implements PM08Svc {
 			String coCd = paramMap.get("coCd");
 			String todoId = paramMap.get("todoId");
 			String todoCfOpn = paramMap.get("todoCfOpn");
-
-			// 의견이 없으면 저장할 내용 없음
-			if (todoCfOpn == null || todoCfOpn.trim().isEmpty()) {
-				return 1;
-			}
+			String todoYn = paramMap.get("todoYn");
 
 			// 신청건 조회 - 신청자 ID 추출
 			Map<String, String> queryParam = new HashMap<>();
 			queryParam.put("coCd", coCd);
 			queryParam.put("reqNo", reqNo);
 			Map<String, String> reqDetail = pm08Mapper.selectSubstituteWorkDtl(queryParam);
-			if (reqDetail == null || reqDetail.isEmpty()) {
-				return 1;
+
+			// 의견이 있을 경우 담당팀장 결과의견 저장
+			if (todoCfOpn != null && !todoCfOpn.trim().isEmpty() && reqDetail != null && !reqDetail.isEmpty()) {
+				String reqId = reqDetail.get("reqId");
+				Map<String, String> managerParam = new HashMap<>();
+				managerParam.put("userId", reqId);
+				Map<String, String> managerInfo = wb24Svc.selectTeamManagerInfo(managerParam);
+
+				if (managerInfo != null && !managerInfo.isEmpty()) {
+					String managerId = managerInfo.get("id");
+					if (managerId != null && managerId.equals(todoId)) {
+						Map<String, String> updateParam = new HashMap<>();
+						updateParam.put("coCd", coCd);
+						updateParam.put("reqNo", reqNo);
+						updateParam.put("resultMngOpn", todoCfOpn);
+						pm08Mapper.updateSubstituteWorkResultMngOpn(updateParam);
+					}
+				}
 			}
 
-			String reqId = reqDetail.get("reqId");
-
-			// 신청자의 담당팀장 정보 조회
-			Map<String, String> managerParam = new HashMap<>();
-			managerParam.put("userId", reqId);
-			Map<String, String> managerInfo = wb24Svc.selectTeamManagerInfo(managerParam);
-
-			// 담당팀장이 결재승인한 본인이 맞는지 확인
-			if (managerInfo == null || managerInfo.isEmpty()) {
-				return 1;
+			// 최종 결재 완료 시 RESULT_STATUS 갱신
+			if ("Y".equals(todoYn)) {
+				Map<String, String> statusParam = new HashMap<>();
+				statusParam.put("coCd", coCd);
+				statusParam.put("reqNo", reqNo);
+				statusParam.put("resultStatus", "END");
+				statusParam.put("udtId", todoId);
+				pm08Mapper.updateSubstituteWorkResultStatus(statusParam);
 			}
-
-			String managerId = managerInfo.get("id");
-			if (managerId == null || !managerId.equals(todoId)) {
-				return 1;
-			}
-
-			// 담당팀장이 맞으면 의견 저장
-			Map<String, String> updateParam = new HashMap<>();
-			updateParam.put("coCd", coCd);
-			updateParam.put("reqNo", reqNo);
-			updateParam.put("resultMngOpn", todoCfOpn);
-			pm08Mapper.updateSubstituteWorkResultMngOpn(updateParam);
 
 			return 1;
 		} catch (Exception e) {
