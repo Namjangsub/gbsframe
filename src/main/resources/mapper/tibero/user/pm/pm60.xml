@@ -333,6 +333,42 @@
 		ORDER BY V.VNDR_NM ASC, V.WORKER_NM ASC, NVL(V.WORK_ST_DT, V.WORK_DT) ASC
 	</select>
 
+	<!-- 외주 인력 투입 중복 체크 -->
+	<select id="selectVndrOverlapList" parameterType="Map" resultType="CamelMap">
+		SELECT
+			V.RSV_NO AS RSV_NO,
+			V.CLNT_CD AS CLNT_CD,
+			V.VNDR_NM AS VNDR_NM,
+			V.WORKER_NM AS WORKER_NM,
+			NVL(V.WORK_ST_DT, V.WORK_DT) AS WORK_ST_DT,
+			NVL(V.WORK_ED_DT, NVL(V.WORK_ST_DT, V.WORK_DT)) AS WORK_ED_DT
+		FROM TB_PM60M02 V
+		WHERE V.CO_CD = 'GUN'
+		<if test="rsvNo != null and rsvNo != ''">
+			AND V.RSV_NO != #{rsvNo}
+		</if>
+		<choose>
+			<when test="clntCd != null and clntCd != ''">
+				AND (V.CLNT_CD = #{clntCd} OR V.VNDR_NM = #{vndrNm})
+			</when>
+			<otherwise>
+				AND V.VNDR_NM = #{vndrNm}
+			</otherwise>
+		</choose>
+		<choose>
+			<when test="workerNm != null and workerNm != ''">
+				AND TRIM(V.WORKER_NM) = TRIM(#{workerNm})
+			</when>
+			<otherwise>
+				AND (V.WORKER_NM IS NULL OR TRIM(V.WORKER_NM) = '')
+			</otherwise>
+		</choose>
+		<if test="workStDt != null and workStDt != '' and workEdDt != null and workEdDt != ''">
+			AND NVL(V.WORK_ST_DT, V.WORK_DT) &lt;= #{workEdDt}
+			AND NVL(V.WORK_ED_DT, NVL(V.WORK_ST_DT, V.WORK_DT)) &gt;= #{workStDt}
+		</if>
+	</select>
+
 	<!-- 외주 투입 등록 (시작일~종료일 지정) -->
 	<insert id="insertVndr" parameterType="Map">
 		<selectKey keyProperty="rsvNo" resultType="String" order="BEFORE">

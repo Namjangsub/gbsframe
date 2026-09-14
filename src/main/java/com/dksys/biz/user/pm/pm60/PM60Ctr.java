@@ -173,6 +173,19 @@ public class PM60Ctr {
 		return "jsonView";
 	}
 
+	@PostMapping("/selectVndrOverlapList")
+	public String selectVndrOverlapList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		try {
+			List<Map<String, String>> result = pm60Svc.selectVndrOverlapList(paramMap);
+			model.addAttribute("resultCode", 200);
+			model.addAttribute("overlapList", result);
+		} catch (Exception e) {
+			model.addAttribute("resultCode", 900);
+			model.addAttribute("resultMessage", e.getMessage());
+		}
+		return "jsonView";
+	}
+
 	@PostMapping("/insertVndr")
 	public String insertVndr(@RequestBody Map<String, String> paramMap, ModelMap model) {
 		try {

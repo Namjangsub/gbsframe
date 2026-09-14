@@ -27,6 +27,8 @@ public interface PM60Mapper {
 	List<Map<String, String>> selectRsvDateOverlapList(Map<String, String> paramMap);
 
 	List<Map<String, String>> selectVndrList(Map<String, String> paramMap);
+	
+	List<Map<String, String>> selectVndrOverlapList(Map<String, String> paramMap);
 
 	int insertVndr(Map<String, String> paramMap);
 

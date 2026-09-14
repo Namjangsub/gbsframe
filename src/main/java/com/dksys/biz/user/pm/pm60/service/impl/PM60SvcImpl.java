@@ -75,14 +75,21 @@ public class PM60SvcImpl implements PM60Svc {
 	}
 
 	@Override
+	public List<Map<String, String>> selectVndrOverlapList(Map<String, String> paramMap) {
+		return pm60Mapper.selectVndrOverlapList(paramMap);
+	}
+
+	@Override
 	public int insertVndr(Map<String, String> paramMap) throws Exception {
 		validateVndrParam(paramMap);
+		validateVndrOverlap(paramMap);
 		return pm60Mapper.insertVndr(paramMap);
 	}
 
 	@Override
 	public int updateVndr(Map<String, String> paramMap) throws Exception {
 		validateVndrParam(paramMap);
+		validateVndrOverlap(paramMap);
 		return pm60Mapper.updateVndr(paramMap);
 	}
 
@@ -152,6 +159,17 @@ public class PM60SvcImpl implements PM60Svc {
 		}
 		if (!hasText(paramMap.get("workDt")) || paramMap.get("workDt").length() < 8) {
 			throw new RuntimeException("근무일자를 입력해주세요.");
+		}
+	}
+
+	private void validateVndrOverlap(Map<String, String> paramMap) {
+		List<Map<String, String>> overlapList = pm60Mapper.selectVndrOverlapList(paramMap);
+		if (overlapList != null && !overlapList.isEmpty()) {
+			Map<String, String> overlap = overlapList.get(0);
+			String vndrNm = hasText(overlap.get("vndrNm")) ? overlap.get("vndrNm") : paramMap.get("vndrNm");
+			String workerNm = hasText(overlap.get("workerNm")) ? overlap.get("workerNm") : paramMap.get("workerNm");
+			String targetName = hasText(workerNm) ? vndrNm + "(" + workerNm + ")" : vndrNm;
+			throw new RuntimeException("이미 등록된 담당입니다. " + targetName);
 		}
 	}
 
