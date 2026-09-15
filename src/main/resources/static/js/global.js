@@ -1703,6 +1703,63 @@ function checkMenuAuth(accessList) {
             favoritesMenuControl(this);
         });
 
+		// 현재 페이지 URL 기반 상위/하위 메뉴 자동 추출 및 상단 타이틀 동기화
+		try {
+			var curPath = location.pathname;
+			if (curPath && Array.isArray(accessList) && accessList.length > 0) {
+				var curFile = curPath.substring(curPath.lastIndexOf('/') + 1).toLowerCase();
+				var matchedItem = null;
+
+				// 1단계: 전체 경로 완전 일치 또는 끝부분 일치 우선 검색 (즐겨찾기 U99 제외)
+				for (var i = 0; i < accessList.length; i++) {
+					var mItem = accessList[i];
+					if (mItem.menuType === 'HTML' && mItem.upMenuId !== 'U99' && mItem.menuUrl) {
+						var pureUrl = mItem.menuUrl.split('?')[0].split('#')[0].trim();
+						if (pureUrl && (curPath === pureUrl || curPath.endsWith(pureUrl) || pureUrl.endsWith(curPath))) {
+							matchedItem = mItem;
+							break;
+						}
+					}
+				}
+
+				// 2단계: 1단계 실패 시 파일명 일치 검색 (즐겨찾기 U99 제외)
+				if (!matchedItem && curFile) {
+					for (var i = 0; i < accessList.length; i++) {
+						var mItem = accessList[i];
+						if (mItem.menuType === 'HTML' && mItem.upMenuId !== 'U99' && mItem.menuUrl) {
+							var pureUrl = mItem.menuUrl.split('?')[0].split('#')[0].trim();
+							var targetFile = pureUrl.substring(pureUrl.lastIndexOf('/') + 1).toLowerCase();
+							if (targetFile && curFile === targetFile) {
+								matchedItem = mItem;
+								break;
+							}
+						}
+					}
+				}
+
+				// 3단계: 매칭 성공 시 상위메뉴(FOLDER) 탐색 및 상단 영역 동기화
+				if (matchedItem) {
+					var subMenuNm = matchedItem.menuNm;
+					var menuNm = "";
+					for (var j = 0; j < accessList.length; j++) {
+						if (accessList[j].menuId === matchedItem.upMenuId) {
+							menuNm = accessList[j].menuNm;
+							break;
+						}
+					}
+					if (menuNm) {
+						$('#topMenu').text(menuNm);
+					}
+					if (subMenuNm) {
+						$('#topSubMenu').text(subMenuNm);
+						$("#head_area #title").html(subMenuNm);
+						document.title = subMenuNm;
+					}
+				}
+			}
+		} catch (e) {
+			console.warn("메뉴 자동 추출 실패:", e);
+		}
 	}
 
 
@@ -1797,7 +1854,7 @@ function setCommonSelect(selectArr){
 function mainDefaultLoad(menuNm, subMenuNm) {
 	// left
 	$("#head_area").load("/static/html/header.html", function(){
-		$("#head_area #title").html(subMenuNm);
+		if (subMenuNm) $("#head_area #title").html(subMenuNm);
 	});
 	$("#head_area").after('<div class="menu_off"><a class="off_btn"></a></div>');
 	$('.off_btn').click(function () {
@@ -1807,8 +1864,8 @@ function mainDefaultLoad(menuNm, subMenuNm) {
     });
 	// top
 	$("#top_area").load("/static/html/top.html", function(){
-		$('#topMenu').text(menuNm);
-		$('#topSubMenu').text(subMenuNm);
+		if (menuNm) $('#topMenu').text(menuNm);
+		if (subMenuNm) $('#topSubMenu').text(subMenuNm);
 		$("#topUserNm").text(jwt.userNm);
 		setMenuAuth();
 	});
