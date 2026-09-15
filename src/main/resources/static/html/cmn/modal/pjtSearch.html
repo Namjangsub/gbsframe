@@ -1,0 +1,128 @@
+<div id="commonPopup">
+    <div class="popup_area" style="width: 100%;">
+        <div class="popup_table">
+            <table>
+                <colgroup>
+                    <col width="15%">
+                    <col width="50%">
+                    <col width="15%">
+                    <col width="20%">
+                </colgroup>
+                
+                <tr>
+                    <th>검색조건</th>
+                    <td>
+                        <select id="searchType" style="width: 35%;">
+                            <option value="CODE_NM">프로젝트 명</option>
+                            <option value="CODE_ID">프로젝트 코드ID</option>
+                            <option value="CODE_DESC">프로젝트 설명</option>
+                        </select>
+                        <input type="text" id="searchValue" style="width: 60%;" onkeypress="if(event.keyCode == 13){pjtGridView.setData(0);}">
+                    </td>
+                    <th>사용여부</th>
+                    <td>
+                        <select id="useType" onchange="pjtGridView.setData(0);">
+                            <option value="Y">사용</option>
+                            <option value="N">미사용</option>
+                            <option value="">전체</option>
+                        </select>
+                    </td>
+                </tr>
+            </table>
+            <div class="ax5_grid" data-ax5grid="pjt-grid" data-ax5grid-config="{}" style="height: 600px;"></div>
+        </div>
+    </div>
+
+    <div class="popup_bottom_btn">
+        <button type="button" onClick="executeCallback();">선택</button>
+        <button type="button" class="close_btn" onClick="modalStack.close();">닫기</button>
+    </div>
+</div>
+
+<script type="text/javascript">
+    var pjtGridView = {
+        initView: function() {
+            this.target = new ax5.ui.grid();
+            this.target.setConfig({
+                target: $('[data-ax5grid="pjt-grid"]'),
+                showRowSelector: true,
+                multipleSelect: false,
+                sortable: true,
+                header: { align: "center", selector: false },
+                body: {
+                    onClick: function () {
+                        this.self.select(this.dindex);
+                    },
+                    onDBLClick: function () {
+                        executeCallback();
+                    },
+                },
+                columns: [
+                    {key: "codeId",   label: "프로젝트코드", align: "center", width: 120, hidden: true},
+                    {key: "codeNm",   label: "프로젝트명",   align: "left",   width: 150},
+                    {key: "codeDesc", label: "프로젝트 설명", align: "left",   width: "*"},
+                    {key: "useYn",    label: "사용",        align: "center", width: 60, hidden: true}
+                ],
+                page: {
+                    navigationItemCount: 10,
+                    height: 30,
+                    display: true,
+                    firstIcon: '<i class="fa fa-step-backward" aria-hidden="true"></i>',
+                    prevIcon: '<i class="fa fa-caret-left" aria-hidden="true"></i>',
+                    nextIcon: '<i class="fa fa-caret-right" aria-hidden="true"></i>',
+                    lastIcon: '<i class="fa fa-step-forward" aria-hidden="true"></i>',
+                    onChange: function () {
+                        pjtGridView.setData(this.page.selectPage);
+                    }
+                }
+            });
+            return this;
+        },
+        setData: function(_pageNo) {
+            var targetObj = this.target;
+            var page = (_pageNo || 0);
+            var paramObj = {
+                "pageNo": page + 1,
+                "recordCnt": 9999,
+                "codeKind": "PRJCTCD",
+                "useYn": $('#useType').val(),
+                "searchType": $('#searchType').val(),
+                "searchValue": $('#searchValue').val()
+            };
+            
+            postAjax("/admin/cm/cm05/selectCodeList", paramObj, null, function(data){
+                try {
+                    targetObj.setData({
+                        list: data.codeList || [],
+                        page: {
+                            currentPage: page,
+                            pageSize: (data.paginationInfo && data.paginationInfo.pageSize) ? data.paginationInfo.pageSize : 9999,
+                            totalElements: (data.paginationInfo && data.paginationInfo.totalRecordCount != null) ? data.paginationInfo.totalRecordCount : (data.codeList ? data.codeList.length : 0),
+                            totalPages: (data.paginationInfo && data.paginationInfo.totalPageCount) ? data.paginationInfo.totalPageCount : 1
+                        }
+                    });
+                } catch (error) {
+                    console.error("데이터 바인딩 오류:", error);
+                }
+            });
+        }
+    };
+    
+    $(document).ready(function() {
+        pjtGridView.initView();
+        
+        // 부모창에서 넘겨준 검색어 세팅
+        if (modalStack.last().paramObj && modalStack.last().paramObj.searchValue) {
+            $('#searchValue').val(modalStack.last().paramObj.searchValue);
+        }
+        
+        $('#searchValue').focus();
+        pjtGridView.setData(0);
+    });
+
+    function executeCallback(){
+        if(selectGridValidation(pjtGridView.target)) return;
+        modalStack.last().callback(pjtGridView);
+        modalStack.close();
+    }
+</script>
