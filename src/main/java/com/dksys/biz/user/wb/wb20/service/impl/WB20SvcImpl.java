@@ -415,6 +415,10 @@ public class WB20SvcImpl implements WB20Svc {
 		if (tripReq == null) {
 			throw new RuntimeException("출장신청서 정보를 찾을 수 없습니다.");
 		}
+		// 신청인의 본인 결재는 영업부서 소속이어도 영업 확인 결재와 구분한다.
+		if (hasText(tripReq.get("reqId")) && tripReq.get("reqId").equals(paramMap.get("todoId"))) {
+			return;
+		}
 
 		boolean supportChecked = checked(tripReq.get("sprtTrfcYn"))
 				|| checked(tripReq.get("sprtLdgYn"))
@@ -617,7 +621,7 @@ public class WB20SvcImpl implements WB20Svc {
 	}
 
 	private boolean isSalesDept(String deptId) {
-		return deptId != null && (deptId.startsWith("GUN30") || deptId.startsWith("TRN30"));
+		return deptId != null && deptId.startsWith("GUN30");
 	}
 
 	private boolean checked(String value) {
