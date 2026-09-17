@@ -140,6 +140,7 @@ public class PM51SvcImpl implements PM51Svc {
 		List<Map<String, String>> travelers = gson.fromJson(paramMap.get("travelerArr"), listType);
 		validateTravelerDateOverlap(paramMap, travelers);
 		List<Map<String, String>> expenses = gson.fromJson(paramMap.get("expenseArr"), listType);
+		List<Map<String, String>> projects = gson.fromJson(paramMap.get("projectArr"), listType);
 
 		// 1. 현재본을 이력으로 백업 (M01/D01/D02)
 		pm51Mapper.insertTripReqHistM01(paramMap);
@@ -163,6 +164,16 @@ public class PM51SvcImpl implements PM51Svc {
 			for (Map<String, String> row : expenses) {
 				row.put("tripReqNo", paramMap.get("tripReqNo"));
 				pm51Mapper.insertTripReqD02(row);
+			}
+		}
+
+		// 변경신청에서도 프로젝트 기간 등 D03 변경 내용을 현재본에 반영한다.
+		if (projects != null) {
+			pm51Mapper.deleteTripReqD03(paramMap);
+			for (Map<String, String> row : projects) {
+				row.put("tripReqNo", paramMap.get("tripReqNo"));
+				row.put("coCd", paramMap.get("coCd"));
+				pm51Mapper.insertTripReqD03(row);
 			}
 		}
 
