@@ -258,4 +258,16 @@ public class CM05Ctr {
     	}
     	return "jsonView";
     }
+
+	// 공통코드 리스트 조회
+    @PostMapping("/selectPjtCodeList")
+    public String selectPjtCodeList(@RequestBody Map<String, String> param, ModelMap model) {
+    	int totalCnt = cm05Svc.selectPjtCodeCount(param);
+    	PaginationInfo paginationInfo = new PaginationInfo(param, totalCnt);
+    	model.addAttribute("paginationInfo", paginationInfo);
+
+    	List<Map<String, String>> codeList = cm05Svc.selectPjtCodeList(param);
+    	model.addAttribute("codeList", codeList);
+        return "jsonView";
+    }
 }

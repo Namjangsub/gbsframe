@@ -40,4 +40,8 @@ public interface CM05Svc {
 	public int prdtDivInsert(Map<String, String> param);
 
 	public int selectPrjectCodeDupCheck(Map<String, String> param);
+
+	public int selectPjtCodeCount(Map<String, String> param);
+
+    public List<Map<String, String>> selectPjtCodeList(Map<String, String> param);
 }

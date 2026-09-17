@@ -499,5 +499,122 @@
 			A.CODE_ID LIKE 'PRJCT%'
 		AND  trim(a.CODE_NM) = TRIM(#{codeNm})
 	</select>
+
+	<select id="selectPjtCodeCount" resultType="int">
+		SELECT COUNT(*)
+		FROM TB_CM05M01 A
+		WHERE 1 = 1
+		<if test="codeKind != null and !codeKind.equals('')">
+		AND A.CODE_KIND = #{codeKind}
+		</if>
+		<if test="useYn != null and !useYn.equals('')">
+		AND A.USE_YN = #{useYn}
+		</if>
+		<if test="searchValue != null and !searchValue.equals('')">
+		AND (
+			UPPER(A.CODE_ID)   LIKE '%' || UPPER(#{searchValue}) || '%'
+		 OR UPPER(A.CODE_NM)   LIKE '%' || UPPER(#{searchValue}) || '%'
+		 OR UPPER(A.CODE_DESC) LIKE '%' || UPPER(#{searchValue}) || '%'
+		 OR EXISTS (
+				SELECT 1
+				FROM TB_CR02M01 CR
+				INNER JOIN TB_CR02D02 CD ON CR.ORDRS_NO = CD.ORDRS_NO
+				WHERE CR.CLNT_PJT = A.CODE_ID
+				  AND UPPER(CD.SALES_CD) LIKE '%' || UPPER(#{searchValue}) || '%'
+			)
+		 OR EXISTS (
+				SELECT 1
+				FROM TB_CR02M01 CR
+				INNER JOIN TB_BM02M01 BM ON CR.ORDRS_CLNT_CD = BM.CLNT_CD
+				WHERE CR.CLNT_PJT = A.CODE_ID
+				  AND (UPPER(BM.CLNT_NM) LIKE '%' || UPPER(#{searchValue}) || '%'
+					OR UPPER(BM.CLNT_CD) LIKE '%' || UPPER(#{searchValue}) || '%')
+			)
+		 OR EXISTS (
+				SELECT 1
+				FROM TB_BM06M01 PR
+				INNER JOIN TB_BM02M01 BM ON PR.CLNT_CD = BM.CLNT_CD
+				WHERE PR.PRJCT_CD = A.CODE_ID
+				  AND (UPPER(BM.CLNT_NM) LIKE '%' || UPPER(#{searchValue}) || '%'
+					OR UPPER(PR.PRJCT_NM) LIKE '%' || UPPER(#{searchValue}) || '%')
+			)
+		)
+		</if>
+	</select>
+
+	<select id="selectPjtCodeList" resultType="CamelMap">
+		SELECT *
+		FROM (
+				SELECT
+					ROWNUM AS RNUM, A.*,
+						(SELECT CODE_NM FROM TB_CM05M01 WHERE CODE_ID = A.CODE_KIND) AS CODE_KIND_NM,
+						(SELECT CODE_NM FROM TB_CM05M01 WHERE CODE_ID = A.CODE_RPRC) AS CODE_RPRC_NM,
+						decode( A.CODE_KIND, 'ESTCOPRT',(SELECT CLNT_NM FROM TB_BM02M01 WHERE CLNT_CD = A.CODE_ETC),
+														(SELECT CODE_NM FROM TB_CM05M01 WHERE CODE_ID = A.CODE_ETC))  AS CODE_ETC_NM,
+						decode( A.CODE_KIND, 'WH',      (SELECT CODE_NM FROM TB_CM05M01 WHERE CODE_ID = A.CODE_DESC),
+														A.CODE_DESC ) AS CODE_DESC_NM
+				FROM
+				(
+					SELECT
+						CODE_ID,
+						CODE_NM,
+						CODE_KIND,
+						CODE_DESC,
+						CODE_RPRC,
+						CODE_ETC,
+						SORT_NO,
+						USE_YN,
+						CREAT_ID,
+						TO_CHAR(CREAT_DTTM, 'yyyy-MM-dd') AS CREAT_DTTM,
+						CREAT_PGM,
+						UDT_ID,
+						TO_CHAR(UDT_DTTM, 'yyyy-MM-dd') AS UDT_DTTM,
+						UDT_PGM,
+						DZ_CODE
+					FROM
+						TB_CM05M01 A
+					WHERE 1 = 1
+						<if test="codeKind != null and !codeKind.equals('')">
+						AND A.CODE_KIND = #{codeKind}
+						</if>
+						<if test="useYn != null and !useYn.equals('')">
+						AND A.USE_YN = #{useYn}
+						</if>
+						<if test="searchValue != null and !searchValue.equals('')">
+						AND (
+							UPPER(A.CODE_ID)   LIKE '%' || UPPER(#{searchValue}) || '%'
+						 OR UPPER(A.CODE_NM)   LIKE '%' || UPPER(#{searchValue}) || '%'
+						 OR UPPER(A.CODE_DESC) LIKE '%' || UPPER(#{searchValue}) || '%'
+						 OR EXISTS (
+								SELECT 1
+								FROM TB_CR02M01 CR
+								INNER JOIN TB_CR02D02 CD ON CR.ORDRS_NO = CD.ORDRS_NO
+								WHERE CR.CLNT_PJT = A.CODE_ID
+								  AND UPPER(CD.SALES_CD) LIKE '%' || UPPER(#{searchValue}) || '%'
+							)
+						 OR EXISTS (
+								SELECT 1
+								FROM TB_CR02M01 CR
+								INNER JOIN TB_BM02M01 BM ON CR.ORDRS_CLNT_CD = BM.CLNT_CD
+								WHERE CR.CLNT_PJT = A.CODE_ID
+								  AND (UPPER(BM.CLNT_NM) LIKE '%' || UPPER(#{searchValue}) || '%'
+									OR UPPER(BM.CLNT_CD) LIKE '%' || UPPER(#{searchValue}) || '%')
+							)
+						 OR EXISTS (
+								SELECT 1
+								FROM TB_BM06M01 PR
+								INNER JOIN TB_BM02M01 BM ON PR.CLNT_CD = BM.CLNT_CD
+								WHERE PR.PRJCT_CD = A.CODE_ID
+								  AND (UPPER(BM.CLNT_NM) LIKE '%' || UPPER(#{searchValue}) || '%'
+									OR UPPER(PR.PRJCT_NM) LIKE '%' || UPPER(#{searchValue}) || '%')
+							)
+						)
+						</if>
+					ORDER BY SORT_NO ASC, CODE_NM
+				) A
+			)
+		WHERE
+			RNUM BETWEEN #{firstIndex} AND #{lastIndex}
+	</select>
 	
 </mapper>

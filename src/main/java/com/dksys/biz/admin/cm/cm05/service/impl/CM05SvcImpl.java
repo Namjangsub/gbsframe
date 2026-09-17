@@ -134,5 +134,15 @@ public class CM05SvcImpl implements CM05Svc {
 		return cm05Mapper.selectPrjectCodeDupCheck(param);
 	}
 
+	@Override
+	public int selectPjtCodeCount(Map<String, String> param) {
+		return cm05Mapper.selectPjtCodeCount(param);
+	}
+
+	@Override
+	public List<Map<String, String>> selectPjtCodeList(Map<String, String> param) {
+		return cm05Mapper.selectPjtCodeList(param);
+	}
+
 	
 }

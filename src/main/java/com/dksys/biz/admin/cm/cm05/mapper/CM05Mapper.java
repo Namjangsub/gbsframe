@@ -43,4 +43,8 @@ public interface CM05Mapper {
 	Map<String, String> selectPrdtCodeLastNoInfo(Map<String, String> param);
 
 	int selectPrjectCodeDupCheck(Map<String, String> param);
+
+	int selectPjtCodeCount(Map<String, String> param);
+
+	List<Map<String, String>> selectPjtCodeList(Map<String, String> param);
 }
