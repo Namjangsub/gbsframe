@@ -2416,6 +2416,65 @@ onkeyup="(event.keyCode == 8 || event.keyCode == 46) ? ordrsClntCd_S.value = '' 
       }, delay);
     }
 
+    // 고정 셀 안에서만 줄바꿈/스크롤한다. 선택하지 않은 셀 위에서는 목록 스크롤을 유지한다.
+    function setupCellTextScroll(el) {
+      el.classList.add('cell-text-scroll');
+      el.tabIndex = 0;
+      el.title = '클릭 후 스크롤하여 내용 확인 · 더블클릭하여 수정';
+      const refresh = () => el.classList.toggle('has-overflow', el.scrollHeight > el.clientHeight + 1);
+      const observer = new ResizeObserver(refresh);
+      observer.observe(el);
+      el.addEventListener('wheel', event => {
+        if(document.activeElement === el && el.scrollHeight > el.clientHeight) event.stopPropagation();
+      });
+      requestAnimationFrame(refresh);
+      return { refresh, destroy: () => observer.disconnect() };
+    }
+
+    class WrappedTextRenderer {
+      constructor(props) {
+        this.el = document.createElement('div');
+        this.el.className = 'fixed-cell-text';
+        this.scroll = setupCellTextScroll(this.el);
+        this.render(props);
+      }
+      getElement() { return this.el; }
+      render(props) {
+        this.el.textContent = String(props.value == null ? '' : props.value);
+        this.el.scrollTop = 0;
+        requestAnimationFrame(this.scroll.refresh);
+      }
+      beforeDestroy() { this.scroll.destroy(); }
+    }
+
+    class WrappedTextEditor {
+      constructor(props) {
+        this.el = document.createElement('textarea');
+        this.el.className = 'fixed-cell-editor';
+        this.el.value = String(props.value == null ? '' : props.value);
+        this.el.setAttribute('aria-label', props.columnInfo.header || props.columnInfo.name);
+        this.el.title = 'Enter: 저장 · Shift+Enter: 줄바꿈 · Esc: 취소';
+        this.el.addEventListener('keydown', event => {
+          if(event.isComposing || event.keyCode === 229) { event.stopPropagation(); return; }
+          if(event.key === 'Enter' && !event.shiftKey) {
+            event.preventDefault();
+            event.stopPropagation();
+            props.grid.finishEditing(props.rowKey, props.columnInfo.name, this.el.value);
+          } else if(event.key === 'Escape') {
+            event.preventDefault();
+            event.stopPropagation();
+            props.grid.cancelEditing();
+          } else if(event.key !== 'Tab') {
+            event.stopPropagation();
+          }
+        });
+        this.el.addEventListener('wheel', event => event.stopPropagation());
+      }
+      getElement() { return this.el; }
+      getValue() { return this.el.value; }
+      mounted() { this.el.focus(); }
+    }
+
     class MemoHistoryRenderer {
       constructor(props) {
         this.el = document.createElement("div");
@@ -2423,6 +2482,7 @@ onkeyup="(event.keyCode == 8 || event.keyCode == 46) ? ordrsClntCd_S.value = '' 
 
         this.valueEl = document.createElement("span");
         this.valueEl.className = "memo-history-cell-value";
+        this.scroll = setupCellTextScroll(this.valueEl);
 
         this.buttonEl = document.createElement("button");
         this.buttonEl.type = "button";
@@ -2473,10 +2533,14 @@ onkeyup="(event.keyCode == 8 || event.keyCode == 46) ? ordrsClntCd_S.value = '' 
         return this.el;
       }
 
+      beforeDestroy() { this.scroll.destroy(); }
+
       render(props) {
         this.props = props;
         const valStr = String(props.value == null ? "" : props.value).trim();
         this.valueEl.textContent = valStr;
+        this.valueEl.scrollTop = 0;
+        requestAnimationFrame(this.scroll.refresh);
 
         const columnLabel = MEMO_HISTORY_COLUMNS[props.columnInfo.name] || "메모";
         this.buttonEl.setAttribute("aria-label", columnLabel + " 변경 이력 조회");
@@ -2676,6 +2740,13 @@ onkeyup="(event.keyCode == 8 || event.keyCode == 46) ? ordrsClntCd_S.value = '' 
         { name: "salesMemoHistCnt", header: "영업이력수", hidden: true },
         { name: "pmMemoHistCnt", header: "PM이력수", hidden: true }
       ];
+
+      columns.forEach(column => {
+        if(column.editor === 'text') {
+          column.editor = { type: WrappedTextEditor };
+          if(!column.renderer) column.renderer = { type: WrappedTextRenderer };
+        }
+      });
 
       EXTRA_TUI_GRID = GridAdapter.create(el, columns, {
         scrollX: true,
@@ -3814,6 +3885,9 @@ onkeyup="(event.keyCode == 8 || event.keyCode == 46) ? ordrsClntCd_S.value = '' 
     }
 
     function renderRemarkCell($cell, value, row){
+      $cell.find('.remark-history-text').each(function(){
+        if(this.cellScroll) this.cellScroll.destroy();
+      });
       const sjFileTrgtKey = row && row.sjFileTrgtKey !== undefined
         ? row.sjFileTrgtKey
         : $cell.attr("data-sjfiletrgtkey");
@@ -3829,6 +3903,7 @@ onkeyup="(event.keyCode == 8 || event.keyCode == 46) ? ordrsClntCd_S.value = '' 
       $cell.attr("data-salescd", salesCd || "");
       $cell.attr("data-remarkhistcnt", Number(histCnt || 0));
       $cell.html(buildRemarkCellHtml(value, sjFileTrgtKey, histCnt));
+      $cell.find('.remark-history-text').each(function(){ this.cellScroll = setupCellTextScroll(this); });
     }
 
     function closeRemarkHistoryPopover(){
@@ -3933,12 +4008,18 @@ onkeyup="(event.keyCode == 8 || event.keyCode == 46) ? ordrsClntCd_S.value = '' 
     function bindRemarks(){
       const $wbs = $('#wbs');
       bindRemarkHistoryEvents($wbs);
-      $wbs.off('click.remarks').on('click.remarks', '.remarks', function(){
+      $wbs.find('.remark-history-text').each(function(){
+        if(this.cellScroll) this.cellScroll.destroy();
+        this.cellScroll = setupCellTextScroll(this);
+      });
+      $wbs.off('click.remarks').off('dblclick.remarks').on('dblclick.remarks', '.remarks', function(event){
+        if($(event.target).closest('.remark-history-trigger').length) return;
         const $cell = $(this);
         if($cell.hasClass('editing')) return;
 
         const raw = String($cell.data('remarks') || '');
         const $input = $('<textarea class="remarks-input"></textarea>').val(raw);
+        $cell.find('.remark-history-text').each(function(){ if(this.cellScroll) this.cellScroll.destroy(); });
         $cell.addClass('editing').empty().append($input);
         $input.focus().select();
 
@@ -4020,6 +4101,15 @@ onkeyup="(event.keyCode == 8 || event.keyCode == 46) ? ordrsClntCd_S.value = '' 
         };
 
         $input.on('blur', commit);
+        $input.on('keydown', function(event){
+          if(event.key === 'Escape' && !event.originalEvent.isComposing) {
+            event.preventDefault();
+            $input.off('blur');
+            cancel();
+          }
+          event.stopPropagation();
+        });
+        $input.on('wheel', function(event){ event.stopPropagation(); });
       });
     }
 
