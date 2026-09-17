@@ -664,6 +664,7 @@
 	var gridViewApprovalMng = null;
 	var originalTripReqSnapshot = null;
 	var originalTravelerSnapshot = [];
+	var originalProjectSnapshot = [];
 
 	// 근태마감년월 (PM30 관리 값)
 	var pm51AttendanceCloseYm = null;
@@ -1259,7 +1260,7 @@
 					if (isTravelerGridEditBlocked()) {
 						return false;
 					}
-					if (hasCompletedApprover()) {
+					if (popParam.actionType !== 'CHG' && hasCompletedApprover()) {
 						if (isPayDtExist) return;
 						var expenseKeys = ["eatCnt", "trafficAmt", "lodgingAmt", "mealAmt", "dailyAmt", "specialAmt"];
 						if (expenseKeys.indexOf(this.column.key) === -1) {
@@ -1273,8 +1274,9 @@
 					var dindex = this.dindex;
 					var row = this.item;
 
-					// 출발일자, 도착일자는 프로젝트에서 자동 추출되므로 데이터피커 팝업 차단
+					// 변경신청에서는 프로젝트 기간과 별도로 실제 출발/도착 기간도 수정할 수 있다.
 					if (this.column.key === "tripStDt" || this.column.key === "tripEdDt") {
+						if (popParam.actionType === 'CHG') openTravelerDateTimePicker(gridInstance, dindex, row);
 						return;
 					}
 					// 출발시간, 도착시간 클릭 시 시간 선택 팝업만 오픈
@@ -1299,7 +1301,7 @@
 						return false;
 					}
 					// 승인자가 있는 경우: 지급금액 필드만 수정 가능
-					if (hasCompletedApprover()) {
+					if (popParam.actionType !== 'CHG' && hasCompletedApprover()) {
 						if (isPayDtExist) return false;
 						var expenseKeys = ["eatCnt", "trafficAmt", "lodgingAmt", "mealAmt", "dailyAmt", "specialAmt"];
 						var isExpenseField = expenseKeys.indexOf(this.column.key) > -1;
@@ -2008,7 +2010,7 @@
 		var isSavedGen = hasSavedGeneralApprovalLine() && !isEditableByAuthor;
 
 		if (actionType === 'CHG') {
-			return isApprovalEntryMode() || isSavedGen;
+			return isApprovalEntryMode();
 		}
 		return isApprovalEntryMode() || actionType === 'PAY' || actionType === 'V' || isPayDtExist || isSavedGen;
 	}
@@ -2295,7 +2297,7 @@
 			// 프로젝트 그리드
 			projectGridView.target.setData({ list: projectList, page: { totalElements: projectList.length } });
 			gridResize(projectGridView, projectList.length);
-			syncProjectDatesToTravelerGrid();
+			// 조회 시에는 저장된 출장기간과 식수를 유지한다. 프로젝트 날짜를 편집할 때만 연동한다.
 
 			// 예상경비 테이블 데이터 바인딩
 			bindExpenseTableData(expenseList); //예상경비
@@ -2331,6 +2333,7 @@
 			if (popParam && popParam.actionType === 'CHG') {
 				originalTripReqSnapshot = $.extend({}, data.result.m01 || {});
 				originalTravelerSnapshot = $.map(data.result.d01 || [], function (r) { return $.extend({}, r); });
+				originalProjectSnapshot = $.map(projectList || [], function (r) { return $.extend({}, r); });
 				renderTripReqChgDiff();
 				$('#chgDiffArea').show();
 			}
@@ -2423,6 +2426,15 @@
 			var currentTravelerNames = $.map(currentTravelers, function(t) { return t.userNm; }).join(', ');
 			var origTravelerNames = $.map(originalTravelerSnapshot, function(t) { return t.userNm; }).join(', ');
 			lines.push('출장자/출장기간: ' + origTravelerNames + ' → ' + currentTravelerNames);
+		}
+
+		// 전체 출장기간이 같아도 개별 프로젝트 기간 변경을 저장할 수 있어야 한다.
+		function projectRowSignature(p) {
+			return [p.ordrsNo || '', p.salesCd || '', p.stDt || '', p.edDt || '', p.md || '', p.etc || ''].join('|');
+		}
+		if ($.map(projectGridView.target.getList() || [], projectRowSignature).join(', ') !==
+			$.map(originalProjectSnapshot, projectRowSignature).join(', ')) {
+			lines.push('프로젝트 목록/시작일/종료일 변경');
 		}
 
 		// 렌더링
@@ -2669,13 +2681,13 @@
 			formData.append('exrate2', normalizeExchangeNumber($popForm.find('#exrate2').val()) || 1); //환율2
 
 			// 날짜 변환: datetime-local (2026-03-15T09:00) -> YYYYMMDDHH24MI
-			var stDtm = formatToYYYYMMDDHHMM($('#tripStDtm').val()) || tripSummary.tripStDtm; //출장시작일시
-			var edDtm = formatToYYYYMMDDHHMM($('#tripEdDtm').val()) || tripSummary.tripEdDtm; //출장종료일시
+			var stDtm = tripSummary.tripStDtm || formatToYYYYMMDDHHMM($('#tripStDtm').val()); //출장시작일시
+			var edDtm = tripSummary.tripEdDtm || formatToYYYYMMDDHHMM($('#tripEdDtm').val()); //출장종료일시
 			formData.append('tripStDtm', stDtm); //출장시작일시
 			formData.append('tripEdDtm', edDtm); //출장종료일시
 
-			formData.append('nightCnt', $('#nightCnt').val() || tripSummary.nightCnt); //박수
-			formData.append('dayCnt', $('#dayCnt').val() || tripSummary.dayCnt); //일수
+			formData.append('nightCnt', tripSummary.nightCnt); //박수
+			formData.append('dayCnt', tripSummary.dayCnt); //일수
 			formData.append('tripPlan', $('#tripPlan').val()); //출장계획
 			formData.append('tripPurpose', $('#tripPurpose').val()); //출장목적
 			// 예상경비 배열 수집 및 지급 금액 집계
