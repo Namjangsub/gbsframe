@@ -355,6 +355,17 @@
 		if (hasInitRetired) {
 			alert("퇴사자가 존재합니다.");
 		}
+
+		// 동일ID가 결재, 공유에 같이 들어가 있으면 공유는 자동 제거
+		var initAppIds = {};
+		approvalData.forEach(function(item) {
+			var uid = item ? (item.id || item.usrNm || item.todoId || item.empNo) : null;
+			if (uid) initAppIds[uid] = true;
+		});
+		shareData = shareData.filter(function(item) {
+			var uid = item ? (item.id || item.usrNm || item.todoId || item.empNo) : null;
+			return !uid || !initAppIds[uid];
+		});
 		
 		if (approvalData.length > 0) approvalGrid.setData(approvalData);
 		if (shareData.length > 0) shareGrid.setData(shareData);
@@ -507,7 +518,13 @@
 		  			if (_type == "approval") {
 		  				approvalData.push(nodeInfo);
 		  			} else {
-		  				shareData.push(nodeInfo);
+		  				var isAlreadyInApproval = approvalData.some(function(item) {
+		  					var uid = item ? (item.id || item.usrNm || item.todoId || item.empNo) : null;
+		  					return uid === nodeId;
+		  				});
+		  				if (!isAlreadyInApproval) {
+		  					shareData.push(nodeInfo);
+		  				}
 		  			}
 // 		  			console.log('---sanctnSn>>'+sanctnSn+'<--')		  			
 		  			sanctnSn++;
@@ -550,7 +567,13 @@
 		  			if (_type == "approval") {
 		  				approvalData.push(nodeInfo);
 		  			} else {
-		  				shareData.push(nodeInfo);
+		  				var isAlreadyInApproval = approvalData.some(function(item) {
+		  					var uid = item ? (item.id || item.usrNm || item.todoId || item.empNo) : null;
+		  					return uid === row.appId;
+		  				});
+		  				if (!isAlreadyInApproval) {
+		  					shareData.push(nodeInfo);
+		  				}
 		  			}
 		  			nodeInfo.sanctnSn	= sanctnSn;
 		  			//idx++;
@@ -565,6 +588,23 @@
 			alert("퇴사자가 존재합니다.");
 		}
 		
+		// 결재선에 동일 ID가 추가되었으면 공유선에서 자동 제거
+		if (_type == "approval") {
+			var appIds = {};
+			approvalData.forEach(function(item) {
+				var uid = item ? (item.id || item.usrNm || item.todoId || item.empNo) : null;
+				if (uid) appIds[uid] = true;
+			});
+			var prevShareLen = shareData.length;
+			shareData = shareData.filter(function(item) {
+				var uid = item ? (item.id || item.usrNm || item.todoId || item.empNo) : null;
+				return !uid || !appIds[uid];
+			});
+			if (shareData.length !== prevShareLen) {
+				shareGrid.setData(shareData);
+			}
+		}
+
 		//결재자, 공유자 그리드 json자료로 다시 그리기
 		if (_type == "approval") {
 			approvalGrid.setData(approvalData);
@@ -656,6 +696,22 @@
 // 		debugger;
 		var userLstTree = $('#userLstTree').jstree(true);
 		var list =  approvalGrid.target.getList(); //결재그리드
+
+		// 동일아이디가 결재라인, 공유라인에 같이 존재하면 공유라인에 있는 자료는 제거처리
+		var appIds = {};
+		$.each(list, function(idx, item) {
+			var uid = item ? (item.id || item.usrNm || item.todoId || item.empNo) : null;
+			if (uid) {
+				appIds[uid] = true;
+			}
+		});
+
+		shareData = (shareData || []).filter(function(item) {
+			var uid = item ? (item.id || item.usrNm || item.todoId || item.empNo) : null;
+			return uid && !appIds[uid];
+		});
+		shareGrid.setData(shareData);
+
 		var list1 =  shareGrid.target.getList(); //공유그리드
 
 		if (list.length == 0 && list1.length == 0){//공유 & 결재 그리드 모두 비어 있을때
