@@ -1179,45 +1179,69 @@
 
 	//Part List 출력
 	function setReportMulti(_type = "") {
-		// var selectedNodeIds = $('#deptTree').jstree('get_selected');
-		var selectedNodeIds = $('#deptTree').jstree(true).get_checked();
-// 			/* Sample Data
-// 				    "original": {
-// 				        "parent": "#",
-// 				        "id": "28616",
-// 				        "upperCd": "#",
-// 				        "lowerCd": "24000-00DUMMY",
+		var tree = $('#deptTree').jstree(true);
+		var checkedNodes = tree ? tree.get_checked(true) : [];
 
-// 			        "original": {
-// 			            "parent": "28616",
-// 			            "id": "47211",
-// 			            "upperCd": "24000-00DUMMY",
-// 			            "lowerCd": "7000",
-// 	        */
-		var targetPart = 'ALLPART';	//파트리스트 출력시 특정파트만 지정 가능하게 하기 위함.
-	 	if (selectedNodeIds.length != 0 ) {
-			var selDataList = [];
-	 	    for (var i = 0; i < selectedNodeIds.length; i++) {
-				var selectedNode = $('#deptTree').jstree('get_node', selectedNodeIds[i]);
-		        if (selectedNode.type == 'leaf') {
-		        	selectedNode = $('#deptTree').jstree('get_node', selectedNode.parent);
-		        }
-				if (selectedNode.parent != '#') { //트리 top 노드임
-					selDataList.push(selectedNode.original.lowerCd)
+		// Part List 출력(_type == "")인 경우: 선택된 항목에 대해서만 출력
+		var targetKeys = "";
+		var targetPart = 'ALLPART';
+
+		if (_type === 'T') {
+			targetPart = '9000';
+		} else if (_type === 'S') {
+			if (checkedNodes.length != 0) {
+				var selDataList = [];
+				for (var i = 0; i < checkedNodes.length; i++) {
+					var selectedNode = checkedNodes[i];
+					if (selectedNode.type == 'leaf') {
+						selectedNode = tree.get_node(selectedNode.parent);
+					}
+					if (selectedNode && selectedNode.parent != '#') {
+						selDataList.push(selectedNode.original.lowerCd);
+					}
 				}
-	 	    }
-			//선택된 노드의 정보를 콤마로 연결하여 파라메터로 전달하기 위함.
-	 		targetPart = selDataList.map(item => item).join(",");
-		}
+				targetPart = selDataList.map(item => item).join(",");
+			}
+			if (targetPart == '') targetPart = 'ALLPART';
+		} else {
+			// 일반 Part List 출력 (BM1401R01.jrf)
+			if (checkedNodes.length == 0) {
+				customAlert("출력할 파트 또는 항목을 좌측 트리에서 체크박스로 선택해 주세요.");
+				return;
+			}
 
-		if (targetPart == '') targetPart = 'ALLPART'; //선택된 내용이 없으면 전체 출력으로 인식함.
-		// Spare Part List 인지 구분하기 위함
-		if (_type === 'T') targetPart = '9000'
+			var targetKeySet = new Set();
+			checkedNodes.forEach(function(node) {
+				if (node.id === "new" || node.parent === "#") return;
+				if (node.type === 'leaf') {
+					// 개별 품목(001, 002 등)이 체크된 경우
+					targetKeySet.add(node.id);
+				} else {
+					// 상위 파트(1100 등)가 체크된 경우 -> 그 파트의 모든 하위 leaf 수집
+					if (node.children_d && node.children_d.length > 0) {
+						node.children_d.forEach(function(childId) {
+							var childNode = tree.get_node(childId);
+							if (childNode && childNode.type === 'leaf') {
+								targetKeySet.add(childNode.id);
+							}
+						});
+					}
+				}
+			});
+
+			if (targetKeySet.size == 0) {
+				customAlert("출력 가능한 하위 자재 항목이 선택되지 않았습니다.");
+				return;
+			}
+
+			targetKeys = Array.from(targetKeySet).join(",");
+		}
 
 	  	var arg =
 	  		  "coCd#"		+  $('#coCd_S').val()
 	  	    + "#salesCd#"	+  $("#salesCd_S").val()
 	  	    + "#partCd#"	+  targetPart
+	  	    + "#lowerKeys#"	+  targetKeys
 	      	+ "#userId#"	+  jwt.userId
 	      	+ "#";
 
