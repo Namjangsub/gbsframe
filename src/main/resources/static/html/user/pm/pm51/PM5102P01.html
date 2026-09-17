@@ -5046,6 +5046,7 @@
 			, "todoDiv2CodeId": todoDiv2CodeId
 			, "todoDiv1CodeNm": sanctnDiv2
 			, "title": buildTripRptGanttStyleTitle()
+			, "customBusinessContents": buildTripRptKakaoBusinessContents()
 			, "sanctnDiv2": sanctnDiv2				//템플릿 결재구분2 #{sanctnDiv2}
 			, "todoNo": docNo
 			, "clntCd": "1"
@@ -5054,7 +5055,6 @@
 			, "ordrgMngTelNo": teleNo				//담당자전화번호
 			, "creatPgm": "PM5102P01"
 			, "chkSentYn": "Y"					//기발송 수신자 제외(중복방지)
-			, "customMessage": buildTripRptKakaoMessage(sanctnDiv2, clntNm, teleNo)	//본문은 복명서 정보로 직접 조립 (제목은 기존 그대로)
 		};
 		if (sanctnSn) {
 			param.sanctnSn = sanctnSn;	// 순차결재: 지정 시 해당 순번(현재 차례)의 결재자에게만 발송
@@ -5062,8 +5062,9 @@
 		commKaKaoSendTodo(param);
 	}
 
-	// 알림톡 본문 조립 - 표준 양식(내용/업무/요청일시/요청자/확인문구/회사연락처) 참고: mobile/modal/WB2001P01.html
-	function buildTripRptKakaoMessage(sanctnDiv2, clntNm, teleNo) {
+
+	// 10003 고정 본문이 아닌 요청업무 변수에 넣을 출장 상세 내용
+	function buildTripRptKakaoBusinessContents() {
 		var tripPlace = $('#reqViewTripPlace').val() || '';
 		var clntPjtNm = $('#reqViewClntPjtNm').val() || '';
 		var tripDivNm = $('#reqViewTripDiv option:selected').text() || '';
@@ -5082,16 +5083,11 @@
 		var period = (stDt && edDt) ? stDt + '~' + edDt : '';
 
 		var info = tripPlace + ', ' + clntPjtNm + ', ' + tripDivNm;
-		var msg = '내용 : [출장복명서, ' + info + '] ' + sanctnDiv2 + ' 요청 건';
-		msg += '\n업무 : ' + info + ', ' + period + ' ' + travelerTxt;
+		var msg = info + ', ' + period + ' ' + travelerTxt;
 		var tripResult = $('#tripResult').val() || '';
 		if (tripResult) {
 			msg += '\n' + tripResult;
 		}
-		msg += '\n\n요청일시 : #{sendDt}';			//수신자 loop에서 치환됨
-		msg += '\n요청자 : ' + jwt.userNm;
-		msg += '\n\n' + sanctnDiv2 + ' 확인 바랍니다.';
-		msg += '\n\n' + clntNm + '/' + teleNo;
 		return msg;
 	}
 
@@ -5127,19 +5123,19 @@
 			param.rcvNm = sendObj.name;				//todo 수신자명
 			param.nameTo = sendObj.name;			//todo 수신자명
 			todoDiv2CodeNm = sendObj.todoTitl;
-			param.todoDiv2CodeNm = todoDiv2CodeNm;
+			param.todoDiv2CodeNm = param.customBusinessContents || todoDiv2CodeNm;
 			param.sendDt = sendObj.sendDt;
 
 			if (mobile == "" || mobile == null) {
 				alert('수신전화번호가 없습니다.\r\n[' + sendObj.name + '] 사용자의 전화번호를 확인해 주십시오.');
 				return;
 			}
-			if ((talkMessage == "" || talkMessage == null) && !param.customMessage) {
+			if (talkMessage == "" || talkMessage == null) {
 				alert('발송할 내용이 없습니다.\r\n알림톡템플릿관리를 확인해 주십시오.');
 				return;
 			}
-			//message 치환 (customMessage가 있으면 화면에서 조립한 본문 사용, 제목은 기존 그대로)
-			let message = param.customMessage ? param.customMessage : talkMessage;
+			// 10003 결재요청은 결재함과 동일하게 TMPLATDIV02 원문에서 변수만 치환한다.
+			let message = talkMessage;
 			let splitStr = Array.from(message.matchAll('\\{(.*?)\\}'), match => `${match[0]}`);
 			$.each(splitStr, function (key2, val) {
 				let compKey = val.substring(1, val.length - 1);
