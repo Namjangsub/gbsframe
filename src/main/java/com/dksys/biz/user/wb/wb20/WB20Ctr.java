@@ -204,6 +204,13 @@ public class WB20Ctr {
 		  return "jsonView";
 	  }
 
+	  @PostMapping(value = "/rejectApprovalLine")
+	  public String rejectApprovalLine(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		  Map<String, String> result = wb20Svc.rejectApprovalLine(paramMap);
+		  model.addAttribute("result", result);
+		  return "jsonView";
+	  }
+
 	  // 결재라인 싱글 셀렉트 read
 	  @PostMapping(value = "/selectSignResUserlst")
 	  public String selectSignResUserlst(@RequestBody Map<String, String> paramMap, ModelMap model) {

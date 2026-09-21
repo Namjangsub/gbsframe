@@ -8,9 +8,6 @@
 		SELECT COUNT(*)
 		FROM TB_PM51M01 M
 		WHERE 1 = 1
-		<if test="coCd != null and coCd != ''">
-			AND M.CO_CD = #{coCd}
-		</if>
 		<if test="srchStDt != null and srchStDt != '' and srchEdDt != null and srchEdDt != ''">
 			AND M.TRIP_ST_DTM &lt;= REPLACE(#{srchEdDt}, '-', '') || '235959'
 			AND M.TRIP_ED_DTM &gt;= REPLACE(#{srchStDt}, '-', '') || '000000'
@@ -53,8 +50,14 @@
 			FN_CM05M01_CD_TO_NM(M.CLNT_PJT) AS CLNT_PJT_NM,
 			M.CURR_CD,
 			FN_CM05M01_CD_TO_NM(M.CURR_CD) AS CURR_CD_NM,
-			M.APRV_STS_CD,
-			FN_CM05M01_CD_TO_NM(M.APRV_STS_CD) AS APRV_STS_NM,
+			CASE
+				WHEN EXISTS (SELECT 1 FROM TB_WB20M03 WHERE TODO_NO = M.TRIP_REQ_NO AND TODO_DIV2_CODE_ID = 'TODODIV2190' AND NVL(APPR_REJECT_YN, 'N') = 'Y') THEN 'RTN'
+				ELSE M.APRV_STS_CD
+			END AS APRV_STS_CD,
+			CASE
+				WHEN EXISTS (SELECT 1 FROM TB_WB20M03 WHERE TODO_NO = M.TRIP_REQ_NO AND TODO_DIV2_CODE_ID = 'TODODIV2190' AND NVL(APPR_REJECT_YN, 'N') = 'Y') THEN '반려'
+				ELSE FN_CM05M01_CD_TO_NM(M.APRV_STS_CD)
+			END AS APRV_STS_NM,
 			CASE
 				WHEN LENGTH(M.PAY_DT) >= 8 THEN SUBSTR(M.PAY_DT, 1, 4) || '-' || SUBSTR(M.PAY_DT, 5, 2) || '-' || SUBSTR(M.PAY_DT, 7, 2)
 				ELSE M.PAY_DT
@@ -69,8 +72,10 @@
 			CASE WHEN RP.TRIP_RPT_NO IS NULL THEN 'N' ELSE 'Y' END AS TRIP_RPT_YN,
 			(SELECT COUNT(*) FROM TB_WB20M03 WHERE TODO_NO = M.TRIP_REQ_NO AND TODO_DIV2_CODE_ID = 'TODODIV2190') AS APP_TOT_CNT,
 			(SELECT COUNT(*) FROM TB_WB20M03 WHERE TODO_NO = M.TRIP_REQ_NO AND TODO_DIV2_CODE_ID = 'TODODIV2190' AND SANCTN_STTUS = 'Y') AS APP_DONE_CNT,
+			(SELECT COUNT(*) FROM TB_WB20M03 WHERE TODO_NO = M.TRIP_REQ_NO AND TODO_DIV2_CODE_ID = 'TODODIV2190' AND NVL(APPR_REJECT_YN, 'N') = 'Y') AS APP_REJECT_CNT,
 			(SELECT COUNT(*) FROM TB_WB20M03 WHERE TODO_NO = M.TRIP_REQ_NO AND TODO_DIV2_CODE_ID = 'TODODIV2191') AS PAY_APP_TOT_CNT,
 			(SELECT COUNT(*) FROM TB_WB20M03 WHERE TODO_NO = M.TRIP_REQ_NO AND TODO_DIV2_CODE_ID = 'TODODIV2191' AND SANCTN_STTUS = 'Y') AS PAY_APP_DONE_CNT,
+			(SELECT COUNT(*) FROM TB_WB20M03 WHERE TODO_NO = M.TRIP_REQ_NO AND TODO_DIV2_CODE_ID = 'TODODIV2191' AND NVL(APPR_REJECT_YN, 'N') = 'Y') AS PAY_APP_REJECT_CNT,
 			(SELECT LISTAGG(D.USER_NM, ', ') WITHIN GROUP (ORDER BY D.SEQ) FROM TB_PM51D01 D WHERE D.TRIP_REQ_NO = M.TRIP_REQ_NO) AS TRAVELER_LIST,
 			(SELECT SUBSTR(MIN(D.TRIP_ST_DTM), 1, 10) || '~' || SUBSTR(MAX(D.TRIP_ED_DTM), 1, 10) FROM TB_PM51D01 D WHERE D.TRIP_REQ_NO = M.TRIP_REQ_NO) AS TRIP_PERIOD,
 			(SELECT COUNT(*) FROM TB_PM51H01 WHERE TRIP_REQ_NO = M.TRIP_REQ_NO) AS CHG_CNT,
@@ -115,7 +120,7 @@
 			TRIP_PLACE,
 			TRIP_NATION_NM,
 			NVL(TB_PM51M01.EQUIP_NM, 
-				NVL((SELECT D.EQUIP_NM FROM TB_PM51D03 D WHERE D.TRIP_REQ_NO = TB_PM51M01.TRIP_REQ_NO AND D.SEQ = (SELECT MIN(SEQ) FROM TB_PM51D03 WHERE TRIP_REQ_NO = TB_PM51M01.TRIP_REQ_NO)),
+				NVL((SELECT D.EQUIP_NM FROM TB_PM51D03 D WHERE D.TRIP_REQ_NO = TB_PM51M01.TRIP_REQ_NO AND D.SEQ = (SELECT MIN(SEQ) FROM TB_PM51D03 WHERE TRIP_REQ_NO = TB_PM51M01.TRIP_REQ_NO) AND ROWNUM = 1),
 					(SELECT EQ.EQP_NM FROM TB_CR02D02 EQ WHERE EQ.SALES_CD = TB_PM51M01.SALES_CD AND ROWNUM = 1)
 				)
 			) AS EQUIP_NM,
@@ -142,29 +147,36 @@
 			SPRT_ETC_TXT,
 			SPRT_TRFC_TXT,
 			SPRT_MEAL_TXT,
-			NVL(TB_PM51M01.SALES_CD, (SELECT D.SALES_CD FROM TB_PM51D03 D WHERE D.TRIP_REQ_NO = TB_PM51M01.TRIP_REQ_NO AND D.SEQ = (SELECT MIN(SEQ) FROM TB_PM51D03 WHERE TRIP_REQ_NO = TB_PM51M01.TRIP_REQ_NO))) AS SALES_CD,
+			NVL(TB_PM51M01.SALES_CD, (SELECT D.SALES_CD FROM TB_PM51D03 D WHERE D.TRIP_REQ_NO = TB_PM51M01.TRIP_REQ_NO AND D.SEQ = (SELECT MIN(SEQ) FROM TB_PM51D03 WHERE TRIP_REQ_NO = TB_PM51M01.TRIP_REQ_NO) AND ROWNUM = 1)) AS SALES_CD,
 			CLNT_CD,
-			(SELECT CLNT_NM FROM TB_BM02M01 WHERE CLNT_CD = TB_PM51M01.CLNT_CD) AS CLNT_NM,
+			(SELECT CLNT_NM FROM TB_BM02M01 WHERE CLNT_CD = TB_PM51M01.CLNT_CD AND ROWNUM = 1) AS CLNT_NM,
 			CLNT_PJT,
-			NVL(FN_CM05M01_CD_TO_NM(CLNT_PJT), (SELECT D.CLNT_PJT_NM FROM TB_PM51D03 D WHERE D.TRIP_REQ_NO = TB_PM51M01.TRIP_REQ_NO AND D.SEQ = (SELECT MIN(SEQ) FROM TB_PM51D03 WHERE TRIP_REQ_NO = TB_PM51M01.TRIP_REQ_NO))) AS CLNT_PJT_NM,
+			NVL(FN_CM05M01_CD_TO_NM(CLNT_PJT), (SELECT D.CLNT_PJT_NM FROM TB_PM51D03 D WHERE D.TRIP_REQ_NO = TB_PM51M01.TRIP_REQ_NO AND D.SEQ = (SELECT MIN(SEQ) FROM TB_PM51D03 WHERE TRIP_REQ_NO = TB_PM51M01.TRIP_REQ_NO) AND ROWNUM = 1)) AS CLNT_PJT_NM,
 			PM_ID,
-			NVL(FN_CM06M01_ID_TO_NM(PM_ID), (SELECT D.PM_NM FROM TB_PM51D03 D WHERE D.TRIP_REQ_NO = TB_PM51M01.TRIP_REQ_NO AND D.SEQ = (SELECT MIN(SEQ) FROM TB_PM51D03 WHERE TRIP_REQ_NO = TB_PM51M01.TRIP_REQ_NO))) AS PM_NM,
+			NVL(FN_CM06M01_ID_TO_NM(PM_ID), (SELECT D.PM_NM FROM TB_PM51D03 D WHERE D.TRIP_REQ_NO = TB_PM51M01.TRIP_REQ_NO AND D.SEQ = (SELECT MIN(SEQ) FROM TB_PM51D03 WHERE TRIP_REQ_NO = TB_PM51M01.TRIP_REQ_NO) AND ROWNUM = 1)) AS PM_NM,
 			CURR_CD,
 			EXRATE,
 			CURR_CD2,
 			EXRATE2,
+			CTRT_APPROVAL_NO,
+			CTRT_NO,
 			PAY_DT,
 			PAY_ID,
-			APRV_STS_CD,
+			PAY_RMK,
+			CASE
+				WHEN EXISTS (SELECT 1 FROM TB_WB20M03 WHERE TODO_NO = TB_PM51M01.TRIP_REQ_NO AND TODO_DIV2_CODE_ID = 'TODODIV2190' AND NVL(APPR_REJECT_YN, 'N') = 'Y') THEN 'RTN'
+				ELSE TB_PM51M01.APRV_STS_CD
+			END AS APRV_STS_CD,
 			FILE_TRGT_KEY,
 			CREAT_ID,
 			CREAT_DTTM,
+			TO_CHAR(TB_PM51M01.CREAT_DTTM, 'YYYY-MM-DD') AS REQ_DT,
 			UDT_ID,
 			UDT_DTTM,
 			CASE WHEN EXISTS (SELECT 1 FROM TB_PM52M01 R WHERE R.TRIP_REQ_NO = TB_PM51M01.TRIP_REQ_NO) THEN 'Y' ELSE 'N' END AS TRIP_RPT_YN,
 			(SELECT MAX(REV_NO) FROM TB_PM51H01 WHERE TRIP_REQ_NO = #{tripReqNo}) AS CUR_REV_NO,
 			CASE WHEN EXISTS (SELECT 1 FROM TB_PM51H01 WHERE TRIP_REQ_NO = #{tripReqNo}) THEN 'CHGSTS03' ELSE NULL END AS CHG_STS_CD,
-			(SELECT H.CHG_REASON FROM TB_PM51H01 H WHERE H.TRIP_REQ_NO = #{tripReqNo} AND H.REV_NO = (SELECT MAX(REV_NO) FROM TB_PM51H01 WHERE TRIP_REQ_NO = #{tripReqNo})) AS CHG_REASON
+			(SELECT H.CHG_REASON FROM TB_PM51H01 H WHERE H.TRIP_REQ_NO = #{tripReqNo} AND H.REV_NO = (SELECT MAX(REV_NO) FROM TB_PM51H01 WHERE TRIP_REQ_NO = #{tripReqNo}) AND ROWNUM = 1) AS CHG_REASON
 		FROM TB_PM51M01
 		WHERE TRIP_REQ_NO = #{tripReqNo}
 	</select>
@@ -286,8 +298,8 @@
 		SELECT COUNT(*) FROM TB_PM51H01 WHERE TRIP_REQ_NO = #{tripReqNo}
 	</select>
 	<insert id="insertTripReqHistM01" parameterType="Map">
-		INSERT INTO TB_PM51H01 (TRIP_REQ_NO, REV_NO, CHG_NO, CHG_REASON, CO_CD, TRIP_DIV, TRIP_AREA_DIV, TRIP_TYPE_CDS, TRIP_PLACE, TRIP_NATION_NM, EQUIP_NM, TRIP_PLAN, TRIP_ST_DTM, TRIP_ED_DTM, NIGHT_CNT, DAY_CNT, TRIP_PURPOSE, PAY_AMT_KRW, PAY_AMT_USD, PAY_AMT_USD2, USER_ID, SALES_CD, CLNT_CD, CLNT_PJT, PM_ID, CURR_CD, EXRATE, CURR_CD2, EXRATE2, PAY_DT, PAY_ID, CREAT_ID, CREAT_PGM, CREAT_DTTM, HIST_DTTM, HIST_ID)
-		SELECT M.TRIP_REQ_NO, #{revNo, jdbcType=NUMERIC}, NULL, #{chgReason, jdbcType=VARCHAR}, M.CO_CD, M.TRIP_DIV, M.TRIP_AREA_DIV, M.TRIP_TYPE_CDS, M.TRIP_PLACE, M.TRIP_NATION_NM, M.EQUIP_NM, M.TRIP_PLAN, M.TRIP_ST_DTM, M.TRIP_ED_DTM, M.NIGHT_CNT, M.DAY_CNT, M.TRIP_PURPOSE, M.PAY_AMT_KRW, M.PAY_AMT_USD, M.PAY_AMT_USD2, M.USER_ID, M.SALES_CD, M.CLNT_CD, M.CLNT_PJT, M.PM_ID, M.CURR_CD, M.EXRATE, M.CURR_CD2, M.EXRATE2, M.PAY_DT, M.PAY_ID, M.CREAT_ID, M.CREAT_PGM, M.CREAT_DTTM, SYSDATE, #{userId, jdbcType=VARCHAR} FROM TB_PM51M01 M WHERE M.TRIP_REQ_NO=#{tripReqNo}
+		INSERT INTO TB_PM51H01 (TRIP_REQ_NO, REV_NO, CHG_NO, CHG_REASON, CO_CD, TRIP_DIV, TRIP_AREA_DIV, TRIP_TYPE_CDS, TRIP_PLACE, TRIP_NATION_NM, EQUIP_NM, TRIP_PLAN, TRIP_ST_DTM, TRIP_ED_DTM, NIGHT_CNT, DAY_CNT, TRIP_PURPOSE, PAY_AMT_KRW, PAY_AMT_USD, PAY_AMT_USD2, USER_ID, SALES_CD, CLNT_CD, CLNT_PJT, PM_ID, CURR_CD, EXRATE, CURR_CD2, EXRATE2, PAY_DT, PAY_ID, PAY_RMK, CREAT_ID, CREAT_PGM, CREAT_DTTM, HIST_DTTM, HIST_ID)
+		SELECT M.TRIP_REQ_NO, #{revNo, jdbcType=NUMERIC}, NULL, #{chgReason, jdbcType=VARCHAR}, M.CO_CD, M.TRIP_DIV, M.TRIP_AREA_DIV, M.TRIP_TYPE_CDS, M.TRIP_PLACE, M.TRIP_NATION_NM, M.EQUIP_NM, M.TRIP_PLAN, M.TRIP_ST_DTM, M.TRIP_ED_DTM, M.NIGHT_CNT, M.DAY_CNT, M.TRIP_PURPOSE, M.PAY_AMT_KRW, M.PAY_AMT_USD, M.PAY_AMT_USD2, M.USER_ID, M.SALES_CD, M.CLNT_CD, M.CLNT_PJT, M.PM_ID, M.CURR_CD, M.EXRATE, M.CURR_CD2, M.EXRATE2, M.PAY_DT, M.PAY_ID, M.PAY_RMK, M.CREAT_ID, M.CREAT_PGM, M.CREAT_DTTM, SYSDATE, #{userId, jdbcType=VARCHAR} FROM TB_PM51M01 M WHERE M.TRIP_REQ_NO=#{tripReqNo}
 	</insert>
 	<insert id="insertTripReqHistD01" parameterType="Map">
 		INSERT INTO TB_PM51H02 (TRIP_REQ_NO, SEQ, USER_ID, DEPT_NM, POSITION_NM, USER_NM, TRIP_ST_DTM, TRIP_ED_DTM, NIGHT_CNT, DAY_CNT, EAT_CNT, TRAFFIC_AMT, LODGING_AMT, MEAL_AMT, DAILY_AMT, SPECIAL_AMT, TOTAL_AMT, ETC, REV_NO, CHG_NO)
@@ -308,7 +320,7 @@
 			TRIP_ST_DTM, TRIP_ED_DTM, NIGHT_CNT, DAY_CNT, TRIP_PURPOSE,
 			PAY_AMT_KRW, PAY_AMT_USD, PAY_AMT_USD2, SALES_CNFRM_YN, USER_ID, SALES_CNFRM_DT, TRIP_COND_CD, ETC,
 			SPRT_TRFC_YN, SPRT_LDG_YN, SPRT_MEAL_YN, SPRT_ETC_YN, SPRT_ETC_TXT, SPRT_TRFC_TXT, SPRT_MEAL_TXT,
-			SALES_CD, CLNT_CD, CLNT_PJT, PM_ID, CURR_CD, EXRATE, CURR_CD2, EXRATE2, PAY_DT, PAY_ID,
+			SALES_CD, CLNT_CD, CLNT_PJT, PM_ID, CURR_CD, EXRATE, CURR_CD2, EXRATE2, CTRT_APPROVAL_NO, CTRT_NO, PAY_DT, PAY_ID, PAY_RMK,
 			APRV_STS_CD, FILE_TRGT_KEY,
 			CREAT_ID, CREAT_PGM, CREAT_DTTM
 		) VALUES (
@@ -316,7 +328,7 @@
 			#{tripStDtm, jdbcType=VARCHAR}, #{tripEdDtm, jdbcType=VARCHAR}, #{nightCnt, jdbcType=NUMERIC}, #{dayCnt, jdbcType=NUMERIC}, #{tripPurpose, jdbcType=VARCHAR},
 			#{payAmtKrw, jdbcType=NUMERIC}, #{payAmtUsd, jdbcType=NUMERIC}, #{payAmtUsd2, jdbcType=NUMERIC}, #{salesCnfrmYn, jdbcType=VARCHAR}, #{reqId, jdbcType=VARCHAR}, #{salesCnfrmDt, jdbcType=VARCHAR}, #{tripCondCd, jdbcType=VARCHAR}, #{etc, jdbcType=VARCHAR},
 			#{sprtTrfcYn, jdbcType=VARCHAR}, #{sprtLdgYn, jdbcType=VARCHAR}, #{sprtMealYn, jdbcType=VARCHAR}, #{sprtEtcYn, jdbcType=VARCHAR}, #{sprtEtcTxt, jdbcType=VARCHAR}, #{sprtTrfcTxt, jdbcType=VARCHAR}, #{sprtMealTxt, jdbcType=VARCHAR},
-			#{salesCd, jdbcType=VARCHAR}, #{clntCd, jdbcType=VARCHAR}, #{clntPjt, jdbcType=VARCHAR}, #{pmId, jdbcType=VARCHAR}, #{currCd, jdbcType=VARCHAR}, #{exrate, jdbcType=NUMERIC}, #{currCd2, jdbcType=VARCHAR}, #{exrate2, jdbcType=NUMERIC}, #{payDt, jdbcType=VARCHAR}, #{payId, jdbcType=VARCHAR},
+			#{salesCd, jdbcType=VARCHAR}, #{clntCd, jdbcType=VARCHAR}, #{clntPjt, jdbcType=VARCHAR}, #{pmId, jdbcType=VARCHAR}, #{currCd, jdbcType=VARCHAR}, #{exrate, jdbcType=NUMERIC}, #{currCd2, jdbcType=VARCHAR}, #{exrate2, jdbcType=NUMERIC}, #{ctrtApprovalNo, jdbcType=VARCHAR}, #{ctrtNo, jdbcType=VARCHAR}, #{payDt, jdbcType=VARCHAR}, #{payId, jdbcType=VARCHAR}, #{payRmk, jdbcType=VARCHAR},
 			'APRVSTS01', #{tripReqNo},
 			#{userId}, #{pgmId}, SYSDATE
 		)
@@ -385,8 +397,11 @@
 			EXRATE = #{exrate, jdbcType=NUMERIC},
 			CURR_CD2 = #{currCd2, jdbcType=VARCHAR},
 			EXRATE2 = #{exrate2, jdbcType=NUMERIC},
+			CTRT_APPROVAL_NO = #{ctrtApprovalNo, jdbcType=VARCHAR},
+			CTRT_NO = #{ctrtNo, jdbcType=VARCHAR},
 			PAY_DT = #{payDt, jdbcType=VARCHAR},
 			PAY_ID = #{payId, jdbcType=VARCHAR},
+			PAY_RMK = #{payRmk, jdbcType=VARCHAR},
 			UDT_ID = #{userId},
 			UDT_PGM = #{pgmId},
 			UDT_DTTM = SYSDATE
@@ -404,13 +419,14 @@
 			CURR_CD2 = #{currCd2, jdbcType=VARCHAR},
 			EXRATE2 = #{exrate2, jdbcType=NUMERIC},
 			TRIP_AREA_DIV = #{tripAreaDiv, jdbcType=VARCHAR},
+			PAY_RMK = #{payRmk, jdbcType=VARCHAR},
 			UDT_ID = #{userId},
 			UDT_PGM = #{pgmId},
 			UDT_DTTM = SYSDATE
 		WHERE TRIP_REQ_NO = #{tripReqNo}
 	</update>
 
-	<!-- 출장신청서 출장자 삭제 -->
+	<!-- 출장신청서 결재상태 변경 -->
 	<update id="updateTripReqAprvStsCd" parameterType="Map">
 		UPDATE TB_PM51M01
 		SET
@@ -421,11 +437,23 @@
 		WHERE TRIP_REQ_NO = #{tripReqNo}
 	</update>
 
+	<!-- 출장신청서 결재선(일반결재 2190 + 관리부서결재 2191)이 모두 승인 완료되었는지 여부.
+	     미승인 행이 하나도 없으면 'Y'(전체 완료), 있으면 'N'. 2191 라인이 없는 문서는 2190만으로 판정. -->
+	<select id="selectTripReqAllApprovalDone" parameterType="Map" resultType="String">
+		SELECT CASE WHEN COUNT(*) = 0 THEN 'Y' ELSE 'N' END
+		  FROM TB_WB20M03
+		 WHERE TODO_NO = #{todoNo}
+		   AND TODO_DIV1_CODE_ID = 'TODODIV20'
+		   AND TODO_DIV2_CODE_ID IN ('TODODIV2190', 'TODODIV2191')
+		   AND NVL(SANCTN_STTUS, 'N') != 'Y'
+	</select>
+
 	<update id="updateTripReqPayDone" parameterType="Map">
 		UPDATE TB_PM51M01
 		SET
 			PAY_DT = TO_CHAR(SYSDATE, 'YYYYMMDDHH24MISS'),
 			PAY_ID = #{userId},
+			PAY_RMK = #{payRmk, jdbcType=VARCHAR},
 			UDT_ID = #{userId},
 			UDT_PGM = #{pgmId},
 			UDT_DTTM = SYSDATE
@@ -513,6 +541,13 @@
 		WHERE TODO_NO = #{reqNo}
 			AND SANCTN_SN &gt; 1
 			AND SANCTN_STTUS = 'Y'
+			/* 반려된 결재선이 존재하는 문서는 결재 진행 중으로 보지 않음 (작성자 재수정 진입 허용) */
+			AND NOT EXISTS (
+				SELECT 1
+				  FROM TB_WB20M03 R
+				 WHERE R.TODO_NO = #{reqNo}
+				   AND R.APPR_REJECT_YN = 'Y'
+			)
 	</select>
 
 	<select id="selectApprovalMngChk" parameterType="Map" resultType="CamelMap">
@@ -854,8 +889,11 @@
 			APRV_EVAL_CD,
 			APRV_STS_CD,
 			FILE_TRGT_KEY,
+			CTRT_APPROVAL_NO,
+			CTRT_NO,
 			CREAT_ID,
 			CREAT_DTTM,
+			TO_CHAR(TB_PM52M01.CREAT_DTTM, 'YYYY-MM-DD') AS RPT_DT,
 			UDT_ID,
 			UDT_DTTM,
 			ACCT_NIGHT_CNT,
@@ -1013,14 +1051,14 @@
 			TRIP_RPT_NO, CO_CD, TRIP_REQ_NO, ACT_ST_DTM, ACT_ED_DTM, TRIP_PURPOSE, TRIP_RESULT,
 			SELF_EVAL_CD, DEPT_EVAL_CD, FINAL_EVAL_CD, SPECIAL_NOTE, EXTEND_RSN, MINUTES_MISS_RSN,
 			ADV_RCV_AMT_KRW, ADV_RCV_AMT_USD, ADV_RCV_AMT_USD2, SETTLE_AMT_KRW, SETTLE_AMT_USD, SETTLE_AMT_USD2,
-			SPRT_EVAL_CD, APRV_EVAL_CD,
+			SPRT_EVAL_CD, APRV_EVAL_CD, CTRT_APPROVAL_NO, CTRT_NO,
 			APRV_STS_CD, FILE_TRGT_KEY,
 			CREAT_ID, CREAT_PGM, CREAT_DTTM
 		) VALUES (
 			#{tripRptNo}, #{coCd}, #{tripReqNo}, #{actStDtm}, #{actEdDtm}, #{tripPurpose}, #{tripResult},
 			#{selfEvalCd}, #{deptEvalCd}, #{finalEvalCd}, #{specialNote}, #{extendRsn}, #{minutesMissRsn},
 			#{advRcvAmtKrw}, #{advRcvAmtUsd}, #{advRcvAmtUsd2, jdbcType=NUMERIC}, #{settleAmtKrw}, #{settleAmtUsd}, #{settleAmtUsd2, jdbcType=NUMERIC},
-			#{sprtEvalCd}, #{aprvEvalCd},
+			#{sprtEvalCd}, #{aprvEvalCd}, #{ctrtApprovalNo, jdbcType=VARCHAR}, #{ctrtNo, jdbcType=VARCHAR},
 			'APRVSTS01', #{tripRptNo},
 			#{userId}, #{pgmId}, SYSDATE
 		)
@@ -1132,6 +1170,8 @@
 			SETTLE_AMT_USD2 = #{settleAmtUsd2, jdbcType=NUMERIC},
 			SPRT_EVAL_CD = #{sprtEvalCd},
 			APRV_EVAL_CD = #{aprvEvalCd},
+			CTRT_APPROVAL_NO = #{ctrtApprovalNo, jdbcType=VARCHAR},
+			CTRT_NO = #{ctrtNo, jdbcType=VARCHAR},
 			UDT_ID = #{userId},
 			UDT_PGM = #{pgmId},
 			UDT_DTTM = SYSDATE
@@ -1180,11 +1220,9 @@
 		INNER JOIN TB_PM01M01 M ON T.WORK_RPT_NO = M.WORK_RPT_NO
 		LEFT JOIN TB_PM52D01 S
 			ON S.TRIP_RPT_NO = #{tripRptNo, jdbcType=VARCHAR}
-			AND S.CO_CD = T.CO_CD
 			AND S.WORK_RPT_NO = T.WORK_RPT_NO
 			AND S.WORK_RPT_NO_SEQ = T.WORK_RPT_NO_SEQ
-		WHERE T.CO_CD = #{coCd}
-			AND T.TRIP_RPT_AMT IS NOT NULL
+		WHERE T.TRIP_RPT_AMT IS NOT NULL
 			AND M.WORK_RPT_DT BETWEEN TO_DATE(#{stDt}, 'YYYY-MM-DD') AND TO_DATE(#{edDt}, 'YYYY-MM-DD')
 			AND T.WORK_RPT_ID IN
 			<foreach collection="userIds" item="userId" open="(" separator="," close=")">
@@ -1193,16 +1231,15 @@
 			<!-- 다른 복명서(TB_PM52D01 또는 T.TRIP_RPT_NO)에 이미 등록/반영된 경비 내역은 제외 (현재 복명서 건만 포함) -->
 			AND (T.TRIP_RPT_NO IS NULL
 			<if test="tripRptNo != null and tripRptNo != ''">
-				OR T.TRIP_RPT_NO = #{tripRptNo, jdbcType=VARCHAR}
+				OR T.TRIP_RPT_NO = #{tripRptNo}
 			</if>
 			)
 			AND NOT EXISTS (
 				SELECT 1 FROM TB_PM52D01 X
-				WHERE X.CO_CD = T.CO_CD
-					AND X.WORK_RPT_NO = T.WORK_RPT_NO
+				WHERE X.WORK_RPT_NO = T.WORK_RPT_NO
 					AND X.WORK_RPT_NO_SEQ = T.WORK_RPT_NO_SEQ
 					<if test="tripRptNo != null and tripRptNo != ''">
-						AND X.TRIP_RPT_NO != #{tripRptNo, jdbcType=VARCHAR}
+						AND X.TRIP_RPT_NO != #{tripRptNo}
 					</if>
 			)
 		ORDER BY M.WORK_RPT_DT, T.WORK_RPT_NO, T.WORK_RPT_NO_SEQ
@@ -1220,8 +1257,7 @@
 			UDT_ID = #{userId},
 			UDT_PGM = #{pgmId},
 			UDT_DTTM = SYSDATE
-		WHERE CO_CD = #{coCd}
-			AND WORK_RPT_NO = #{workRptNo}
+		WHERE WORK_RPT_NO = #{workRptNo}
 			AND WORK_RPT_NO_SEQ = #{workRptNoSeq}
 	</update>
 
@@ -1285,7 +1321,7 @@
 			AND T.TRIP_RPT_NO != #{tripRptNo}
 			AND (
 			<foreach collection="rows" item="row" separator=" OR ">
-				(T.CO_CD = #{row.coCd} AND T.WORK_RPT_NO = #{row.workRptNo} AND T.WORK_RPT_NO_SEQ = #{row.workRptNoSeq})
+				(T.WORK_RPT_NO = #{row.workRptNo} AND T.WORK_RPT_NO_SEQ = #{row.workRptNoSeq})
 			</foreach>
 			)
 		ORDER BY M.WORK_RPT_DT, T.WORK_RPT_NO, T.WORK_RPT_NO_SEQ
@@ -1310,8 +1346,7 @@
 			UDT_ID = #{userId},
 			UDT_PGM = #{pgmId},
 			UDT_DTTM = SYSDATE
-		WHERE CO_CD = #{coCd}
-			AND WORK_RPT_NO = #{workRptNo}
+		WHERE WORK_RPT_NO = #{workRptNo}
 			AND WORK_RPT_NO_SEQ = #{workRptNoSeq}
 	</update>
 
@@ -1361,11 +1396,97 @@
 			MAX(CASE WHEN WBS_PLAN_CODE_KIND = 'WBSCODE14' THEN TO_CHAR(WBS_PLANE_DT, 'YYYYMMDD') END) AS PLAN14_EDT
 		FROM TB_WB22M01
 		WHERE SALES_CD = #{salesCd, jdbcType=VARCHAR}
-		  AND CO_CD = #{coCd, jdbcType=VARCHAR}
 		  AND CLOSE_YN = 'Y'
 		  AND WBS_PLAN_MNG_ID IS NOT NULL
 		  AND WBS_PLANS_DT IS NOT NULL
 		  AND WBS_PLANE_DT IS NOT NULL
+	</select>
+
+	<!-- 출장신청서 연동 전자결재 문서 ID 조회 -->
+	<!-- ERP_BIZ_KEY(=TRIP_REQ_NO)는 전역 UNIQUE 키이므로 이 값만으로 조회한다 (CO_CD는 조건에 사용하지 않음) -->
+	<select id="selectAmDocIdByTripReqNo" parameterType="Map" resultType="String">
+		SELECT DOC_ID
+		  FROM (
+				SELECT DOC_ID
+				  FROM TB_AM11M01
+				 WHERE ERP_BIZ_KEY = #{tripReqNo}
+				 ORDER BY CREAT_DTTM DESC
+			   )
+		 WHERE ROWNUM = 1
+	</select>
+
+	<!-- 출장신청서 삭제 시 전자결재 결재선 삭제 -->
+	<!-- ERP_BIZ_KEY(=TRIP_REQ_NO)는 전역 UNIQUE 키이므로 이 값만으로 대상 문서를 특정한다 (CO_CD 조건 불필요) -->
+	<delete id="deleteAmApprovalLinesByBizKey" parameterType="Map">
+		DELETE FROM TB_AM11D01
+		 WHERE DOC_ID IN (
+				SELECT DOC_ID
+				  FROM TB_AM11M01
+				 WHERE ERP_BIZ_KEY = #{tripReqNo}
+			   )
+	</delete>
+
+	<!-- 출장신청서 삭제 시 전자결재 문서 삭제 -->
+	<delete id="deleteAmApprovalDocByBizKey" parameterType="Map">
+		DELETE FROM TB_AM11M01
+		 WHERE ERP_BIZ_KEY = #{tripReqNo}
+	</delete>
+
+	<!-- TRN 외주계약 검색 (신청인 소속회사가 TRN일 때) -->
+	<select id="selectTrnContractList" parameterType="Map" resultType="CamelMap">
+		SELECT DISTINCT
+			M.CTRT_APPROVAL_NO,
+			M.CTRT_NO,
+			M.ORDRS_NO,
+			MD.SALES_CD,
+			M.CLNT_CD,
+			B.CLNT_NM,
+			B.CLNT_NM                           AS CTRT_VEND_NM,
+			M.CLNT_CD                           AS CTRT_VEND_CD,
+			MNG_U.NAME                          AS CTRT_MNG_NM,
+			M.MNG_ID                            AS CTRT_MNG_ID,
+			NVL(CR.EQP_NM, CM.CTRT_NM) AS EQP_NM,
+			CR.CO_CD                            AS CO_CD,
+			SC_M.ORDRS_CLNT_CD                  AS ORDRS_CLNT_CD,
+			SC_B.CLNT_NM                        AS ORDRS_CLNT_NM,
+			SC_M.CLNT_PJT                       AS CLNT_PJT,
+			FN_CM05M01_CD_TO_NM(SC_M.CLNT_PJT)  AS CLNT_PJT_NM,
+			SC_W.SMRIZE_ID                      AS PM_ID,
+			FN_CM06M01_ID_TO_NM(SC_W.SMRIZE_ID) AS PM_NM
+		FROM TB_SM11M01 M
+		LEFT OUTER JOIN TB_BM02M01 B ON M.CLNT_CD = B.CLNT_CD
+		LEFT OUTER JOIN TB_CM06M01 MNG_U ON MNG_U.ID = M.MNG_ID
+		LEFT OUTER JOIN (
+			SELECT MM.CTRT_NO, MM.SALES_CD, MM.ORDRS_CO_CD
+			  FROM TB_SM11D02 MM
+			 WHERE MM.CTRT_NO_SEQ = (SELECT MIN(CTRT_NO_SEQ) FROM TB_SM11D02 D WHERE D.CTRT_NO = MM.CTRT_NO)
+		) AS MD ON MD.CTRT_NO = M.CTRT_NO
+		LEFT OUTER JOIN TB_CR02D02 CR ON CR.SALES_CD = MD.SALES_CD
+		LEFT OUTER JOIN TB_CR02M01 CM ON CM.CO_CD = M.ORDRS_CO_CD AND CM.ORDRS_NO = M.ORDRS_NO
+		<!-- 정상 Sales Code 선택과 동일한 영업정보(고객사/프로젝트/총괄PM) 도출: wb01.selectWbsSalesCodeList 의 X(TB_CR02D02)->Y(TB_CR02M01)->A(TB_BM02M01)->W1(TB_WB21M01) 체인을 계약의 CR 기준으로 재현 -->
+		LEFT OUTER JOIN TB_CR02M01 SC_M ON SC_M.CO_CD = CR.CO_CD AND SC_M.ORDRS_NO = CR.ORDRS_NO
+		LEFT OUTER JOIN TB_BM02M01 SC_B ON SC_B.CLNT_CD = SC_M.ORDRS_CLNT_CD
+		LEFT OUTER JOIN TB_WB21M01 SC_W ON SC_W.CO_CD = CR.CO_CD AND SC_W.SALES_CD = CR.SALES_CD
+			AND SC_W.VER_NO = (SELECT MAX(SC_W2.VER_NO) FROM TB_WB21M01 SC_W2 WHERE SC_W2.CO_CD = SC_W.CO_CD AND SC_W2.SALES_CD = SC_W.SALES_CD)
+		WHERE 1=1
+		<if test="coCd != null and !coCd.equals('')">
+			AND M.CO_CD = #{coCd}
+		</if>
+		<if test="ctrtNo != null and !ctrtNo.equals('')">
+			AND M.CTRT_NO = #{ctrtNo}
+		</if>
+		<if test="searchValue != null and !searchValue.equals('')">
+			AND (
+				REPLACE(REPLACE(M.CTRT_APPROVAL_NO, '-', ''), ' ', '') LIKE '%' || REPLACE(REPLACE(UPPER(#{searchValue}), '-', ''), ' ', '') || '%'
+				OR REPLACE(REPLACE(M.CTRT_NO, '-', ''), ' ', '') LIKE '%' || REPLACE(REPLACE(UPPER(#{searchValue}), '-', ''), ' ', '') || '%'
+				OR REPLACE(REPLACE(MD.SALES_CD, '-', ''), ' ', '') LIKE '%' || REPLACE(REPLACE(UPPER(#{searchValue}), '-', ''), ' ', '') || '%'
+				OR REPLACE(REPLACE(M.ORDRS_NO, '-', ''), ' ', '') LIKE '%' || REPLACE(REPLACE(UPPER(#{searchValue}), '-', ''), ' ', '') || '%'
+				OR UPPER(B.CLNT_NM) LIKE '%' || UPPER(#{searchValue}) || '%'
+				OR UPPER(SC_B.CLNT_NM) LIKE '%' || UPPER(#{searchValue}) || '%'
+				OR UPPER(NVL(CR.EQP_NM, CM.CTRT_NM)) LIKE '%' || UPPER(#{searchValue}) || '%'
+			)
+		</if>
+		ORDER BY M.CTRT_NO DESC, M.CTRT_APPROVAL_NO DESC
 	</select>
 
 </mapper>

@@ -1,0 +1,131 @@
+<div id="contractSearchPopup" style="width: 100%; height: 100%;">
+	<div class="popup_table" style="padding: 10px 10px 0 10px;">
+		<div class="search_form">
+			<input type="text" id="contractSearchValue" name="contractSearchValue" placeholder="계약번호/영업코드/고객사/설비명 등 검색어 입력" onkeypress="if(event.keyCode == 13){searchContract();}">
+			<a id="contractSearchBtn" onclick="searchContract();">
+				<i class="i_search_w"></i>
+			</a>
+		</div>
+	</div>
+	<div style="padding: 5px 0px;">
+		<div id="contractGrid" class="ax5_grid" data-ax5grid="contractGridView" data-ax5grid-config="{}" style="height: 710px; width: 100%;"></div>
+	</div>
+	<div style="padding: 5px 0px;">
+		<button type="button" class="btn btn-default btn-sm" onclick="executeContractCallback();">선택</button>
+		<button type="button" class="btn btn-default btn-sm" onclick="modalStack.close();">닫기</button>
+	</div>
+</div>
+
+<script type="text/javascript">
+var contractGridView = null;
+var contractFullList = [];
+var contractPageSize = 100;
+
+// 모달 조각은 이미 ready된 문서에 동적 주입되므로 $(document).ready 콜백이 실행되지 않을 수 있다.
+// (다른 모달 조각과 동일하게) 인라인에서 직접 초기화한다.
+initContractGrid();
+searchContract();
+$('#contractSearchValue').focus();
+
+function initContractGrid() {
+	contractGridView = { target: new ax5.ui.grid() };
+	contractGridView.target.setConfig({
+		target: $('#contractGrid'),
+		showRowSelector: true,
+		multipleSelect: false,
+		sortable: false,
+		header: {
+			align: "center",
+			selector: true
+		},
+		body: {
+			onClick: function () {
+				this.self.select(this.dindex);
+			},
+			onDBLClick: function () {
+				this.self.select(this.dindex);
+				executeContractCallback();
+			}
+		},
+		page: {
+			display: true,
+			navigationItemCount: 10,
+			height: 30,
+			statusDisplay: true,
+			onChange: function() {
+				var pageNum = this.page.selectPage;
+				loadContractGridPage(pageNum);
+			}
+		},
+		columns: [
+			{ key: 'ctrtApprovalNo', label: '계약번호', width: 60, align: 'center' },
+			{ key: 'ctrtNo', label: '외주계약번호', width: 90, align: '	' },
+			{ key: 'ordrsNo', label: '수주번호', width: 60, align: 'center' },
+			{ key: 'salesCd', label: 'salesCd', width: 120, align: 'center' },
+			{ key: 'clntNm', label: '고객사', width: 150, align: 'left' },
+			{ key: 'ctrtVendNm', label: '외주계약업체명', width: 130, align: 'left' },
+			{ key: 'ctrtMngNm', label: '외주계약담당자명', width: 110, align: 'center' },
+			{ key: 'eqpNm', label: '설비명', width: "*", align: 'left' }
+		]
+	});
+}
+
+// pageNum 은 AX5-Grid page 기준 0-based 페이지 인덱스
+function loadContractGridPage(pageNum) {
+	var totalElements = contractFullList.length;
+	var totalPages = Math.ceil(totalElements / contractPageSize);
+
+	var startIdx = pageNum * contractPageSize;
+	var endIdx = startIdx + contractPageSize;
+	var slicedList = contractFullList.slice(startIdx, endIdx);
+
+	contractGridView.target.setData({
+		list: slicedList,
+		page: {
+			currentPage: pageNum,
+			pageSize: contractPageSize,
+			totalElements: totalElements,
+			totalPages: totalPages
+		}
+	});
+}
+
+function searchContract() {
+	if (!contractGridView || !contractGridView.target) { initContractGrid(); }
+	var searchValue = $('#contractSearchValue').val() || '';
+	var paramObj = modalStack.last().paramObj;
+	var coCd = paramObj.coCd || '';
+
+	var param = {
+		coCd: coCd,
+		searchValue: searchValue
+	};
+
+	postAjaxSync("/user/pm/pm51/selectTrnContractList", param, null, function(data) {
+		if (data && data.result) {
+			contractFullList = data.result || [];
+		} else {
+			contractFullList = [];
+		}
+		loadContractGridPage(0);
+	});
+}
+
+function executeContractCallback() {
+	var selectedRows = contractGridView.target.getList('selected');
+
+	if (selectedRows.length === 0) {
+		alert("선택된 계약이 없습니다.");
+		return false;
+	}
+
+	var selectedContract = selectedRows[0];
+	var callback = modalStack.last().callback;
+
+	if (typeof callback === 'function') {
+		callback(selectedContract);
+	}
+
+	modalStack.close();
+}
+</script>

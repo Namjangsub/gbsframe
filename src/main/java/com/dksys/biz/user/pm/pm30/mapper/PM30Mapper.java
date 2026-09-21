@@ -36,4 +36,12 @@ public interface PM30Mapper {
 
 	int updateAttendanceCloseYm(Map<String, Object> paramMap);
 
+	List<Map<String, String>> selectComprehensiveMain(Map<String, String> paramMap);
+
+	List<Map<String, String>> selectChangeSumByMonth(Map<String, String> paramMap);
+
+	List<Map<String, String>> selectSubstWorkOccur(Map<String, String> paramMap);
+
+	List<Map<String, String>> selectSubstVacUse(Map<String, String> paramMap);
+
 }

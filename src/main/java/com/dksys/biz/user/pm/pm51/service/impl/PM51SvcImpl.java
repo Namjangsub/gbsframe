@@ -2,12 +2,16 @@ package com.dksys.biz.user.pm.pm51.service.impl;
 
 import java.lang.reflect.Type;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -16,6 +20,7 @@ import org.springframework.web.multipart.MultipartHttpServletRequest;
 import com.dksys.biz.admin.cm.cm05.service.CM05Svc;
 import com.dksys.biz.admin.cm.cm06.mapper.CM06Mapper;
 import com.dksys.biz.admin.cm.cm08.service.CM08Svc;
+import com.dksys.biz.user.am.am11.service.AM11Svc;
 import com.dksys.biz.user.pm.pm30.service.PM30Svc;
 import com.dksys.biz.user.pm.pm51.mapper.PM51Mapper;
 import com.dksys.biz.user.pm.pm51.service.PM51Svc;
@@ -30,6 +35,8 @@ import com.google.gson.reflect.TypeToken;
 @Transactional(rollbackFor = Exception.class)
 public class PM51SvcImpl implements PM51Svc {
 
+	private final Logger logger = LoggerFactory.getLogger(getClass());
+
 	@Autowired
 	PM51Mapper pm51Mapper;
 
@@ -41,6 +48,9 @@ public class PM51SvcImpl implements PM51Svc {
 
 	@Autowired
 	WB20Svc wb20Svc;
+
+	@Autowired
+	AM11Svc am11Svc;
 
 	@Autowired
 	WB24Mapper wb24Mapper;
@@ -65,9 +75,44 @@ public class PM51SvcImpl implements PM51Svc {
 	}
 
 	@Override
+	public int selectTripStatusListCount(Map<String, String> paramMap) {
+		return pm51Mapper.selectTripStatusListCount(paramMap);
+	}
+
+	@Override
+	public List<Map<String, String>> selectTripStatusList(Map<String, String> paramMap) {
+		return pm51Mapper.selectTripStatusList(paramMap);
+	}
+
+	private double parseDoubleSafe(Object obj) {
+		if (obj == null) return 0.0;
+		String str = String.valueOf(obj).replaceAll("[^0-9.-]", "").trim();
+		if (str.isEmpty() || "-".equals(str) || ".".equals(str)) return 0.0;
+		try {
+			return Double.parseDouble(str);
+		} catch (Exception e) {
+			return 0.0;
+		}
+	}
+
+	@Override
 	public Map<String, Object> selectTripReqDtl(Map<String, String> paramMap) {
+		String tripReqNo = paramMap.get("tripReqNo");
+		if (!hasText(tripReqNo)) tripReqNo = paramMap.get("TRIP_REQ_NO");
+		if (!hasText(tripReqNo)) tripReqNo = paramMap.get("reqNo");
+		if (!hasText(tripReqNo)) tripReqNo = paramMap.get("todoFileTrgtKey");
+		if (!hasText(tripReqNo)) tripReqNo = paramMap.get("fileTrgtKey");
+		if (hasText(tripReqNo)) {
+			paramMap.put("tripReqNo", tripReqNo.trim());
+		} else {
+			throw new IllegalArgumentException("출장신청서 번호(tripReqNo) 파라미터가 누락되었습니다.");
+		}
+
 		Map<String, Object> result = new HashMap<>();
 		Map<String, String> m01 = pm51Mapper.selectTripReqM01(paramMap);
+		if (m01 == null || m01.isEmpty()) {
+			throw new IllegalStateException("출장신청서[" + tripReqNo + "] 마스터 정보를 찾을 수 없습니다.");
+		}
 		List<Map<String, String>> d01 = pm51Mapper.selectTripReqD01(paramMap);
 		List<Map<String, String>> d02 = pm51Mapper.selectTripReqD02(paramMap);
 		List<Map<String, String>> d03 = pm51Mapper.selectTripReqD03(paramMap);
@@ -75,8 +120,8 @@ public class PM51SvcImpl implements PM51Svc {
 		boolean hasData = false;
 		if (d02 != null) {
 			for (Map<String, String> map : d02) {
-				double krw = map.get("krwAmt") != null ? Double.parseDouble(String.valueOf(map.get("krwAmt"))) : 0;
-				double usd = map.get("usdAmt") != null ? Double.parseDouble(String.valueOf(map.get("usdAmt"))) : 0;
+				double krw = parseDoubleSafe(map.get("krwAmt"));
+				double usd = parseDoubleSafe(map.get("usdAmt"));
 				if (krw > 0 || usd > 0) {
 					hasData = true;
 					break;
@@ -89,7 +134,7 @@ public class PM51SvcImpl implements PM51Svc {
 			boolean hasRptData = false;
 			if (rptExpense != null && !rptExpense.isEmpty()) {
 				for (Map<String, String> rpt : rptExpense) {
-					double krw = rpt.get("krwAmt") != null ? Double.parseDouble(String.valueOf(rpt.get("krwAmt"))) : 0;
+					double krw = parseDoubleSafe(rpt.get("krwAmt"));
 					if (krw > 0) {
 						hasRptData = true;
 						break;
@@ -98,6 +143,20 @@ public class PM51SvcImpl implements PM51Svc {
 				if (hasRptData) {
 					d02 = rptExpense;
 				}
+			}
+		}
+
+		if (m01 != null && hasText(m01.get("tripReqNo"))) {
+			try {
+				Map<String, String> docIdParam = new HashMap<>();
+				docIdParam.put("tripReqNo", m01.get("tripReqNo"));
+				docIdParam.put("coCd", hasText(m01.get("coCd")) ? m01.get("coCd") : "GUN");
+				String amDocId = pm51Mapper.selectAmDocIdByTripReqNo(docIdParam);
+				if (!hasText(amDocId)) {
+					syncTripReqToAm(m01);
+				}
+			} catch (Exception e) {
+				logger.warn("출장신청서 AM 전자결재 자동 동기화 예외 (상세 조회 계속 진행): tripReqNo={}, error={}", m01.get("tripReqNo"), e.getMessage());
 			}
 		}
 
@@ -140,7 +199,6 @@ public class PM51SvcImpl implements PM51Svc {
 		List<Map<String, String>> travelers = gson.fromJson(paramMap.get("travelerArr"), listType);
 		validateTravelerDateOverlap(paramMap, travelers);
 		List<Map<String, String>> expenses = gson.fromJson(paramMap.get("expenseArr"), listType);
-		List<Map<String, String>> projects = gson.fromJson(paramMap.get("projectArr"), listType);
 
 		// 1. 현재본을 이력으로 백업 (M01/D01/D02)
 		pm51Mapper.insertTripReqHistM01(paramMap);
@@ -164,16 +222,6 @@ public class PM51SvcImpl implements PM51Svc {
 			for (Map<String, String> row : expenses) {
 				row.put("tripReqNo", paramMap.get("tripReqNo"));
 				pm51Mapper.insertTripReqD02(row);
-			}
-		}
-
-		// 변경신청에서도 프로젝트 기간 등 D03 변경 내용을 현재본에 반영한다.
-		if (projects != null) {
-			pm51Mapper.deleteTripReqD03(paramMap);
-			for (Map<String, String> row : projects) {
-				row.put("tripReqNo", paramMap.get("tripReqNo"));
-				row.put("coCd", paramMap.get("coCd"));
-				pm51Mapper.insertTripReqD03(row);
 			}
 		}
 
@@ -304,6 +352,7 @@ public class PM51SvcImpl implements PM51Svc {
 			}
 		}
 		processTripReqApprovalArr(paramMap, gsonDtl, dtlMap, "mngApprovalArr", "관리부서");
+		syncTripReqToAm(paramMap);
 
 		return result;
 	}
@@ -328,14 +377,14 @@ public class PM51SvcImpl implements PM51Svc {
 		String aprvStsCd = orgMap.get("aprvStsCd");
 		boolean salesDept = isSalesDept(paramMap.get("deptId"));
 		boolean accountingDept = isAccountingDept(paramMap.get("deptId"));
+		boolean currentMngApprover = isCurrentManagementApproverPending(paramMap);
 		boolean payMode = "Y".equals(paramMap.get("payMode"));
 
 		String reqUserId = orgMap.get("userId");
-		if (!hasText(reqUserId)) {
-			reqUserId = orgMap.get("creatId");
-		}
+		String creatId = orgMap.get("creatId");
 		String loginUserId = paramMap.get("userId");
-		boolean isAuthor = hasText(reqUserId) && hasText(loginUserId) && reqUserId.trim().equalsIgnoreCase(loginUserId.trim());
+		boolean isAuthor = (hasText(reqUserId) && hasText(loginUserId) && reqUserId.trim().equalsIgnoreCase(loginUserId.trim()))
+		                || (hasText(creatId) && hasText(loginUserId) && creatId.trim().equalsIgnoreCase(loginUserId.trim()));
 
 		boolean hasCompletedApproval = false;
 		List<Map<String, String>> approvalChkList = pm51Mapper.selectApprovalChk(paramMap);
@@ -347,7 +396,9 @@ public class PM51SvcImpl implements PM51Svc {
 
 		// 본인 외 타인 결재가 진행되었거나 최종 결재완료(APRVSTS03)된 경우: 영업팀 또는 회계팀만 수정 가능
 		// 등록자 본인(isAuthor)이면서 본인 결재만 진행된 상태(!hasCompletedApproval && !"APRVSTS03".equals(aprvStsCd))에서는 본문 수정 허용
-		if (!salesDept && !accountingDept) {
+		// 자금담당자(SPECRTS15)는 회계팀 부서가 아니어도 지급완료 전 출장기간 등 수정이 가능해야 하므로 예외 허용(클라이언트 isTravelerPeriodEditBlocked와 동일 기준)
+		boolean acctMngApprover = isAcctMngApprover(loginUserId);
+		if (!salesDept && !accountingDept && !currentMngApprover && !acctMngApprover) {
 			if (!isAuthor || hasCompletedApproval || "APRVSTS03".equals(aprvStsCd)) {
 				throw new RuntimeException("결재 진행 이후에는 영업팀 또는 회계팀만 수정할 수 있습니다.");
 			}
@@ -374,6 +425,16 @@ public class PM51SvcImpl implements PM51Svc {
 
 		int result = payMode ? pm51Mapper.updateTripReqPayAmounts(paramMap) : pm51Mapper.updateTripReqM01(paramMap);
 
+		// 반려된 출장신청서 내용 수정 저장 시 결재선 초기화 및 반려 Flag clear (처음부터 재상신 가능하도록)
+		if (!payMode) {
+			Map<String, String> resetParam = new HashMap<>();
+			resetParam.put("coCd", paramMap.get("coCd"));
+			resetParam.put("todoNo", paramMap.get("tripReqNo"));
+			resetParam.put("userId", paramMap.get("userId"));
+			resetParam.put("pgmId", "PM5101P01");
+			wb20Svc.resetRejectedApprovalLines(resetParam);
+		}
+
 		Map<String, String> delParam = new HashMap<>();
 		delParam.put("tripReqNo", paramMap.get("tripReqNo"));
 		delParam.put("reqNo", paramMap.get("tripReqNo"));
@@ -385,13 +446,11 @@ public class PM51SvcImpl implements PM51Svc {
 			pm51Mapper.deleteTripReqMngApprovalLines(delParam);
 		}
 
-		if (!payMode) {
-			pm51Mapper.deleteTripReqD01(delParam);
-		}
+		pm51Mapper.deleteTripReqD01(delParam);
 		pm51Mapper.deleteTripReqD02(delParam);
 		pm51Mapper.deleteTripReqD03(delParam);
 
-		if (!payMode) {
+		if (paramMap.get("travelerArr") != null && !paramMap.get("travelerArr").isEmpty()) {
 			List<Map<String, String>> travelerArr = gsonDtl.fromJson(paramMap.get("travelerArr"), dtlMap);
 			validateTravelerDateOverlap(paramMap, travelerArr);
 			if (travelerArr != null && !travelerArr.isEmpty()) {
@@ -489,11 +548,35 @@ public class PM51SvcImpl implements PM51Svc {
 				}
 			}
 		}
-		if (!hasCompletedApproval || (accountingDept && !hasCompletedMngApproval)) {
+		if (!payMode && (!hasCompletedApproval || (accountingDept && !hasCompletedMngApproval))) {
 			processTripReqApprovalArr(paramMap, gsonDtl, dtlMap, "mngApprovalArr", "관리부서");
 		}
+		syncTripReqToAm(paramMap);
 
 		return result;
+	}
+
+	private boolean isCurrentManagementApproverPending(Map<String, String> paramMap) {
+		String userId = paramMap.get("userId");
+		if (!hasText(userId)) return false;
+		boolean authorized = false;
+		for (String approverId : selectAcctMngApproverIds()) {
+			if (userId.equalsIgnoreCase(approverId.trim())) {
+				authorized = true;
+				break;
+			}
+		}
+		if (!authorized) return false;
+		Map<String, String> query = new HashMap<>();
+		query.put("todoNo", paramMap.get("tripReqNo"));
+		query.put("todoDiv2CodeId", "TODODIV2191");
+		List<Map<String, String>> lines = wb20Svc.selectGetApprovalList(query);
+		if (lines == null) return false;
+		for (Map<String, String> line : lines) {
+			if (userId.equalsIgnoreCase(String.valueOf(line.get("todoId")))
+					&& "N".equals(String.valueOf(line.get("sanctnSttus")))) return true;
+		}
+		return false;
 	}
 
 	private void processTripReqApprovalArr(Map<String, String> paramMap, Gson gsonDtl, Type dtlMap, String arrKey, String gubun) {
@@ -596,6 +679,7 @@ public class PM51SvcImpl implements PM51Svc {
 			}
 		}
 		ordered.addAll(remaining); // 나머지 결재선
+		shareRows = filterDuplicateShareRows(ordered, shareRows);
 		ordered.addAll(shareRows); // 공유선
 		return ordered;
 	}
@@ -661,6 +745,7 @@ public class PM51SvcImpl implements PM51Svc {
 		if (teamMgrRow != null) ordered.add(teamMgrRow);
 		if (pmRow != null) ordered.add(pmRow);
 		ordered.addAll(remaining); // 나머지 수동 결재선
+		shareRows = filterDuplicateShareRows(ordered, shareRows);
 		ordered.addAll(shareRows); // 공유선
 
 		return ordered;
@@ -694,8 +779,42 @@ public class PM51SvcImpl implements PM51Svc {
 			ordered.add(authorRow);
 		}
 		ordered.addAll(remaining);
+		shareRows = filterDuplicateShareRows(ordered, shareRows);
 		ordered.addAll(shareRows);
 		return ordered;
+	}
+
+	private List<Map<String, String>> filterDuplicateShareRows(List<Map<String, String>> approvalRows,
+			List<Map<String, String>> shareRows) {
+		if (shareRows == null || shareRows.isEmpty()) {
+			return shareRows;
+		}
+		Set<String> appIds = new HashSet<>();
+		if (approvalRows != null) {
+			for (Map<String, String> app : approvalRows) {
+				String uid = getApproverId(app);
+				if (uid != null && !uid.isEmpty()) {
+					appIds.add(uid);
+				}
+			}
+		}
+		List<Map<String, String>> filtered = new ArrayList<>();
+		for (Map<String, String> share : shareRows) {
+			String uid = getApproverId(share);
+			if (uid == null || !appIds.contains(uid)) {
+				filtered.add(share);
+			}
+		}
+		return filtered;
+	}
+
+	private String getApproverId(Map<String, String> row) {
+		if (row == null) return null;
+		String uid = row.get("usrNm");
+		if (!hasText(uid)) uid = row.get("todoId");
+		if (!hasText(uid)) uid = row.get("empNo");
+		if (!hasText(uid)) uid = row.get("userId");
+		return uid == null ? null : uid.trim();
 	}
 
 	private Map<String, String> extractApprovalRowById(List<Map<String, String>> list, String targetId) {
@@ -738,10 +857,10 @@ public class PM51SvcImpl implements PM51Svc {
 				throw new RuntimeException("이미 복명서가 작성된 출장신청서는 삭제할 수 없습니다.");
 			}
 
-			// 결재 진행중이거나 완료된 경우 삭제 불가 (APRVSTS01=신청/대기 이외 차단)
+			// 결재 완료(APRVSTS03)된 경우 삭제 불가 (신청자 본인 결재만 된 진행중 APRVSTS02 상태는 위 selectApprovalChk 검증 통과 시 삭제 허용)
 			String aprvStsCd = m01.get("aprvStsCd");
-			if (hasText(aprvStsCd) && !"APRVSTS01".equals(aprvStsCd) && !"APRVSTS00".equals(aprvStsCd)) {
-				throw new RuntimeException("결재처리가 이미 진행중이거나 완료된 출장신청서는 삭제할 수 없습니다.");
+			if ("APRVSTS03".equals(aprvStsCd)) {
+				throw new RuntimeException("결재처리가 이미 완료된 출장신청서는 삭제할 수 없습니다.");
 			}
 
 			String currentUserId = paramMap.get("userId");
@@ -772,6 +891,8 @@ public class PM51SvcImpl implements PM51Svc {
 		}
 		pm51Mapper.deleteTripReqApprovalLines(delParam);
 		pm51Mapper.deleteTripReqMngApprovalLines(delParam);
+		pm51Mapper.deleteAmApprovalLinesByBizKey(delParam);
+		pm51Mapper.deleteAmApprovalDocByBizKey(delParam);
 
 		// 2. 출장 디테일 및 변경이력 CASCADE 삭제
 		pm51Mapper.deleteTripReqD01(delParam);
@@ -876,7 +997,25 @@ public class PM51SvcImpl implements PM51Svc {
 			throw new RuntimeException("이미 지급완료 처리된 출장신청서입니다.");
 		}
 		validateTripReqGeneralApprovalDone(paramMap.get("tripReqNo"));
+		approvePendingManagementLineForPayment(paramMap);
 		return pm51Mapper.updateTripReqPayDone(paramMap);
+	}
+
+	private void approvePendingManagementLineForPayment(Map<String, String> paramMap) {
+		if (!isCurrentManagementApproverPending(paramMap)) return;
+		Map<String, String> docParam = new HashMap<>();
+		docParam.put("tripReqNo", paramMap.get("tripReqNo"));
+		docParam.put("coCd", paramMap.get("coCd"));
+		String docId = pm51Mapper.selectAmDocIdByTripReqNo(docParam);
+		if (!hasText(docId)) throw new RuntimeException("전자결재 문서를 찾을 수 없어 지급완료 처리할 수 없습니다.");
+		Map<String, Object> approvalParam = new HashMap<>();
+		approvalParam.put("docId", docId);
+		approvalParam.put("userId", paramMap.get("userId"));
+		approvalParam.put("apprOpinion", paramMap.get("apprOpinion"));
+		Map<String, Object> result = am11Svc.approveDocument(approvalParam);
+		if (result == null || !"200".equals(String.valueOf(result.get("resultCode")))) {
+			throw new RuntimeException(result == null ? "관리 결재 자동 승인에 실패했습니다." : String.valueOf(result.get("resultMessage")));
+		}
 	}
 
 	// 지급완료 처리 전 신청부서(일반) 결재선(TODODIV2190)이 모두 승인되었는지 검증한다.
@@ -939,7 +1078,8 @@ public class PM51SvcImpl implements PM51Svc {
 			throw new RuntimeException("지급완료 처리된 출장신청서가 아닙니다.");
 		}
 		int result = pm51Mapper.updateTripReqPayCancel(paramMap);
-		pm51Mapper.updateTripReqPayCancelMngApproval(paramMap);
+		// 지급취소는 지급만 취소하고 관리부서 결재선은 유지
+		// pm51Mapper.updateTripReqPayCancelMngApproval(paramMap);
 		return result;
 	}
 
@@ -1003,6 +1143,21 @@ public class PM51SvcImpl implements PM51Svc {
 		result.put("reqProjectList", reqProjectList);
 		result.put("rptProjectList", rptProjectList);
 		result.put("rptCardList", rptCardList);
+
+		if (m02 != null && hasText(m02.get("tripRptNo"))) {
+			try {
+				Map<String, String> docIdParam = new HashMap<>();
+				docIdParam.put("tripReqNo", m02.get("tripRptNo"));
+				docIdParam.put("coCd", hasText(m02.get("coCd")) ? m02.get("coCd") : "GUN");
+				String amDocId = pm51Mapper.selectAmDocIdByTripReqNo(docIdParam);
+				if (!hasText(amDocId)) {
+					syncTripRptToAm(m02);
+				}
+			} catch (Exception e) {
+				logger.warn("출장복명서 AM 전자결재 자동 동기화 예외 (상세 조회 계속 진행): tripRptNo={}, error={}", m02.get("tripRptNo"), e.getMessage());
+			}
+		}
+
 		return result;
 	}
 
@@ -1126,6 +1281,8 @@ public class PM51SvcImpl implements PM51Svc {
 		}
 		processTripReqApprovalArr(paramMap, gsonDtl, dtlMap, "mngApprovalArr", "관리부서");
 
+		syncTripRptToAm(paramMap);
+
 		return result;
 	}
 
@@ -1163,6 +1320,14 @@ public class PM51SvcImpl implements PM51Svc {
 		}
 
 		int result = pm51Mapper.updateTripRptM01(paramMap);
+
+		// 반려된 출장복명서 내용 수정 저장 시 결재선 초기화 및 반려 Flag clear (처음부터 재상신 가능하도록)
+		Map<String, String> resetParam = new HashMap<>();
+		resetParam.put("coCd", paramMap.get("coCd"));
+		resetParam.put("todoNo", paramMap.get("tripRptNo"));
+		resetParam.put("userId", paramMap.get("userId"));
+		resetParam.put("pgmId", "PM5102P01");
+		wb20Svc.resetRejectedApprovalLines(resetParam);
 
 		Map<String, String> delParam = new HashMap<>();
 		delParam.put("tripRptNo", paramMap.get("tripRptNo"));
@@ -1281,6 +1446,8 @@ public class PM51SvcImpl implements PM51Svc {
 			}
 		}
 		processTripReqApprovalArr(paramMap, gsonDtl, dtlMap, "mngApprovalArr", "관리부서");
+
+		syncTripRptToAm(paramMap);
 
 		return result;
 	}
@@ -1423,6 +1590,13 @@ public class PM51SvcImpl implements PM51Svc {
 		delParam.put("salesCd", pm51Mapper.selectTripRptSalesCd(paramMap));
 
 		pm51Mapper.deleteTripReqApprovalLines(delParam);
+		pm51Mapper.deleteTripReqMngApprovalLines(delParam);
+
+		// AM11 전자결재 문서/결재선 삭제는 ERP_BIZ_KEY(=TRIP_RPT_NO) 유니크 키만으로 특정한다 (CO_CD 조건 불필요).
+		Map<String, String> amDelParam = new HashMap<>();
+		amDelParam.put("tripReqNo", paramMap.get("tripRptNo"));
+		pm51Mapper.deleteAmApprovalLinesByBizKey(amDelParam);
+		pm51Mapper.deleteAmApprovalDocByBizKey(amDelParam);
 
 		// 공유선(WBS) CASCADE 삭제 - deleteTripReq/updateTripRpt 와 동일한 관례
 		// (기존에 여기 누락되어 복명서에 등록된 공유자가 삭제 후에도 TB_WB20M03 에 고아로 남는 문제가 있었음)
@@ -1678,6 +1852,18 @@ public class PM51SvcImpl implements PM51Svc {
 		return codeEtc.split(",");
 	}
 
+	// 로그인 사용자가 자금담당자(SPECRTS15) 권한자인지. 회계팀 부서(deptId GUN20/GUN80)와 별개로
+	// SPECRTS15 코드 등록자는 지급완료 전 출장기간 등 내용 수정 권한을 가진다.
+	private boolean isAcctMngApprover(String loginUserId) {
+		if (!hasText(loginUserId)) return false;
+		for (String approverId : selectAcctMngApproverIds()) {
+			if (approverId != null && loginUserId.trim().equalsIgnoreCase(approverId.trim())) {
+				return true;
+			}
+		}
+		return false;
+	}
+
 	private static final Object APPROVAL_LOCK = new Object();
 
 	private void insertWbsApprovalListSync(Map<String, String> approvalMap) {
@@ -1731,10 +1917,15 @@ public class PM51SvcImpl implements PM51Svc {
 
 	private void fillApprovalBaseParam(Map<String, String> approvalMap, Map<String, String> paramMap) {
 		if (paramMap != null) {
+			if (!hasText(paramMap.get("coCd"))) {
+				throw new IllegalArgumentException("PM51 WB20 필수값(coCd)이 누락되었습니다.");
+			}
 			String pgmId = paramMap.get("pgmId");
 			approvalMap.put("pgmId", pgmId);
 			approvalMap.put("pgPath", approvalPgPath(pgmId));
 			approvalMap.put("userId", paramMap.get("userId"));
+			// TB_WB20M03.CO_CD는 필수키이므로 WB20 생성 호출에 반드시 전달한다.
+			approvalMap.put("coCd", paramMap.get("coCd"));
 			approvalMap.put("todoDiv1CodeId", isShareApproval(approvalMap) ? "TODODIV10" : "TODODIV20");
 			approvalMap.put("todoCoCd", paramMap.get("coCd"));
 			approvalMap.put("histNo", "");
@@ -1776,6 +1967,507 @@ public class PM51SvcImpl implements PM51Svc {
 				|| "TODODIV1200".equals(todoDiv2CodeId)
 				|| "TODODIV1201".equals(todoDiv2CodeId)
 				|| "공유".equals(approvalMap.get("gb"));
+	}
+
+	// 결재/공유 그룹 우선순위: 일반결재(2190/2200) -> 관리부서결재(2191/2201)
+	private int getApprovalGroupPriority(String todoDiv2CodeId) {
+		if ("TODODIV2190".equals(todoDiv2CodeId) || "TODODIV2200".equals(todoDiv2CodeId)
+				|| "TODODIV1190".equals(todoDiv2CodeId) || "TODODIV1200".equals(todoDiv2CodeId)) {
+			return 1; // 1단계: 일반 결재선 및 일반 공유선 (1, 2, 3...)
+		}
+		if ("TODODIV2191".equals(todoDiv2CodeId) || "TODODIV2201".equals(todoDiv2CodeId)
+				|| "TODODIV1191".equals(todoDiv2CodeId) || "TODODIV1201".equals(todoDiv2CodeId)) {
+			return 2; // 2단계: 관리부서 결재선 및 관리부서 공유선 (1, 2, 3...)
+		}
+		return 9;
+	}
+
+	private void syncTripReqToAm(Map<String, String> paramMap) {
+		try {
+			String tripReqNo = paramMap.get("tripReqNo");
+			if (!hasText(tripReqNo)) {
+				tripReqNo = paramMap.get("reqNo");
+			}
+			if (!hasText(tripReqNo)) {
+				return;
+			}
+
+			String coCd = hasText(paramMap.get("coCd")) ? paramMap.get("coCd") : "GUN";
+
+			if (!hasText(paramMap.get("reqDt")) || !hasText(paramMap.get("creatDttm"))) {
+				Map<String, String> qMap = new HashMap<>();
+				qMap.put("tripReqNo", tripReqNo);
+				Map<String, String> dbM01 = pm51Mapper.selectTripReqM01(qMap);
+				if (dbM01 != null) {
+					for (Map.Entry<String, String> entry : dbM01.entrySet()) {
+						if (!hasText(paramMap.get(entry.getKey())) && entry.getValue() != null) {
+							paramMap.put(entry.getKey(), String.valueOf(entry.getValue()));
+						}
+					}
+				}
+			}
+
+			Map<String, String> wb20Query = new HashMap<>();
+			wb20Query.put("todoNo", tripReqNo);
+			wb20Query.put("coCd", coCd);
+			List<Map<String, String>> wb20Lines = wb20Svc.selectGetApprovalList(wb20Query);
+			if (wb20Lines == null || wb20Lines.isEmpty()) {
+				return;
+			}
+
+			// 결재선(TODODIV20)과 공유선(TODODIV10) 분리 후 SANCTN_SN 오름차순 정렬
+			List<Map<String, String>> apprList = new ArrayList<>();
+			List<Map<String, String>> refList = new ArrayList<>();
+			for (Map<String, String> row : wb20Lines) {
+				if ("TODODIV10".equals(row.get("todoDiv1CodeId")) || "공유".equals(row.get("gb"))) {
+					refList.add(row);
+				} else {
+					apprList.add(row);
+				}
+			}
+
+			// 결재선 순서 보장: TODODIV2190 (일반결재 1,2,3...) -> TODODIV2191 (관리부서결재 1,2,3...)
+			Collections.sort(apprList, new Comparator<Map<String, String>>() {
+				@Override
+				public int compare(Map<String, String> o1, Map<String, String> o2) {
+					int g1 = getApprovalGroupPriority(o1.get("todoDiv2CodeId"));
+					int g2 = getApprovalGroupPriority(o2.get("todoDiv2CodeId"));
+					if (g1 != g2) {
+						return Integer.compare(g1, g2);
+					}
+					int s1 = parseIntSafe(o1.get("sanctnSn"));
+					int s2 = parseIntSafe(o2.get("sanctnSn"));
+					return Integer.compare(s1, s2);
+				}
+			});
+
+			// 공유선 순서 보장: TODODIV1190 (일반공유 1,2,3...) -> TODODIV1191 (관리부서공유 1,2,3...)
+			Collections.sort(refList, new Comparator<Map<String, String>>() {
+				@Override
+				public int compare(Map<String, String> o1, Map<String, String> o2) {
+					int g1 = getApprovalGroupPriority(o1.get("todoDiv2CodeId"));
+					int g2 = getApprovalGroupPriority(o2.get("todoDiv2CodeId"));
+					if (g1 != g2) {
+						return Integer.compare(g1, g2);
+					}
+					int s1 = parseIntSafe(o1.get("sanctnSn"));
+					int s2 = parseIntSafe(o2.get("sanctnSn"));
+					return Integer.compare(s1, s2);
+				}
+			});
+
+			List<Map<String, Object>> amLineList = new ArrayList<>();
+			for (Map<String, String> row : apprList) {
+				Map<String, Object> amLine = new HashMap<>();
+				amLine.put("approverId", row.get("todoId"));
+				amLine.put("approverNm", hasText(row.get("todoNm")) ? row.get("todoNm") : row.get("name"));
+				amLine.put("deptId", row.get("deptId"));
+				amLine.put("lineSeq", row.get("sanctnSn"));
+					amLine.put("lineType", "APPR");
+					amLine.put("wb20TodoKey", row.get("todoKey"));
+					amLine.put("wb20CoCd", row.get("coCd"));
+					amLine.put("wb20TodoNo", row.get("todoNo"));
+					amLine.put("wb20SanctnSn", row.get("sanctnSn"));
+					amLine.put("wb20Div1CodeId", row.get("todoDiv1CodeId"));
+					amLine.put("wb20Div2CodeId", row.get("todoDiv2CodeId"));
+				amLine.put("sourceApproved", "Y".equalsIgnoreCase(row.get("sanctnSttus")) ? "Y" : "N");
+				amLineList.add(amLine);
+			}
+
+			for (Map<String, String> row : refList) {
+				Map<String, Object> amLine = new HashMap<>();
+				amLine.put("approverId", row.get("todoId"));
+				amLine.put("approverNm", hasText(row.get("todoNm")) ? row.get("todoNm") : row.get("name"));
+				amLine.put("deptId", row.get("deptId"));
+					amLine.put("lineSeq", row.get("sanctnSn"));
+					amLine.put("lineType", "REF");
+					amLine.put("wb20TodoKey", row.get("todoKey"));
+					amLine.put("wb20CoCd", row.get("coCd"));
+					amLine.put("wb20TodoNo", row.get("todoNo"));
+					amLine.put("wb20SanctnSn", row.get("sanctnSn"));
+					amLine.put("wb20Div1CodeId", row.get("todoDiv1CodeId"));
+					amLine.put("wb20Div2CodeId", row.get("todoDiv2CodeId"));
+				amLine.put("sourceApproved", "N");
+				amLineList.add(amLine);
+			}
+
+			if (amLineList.isEmpty()) {
+				return;
+			}
+
+			int autoApprovedCount = 0;
+			for (Map<String, Object> line : amLineList) {
+				if (!"Y".equals(line.get("sourceApproved"))) break;
+				autoApprovedCount++;
+			}
+
+			String applicantId = resolveOriginalRequesterId(paramMap);
+			if (!hasText(applicantId)) {
+				applicantId = paramMap.get("reqId");
+			}
+			if (!hasText(applicantId)) {
+				applicantId = paramMap.get("userId");
+			}
+
+			String applicantNm = paramMap.get("reqNm");
+			if (!hasText(applicantNm)) {
+				applicantNm = paramMap.get("userNm");
+			}
+
+			Map<String, String> docIdParam = new HashMap<>();
+			docIdParam.put("tripReqNo", tripReqNo);
+			docIdParam.put("coCd", coCd);
+			String existingDocId = pm51Mapper.selectAmDocIdByTripReqNo(docIdParam);
+
+			Map<String, Object> amParam = new HashMap<>();
+			if (hasText(existingDocId)) {
+				amParam.put("docId", existingDocId);
+			}
+			amParam.put("coCd", coCd);
+			amParam.put("userId", applicantId);
+			amParam.put("userNm", applicantNm);
+			amParam.put("docTitle", buildTripReqApprovalTitle(paramMap));
+			amParam.put("formCd", "PM5101");
+			amParam.put("formVer", 1);
+			amParam.put("erpBizType", "PM51");
+			amParam.put("erpBizKey", tripReqNo);
+			amParam.put("docDataJson", new GsonBuilder().disableHtmlEscaping().create().toJson(paramMap));
+			amParam.put("docRenderHtml", buildTripReqApprovalHtml(paramMap));
+			amParam.put("pgmId", "PM5101P01");
+			amParam.put("lineList", amLineList);
+			amParam.put("autoApprovedCount", autoApprovedCount);
+
+			Map<String, Object> amResult = am11Svc.submitApproval(amParam);
+			if (!"200".equals(String.valueOf(amResult.get("resultCode")))) {
+				if (amParam.get("docId") != null) {
+					amParam.put("changeReason", "PM51 출장신청서 수정 동기화");
+					am11Svc.changeApprovalLines(amParam);
+				} else {
+					throw new IllegalStateException("AM 결재문서 자동등록 실패: " + amResult.get("resultMessage"));
+				}
+			}
+		} catch (Exception e) {
+			if (e instanceof RuntimeException) {
+				throw (RuntimeException) e;
+			}
+			throw new RuntimeException("전자결재 문서 연동 중 오류가 발생했습니다: " + e.getMessage(), e);
+		}
+	}
+
+	private String buildTripReqApprovalTitle(Map<String, String> paramMap) {
+		String applicant = paramMap.get("reqNm");
+		if (!hasText(applicant)) applicant = paramMap.get("userNm");
+		if (!hasText(applicant)) applicant = paramMap.get("reqId");
+		if (!hasText(applicant)) applicant = "";
+		String tripPlace = paramMap.get("tripPlace");
+		if (hasText(tripPlace)) {
+			return applicant.trim() + " 출장신청서 (" + tripPlace.trim() + ")";
+		}
+		return applicant.trim() + " 출장신청서";
+	}
+
+	// 공통코드 코드값 -> 코드명 변환 (전자결재 문서 표시용). 조회 실패 시 원본 코드값 반환.
+	private String resolveCodeNm(String codeId) {
+		if (!hasText(codeId)) return "";
+		try {
+			Map<String, String> codeMap = new HashMap<>();
+			codeMap.put("codeId", codeId);
+			Map<String, String> codeDetail = cm05Svc.selectCodeInfo(codeMap);
+			if (codeDetail != null && hasText(codeDetail.get("codeNm"))) {
+				return codeDetail.get("codeNm");
+			}
+		} catch (Exception e) {
+			logger.warn("공통코드 코드명 조회 실패: codeId={}, error={}", codeId, e.getMessage());
+		}
+		return codeId;
+	}
+
+	private String buildTripReqApprovalHtml(Map<String, String> paramMap) {
+		String reqDt = formatDateDisplay(paramMap.get("reqDt"));
+		if (!hasText(reqDt)) {
+			reqDt = formatDateDisplay(paramMap.get("creatDttm"));
+		}
+		if (!hasText(reqDt)) {
+			reqDt = new java.text.SimpleDateFormat("yyyy-MM-dd").format(new java.util.Date());
+		}
+		String reqNm = hasText(paramMap.get("reqNm")) ? paramMap.get("reqNm") : paramMap.get("userNm");
+		String pmNm = paramMap.get("pmNm");
+		String salesCd = paramMap.get("salesCd");
+		String clntPjtNm = hasText(paramMap.get("clntPjtNm")) ? paramMap.get("clntPjtNm") : paramMap.get("clntPjt");
+		String tripDiv = paramMap.get("tripDiv");
+		String tripNationNm = paramMap.get("tripNationNm");
+		String tripPlace = paramMap.get("tripPlace");
+		String tripStDtm = formatDateDisplay(paramMap.get("tripStDtm"));
+		String tripEdDtm = formatDateDisplay(paramMap.get("tripEdDtm"));
+		String equipNm = paramMap.get("equipNm");
+		String tripPurpose = paramMap.get("tripPurpose");
+
+		StringBuilder html = new StringBuilder();
+		html.append("<div class=\"approval-document\" style=\"font-size: 13px; line-height: 1.6;\">");
+		html.append("<h3 style=\"text-align: center; margin-bottom: 20px; font-weight: bold;\">출장신청서</h3>");
+		html.append("<table class=\"table table-bordered\" style=\"width: 100%; border-collapse: collapse;\">");
+		html.append("<colgroup><col style=\"width: 15%;\"><col style=\"width: 35%;\"><col style=\"width: 15%;\"><col style=\"width: 35%;\"></colgroup>");
+		html.append("<tr><th>신청서번호</th><td>").append(escapeHtml(paramMap.get("tripReqNo"))).append("</td>");
+		html.append("<th>신청일자</th><td>").append(escapeHtml(reqDt)).append("</td></tr>");
+		html.append("<tr><th>신청인</th><td>").append(escapeHtml(reqNm)).append("</td>");
+		html.append("<th>영업PM</th><td>").append(escapeHtml(pmNm)).append("</td></tr>");
+		html.append("<tr><th>Sales Code</th><td>").append(escapeHtml(salesCd)).append("</td>");
+		html.append("<th>프로젝트명</th><td>").append(escapeHtml(clntPjtNm)).append("</td></tr>");
+		html.append("<tr><th>출장구분</th><td>").append(escapeHtml(resolveCodeNm(tripDiv)));
+		if (hasText(tripNationNm)) {
+			html.append(" (").append(escapeHtml(tripNationNm)).append(")");
+		}
+		html.append("</td><th>출장기간</th><td>").append(escapeHtml(tripStDtm));
+		if (hasText(tripStDtm) || hasText(tripEdDtm)) {
+			html.append(" ~ ").append(escapeHtml(tripEdDtm));
+		}
+		html.append("</td></tr>");
+		html.append("<tr><th>출장지</th><td colspan=\"3\">").append(escapeHtml(tripPlace)).append("</td></tr>");
+		html.append("<tr><th>장비명</th><td colspan=\"3\">").append(escapeHtml(equipNm)).append("</td></tr>");
+		html.append("<tr><th>출장목적</th><td colspan=\"3\" style=\"white-space: pre-wrap;\">").append(escapeHtml(tripPurpose)).append("</td></tr>");
+		html.append("</table></div>");
+		return html.toString();
+	}
+
+	private void syncTripRptToAm(Map<String, String> paramMap) {
+		try {
+			String tripRptNo = paramMap.get("tripRptNo");
+			if (!hasText(tripRptNo)) {
+				tripRptNo = paramMap.get("reqNo");
+			}
+			if (!hasText(tripRptNo)) {
+				return;
+			}
+
+			String coCd = hasText(paramMap.get("coCd")) ? paramMap.get("coCd") : "GUN";
+
+			if (!hasText(paramMap.get("rptDt")) || !hasText(paramMap.get("creatDttm"))) {
+				Map<String, String> qMap = new HashMap<>();
+				qMap.put("tripRptNo", tripRptNo);
+				Map<String, String> dbM02 = pm51Mapper.selectTripRptM01(qMap);
+				if (dbM02 != null) {
+					for (Map.Entry<String, String> entry : dbM02.entrySet()) {
+						if (!hasText(paramMap.get(entry.getKey())) && entry.getValue() != null) {
+							paramMap.put(entry.getKey(), String.valueOf(entry.getValue()));
+						}
+					}
+				}
+			}
+
+			Map<String, String> wb20Query = new HashMap<>();
+			wb20Query.put("todoNo", tripRptNo);
+			wb20Query.put("coCd", coCd);
+			List<Map<String, String>> wb20Lines = wb20Svc.selectGetApprovalList(wb20Query);
+			if (wb20Lines == null || wb20Lines.isEmpty()) {
+				return;
+			}
+
+			// 결재선(TODODIV20)과 공유선(TODODIV10) 분리
+			List<Map<String, String>> apprList = new ArrayList<>();
+			List<Map<String, String>> refList = new ArrayList<>();
+			for (Map<String, String> row : wb20Lines) {
+				if ("TODODIV10".equals(row.get("todoDiv1CodeId")) || "공유".equals(row.get("gb"))) {
+					refList.add(row);
+				} else {
+					apprList.add(row);
+				}
+			}
+
+			// 결재선 순서 보장: TODODIV2200 (일반결재 1,2,3...) -> TODODIV2201 (관리부서결재 1,2,3...)
+			Collections.sort(apprList, new Comparator<Map<String, String>>() {
+				@Override
+				public int compare(Map<String, String> o1, Map<String, String> o2) {
+					int g1 = getApprovalGroupPriority(o1.get("todoDiv2CodeId"));
+					int g2 = getApprovalGroupPriority(o2.get("todoDiv2CodeId"));
+					if (g1 != g2) {
+						return Integer.compare(g1, g2);
+					}
+					int s1 = parseIntSafe(o1.get("sanctnSn"));
+					int s2 = parseIntSafe(o2.get("sanctnSn"));
+					return Integer.compare(s1, s2);
+				}
+			});
+
+			// 공유선 순서 보장: TODODIV1200 (일반공유 1,2,3...) -> TODODIV1201 (관리부서공유 1,2,3...)
+			Collections.sort(refList, new Comparator<Map<String, String>>() {
+				@Override
+				public int compare(Map<String, String> o1, Map<String, String> o2) {
+					int g1 = getApprovalGroupPriority(o1.get("todoDiv2CodeId"));
+					int g2 = getApprovalGroupPriority(o2.get("todoDiv2CodeId"));
+					if (g1 != g2) {
+						return Integer.compare(g1, g2);
+					}
+					int s1 = parseIntSafe(o1.get("sanctnSn"));
+					int s2 = parseIntSafe(o2.get("sanctnSn"));
+					return Integer.compare(s1, s2);
+				}
+			});
+
+			List<Map<String, Object>> amLineList = new ArrayList<>();
+			for (Map<String, String> row : apprList) {
+				Map<String, Object> amLine = new HashMap<>();
+				amLine.put("approverId", row.get("todoId"));
+				amLine.put("approverNm", hasText(row.get("todoNm")) ? row.get("todoNm") : row.get("name"));
+				amLine.put("deptId", row.get("deptId"));
+				amLine.put("lineSeq", row.get("sanctnSn"));
+				amLine.put("lineType", "APPR");
+				amLine.put("wb20TodoKey", row.get("todoKey"));
+				amLine.put("wb20CoCd", row.get("coCd"));
+				amLine.put("wb20TodoNo", row.get("todoNo"));
+				amLine.put("wb20SanctnSn", row.get("sanctnSn"));
+				amLine.put("wb20Div1CodeId", row.get("todoDiv1CodeId"));
+				amLine.put("wb20Div2CodeId", row.get("todoDiv2CodeId"));
+				amLine.put("sourceApproved", "Y".equalsIgnoreCase(row.get("sanctnSttus")) ? "Y" : "N");
+				amLineList.add(amLine);
+			}
+
+			for (Map<String, String> row : refList) {
+				Map<String, Object> amLine = new HashMap<>();
+				amLine.put("approverId", row.get("todoId"));
+				amLine.put("approverNm", hasText(row.get("todoNm")) ? row.get("todoNm") : row.get("name"));
+				amLine.put("deptId", row.get("deptId"));
+				amLine.put("lineSeq", row.get("sanctnSn"));
+				amLine.put("lineType", "REF");
+				amLine.put("wb20TodoKey", row.get("todoKey"));
+				amLine.put("wb20CoCd", row.get("coCd"));
+				amLine.put("wb20TodoNo", row.get("todoNo"));
+				amLine.put("wb20SanctnSn", row.get("sanctnSn"));
+				amLine.put("wb20Div1CodeId", row.get("todoDiv1CodeId"));
+				amLine.put("wb20Div2CodeId", row.get("todoDiv2CodeId"));
+				amLine.put("sourceApproved", "N");
+				amLineList.add(amLine);
+			}
+
+			if (amLineList.isEmpty()) {
+				return;
+			}
+
+			int autoApprovedCount = 0;
+			for (Map<String, Object> line : amLineList) {
+				if (!"Y".equals(line.get("sourceApproved"))) break;
+				autoApprovedCount++;
+			}
+
+			String applicantId = resolveOriginalRequesterId(paramMap);
+			if (!hasText(applicantId)) applicantId = paramMap.get("reqId");
+			if (!hasText(applicantId)) applicantId = paramMap.get("userId");
+
+			String applicantNm = paramMap.get("reqNm");
+			if (!hasText(applicantNm)) applicantNm = paramMap.get("userNm");
+
+			Map<String, String> docIdParam = new HashMap<>();
+			docIdParam.put("tripReqNo", tripRptNo);
+			docIdParam.put("coCd", coCd);
+			String existingDocId = pm51Mapper.selectAmDocIdByTripReqNo(docIdParam);
+
+			Map<String, Object> amParam = new HashMap<>();
+			if (hasText(existingDocId)) {
+				amParam.put("docId", existingDocId);
+			}
+			amParam.put("coCd", coCd);
+			amParam.put("userId", applicantId);
+			amParam.put("userNm", applicantNm);
+			amParam.put("docTitle", buildTripRptApprovalTitle(paramMap));
+			amParam.put("formCd", "PM5102");
+			amParam.put("formVer", 1);
+			amParam.put("erpBizType", "PM52");
+			amParam.put("erpBizKey", tripRptNo);
+			amParam.put("docDataJson", new GsonBuilder().disableHtmlEscaping().create().toJson(paramMap));
+			amParam.put("docRenderHtml", buildTripRptApprovalHtml(paramMap));
+			amParam.put("pgmId", "PM5102P01");
+			amParam.put("lineList", amLineList);
+			amParam.put("autoApprovedCount", autoApprovedCount);
+
+			Map<String, Object> amResult = am11Svc.submitApproval(amParam);
+			if (!"200".equals(String.valueOf(amResult.get("resultCode")))) {
+				if (amParam.get("docId") != null) {
+					amParam.put("changeReason", "PM51 출장복명서 수정 동기화");
+					am11Svc.changeApprovalLines(amParam);
+				} else {
+					throw new IllegalStateException("AM 복명서 결재문서 자동등록 실패: " + amResult.get("resultMessage"));
+				}
+			}
+		} catch (Exception e) {
+			if (e instanceof RuntimeException) {
+				throw (RuntimeException) e;
+			}
+			throw new RuntimeException("전자결재 복명서 문서 연동 중 오류가 발생했습니다: " + e.getMessage(), e);
+		}
+	}
+
+	private String buildTripRptApprovalTitle(Map<String, String> paramMap) {
+		String applicant = paramMap.get("reqNm");
+		if (!hasText(applicant)) applicant = paramMap.get("userNm");
+		if (!hasText(applicant)) applicant = paramMap.get("reqId");
+		if (!hasText(applicant)) applicant = "";
+		String tripPlace = paramMap.get("tripPlace");
+		if (hasText(tripPlace)) {
+			return applicant.trim() + " 출장복명서 (" + tripPlace.trim() + ")";
+		}
+		return applicant.trim() + " 출장복명서";
+	}
+
+	private String buildTripRptApprovalHtml(Map<String, String> paramMap) {
+		String rptDt = formatDateDisplay(paramMap.get("rptDt"));
+		if (!hasText(rptDt)) {
+			rptDt = formatDateDisplay(paramMap.get("creatDttm"));
+		}
+		if (!hasText(rptDt)) {
+			rptDt = new java.text.SimpleDateFormat("yyyy-MM-dd").format(new java.util.Date());
+		}
+		String reqNm = hasText(paramMap.get("reqNm")) ? paramMap.get("reqNm") : paramMap.get("userNm");
+		String pmNm = paramMap.get("pmNm");
+		String salesCd = paramMap.get("salesCd");
+		String clntPjtNm = hasText(paramMap.get("clntPjtNm")) ? paramMap.get("clntPjtNm") : paramMap.get("clntPjt");
+		String tripPlace = paramMap.get("tripPlace");
+		String actStDtm = formatDateDisplay(paramMap.get("actStDtm"));
+		String actEdDtm = formatDateDisplay(paramMap.get("actEdDtm"));
+		String rptContent = paramMap.get("rptContent");
+
+		StringBuilder html = new StringBuilder();
+		html.append("<div class=\"approval-document\" style=\"font-size: 13px; line-height: 1.6;\">");
+		html.append("<h3 style=\"text-align: center; margin-bottom: 20px; font-weight: bold;\">출장복명서</h3>");
+		html.append("<table class=\"table table-bordered\" style=\"width: 100%; border-collapse: collapse;\">");
+		html.append("<colgroup><col style=\"width: 15%;\"><col style=\"width: 35%;\"><col style=\"width: 15%;\"><col style=\"width: 35%;\"></colgroup>");
+		html.append("<tr><th>복명서번호</th><td>").append(escapeHtml(paramMap.get("tripRptNo"))).append("</td>");
+		html.append("<th>복명일자</th><td>").append(escapeHtml(rptDt)).append("</td></tr>");
+		html.append("<tr><th>출장자</th><td>").append(escapeHtml(reqNm)).append("</td>");
+		html.append("<th>영업PM</th><td>").append(escapeHtml(pmNm)).append("</td></tr>");
+		html.append("<tr><th>Sales Code</th><td>").append(escapeHtml(salesCd)).append("</td>");
+		html.append("<th>프로젝트명</th><td>").append(escapeHtml(clntPjtNm)).append("</td></tr>");
+		html.append("<tr><th>출장기간</th><td colspan=\"3\">").append(escapeHtml(actStDtm));
+		if (hasText(actStDtm) || hasText(actEdDtm)) {
+			html.append(" ~ ").append(escapeHtml(actEdDtm));
+		}
+		html.append("</td></tr>");
+		html.append("<tr><th>출장지</th><td colspan=\"3\">").append(escapeHtml(tripPlace)).append("</td></tr>");
+		html.append("<tr><th>복명내용</th><td colspan=\"3\" style=\"white-space: pre-wrap;\">").append(escapeHtml(rptContent)).append("</td></tr>");
+		html.append("</table></div>");
+		return html.toString();
+	}
+
+	private String formatDateDisplay(String dtm) {
+		if (!hasText(dtm)) return "";
+		String clean = dtm.trim().replace("-", "");
+		if (clean.length() >= 8) {
+			return clean.substring(0, 4) + "-" + clean.substring(4, 6) + "-" + clean.substring(6, 8);
+		}
+		return dtm;
+	}
+
+	private String escapeHtml(String value) {
+		if (value == null) return "";
+		return value.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+				.replace("\"", "&quot;").replace("'", "&#39;");
+	}
+
+	private int parseIntSafe(String val) {
+		if (val == null || val.trim().isEmpty()) return 0;
+		try {
+			return Integer.parseInt(val.trim());
+		} catch (Exception e) {
+			return 0;
+		}
 	}
 
 	@Override
@@ -1845,7 +2537,7 @@ public class PM51SvcImpl implements PM51Svc {
 		Gson gsonDtl = new GsonBuilder().disableHtmlEscaping().create();
 		Type dtlMap = new TypeToken<ArrayList<Map<String, String>>>() {
 		}.getType();
-		
+
 		Map<String, String> delParam = new HashMap<>();
 		delParam.put("tripRptNo", tripRptNo);
 		pm51Mapper.deleteTripRptD01(delParam);
@@ -1990,13 +2682,14 @@ public class PM51SvcImpl implements PM51Svc {
 			throw new RuntimeException("회계담당자만 지급완료를 취소할 수 있습니다.");
 		}
 
-		// 지불담당자(PAY_ID) 본인의 관리결재행만 결재전 상태로 환원 (라인 전체가 아니라 해당 담당자 행만)
-		Map<String, String> approvalCancelParam = new HashMap<>();
-		approvalCancelParam.put("tripRptNo", tripRptNo);
-		approvalCancelParam.put("payId", m02.get("payId"));
-		approvalCancelParam.put("userId", userId);
-		approvalCancelParam.put("pgmId", paramMap.get("pgmId"));
-		pm51Mapper.updateTripRptPayCancelApproval(approvalCancelParam);
+		// 지급취소는 지급만 취소하고 관리부서 결재선은 유지한다(신청서 updateTripReqPayCancel과 동일 정책).
+		// 기존에는 지불담당자(PAY_ID) 본인의 관리결재행을 결재전 상태로 환원했으나, 결재와 지급 기능 분리에 따라 제거함.
+		// Map<String, String> approvalCancelParam = new HashMap<>();
+		// approvalCancelParam.put("tripRptNo", tripRptNo);
+		// approvalCancelParam.put("payId", m02.get("payId"));
+		// approvalCancelParam.put("userId", userId);
+		// approvalCancelParam.put("pgmId", paramMap.get("pgmId"));
+		// pm51Mapper.updateTripRptPayCancelApproval(approvalCancelParam);
 
 		// TB_PM52D01 백업 데이터 삭제 (지급완료 취소이므로 스냅샷 제거)
 		Map<String, String> d03DeleteParam = new HashMap<>();
@@ -2015,6 +2708,11 @@ public class PM51SvcImpl implements PM51Svc {
 		cancelParam.put("userId", userId);
 		cancelParam.put("pgmId", paramMap.get("pgmId"));
 		return pm51Mapper.updateTripRptPayCancel(cancelParam);
+	}
+
+	@Override
+	public List<Map<String, String>> selectTrnContractList(Map<String, String> paramMap) {
+		return pm51Mapper.selectTrnContractList(paramMap);
 	}
 
 }

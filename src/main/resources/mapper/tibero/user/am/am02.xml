@@ -1,0 +1,179 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.dksys.biz.user.am.am02.mapper.AM02Mapper">
+
+    <!-- 양식 목록 건수 조회 -->
+    <select id="selectFormCount" parameterType="Map" resultType="int">
+        SELECT COUNT(*)
+          FROM TB_AM02M01 M
+         WHERE 1 = 1
+        <if test="coCd != null and !coCd.equals('')">
+           AND M.CO_CD = #{coCd, jdbcType=VARCHAR}
+        </if>
+        <if test="formCat != null and !formCat.equals('')">
+           AND M.FORM_CAT = #{formCat}
+        </if>
+        <if test="useYn != null and !useYn.equals('')">
+           AND M.USE_YN = #{useYn}
+        </if>
+        <if test="searchValue != null and !searchValue.equals('')">
+           AND (M.FORM_CD LIKE '%' || #{searchValue} || '%' OR M.FORM_NM LIKE '%' || #{searchValue} || '%')
+        </if>
+    </select>
+
+    <!-- 양식 목록 페이징 조회 -->
+    <select id="selectFormList" parameterType="Map" resultType="CamelMap">
+        SELECT *
+          FROM (
+                SELECT ROWNUM AS RN, A.*
+                  FROM (
+                        SELECT M.FORM_CD,
+                               M.FORM_NM,
+                               M.FORM_CAT,
+                               FN_CM05M01_CD_TO_NM(M.FORM_CAT) AS FORM_CAT_NM,
+                               M.FORM_DESC,
+                               M.CURR_VER,
+                               M.USE_YN,
+                               M.SORT_NO,
+                               M.CO_CD,
+                               FN_CM05M01_CD_TO_NM(M.CO_CD) AS CO_NM,
+                               TO_CHAR(M.CREAT_DTTM, 'YYYY-MM-DD') AS CREAT_DTTM
+                          FROM TB_AM02M01 M
+                         WHERE 1 = 1
+                        <if test="coCd != null and !coCd.equals('')">
+                           AND M.CO_CD = #{coCd, jdbcType=VARCHAR}
+                        </if>
+                        <if test="formCat != null and !formCat.equals('')">
+                           AND M.FORM_CAT = #{formCat}
+                        </if>
+                        <if test="useYn != null and !useYn.equals('')">
+                           AND M.USE_YN = #{useYn}
+                        </if>
+                        <if test="searchValue != null and !searchValue.equals('')">
+                           AND (M.FORM_CD LIKE '%' || #{searchValue} || '%' OR M.FORM_NM LIKE '%' || #{searchValue} || '%')
+                        </if>
+                         ORDER BY M.SORT_NO ASC, M.FORM_CD ASC
+                  ) A
+                 WHERE ROWNUM <![CDATA[ <= ]]> #{lastIndex}
+          )
+         WHERE RN <![CDATA[ >= ]]> #{firstIndex}
+    </select>
+
+    <!-- 양식 상세 및 특정/최신 버전 템플릿 조회 -->
+    <select id="selectFormDetail" parameterType="Map" resultType="CamelMap">
+        SELECT M.FORM_CD,
+               M.FORM_NM,
+               M.FORM_CAT,
+               FN_CM05M01_CD_TO_NM(M.FORM_CAT) AS FORM_CAT_NM,
+               M.FORM_DESC,
+               M.CURR_VER,
+               M.USE_YN,
+               M.SORT_NO,
+               M.CO_CD,
+               D.FORM_VER,
+               D.FORM_TMPL_HTML,
+               D.FORM_SCHEMA_JSON,
+               D.DFLT_LINE_JSON,
+               D.VER_EXPL,
+               D.APLY_ST_DT
+          FROM TB_AM02M01 M
+               INNER JOIN TB_AM02D01 D ON M.FORM_CD = D.FORM_CD
+         WHERE M.FORM_CD = #{formCd}
+           AND D.FORM_VER = NVL(#{formVer}, M.CURR_VER)
+    </select>
+
+    <!-- 양식 마스터 등록 -->
+    <insert id="insertForm" parameterType="Map">
+        INSERT INTO TB_AM02M01
+        (
+            FORM_CD,
+            FORM_NM,
+            FORM_CAT,
+            FORM_DESC,
+            CURR_VER,
+            USE_YN,
+            SORT_NO,
+            CO_CD,
+            CREAT_ID,
+            CREAT_PGM,
+            CREAT_DTTM,
+            UDT_ID,
+            UDT_PGM,
+            UDT_DTTM
+        )
+        VALUES
+        (
+            #{formCd},
+            #{formNm},
+            #{formCat},
+            #{formDesc, jdbcType=VARCHAR},
+            NVL(#{currVer, jdbcType=INTEGER}, 1),
+            NVL(#{useYn, jdbcType=VARCHAR}, 'Y'),
+            NVL(#{sortNo, jdbcType=INTEGER}, 1),
+            #{coCd, jdbcType=VARCHAR},
+            #{userId},
+            #{pgmId},
+            SYSDATE,
+            #{userId},
+            #{pgmId},
+            SYSDATE
+        )
+    </insert>
+
+    <!-- 양식 버전 템플릿 등록 -->
+    <insert id="insertFormVersion" parameterType="Map">
+        INSERT INTO TB_AM02D01
+        (
+            FORM_CD,
+            FORM_VER,
+            FORM_TMPL_HTML,
+            FORM_SCHEMA_JSON,
+            DFLT_LINE_JSON,
+            VER_EXPL,
+            APLY_ST_DT,
+            USE_YN,
+            CO_CD,
+            CREAT_ID,
+            CREAT_PGM,
+            CREAT_DTTM,
+            UDT_ID,
+            UDT_PGM,
+            UDT_DTTM
+        )
+        VALUES
+        (
+            #{formCd},
+            #{formVer},
+            #{formTmplHtml, jdbcType=CLOB},
+            #{formSchemaJson, jdbcType=CLOB},
+            #{dfltLineJson, jdbcType=CLOB},
+            #{verExpl, jdbcType=VARCHAR},
+            NVL(#{aplyStDt, jdbcType=VARCHAR}, TO_CHAR(SYSDATE, 'YYYYMMDD')),
+            NVL(#{useYn, jdbcType=VARCHAR}, 'Y'),
+            #{coCd, jdbcType=VARCHAR},
+            #{userId},
+            #{pgmId},
+            SYSDATE,
+            #{userId},
+            #{pgmId},
+            SYSDATE
+        )
+    </insert>
+
+    <!-- 양식 마스터 수정 -->
+    <update id="updateForm" parameterType="Map">
+        UPDATE TB_AM02M01
+           SET FORM_NM   = #{formNm},
+               FORM_CAT  = #{formCat},
+               FORM_DESC = #{formDesc, jdbcType=VARCHAR},
+               CURR_VER  = NVL(#{currVer, jdbcType=INTEGER}, CURR_VER),
+               USE_YN    = NVL(#{useYn, jdbcType=VARCHAR}, USE_YN),
+               SORT_NO   = NVL(#{sortNo, jdbcType=INTEGER}, SORT_NO),
+               UDT_ID    = #{userId},
+               UDT_PGM   = #{pgmId},
+               UDT_DTTM  = SYSDATE
+         WHERE FORM_CD   = #{formCd}
+    </update>
+
+</mapper>

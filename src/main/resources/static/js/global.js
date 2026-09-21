@@ -790,6 +790,23 @@ var openFourthModal = function(url, width, height, title, paramObj, callback) {
     });
 };
 
+// 현재 열린 모달 스택 깊이(modalStack.size())를 감지해 자동으로 "다음 레벨" 모달로 연다.
+// 기존 openModal/openSecondModal/openThirdModal/openFourthModal 과 그 호출처(~1,200곳)는 그대로 두어 무영향.
+// 화면이 진입 경로에 따라 서로 다른 레벨(1차/3차 등)로 열릴 수 있는 곳에서, 레벨을 하드코딩하지 않고 이 함수를 쓰면 된다.
+// 시그니처는 기존 opener 들과 동일: (url, width, height, title, paramObj, callback)
+var openAutoModal = function(url, width, height, title, paramObj, callback) {
+	var lvl = 0;
+	try {
+		if (typeof modalStack !== 'undefined' && modalStack && typeof modalStack.size === 'function') {
+			lvl = modalStack.size();
+		}
+	} catch (e) { lvl = 0; }
+	if (lvl <= 0)  return openModal(url, width, height, title, paramObj, callback);
+	if (lvl === 1) return openSecondModal(url, width, height, title, paramObj, callback);
+	if (lvl === 2) return openThirdModal(url, width, height, title, paramObj, callback);
+	return openFourthModal(url, width, height, title, paramObj, callback);
+};
+
 var openBlindModal = function(url, width, height, title, paramObj, callback) {
 	blindModal.open({
 		header: {

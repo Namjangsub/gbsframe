@@ -5,6 +5,11 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.HashSet;
+
+import java.util.Collections;
+import java.util.Comparator;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -12,6 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartHttpServletRequest;
 
 import com.dksys.biz.admin.cm.cm08.service.CM08Svc;
+import com.dksys.biz.user.am.am11.service.AM11Svc;
 import com.dksys.biz.user.pm.pm08.mapper.PM08Mapper;
 import com.dksys.biz.user.pm.pm08.service.PM08Svc;
 import com.dksys.biz.user.pm.pm30.service.PM30Svc;
@@ -39,6 +45,9 @@ public class PM08SvcImpl implements PM08Svc {
 
 	@Autowired
 	PM30Svc pm30Svc;
+
+	@Autowired
+	AM11Svc am11Svc;
 
 	@Override
 	public int selectSubstituteWorkCount(Map<String, String> paramMap) {
@@ -133,6 +142,7 @@ public class PM08SvcImpl implements PM08Svc {
 			String approvalArrStr = paramMap.get("approvalArr");
 			if (approvalArrStr != null && !approvalArrStr.isEmpty()) {
 				List<Map<String, String>> approvalList = gsonDtl.fromJson(approvalArrStr, dtlMap);
+				approvalList = deduplicateApprovalAndShare(approvalList);
 
 					for (Map<String, String> apprItem : approvalList) {
 						apprItem.put("todoNo", reqNo);
@@ -172,6 +182,7 @@ public class PM08SvcImpl implements PM08Svc {
 					paramMap.put("todoDiv2CodeId", "TODODIV2410");
 					paramMap.put("etcField1", reqNo);
 					wb20Svc.insertTodoMaster(paramMap);
+					syncSubstituteWorkToAm(paramMap, "TODODIV2410");
 				}
 
 			// 6. 첨부파일 처리
@@ -278,6 +289,7 @@ public class PM08SvcImpl implements PM08Svc {
 				Gson gsonDtl = new GsonBuilder().disableHtmlEscaping().create();
 				Type dtlMap = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
 				List<Map<String, String>> approvalList = gsonDtl.fromJson(approvalArrStr, dtlMap);
+				approvalList = deduplicateApprovalAndShare(approvalList);
 
 				// 첫 번째 프로젝트의 salesCd 추출 (TB_WB20M03.SALES_CD 대입용)
 				String firstSalesCd = null;
@@ -349,6 +361,7 @@ public class PM08SvcImpl implements PM08Svc {
 					paramMap.put("salesCd", firstSalesCd);
 					paramMap.put("etcField1", reqNoVal);
 					wb20Svc.insertTodoMaster(paramMap);
+					syncSubstituteWorkToAm(paramMap, todoDiv2CodeId);
 
 					// 상태 갱신
 					Map<String, String> statusUpdate = new HashMap<>();
@@ -443,6 +456,7 @@ public class PM08SvcImpl implements PM08Svc {
 
 		// 혹시 모를 잔여 결재/공유선까지 REQ_NO 기준으로 100% 일괄 삭제
 		pm08Mapper.deleteApprovalLineByReqNo(paramMap);
+		deleteSubstituteWorkAmDocs(paramMap.get("reqNo"), paramMap.get("coCd"));
 
 		// 3. 참여 프로젝트 목록 삭제
 		pm08Mapper.deleteSubstituteWorkProjectList(paramMap);
@@ -676,5 +690,351 @@ public class PM08SvcImpl implements PM08Svc {
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
+	}
+	private List<Map<String, String>> deduplicateApprovalAndShare(List<Map<String, String>> approvalList) {
+		if (approvalList == null || approvalList.isEmpty()) {
+			return approvalList;
+		}
+		Set<String> approvalUserIds = new HashSet<>();
+		for (Map<String, String> item : approvalList) {
+			boolean isShare = "공유".equals(item.get("gb")) || "TODODIV10".equals(item.get("todoDiv1CodeId"))
+					|| (item.get("todoDiv2CodeId") != null && item.get("todoDiv2CodeId").startsWith("TODODIV1"));
+			if (!isShare) {
+				String uid = getApproverUserId(item);
+				if (uid != null && !uid.isEmpty()) {
+					approvalUserIds.add(uid);
+				}
+			}
+		}
+		List<Map<String, String>> result = new ArrayList<>();
+		int shareSn = 1;
+		int appSn = 1;
+		for (Map<String, String> item : approvalList) {
+			boolean isShare = "공유".equals(item.get("gb")) || "TODODIV10".equals(item.get("todoDiv1CodeId"))
+					|| (item.get("todoDiv2CodeId") != null && item.get("todoDiv2CodeId").startsWith("TODODIV1"));
+			if (isShare) {
+				String uid = getApproverUserId(item);
+				if (uid != null && approvalUserIds.contains(uid)) {
+					continue; // 동일ID 결재선 존재 시 공유선 자동 제거
+				}
+				item.put("sanctnSn", String.valueOf(shareSn++));
+			} else {
+				item.put("sanctnSn", String.valueOf(appSn++));
+			}
+			result.add(item);
+		}
+		return result;
+	}
+
+	private String getApproverUserId(Map<String, String> item) {
+		if (item == null) return null;
+		String uid = item.get("todoId");
+		if (uid == null || uid.trim().isEmpty()) uid = item.get("usrNm");
+		if (uid == null || uid.trim().isEmpty()) uid = item.get("empNo");
+		if (uid == null || uid.trim().isEmpty()) uid = item.get("userId");
+		return uid == null ? null : uid.trim();
+	}
+
+	private void syncSubstituteWorkToAm(Map<String, String> paramMap, String todoDiv2CodeId) {
+		try {
+			String reqNo = paramMap.get("reqNo");
+			if (reqNo == null || reqNo.trim().isEmpty()) {
+				reqNo = paramMap.get("todoNo");
+			}
+			if (reqNo == null || reqNo.trim().isEmpty()) {
+				return;
+			}
+
+			String coCd = paramMap.get("coCd");
+			if (coCd == null || coCd.trim().isEmpty()) {
+				coCd = "GUN";
+			}
+
+			Map<String, String> wb20Query = new HashMap<>();
+			wb20Query.put("todoNo", reqNo);
+			wb20Query.put("coCd", coCd);
+			List<Map<String, String>> wb20Lines = wb20Svc.selectGetApprovalList(wb20Query);
+			if (wb20Lines == null || wb20Lines.isEmpty()) {
+				return;
+			}
+
+			// 현재 결재 단계(todoDiv2CodeId: TODODIV2410 신청 / TODODIV2420 결과)에 맞는 결재선 필터링
+			String targetApprCode = "TODODIV2420".equals(todoDiv2CodeId) ? "TODODIV2420" : "TODODIV2410";
+			String targetRefCode = "TODODIV2420".equals(todoDiv2CodeId) ? "TODODIV1420" : "TODODIV1410";
+
+			List<Map<String, String>> apprList = new ArrayList<>();
+			List<Map<String, String>> refList = new ArrayList<>();
+			for (Map<String, String> row : wb20Lines) {
+				String div2 = row.get("todoDiv2CodeId");
+				if (targetApprCode.equals(div2)) {
+					apprList.add(row);
+				} else if (targetRefCode.equals(div2) || "공유".equals(row.get("gb"))) {
+					refList.add(row);
+				}
+			}
+
+			if (apprList.isEmpty()) {
+				for (Map<String, String> row : wb20Lines) {
+					if ("TODODIV10".equals(row.get("todoDiv1CodeId")) || "공유".equals(row.get("gb"))) {
+						refList.add(row);
+					} else {
+						apprList.add(row);
+					}
+				}
+			}
+
+			Collections.sort(apprList, new Comparator<Map<String, String>>() {
+				@Override
+				public int compare(Map<String, String> o1, Map<String, String> o2) {
+					int s1 = parseIntSafe(o1.get("sanctnSn"));
+					int s2 = parseIntSafe(o2.get("sanctnSn"));
+					return Integer.compare(s1, s2);
+				}
+			});
+
+			Collections.sort(refList, new Comparator<Map<String, String>>() {
+				@Override
+				public int compare(Map<String, String> o1, Map<String, String> o2) {
+					int s1 = parseIntSafe(o1.get("sanctnSn"));
+					int s2 = parseIntSafe(o2.get("sanctnSn"));
+					return Integer.compare(s1, s2);
+				}
+			});
+
+			List<Map<String, Object>> amLineList = new ArrayList<>();
+			for (Map<String, String> row : apprList) {
+				Map<String, Object> amLine = new HashMap<>();
+				amLine.put("approverId", row.get("todoId"));
+				amLine.put("approverNm", row.get("todoNm") != null && !row.get("todoNm").trim().isEmpty() ? row.get("todoNm") : row.get("name"));
+					amLine.put("deptId", row.get("deptId"));
+					amLine.put("lineSeq", row.get("sanctnSn"));
+					amLine.put("wb20TodoKey", row.get("todoKey"));
+					amLine.put("wb20CoCd", row.get("coCd"));
+					amLine.put("wb20TodoNo", row.get("todoNo"));
+					amLine.put("wb20SanctnSn", row.get("sanctnSn"));
+					amLine.put("wb20Div1CodeId", row.get("todoDiv1CodeId"));
+					amLine.put("wb20Div2CodeId", row.get("todoDiv2CodeId"));
+				amLine.put("lineType", "APPR");
+				amLine.put("sourceApproved", "Y".equalsIgnoreCase(row.get("sanctnSttus")) ? "Y" : "N");
+				amLineList.add(amLine);
+			}
+
+			for (Map<String, String> row : refList) {
+				Map<String, Object> amLine = new HashMap<>();
+				amLine.put("approverId", row.get("todoId"));
+				amLine.put("approverNm", row.get("todoNm") != null && !row.get("todoNm").trim().isEmpty() ? row.get("todoNm") : row.get("name"));
+					amLine.put("deptId", row.get("deptId"));
+					amLine.put("lineSeq", row.get("sanctnSn"));
+					amLine.put("wb20TodoKey", row.get("todoKey"));
+					amLine.put("wb20CoCd", row.get("coCd"));
+					amLine.put("wb20TodoNo", row.get("todoNo"));
+					amLine.put("wb20SanctnSn", row.get("sanctnSn"));
+					amLine.put("wb20Div1CodeId", row.get("todoDiv1CodeId"));
+					amLine.put("wb20Div2CodeId", row.get("todoDiv2CodeId"));
+				amLine.put("lineType", "REF");
+				amLine.put("sourceApproved", "N");
+				amLineList.add(amLine);
+			}
+
+			if (amLineList.isEmpty()) {
+				return;
+			}
+
+			int autoApprovedCount = 0;
+			for (Map<String, Object> line : amLineList) {
+				if (!"Y".equals(line.get("sourceApproved"))) break;
+				autoApprovedCount++;
+			}
+
+			String applicantId = paramMap.get("reqId");
+			if (applicantId == null || applicantId.trim().isEmpty()) {
+				applicantId = paramMap.get("userId");
+			}
+			String applicantNm = paramMap.get("reqNm");
+			if (applicantNm == null || applicantNm.trim().isEmpty()) {
+				applicantNm = paramMap.get("userNm");
+			}
+
+			Map<String, String> docIdParam = new HashMap<>();
+			docIdParam.put("reqNo", reqNo);
+			docIdParam.put("coCd", coCd);
+			docIdParam.put("todoDiv2CodeId", todoDiv2CodeId);
+			String existingDocId = pm08Mapper.selectAmDocIdByReqNo(docIdParam);
+
+			Map<String, Object> amParam = new HashMap<>();
+			if (existingDocId != null && !existingDocId.trim().isEmpty()) {
+				amParam.put("docId", existingDocId);
+			}
+			amParam.put("coCd", coCd);
+			amParam.put("userId", applicantId);
+			amParam.put("userNm", applicantNm);
+			amParam.put("docTitle", buildSubstituteWorkApprovalTitle(paramMap, todoDiv2CodeId));
+			amParam.put("formCd", "PM0801");
+			amParam.put("formVer", 1);
+			amParam.put("erpBizType", "PM08");
+			amParam.put("erpBizKey", reqNo);
+			amParam.put("docDataJson", new GsonBuilder().disableHtmlEscaping().create().toJson(paramMap));
+			amParam.put("docRenderHtml", buildSubstituteWorkApprovalHtml(paramMap, todoDiv2CodeId));
+			amParam.put("pgmId", "PM0801P01");
+			amParam.put("lineList", amLineList);
+			amParam.put("autoApprovedCount", autoApprovedCount);
+
+			Map<String, Object> amResult = am11Svc.submitApproval(amParam);
+			// 기존 AM 문서가 진행 중인 상태라 재상신이 거절된 경우에는
+			// PM08에서 변경한 WB20 결재선을 AM 잔여 결재선으로 동기화한다.
+			if (existingDocId != null && !existingDocId.trim().isEmpty()
+					&& amResult != null && !"200".equals(String.valueOf(amResult.get("resultCode")))) {
+				Map<String, Object> lineChangeParam = new HashMap<>(amParam);
+				lineChangeParam.put("changeReason", "PM08 결재선 수정 동기화");
+				lineChangeParam.put("lineList", amLineList);
+				am11Svc.changeApprovalLines(lineChangeParam);
+			}
+		} catch (Exception e) {
+			throw new RuntimeException("전자결재(AM) 연동 중 오류가 발생했습니다: " + e.getMessage(), e);
+		}
+	}
+
+	private void deleteSubstituteWorkAmDocs(String reqNo, String coCd) {
+		if (reqNo == null || reqNo.trim().isEmpty()) {
+			return;
+		}
+		try {
+			Map<String, String> param = new HashMap<>();
+			param.put("reqNo", reqNo);
+			param.put("coCd", (coCd != null && !coCd.trim().isEmpty()) ? coCd : "GUN");
+			String docId = pm08Mapper.selectAmDocIdByReqNo(param);
+			if (docId != null && !docId.trim().isEmpty()) {
+				Map<String, String> delParam = new HashMap<>();
+				delParam.put("docId", docId);
+				pm08Mapper.deleteAmD01ByDocId(delParam);
+				pm08Mapper.deleteAmM01ByDocId(delParam);
+			}
+		} catch (Exception e) {
+			throw new RuntimeException("전자결재 문서 삭제 처리 중 오류가 발생했습니다: " + e.getMessage(), e);
+		}
+	}
+
+	private int parseIntSafe(String val) {
+		if (val == null || val.trim().isEmpty()) return 0;
+		try {
+			return Integer.parseInt(val.trim());
+		} catch (NumberFormatException e) {
+			return 0;
+		}
+	}
+
+	private String buildSubstituteWorkApprovalTitle(Map<String, String> paramMap, String todoDiv2CodeId) {
+		String stageName = "TODODIV2420".equals(todoDiv2CodeId) ? "결과보고" : "신청서";
+		String reqNm = paramMap.get("reqNm");
+		if (reqNm == null || reqNm.trim().isEmpty()) reqNm = paramMap.get("userNm");
+		if (reqNm == null || reqNm.trim().isEmpty()) reqNm = paramMap.get("reqId");
+		String holidayDt = paramMap.get("holidayDt");
+		if (holidayDt == null) holidayDt = paramMap.get("substituteDt");
+		if (holidayDt != null && holidayDt.length() == 8) {
+			holidayDt = holidayDt.substring(0, 4) + "-" + holidayDt.substring(4, 6) + "-" + holidayDt.substring(6, 8);
+		}
+		StringBuilder sb = new StringBuilder();
+		sb.append("[휴일대체근무 ").append(stageName).append("] ");
+		if (reqNm != null && !reqNm.trim().isEmpty()) {
+			sb.append(reqNm);
+		}
+		if (holidayDt != null && !holidayDt.trim().isEmpty()) {
+			sb.append(" (").append(holidayDt).append(")");
+		}
+		return sb.toString();
+	}
+
+	private String buildSubstituteWorkApprovalHtml(Map<String, String> paramMap, String todoDiv2CodeId) {
+		boolean isResult = "TODODIV2420".equals(todoDiv2CodeId);
+		String reqNo = paramMap.get("reqNo");
+		String reqNm = paramMap.get("reqNm");
+		if (reqNm == null) reqNm = paramMap.get("userNm");
+		String deptNm = paramMap.get("deptNm");
+		String holidayDt = paramMap.get("holidayDt");
+		if (holidayDt == null) holidayDt = paramMap.get("substituteDt");
+		if (holidayDt != null && holidayDt.length() == 8) {
+			holidayDt = holidayDt.substring(0, 4) + "-" + holidayDt.substring(4, 6) + "-" + holidayDt.substring(6, 8);
+		}
+		String stTm = paramMap.get("stTm");
+		String edTm = paramMap.get("edTm");
+		if ((stTm == null || stTm.trim().isEmpty()) || (edTm == null || edTm.trim().isEmpty())) {
+			Map<String, String> detailQuery = new HashMap<>();
+			detailQuery.put("reqNo", reqNo);
+			detailQuery.put("coCd", paramMap.get("coCd"));
+			Map<String, String> detail = pm08Mapper.selectSubstituteWorkDtl(detailQuery);
+			if (detail != null) {
+				if (stTm == null || stTm.trim().isEmpty()) stTm = detail.get("stTm");
+				if (edTm == null || edTm.trim().isEmpty()) edTm = detail.get("edTm");
+				if (stTm == null || stTm.trim().isEmpty()) stTm = detail.get("ST_TM");
+				if (edTm == null || edTm.trim().isEmpty()) edTm = detail.get("ED_TM");
+				if (stTm == null || stTm.trim().isEmpty()) stTm = detail.get("rawStTm");
+				if (edTm == null || edTm.trim().isEmpty()) edTm = detail.get("rawEdTm");
+			}
+		}
+		String planTm = (stTm != null ? stTm : "") + " ~ " + (edTm != null ? edTm : "");
+		String realStTm = paramMap.get("realStTm");
+		String realEdTm = paramMap.get("realEdTm");
+		String realTm = (realStTm != null ? realStTm : "") + " ~ " + (realEdTm != null ? realEdTm : "");
+		String reason = paramMap.get("specialReason");
+		String workResult = paramMap.get("workResult");
+		Map<String, String> projectQuery = new HashMap<>();
+		projectQuery.put("reqNo", reqNo);
+		projectQuery.put("coCd", paramMap.get("coCd"));
+		List<Map<String, String>> projectList = pm08Mapper.selectSubstituteWorkProjectList(projectQuery);
+
+		StringBuilder sb = new StringBuilder();
+		sb.append("<table class=\"table_input\" style=\"width:100%; border-collapse:collapse; border:1px solid #ddd; margin-bottom:10px;\">");
+		sb.append("<colgroup><col style=\"width:18%;\"><col style=\"width:32%;\"><col style=\"width:18%;\"><col style=\"width:32%;\"></colgroup>");
+		sb.append("<tr>");
+		sb.append("<th style=\"background:#f5f5f5; border:1px solid #ddd; padding:8px; text-align:center;\">신청번호</th>");
+		sb.append("<td style=\"border:1px solid #ddd; padding:8px;\">").append(escapeHtml(reqNo)).append("</td>");
+		sb.append("<th style=\"background:#f5f5f5; border:1px solid #ddd; padding:8px; text-align:center;\">구분</th>");
+		sb.append("<td style=\"border:1px solid #ddd; padding:8px;\">").append(isResult ? "휴일대체근무 결과보고" : "휴일대체근무 신청서").append("</td>");
+		sb.append("</tr>");
+		sb.append("<tr>");
+		sb.append("<th style=\"background:#f5f5f5; border:1px solid #ddd; padding:8px; text-align:center;\">신청자</th>");
+		sb.append("<td style=\"border:1px solid #ddd; padding:8px;\">").append(escapeHtml(reqNm)).append("</td>");
+		sb.append("<th style=\"background:#f5f5f5; border:1px solid #ddd; padding:8px; text-align:center;\">부서</th>");
+		sb.append("<td style=\"border:1px solid #ddd; padding:8px;\">").append(escapeHtml(deptNm)).append("</td>");
+		sb.append("</tr>");
+		sb.append("<tr>");
+		sb.append("<th style=\"background:#f5f5f5; border:1px solid #ddd; padding:8px; text-align:center;\">근무일자</th>");
+		sb.append("<td style=\"border:1px solid #ddd; padding:8px;\">").append(escapeHtml(holidayDt)).append("</td>");
+		sb.append("<th style=\"background:#f5f5f5; border:1px solid #ddd; padding:8px; text-align:center;\">계획시간</th>");
+		sb.append("<td style=\"border:1px solid #ddd; padding:8px;\">").append(escapeHtml(planTm)).append("</td>");
+		sb.append("</tr>");
+		if (isResult) {
+			sb.append("<tr>");
+			sb.append("<th style=\"background:#f5f5f5; border:1px solid #ddd; padding:8px; text-align:center;\">실제근무시간</th>");
+			sb.append("<td colspan=\"3\" style=\"border:1px solid #ddd; padding:8px;\">").append(escapeHtml(realTm)).append("</td>");
+			sb.append("</tr>");
+			sb.append("<tr>");
+			sb.append("<th style=\"background:#f5f5f5; border:1px solid #ddd; padding:8px; text-align:center;\">근무결과</th>");
+			sb.append("<td colspan=\"3\" style=\"border:1px solid #ddd; padding:8px; white-space:pre-wrap;\">").append(escapeHtml(workResult)).append("</td>");
+			sb.append("</tr>");
+		}
+		sb.append("<tr>");
+		sb.append("<th style=\"background:#f5f5f5; border:1px solid #ddd; padding:8px; text-align:center;\">사유</th>");
+		sb.append("<td colspan=\"3\" style=\"border:1px solid #ddd; padding:8px; white-space:pre-wrap;\">").append(escapeHtml(reason)).append("</td>");
+		sb.append("</tr>");
+		if (projectList != null && !projectList.isEmpty()) {
+			sb.append("<tr><th style=\"background:#f5f5f5; border:1px solid #ddd; padding:8px; text-align:center;\">작업 프로젝트</th>");
+			sb.append("<td colspan=\"3\" style=\"border:1px solid #ddd; padding:8px;\"><table style=\"width:100%; border-collapse:collapse; table-layout:fixed;\"><colgroup><col style=\"width:12.5%;\"><col style=\"width:25%;\"><col style=\"width:50%;\"><col style=\"width:12.5%;\"></colgroup>");
+			sb.append("<tr><th style=\"background:#f9f9f9; border:1px solid #ddd; padding:6px; text-align:center;\">프로젝트</th><th style=\"background:#f9f9f9; border:1px solid #ddd; padding:6px; text-align:center;\">고객사</th><th style=\"background:#f9f9f9; border:1px solid #ddd; padding:6px; text-align:center;\">설비</th><th style=\"background:#f9f9f9; border:1px solid #ddd; padding:6px; text-align:center;\">비고</th></tr>");
+			for (Map<String, String> project : projectList) {
+				sb.append("<tr><td style=\"border:1px solid #ddd; padding:6px; text-align:center;\">").append(escapeHtml(project.get("pjtNm"))).append("</td><td style=\"border:1px solid #ddd; padding:6px;\">")
+					.append(escapeHtml(project.get("clntNm"))).append("</td><td style=\"border:1px solid #ddd; padding:6px;\">")
+					.append(escapeHtml(project.get("eqpNm"))).append("</td><td style=\"border:1px solid #ddd; padding:6px;\">")
+					.append(escapeHtml(project.get("etc"))).append("</td></tr>");
+			}
+			sb.append("</table></td></tr>");
+		}
+		sb.append("</table>");
+		return sb.toString();
+	}
+
+	private String escapeHtml(String str) {
+		if (str == null) return "";
+		return str.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\"", "&quot;").replace("'", "&#39;");
 	}
 }

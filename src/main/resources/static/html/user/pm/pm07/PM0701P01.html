@@ -718,6 +718,16 @@
 					sanctnSttusNm: "미승인"
 				};
 			});
+			var appIds = {};
+			$.each(appArray, function(idx, item) {
+				var uid = item ? (item.usrNm || item.todoId || item.empNo) : null;
+				if (uid) appIds[uid] = true;
+			});
+			shaArray = shaArray.filter(function(item) {
+				var uid = item ? (item.usrNm || item.todoId || item.empNo) : null;
+				return !uid || !appIds[uid];
+			});
+			$.each(shaArray, function(idx, item) { item.sanctnSn = idx + 1; });
 			var totalList = appArray.concat(shaArray);
 			approvalGridView.setData(totalList);
 		});
@@ -820,10 +830,12 @@
 		// - 근태/휴가관리담당자가 본인 외 다른 사원을 대리 선택 시 (reqId !== jwt.userId): 신청인 결재라인 스킵
 		var isTeamMgr = false;
 		var isGisulYeonguso = false;	// 기술연구소(GUN40) 소속 여부
+		var isSaengsan = false;			// 생산팀(GUN60) 소속 여부
 		postAjaxSync("/admin/cm/cm06/selectUserInfo", { "userId": reqId }, null, function(data) {
 			if (data && data.userInfo) {
 				isTeamMgr = (data.userInfo.teamManager === 'TEAM01');
 				isGisulYeonguso = !!(data.userInfo.deptId && data.userInfo.deptId.indexOf('GUN40') === 0);
+				isSaengsan = !!(data.userInfo.deptId && data.userInfo.deptId.indexOf('GUN60') === 0) || !!(data.userInfo.deptNm && data.userInfo.deptNm.indexOf('생산') > -1);
 				if (reqId === jwt.userId) {
 					var uObj = data.userInfo;
 					var key = String(uObj.id).toLowerCase();
@@ -844,22 +856,38 @@
 			}
 		});
 
-		// 2) 담당자 팀장 (신청자가 팀장 본인이면 건너뛴다)
-		if (!isTeamMgr) {
-			postAjaxSync("/user/wb/wb24/selectTeamManagerInfo", { "userId": reqId }, null, function(data) {
-				if (data && data.result) {
-					pushApprover(data.result);
-				}
-			});
-		}
-
-		// 2-1) 기술연구소(GUN40) 소속이면 담당팀장 다음에 kimjhv(김재현) 결재 추가
-		if (isGisulYeonguso) {
-			postAjaxSync("/admin/cm/cm06/selectUserInfo", { "userId": "kimjhv" }, null, function(data) {
+		if (isSaengsan) {
+			// 생산팀: 결재라인에 sms(손민성 차장) 다음에 kucho(조규언 이사) 순차 추가
+			if (reqId !== 'kucho') {
+				postAjaxSync("/admin/cm/cm06/selectUserInfo", { "userId": "sms" }, null, function(data) {
+					if (data && data.userInfo) {
+						pushApprover(data.userInfo);
+					}
+				});
+			}
+			postAjaxSync("/admin/cm/cm06/selectUserInfo", { "userId": "kucho" }, null, function(data) {
 				if (data && data.userInfo) {
 					pushApprover(data.userInfo);
 				}
 			});
+		} else {
+			// 2) 담당자 팀장 (신청자가 팀장 본인이면 건너뛴다)
+			if (!isTeamMgr) {
+				postAjaxSync("/user/wb/wb24/selectTeamManagerInfo", { "userId": reqId }, null, function(data) {
+					if (data && data.result) {
+						pushApprover(data.result);
+					}
+				});
+			}
+
+			// 2-1) 기술연구소(GUN40) 소속이면 담당팀장 다음에 kimjhv(김재현) 결재 추가
+			if (isGisulYeonguso) {
+				postAjaxSync("/admin/cm/cm06/selectUserInfo", { "userId": "kimjhv" }, null, function(data) {
+					if (data && data.userInfo) {
+						pushApprover(data.userInfo);
+					}
+				});
+			}
 		}
 
 		// 3) 휴가관리 결재라인 (SPECRTS17 의 CODE_ETC 등록 순서대로)
@@ -897,9 +925,11 @@
 		if (!reqId) return;
 
 		var isGisulYeonguso = false;
+		var isSaengsan = false;
 		postAjaxSync("/admin/cm/cm06/selectUserInfo", { "userId": reqId }, null, function(data) {
 			if (data && data.userInfo) {
 				isGisulYeonguso = !!(data.userInfo.deptId && data.userInfo.deptId.indexOf('GUN40') === 0);
+				isSaengsan = !!(data.userInfo.deptId && data.userInfo.deptId.indexOf('GUN60') === 0) || !!(data.userInfo.deptNm && data.userInfo.deptNm.indexOf('생산') > -1);
 			}
 		});
 
@@ -940,9 +970,16 @@
 			};
 		}
 
-		// 채워 넣어야 할 사번 목록 산정 (담당팀장 다음 -> kimjhv(기술연구소만) -> SPECRTS17 순서)
+		// 채워 넣어야 할 사번 목록 산정 (담당팀장 다음 -> sms/kucho(생산팀) 또는 kimjhv(기술연구소) -> SPECRTS17 순서)
 		var missingIds = [];
-		if (isGisulYeonguso && !isPresent('kimjhv')) {
+		if (isSaengsan) {
+			if (reqId !== 'sms' && reqId !== 'kucho' && !isPresent('sms')) {
+				missingIds.push('sms');
+			}
+			if (reqId !== 'kucho' && !isPresent('kucho')) {
+				missingIds.push('kucho');
+			}
+		} else if (isGisulYeonguso && !isPresent('kimjhv')) {
 			missingIds.push('kimjhv');
 		}
 		$.each(specrtsIdList, function(idx, uid) {
@@ -972,6 +1009,22 @@
 		});
 		var args = [shareIdx, 0].concat(newRows);
 		Array.prototype.splice.apply(list, args);
+
+		// 결재선에 필수 결재자가 추가되었으므로, 공유선에 동일 ID가 있으면 제거
+		var curAppIds = {};
+		$.each(list, function(idx, item) {
+			if (item.gb === "결재") {
+				var uid = item.usrNm || item.todoId || item.empNo;
+				if (uid) curAppIds[uid] = true;
+			}
+		});
+		list = list.filter(function(item) {
+			if (item.gb === "공유") {
+				var uid = item.usrNm || item.todoId || item.empNo;
+				return !uid || !curAppIds[uid];
+			}
+			return true;
+		});
 
 		approvalGridView.setData(list);
 	}
@@ -1220,13 +1273,33 @@
 		var approvalArr = [];
 		var allList = approvalGridView.target.list || [];
 
+		// 동일ID가 결재, 공유에 같이 들어가 있으면 공유는 자동 제거 처리
+		var appIds = {};
+		$.each(allList, function(idx, item) {
+			if (item.gb === "결재") {
+				var uid = item ? (item.usrNm || item.todoId || item.empNo) : null;
+				if (uid) appIds[uid] = true;
+			}
+		});
+
+		var sanctnSnApp = 0;
+		var sanctnSnShare = 0;
 		$.each(allList, function(idx, item) {
 			var todoDiv1CodeId = "";
 			var todoDiv2CodeId = "";
+			var sn = 0;
 			if (item.gb === "결재") {
+				sanctnSnApp++;
+				sn = sanctnSnApp;
 				todoDiv1CodeId = "TODODIV20";
 				todoDiv2CodeId = "TODODIV2300";
 			} else if (item.gb === "공유") {
+				var uid = item ? (item.usrNm || item.todoId || item.empNo) : null;
+				if (uid && appIds[uid]) {
+					return true; // 결재선에 동일 ID 존재 시 공유선 제외
+				}
+				sanctnSnShare++;
+				sn = sanctnSnShare;
 				todoDiv1CodeId = "TODODIV10";
 				todoDiv2CodeId = "TODODIV1300";
 			}
@@ -1241,7 +1314,7 @@
 				// 결재선 삭제/재등록이 통째로 실패한다. Sales Code 가 없는 모듈은 문서키를 넣는 것이 관례.
 				// (CM1601P01 -> fileTrgtKey, PM4001P01 -> workNo, PM07 -> reqNo)
 				salesCd        : $('#reqNo').val(),
-				sanctnSn       : idx + 1,
+				sanctnSn       : sn,
 				sanctnSttus    : item.sanctnSttus || "N",
 				todoNo         : $('#reqNo').val(),
 				todoTitl       : "휴가신청서",
@@ -1431,8 +1504,20 @@
 		formData.append("reqTitl", $('#reqTitl').val());
 		formData.append("reqId", $('#popForm').find('#reqId').val() || jwt.userId);
 		formData.append("reqDeptId", $('#popForm').find('#reqDeptId').val() || jwt.deptId);
+		var rawVacTypeNm = $('#vacTypeCd option:selected').text() || '';
+		var cleanVacNm = $.trim(rawVacTypeNm.replace(/\s*\(.*$/, ''));
+		var ampmVal = $('#ampmCd').val();
+		var ampmText = $('#ampmCd option:selected').text();
+		var isHalf = (cleanVacNm.indexOf('반차') !== -1)
+			|| ($('#vacTypeCd').val() === 'PM07TYPE02' || $('#vacTypeCd').val() === 'PM07TYPE08' || $('#vacTypeCd').val() === 'PM07TYPE12');
+		if (isHalf && ampmVal && ampmText && ampmText !== '선택하세요') {
+			var ampmLabel = (ampmText.indexOf('오전') !== -1 || ampmVal === 'PM07AMPM01' || ampmVal === 'AM') ? '오전' : '오후';
+			cleanVacNm += ' (' + ampmLabel + ')';
+		}
 		formData.append("vacTypeCd", $('#vacTypeCd').val());
+		formData.append("vacTypeNm", cleanVacNm);
 		formData.append("ampmCd", $('#ampmCd').val());
+		formData.append("ampmNm", (ampmVal ? $.trim($('#ampmCd option:selected').text()) : ''));
 		formData.append("stDt", stDt);
 		formData.append("edDt", edDt);
 		formData.append("stTm", stTm);
@@ -1689,7 +1774,7 @@
 			//   ING - 1명 이상 승인, END - 전원 승인완료, RTN - 반려(승인action 발생).
 			// TEMP/REQ 는 "결재 진행된 게 없는" 상태이므로 수정 가능해야 한다.
 			var sanctnSts = dtlData.sanctnSts || paramObj.sanctnSts || "";
-			var isEditable = (!sanctnSts || sanctnSts === "TEMP" || sanctnSts === "SANCTN01" || sanctnSts === "0" || sanctnSts === "REQ");
+			var isEditable = (!sanctnSts || sanctnSts === "TEMP" || sanctnSts === "SANCTN01" || sanctnSts === "0" || sanctnSts === "REQ" || sanctnSts === "RTN");
 
 			// 근태마감 여부 확인 (stDt, edDt)
 			var isClosed = isAttendanceClosed(dtlData.stDt, dtlData.edDt);

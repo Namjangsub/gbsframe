@@ -1,0 +1,125 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.dksys.biz.user.am.am10.mapper.AM10Mapper">
+
+    <!-- 대시보드 요약 카운터 집계 (경량 단일 쿼리) -->
+    <select id="selectApprovalDashboardCount" parameterType="Map" resultType="CamelMap">
+        SELECT
+            (
+                SELECT COUNT(*)
+                  FROM TB_AM11M01 M
+                 WHERE M.DOC_STATUS IN ('REQUEST', 'PROGRESS')
+                   AND (
+                        M.CURR_APPROVER_ID = #{userId}
+                        OR EXISTS (
+                            SELECT 1
+                              FROM TB_AM03M02 G
+                             WHERE G.ORIGIN_USER_ID = M.CURR_APPROVER_ID
+                               AND G.DELEGATE_USER_ID = #{userId}
+                               AND G.USE_YN = 'Y'
+                               AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN G.START_DT AND G.END_DT
+                        )
+                   )
+            ) AS INBOX_CNT,
+            (
+                SELECT COUNT(*)
+                  FROM TB_AM11M01 M
+                 WHERE M.DOC_STATUS IN ('REQUEST', 'PROGRESS')
+                   AND (
+                        M.DRA_USER_ID = #{userId}
+                        OR EXISTS (
+                            SELECT 1 FROM TB_AM11D01 D
+                             WHERE D.DOC_ID = M.DOC_ID AND D.APPROVER_ID = #{userId}
+                        )
+                   )
+            ) AS PROGRESS_CNT,
+            (
+                SELECT COUNT(*)
+                  FROM TB_AM11M01 M
+                 WHERE M.DRA_USER_ID = #{userId}
+                   AND M.DOC_STATUS != 'DRAFT'
+            ) AS DRAFTED_CNT,
+            (
+                SELECT COUNT(*)
+                  FROM TB_AM11M01 M
+                 WHERE M.DOC_STATUS = 'COMPLETED'
+                   AND (
+                        M.DRA_USER_ID = #{userId}
+                        OR EXISTS (
+                            SELECT 1 FROM TB_AM11D01 D
+                             WHERE D.DOC_ID = M.DOC_ID AND D.APPROVER_ID = #{userId}
+                        )
+                   )
+            ) AS COMPLETED_CNT,
+            (
+                SELECT COUNT(*)
+                  FROM TB_AM11M01 M
+                 WHERE M.DOC_STATUS = 'REJECTED'
+                   AND (
+                        M.DRA_USER_ID = #{userId}
+                        OR EXISTS (
+                            SELECT 1 FROM TB_AM11D01 D
+                             WHERE D.DOC_ID = M.DOC_ID AND D.APPROVER_ID = #{userId}
+                        )
+                   )
+            ) AS REJECTED_CNT,
+            (
+                SELECT COUNT(*)
+                  FROM TB_AM11M01 M
+                 WHERE EXISTS (
+                        SELECT 1 FROM TB_AM11D01 D
+                         WHERE D.DOC_ID = M.DOC_ID
+                           AND D.APPROVER_ID = #{userId}
+                           AND D.LINE_TYPE = 'REF'
+                 )
+            ) AS REFERENCED_CNT,
+            (
+                SELECT COUNT(*)
+                  FROM TB_AM11M01 M
+                 WHERE M.DRA_USER_ID = #{userId}
+                   AND M.DOC_STATUS = 'DRAFT'
+            ) AS TEMP_CNT
+          FROM DUAL
+    </select>
+
+    <!-- 대시보드 메인 최근 결재 대기 목록 (최대 5건) -->
+    <select id="selectDashboardWaitList" parameterType="Map" resultType="CamelMap">
+        SELECT *
+          FROM (
+                SELECT M.DOC_ID,
+                       M.DOC_NO,
+                       M.CO_CD,
+                       FN_CM05M01_CD_TO_NM(M.CO_CD) AS CO_NM,
+                       M.FORM_CD,
+                       F.FORM_NM,
+                       M.DOC_TITLE,
+                       M.DRA_USER_ID,
+                       M.DRA_USER_NM,
+                       M.DRA_DEPT_NM,
+                       M.DRA_LEVEL_NM,
+                       TO_CHAR(M.DRAFT_DT, 'YYYY-MM-DD HH24:MI') AS DRAFT_DT,
+                       M.CURR_LINE_SEQ,
+                       M.CURR_APPROVER_ID,
+                       M.CURR_APPROVER_NM,
+                       CASE WHEN M.CURR_APPROVER_ID != #{userId} THEN 'Y' ELSE 'N' END AS IS_DELEGATED
+                  FROM TB_AM11M01 M
+                       LEFT OUTER JOIN TB_AM02M01 F ON M.FORM_CD = F.FORM_CD
+                 WHERE M.DOC_STATUS IN ('REQUEST', 'PROGRESS')
+                   AND (
+                        M.CURR_APPROVER_ID = #{userId}
+                        OR EXISTS (
+                            SELECT 1
+                              FROM TB_AM03M02 G
+                             WHERE G.ORIGIN_USER_ID = M.CURR_APPROVER_ID
+                               AND G.DELEGATE_USER_ID = #{userId}
+                               AND G.USE_YN = 'Y'
+                               AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN G.START_DT AND G.END_DT
+                        )
+                   )
+                 ORDER BY M.DRAFT_DT ASC, M.DOC_ID ASC
+          )
+         WHERE ROWNUM <![CDATA[ <= ]]> 5
+    </select>
+
+</mapper>

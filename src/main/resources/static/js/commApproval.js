@@ -1,4 +1,235 @@
 
+// 부트스트랩 3 환경에서 누락될 수 있는 보조 배지 스타일 자동 보강
+(function() {
+	if (typeof document !== 'undefined' && !document.getElementById('gbs-approval-badge-style')) {
+		var style = document.createElement('style');
+		style.id = 'gbs-approval-badge-style';
+		style.innerHTML = '.label-secondary { background-color: #777777; color: #ffffff; }'
+			+ ' .label-slate { background-color: #546e7a !important; color: #ffffff !important; }';
+		(document.head || document.getElementsByTagName('head')[0]).appendChild(style);
+	}
+})();
+
+/**
+ * 전자결재 및 업무 공통 상태코드 ➔ 한글 명칭 / 배지 스타일 매핑 테이블
+ * - 뱃지 내부에는 절대로 영문/숫자 코드가 노출되지 않도록 전역 강제 매핑
+ */
+var GBS_APPROVAL_STATUS_MAP = {
+	// PM51 출장 결재/지급 상태코드
+	'APRVSTS01': { text: '상신', cls: 'secondary' },
+	'APRVSTS02': { text: '진행중', cls: 'success' },
+	'APRVSTS03': { text: '최종완료', cls: 'primary' },
+	'APRVSTS04': { text: '반려', cls: 'danger' },
+	'APRVSTS05': { text: '상신취소', cls: 'warning' },
+
+	// 공통 결재상태 코드 (TB_WB20M03 / TB_AM11M01 등)
+	'SANCTN01': { text: '임시저장', cls: 'secondary' },
+	'SANCTN02': { text: '상신', cls: 'secondary' },
+	'SANCTN03': { text: '진행중', cls: 'success' },
+	'SANCTN04': { text: '최종완료', cls: 'primary' },
+	'SANCTN05': { text: '반려', cls: 'danger' },
+
+	// 영문 약어 코드
+	'TEMP': { text: '임시저장', cls: 'secondary' },
+	'DRAFT': { text: '임시저장', cls: 'secondary' },
+	'REQ': { text: '상신', cls: 'secondary' },
+	'REQUEST': { text: '상신', cls: 'secondary' },
+	'ING': { text: '진행중', cls: 'success' },
+	'PROGRESS': { text: '진행중', cls: 'success' },
+	'POST_PROGRESS': { text: '후결진행', cls: 'warning' },
+	'END': { text: '최종완료', cls: 'primary' },
+	'COMPLETE': { text: '최종완료', cls: 'primary' },
+	'COMPLETED': { text: '최종완료', cls: 'primary' },
+	'RTN': { text: '반려', cls: 'danger' },
+	'REJECT': { text: '반려', cls: 'danger' },
+	'REJECTED': { text: '반려', cls: 'danger' },
+	'CANCEL': { text: '상신취소', cls: 'warning' },
+	'CANCELLED': { text: '상신취소', cls: 'warning' },
+	'CANCELED': { text: '상신취소', cls: 'warning' },
+	'ARBIT': { text: '전결', cls: 'primary' },
+	'POST': { text: '후결', cls: 'warning' },
+
+	// 한글 상태명 (직접 전달된 경우의 배지 스타일 보장)
+	'임시저장': { text: '임시저장', cls: 'secondary' },
+	'미상신': { text: '미상신', cls: 'secondary' },
+	'결재자없음': { text: '미상신', cls: 'secondary' },
+	'미결재': { text: '상신', cls: 'secondary' },
+	'결재진행중': { text: '진행중', cls: 'success' },
+	'상신': { text: '상신', cls: 'secondary' },
+	'승인요청': { text: '상신', cls: 'secondary' },
+	'진행중': { text: '진행중', cls: 'success' },
+	'결재완료': { text: '최종완료', cls: 'primary' },
+	'승인완료': { text: '최종완료', cls: 'primary' },
+	'최종완료': { text: '최종완료', cls: 'primary' },
+	'완료': { text: '최종완료', cls: 'primary' },
+	'반려': { text: '반려', cls: 'danger' },
+	'상신취소': { text: '상신취소', cls: 'warning' },
+	'지급완료': { text: '지급완료', cls: 'primary' },
+	'미지급': { text: '미지급', cls: 'secondary' }
+};
+
+/**
+ * 전자결재 공통 상태 배지 포맷터 (HTML String 반환)
+ * - 뱃지 내부에는 절대로 영문/숫자 코드가 노출되지 않고 한글 명칭만 표출됨
+ * @param {Object|string|number} opts - 상태 객체, 단일 상태값(코드/명), 또는 totCnt
+ * @param {number} [argDoneCnt] - 호환용 완료 건수
+ * @param {string} [argStsNm]   - 호환용 상태명
+ * @param {string} [argStsCd]   - 호환용 상태코드
+ * @param {number} [argRejectCnt] - 호환용 반려 건수
+ */
+function gbsFormatApprovalStatus(opts, argDoneCnt, argStsNm, argStsCd, argRejectCnt) {
+	var tot = 0, done = 0, rej = 0;
+	var rawText = '', rawCode = '';
+
+	if (typeof opts === 'object' && opts !== null) {
+		tot = Number(opts.totCnt || opts.tot || opts.appTotCnt || 0);
+		done = Number(opts.doneCnt || opts.done || opts.appDoneCnt || 0);
+		rej = Number(opts.rejectCnt || opts.rej || opts.appRejectCnt || 0);
+		rawText = String(opts.stsNm || opts.docStatusNm || opts.statusNm || opts.text || opts.status || opts.value || '').trim();
+		rawCode = String(opts.stsCd || opts.docStatus || opts.statusCd || opts.code || '').trim();
+	} else if (typeof opts === 'number' || (typeof opts === 'string' && argDoneCnt !== undefined)) {
+		tot = Number(opts || 0);
+		done = Number(argDoneCnt || 0);
+		rawText = String(argStsNm || '').trim();
+		rawCode = String(argStsCd || '').trim();
+		rej = Number(argRejectCnt || 0);
+	} else {
+		var raw = String(opts || '').trim();
+		rawCode = raw;
+		rawText = raw;
+	}
+
+	// 1. 반려 최우선 처리 (반려 건수 > 0 또는 반려 상태코드/명칭)
+	var isRejected = (rej > 0)
+		|| rawCode === 'RTN' || rawCode === 'SANCTN05' || rawCode === 'APRVSTS04'
+		|| rawCode === 'REJECT' || rawCode === 'REJECTED'
+		|| rawText === '반려' || rawText === 'RTN';
+	if (isRejected) {
+		return '<span class="label label-danger">반려</span>';
+	}
+
+	var text = '';
+	var cls = 'default';
+
+	// 2. 매핑 테이블 탐색 (rawCode 또는 rawText 기반)
+	var upperCode = rawCode.toUpperCase();
+	var upperText = rawText.toUpperCase();
+	var match = GBS_APPROVAL_STATUS_MAP[upperCode] || GBS_APPROVAL_STATUS_MAP[rawCode]
+			|| GBS_APPROVAL_STATUS_MAP[upperText] || GBS_APPROVAL_STATUS_MAP[rawText];
+
+	if (match) {
+		text = match.text;
+		cls = match.cls;
+	}
+
+	// 3. 결재 건수(총건수, 완료건수) 기반 보정 (최종완료: 파란색/primary, 진행중: 초록색/success, 최초 상신: 회색/secondary)
+	if (tot > 0) {
+		if (done === tot) {
+			text = '최종완료';
+			cls = 'primary';
+		} else if (done > 0 && done < tot) {
+			text = '진행중';
+			cls = 'success';
+		} else if (done === 0) {
+			text = '상신';
+			cls = 'secondary';
+		}
+	} else if (tot === 0 && (!text || text === '미상신' || text === '결재자없음')) {
+		if (!match || rawCode === 'TEMP' || rawCode === 'DRAFT') {
+			text = (rawCode === 'TEMP' || rawCode === 'DRAFT') ? '임시저장' : '미상신';
+			cls = 'secondary';
+		}
+	}
+
+	// 4. [비협상 원칙] 뱃지에 영문/숫자 코드가 노출되는 현상 원천 차단
+	// text가 비어있거나 영문/숫자 코드 형식(예: APRVSTS02, SANCTN01 등)이면 한글 매핑 강제 적용
+	if (!text || /^[A-Za-z0-9_]+$/.test(text)) {
+		var fallback = GBS_APPROVAL_STATUS_MAP[text.toUpperCase()] || GBS_APPROVAL_STATUS_MAP[upperCode];
+		if (fallback) {
+			text = fallback.text;
+			cls = fallback.cls;
+		} else {
+			text = '-';
+			cls = 'default';
+		}
+	}
+
+	var styleAttr = '';
+	if (text === '상신') {
+		styleAttr = ' style="background-color: #546e7a !important; color: #ffffff !important;"';
+	}
+
+	return '<span class="label label-' + cls + '"' + styleAttr + '>' + text + '</span>';
+}
+
+/**
+ * AX5 Grid 기본 sanctnStsFormatter 전역 등록
+ * - 컬럼에 formatter: "sanctnStsFormatter" 만 적으면 셀 값 및 행(item)을 자동 분석하여 표준 뱃지 생성
+ */
+if (typeof ax5 !== 'undefined' && ax5.ui && ax5.ui.grid && ax5.ui.grid.formatter) {
+	ax5.ui.grid.formatter["sanctnStsFormatter"] = function () {
+		var item = this.item;
+		var val = this.value;
+		var key = this.key || '';
+
+		if (item) {
+			// 지급결재 관련 컬럼인 경우
+			if (key === 'payAprvStsNm' || key === 'payStatus' || key === 'payAprvStsCd') {
+				var payTot = Number(item.payAppTotCnt || 0);
+				var payDone = Number(item.payAppDoneCnt || 0);
+				var payRej = Number(item.payAppRejectCnt || 0);
+				var payStsNm = item.payAprvStsNm || '';
+				var payStsCd = item.payAprvStsCd || '';
+				return gbsFormatApprovalStatus({
+					totCnt: payTot,
+					doneCnt: payDone,
+					rejectCnt: payRej,
+					stsNm: payStsNm,
+					stsCd: payStsCd,
+					value: val
+				});
+			}
+
+			// 일반 결재 관련 컬럼인 경우 (appTotCnt, aprvStsCd 등 스마트 감지)
+			var tot = Number(item.appTotCnt || item.totCnt || 0);
+			var done = Number(item.appDoneCnt || item.doneCnt || 0);
+			var rej = Number(item.appRejectCnt || item.rejectCnt || 0);
+			var stsNm = item.aprvStsNm || item.sanctnStsNm || item.docStatusNm || item.statusNm || val || '';
+			var stsCd = item.aprvStsCd || item.sanctnSts || item.sanctnStsCd || item.reqStatus || item.resultStatus || item.docStatus || '';
+
+			return gbsFormatApprovalStatus({
+				totCnt: tot,
+				doneCnt: done,
+				rejectCnt: rej,
+				stsNm: stsNm,
+				stsCd: stsCd,
+				value: val
+			});
+		}
+
+		return gbsFormatApprovalStatus(val);
+	};
+}
+
+/**
+ * 결재선 리스트에서 반려(Reject) 행이 존재하는지 판정하는 공통 헬퍼
+ * @param {Array} rows - 결재선 행 배열
+ * @return {boolean} - 반려자 존재 여부
+ */
+function gbsIsApprovalLineRejected(rows) {
+	if (!rows || !Array.isArray(rows) || rows.length === 0) return false;
+	for (var i = 0; i < rows.length; i++) {
+		var r = rows[i];
+		if (!r) continue;
+		var gb = r.gb || r.todoDiv1CodeNm || '';
+		if (gb && gb !== '결재' && gb !== 'APPR') continue;
+		if (r.apprRejectYn === 'Y' || r.APPR_REJECT_YN === 'Y' || r.sanctnSttusNm === '반려' || r.sanctnStsNm === '반려' || r.sanctnSttus === 'R') {
+			return true;
+		}
+	}
+	return false;
+}
+
 // PM51 순차결재 대상 결재구분. 값이 있으면 "선행되어야 하는 신청부서 결재구분"을 의미한다.
 // (관리부서 결재는 신청부서 결재가 모두 완료되어야 진행 가능 - 서버 validatePm51SequentialApproval과 동일 기준)
 var PM51_SEQ_GENERAL_OF = {
@@ -569,5 +800,136 @@ function Approval(htmlParam, param, popParam) {
 		});
 
 		return true;
+	}
+}
+
+// PM51 순차결재 전용 division 매핑: 신청부서(개인) 결재구분 -> 관리부서 결재구분
+var PM51_SEQUENTIAL_DIV_MAP = {
+	'TODODIV2190': 'TODODIV2191', // 출장신청서
+	'TODODIV2200': 'TODODIV2201'  // 출장복명서
+};
+var PM51_SEQUENTIAL_TITLE = {
+	'TODODIV2190': '출장신청서', 'TODODIV2191': '출장신청서',
+	'TODODIV2200': '출장복명서', 'TODODIV2201': '출장복명서'
+};
+
+// 지정된 todoNo/todoDiv2CodeId 결재선에서 아직 미완료(sanctnSttus!=='Y')인 최소 순번(sanctnSn) 결재자를 찾아
+// "결재 요청" 알림톡을 발송한다. 대상이 없으면(=해당 구분 결재가 모두 완료) false, 발송했으면 true를 반환한다.
+function notifyPm51NextApprover(todoNo, todoDiv2CodeId, pgmId) {
+	if (!todoNo || !todoDiv2CodeId) return false;
+	var rows = [];
+	postAjaxSync("/user/wb/wb20/selectGetApprovalList", { todoNo: todoNo, todoDiv2CodeId: todoDiv2CodeId }, null, function(data) {
+		rows = data.resultList || [];
+	});
+	var nextRow = null;
+	$.each(rows, function(idx, row) {
+		if (row.sanctnSttus === 'Y') return;
+		var sn = Number(row.sanctnSn || 0);
+		if (!sn) return;
+		if (!nextRow || sn < Number(nextRow.sanctnSn || 0)) nextRow = row;
+	});
+	if (!nextRow) return false;
+	sendPm51ApprovalRequestKakao(todoNo, todoDiv2CodeId, nextRow.sanctnSn, pgmId);
+	return true;
+}
+
+// PM51 전용 "결재 요청" 알림톡 - PM5101P01.html/PM5102P01.html의 kakaoTodo()와 동일한 방식(복수 대상 조회 + TMPLATDIV02)으로
+// 특정 순번(sanctnSn) 한 명에게만 발송한다.
+function sendPm51ApprovalRequestKakao(todoNo, todoDiv2CodeId, sanctnSn, pgmId) {
+	var clntNm = (jwt.coCd == "GUN") ? "(주)건양ITT" : "트루넷";
+	var teleNo = "051-312-2400";
+	postAjaxSync("/user/wb/wb24/selectMemberTelNo", { coCd: jwt.coCd, userId: jwt.userId }, null, function(data) {
+		if (data.result && data.result[0] && data.result[0].telNo) teleNo = data.result[0].telNo;
+	});
+
+	var reqParam = {
+		tmplatDiv: "TMPLATDIV02", coCd: jwt.coCd,
+		todoDiv1CodeId: "TODODIV20", todoDiv2CodeId: todoDiv2CodeId,
+		todoDiv1CodeNm: "결재",
+		title: PM51_SEQUENTIAL_TITLE[todoDiv2CodeId] || "결재",
+		sanctnDiv2: "결재", todoNo: todoNo, clntCd: "1", clntNm: clntNm,
+		ordrgMngNm: jwt.userNm, ordrgMngTelNo: teleNo, creatPgm: pgmId || "WB2001P01",
+		chkSentYn: "Y", sanctnSn: sanctnSn
+	};
+
+	var sendList = [];
+	postAjaxSync("/user/bm/bm18/selectMaxMessageIdTodo", reqParam, null, function(data) {
+		sendList = data.resultList || [];
+	});
+
+	$.each(sendList, function(idx, sendObj) {
+		var mobile = sendObj.telNo;
+		var talkMessage = sendObj.messageDesc;
+		if (!mobile || !talkMessage) return;
+		reqParam.rcvId = sendObj.todoId;
+		reqParam.rcvNm = sendObj.name;
+		reqParam.nameTo = sendObj.name;
+		reqParam.todoDiv2CodeNm = sendObj.todoTitl;
+		reqParam.sendDt = sendObj.sendDt;
+
+		var message = talkMessage;
+		Array.from(message.matchAll(/\{(.*?)\}/g), function(m) { return m[1]; }).forEach(function(compKey) {
+			if (compKey && reqParam[compKey] !== undefined) {
+				message = message.replaceAll('#{' + compKey + '}', reqParam[compKey]);
+			}
+		});
+
+		var talkParam = { authToken: "e/eDfZOFCsrBqadaECQ0+g==", serverName: "gyitt2400", paymentType: "P" };
+		var talkBody = {
+			service: "2310086157", messageId: sendObj.maxMessageId,
+			title: reqParam.title, message: message, mobile: mobile, template: "10003"
+		};
+		kakaoSendReal(JSON.stringify(talkBody), talkParam, reqParam);
+	});
+}
+
+
+// (WB2001P01.html에서 이동) 최종결재 완료 알림톡 공용 함수. 결재함/PM51 등 어느 화면에서든 표준 결재완료 흐름에 쓰인다.
+var kakaoErr = [];
+//최종결재시 결재완료 최초작성자(1번)에게 전송
+function sendTodoFinal(param) {
+	//message load
+	if (kakaoErr.length == 0) {
+		var paramObj = {
+			"userId" : jwt.userId
+			, "codeKind" : "KAKAOMSG"
+		};
+		postAjaxSync("/user/sm/sm02/selectCurrToday", paramObj, null, function(data) {
+			if(data && data.resultList && data.resultList.length > 0 ) {
+				kakaoErr = data.resultList;
+			}
+		});
+	}
+
+	//TODO 결재완료 알림톡
+	let paramSend = {
+			"tmplatDiv"		  : "TMPLATDIV05"				//발송템플릿관리번호
+			, "todoDiv1CodeId": param.todoDiv1CodeId		//공통코드 해당업무 - 결재
+			, "todoDiv2CodeId": param.todoDiv2CodeId		//공통코드 해당업무 - 결재 - 발주서
+			, "todoDiv1CodeNm": "결재"						//공통코드 해당업무 - 결재 - 발주서
+			, "todoDiv2CodeNm": param.todoDiv2CodeNm  		//공통코드 해당업무 - 결재 - 발주서 -- 템플릿 승인 후에는 삭제요망
+			, "sanctnDiv2"	  : "결재"						//템플릿 결재구분2    #{sanctnDiv2} 처리 바랍니다.
+			, "todoNo"	   	  : param.todoNo
+			, "clntCd"		  : "1"							//발신회사는 로그인사용자 회사
+			, "creatPgm"	  : param.pgmId
+			, "sanctnSn"	  : "1"							//결재순번 1번을 결재상신자로 본다
+			, "todoKey"		  : param.todoKey				//결재 고유 등록번호
+			, "todoTitl"	  : param.todoTitl
+			, "bigo"		  : (param?.bigo ?? '').trim()	//list.bigo = "보완요청";  결제 버튼 보완요청 처리시에만 전달됨
+	}
+	commKaKaoSendTodo(paramSend);
+
+	// PM51(출장신청서 TODODIV2190/2191, 출장복명서 TODODIV2200/2201) 전용: 순차결재 다음 차례 결재자에게 결재요청 알림톡 발송.
+	// 그 외 모듈의 todoDiv2CodeId는 이 조건에 걸리지 않으므로 기존 동작에 전혀 영향이 없다.
+	// 보완요청(bigo)건은 실제 결재완료가 아니므로(같은 차례가 유지됨) 대상에서 제외한다.
+	var pm51Bigo = (param?.bigo ?? '').trim();
+	var isPm51Target = param.todoDiv2CodeId === 'TODODIV2190' || param.todoDiv2CodeId === 'TODODIV2191'
+	                || param.todoDiv2CodeId === 'TODODIV2200' || param.todoDiv2CodeId === 'TODODIV2201';
+	if (!pm51Bigo && isPm51Target) {
+		var pm51HasNext = notifyPm51NextApprover(param.todoNo, param.todoDiv2CodeId, param.pgmId);
+		if (!pm51HasNext && PM51_SEQUENTIAL_DIV_MAP.hasOwnProperty(param.todoDiv2CodeId)) {
+			// 방금 신청부서(개인) 결재가 모두 완료됨 -> 관리부서 결재 1번 순번에게 시작 알림
+			notifyPm51NextApprover(param.todoNo, PM51_SEQUENTIAL_DIV_MAP[param.todoDiv2CodeId], param.pgmId);
+		}
 	}
 }

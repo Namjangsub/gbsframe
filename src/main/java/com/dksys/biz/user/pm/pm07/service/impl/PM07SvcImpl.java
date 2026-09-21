@@ -8,6 +8,9 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.HashSet;
+import com.dksys.biz.user.am.am11.service.AM11Svc;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -32,6 +35,9 @@ public class PM07SvcImpl implements PM07Svc {
 
 	@Autowired
 	WB20Svc wb20Svc;
+
+	@Autowired
+	AM11Svc am11Svc;
 
 	@Autowired
 	CM08Svc cm08Svc;
@@ -338,6 +344,7 @@ public class PM07SvcImpl implements PM07Svc {
 				Gson gsonDtl = new GsonBuilder().disableHtmlEscaping().create();
 				Type dtlMap = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
 				approvalList = gsonDtl.fromJson(approvalArr, dtlMap);
+				approvalList = deduplicateApprovalAndShare(approvalList);
 
 				for (Map<String, String> approval : approvalList) {
 					approval.put("todoNo", reqNo);
@@ -386,6 +393,74 @@ public class PM07SvcImpl implements PM07Svc {
 				// 기안자 본인 자체승인 시 END 오판 방어 로직은 applyVacationApprovedInner 안으로
 				// 이전됨(모든 호출 경로를 보호하고, 실시간 결재선을 직접 조회하는 더 정확한 판정).
 				wb20Svc.insertTodoMaster(paramMap);
+				// WB20 자체승인 후 DB의 최신 상태를 재조회하여 AM에 동일하게 전달한다.
+				Map<String, String> wb20ApprovalQuery = new HashMap<>();
+				wb20ApprovalQuery.put("todoNo", reqNo);
+				wb20ApprovalQuery.put("coCd", String.valueOf(paramMap.get("coCd")));
+				List<Map<String, String>> wb20ApprovalList = wb20Svc.selectGetApprovalList(wb20ApprovalQuery);
+				if (wb20ApprovalList != null) {
+					for (Map<String, String> approval : approvalList) {
+						for (Map<String, String> wb20Approval : wb20ApprovalList) {
+							if (approval.get("todoId") != null && approval.get("todoId").equals(wb20Approval.get("todoId"))) {
+								approval.put("sanctnSttus", wb20Approval.get("sanctnSttus"));
+								approval.put("todoCfDt", wb20Approval.get("todoCfDt"));
+								break;
+							}
+						}
+					}
+				}
+
+				// 기존 WB20 결재는 유지하고, 동일 업무를 AM 결재함에도 등록한다.
+				Map<String, Object> amParam = new HashMap<>();
+				amParam.put("coCd", paramMap.get("coCd"));
+				amParam.put("userId", paramMap.get("userId"));
+				amParam.put("userNm", paramMap.get("userNm"));
+				amParam.put("docTitle", buildVacationApprovalTitle(paramMap));
+				amParam.put("formCd", "PM0701");
+				amParam.put("formVer", 1);
+				amParam.put("erpBizType", "PM07");
+				amParam.put("erpBizKey", reqNo);
+				amParam.put("docDataJson", new GsonBuilder().disableHtmlEscaping().create().toJson(paramMap));
+				amParam.put("docRenderHtml", buildVacationApprovalHtml(paramMap));
+				amParam.put("pgmId", "PM0701P01");
+				List<Map<String, Object>> amLineList = new ArrayList<>();
+				for (Map<String, String> approval : approvalList) {
+					Map<String, Object> amLine = new HashMap<>();
+					amLine.put("approverId", approval.get("todoId"));
+					amLine.put("approverNm", approval.get("name"));
+						amLine.put("deptId", approval.get("deptId"));
+						amLine.put("lineSeq", approval.get("sanctnSn"));
+						amLine.put("wb20TodoKey", approval.get("todoKey"));
+						amLine.put("wb20CoCd", approval.get("coCd"));
+						amLine.put("wb20TodoNo", approval.get("todoNo"));
+						amLine.put("wb20SanctnSn", approval.get("sanctnSn"));
+						amLine.put("wb20Div1CodeId", approval.get("todoDiv1CodeId"));
+						amLine.put("wb20Div2CodeId", approval.get("todoDiv2CodeId"));
+					// WB20 TODODIV10(공유)는 AM에서 참조선으로만 매핑한다.
+					amLine.put("lineType", "TODODIV10".equals(approval.get("todoDiv1CodeId")) ? "REF" : "APPR");
+					amLine.put("sourceApproved", "Y".equalsIgnoreCase(approval.get("sanctnSttus")) ? "Y" : "N");
+					amLineList.add(amLine);
+				}
+				amParam.put("lineList", amLineList);
+				int autoApprovedCount = 0;
+				for (Map<String, Object> line : amLineList) {
+					if (!"Y".equals(line.get("sourceApproved"))) break;
+					autoApprovedCount++;
+				}
+				amParam.put("autoApprovedCount", autoApprovedCount);
+				// PM07 화면에서 전달한 신청자명을 AM 기안자명으로 명시 전달한다.
+				if (amParam.get("userNm") == null || String.valueOf(amParam.get("userNm")).trim().isEmpty()) {
+					amParam.put("userNm", paramMap.get("reqTitl"));
+				}
+				Map<String, Object> amResult = am11Svc.submitApproval(amParam);
+				if (!"200".equals(String.valueOf(amResult.get("resultCode")))) {
+					if (amParam.get("docId") != null) {
+						amParam.put("changeReason", "PM07 신청서 수정 동기화");
+						am11Svc.changeApprovalLines(amParam);
+					} else {
+						throw new IllegalStateException("AM 결재문서 자동등록 실패: " + amResult.get("resultMessage"));
+					}
+				}
 			}
 
 			String vacDtArr = paramMap.get("vacDtArr");
@@ -536,6 +611,7 @@ public class PM07SvcImpl implements PM07Svc {
 				Gson gsonDtl = new GsonBuilder().disableHtmlEscaping().create();
 				Type dtlMap = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
 				approvalList = gsonDtl.fromJson(approvalArr, dtlMap);
+				approvalList = deduplicateApprovalAndShare(approvalList);
 
 				for (Map<String, String> approval : approvalList) {
 					approval.put("todoNo", paramMap.get("reqNo"));
@@ -1482,4 +1558,127 @@ public class PM07SvcImpl implements PM07Svc {
 		return pm07Mapper.deleteAwardVacation(paramMap);
 	}
 
+	private List<Map<String, String>> deduplicateApprovalAndShare(List<Map<String, String>> approvalList) {
+		if (approvalList == null || approvalList.isEmpty()) {
+			return approvalList;
+		}
+		Set<String> approvalUserIds = new HashSet<>();
+		for (Map<String, String> item : approvalList) {
+			boolean isShare = "공유".equals(item.get("gb")) || "TODODIV10".equals(item.get("todoDiv1CodeId"))
+					|| (item.get("todoDiv2CodeId") != null && item.get("todoDiv2CodeId").startsWith("TODODIV1"));
+			if (!isShare) {
+				String uid = getApproverUserId(item);
+				if (uid != null && !uid.isEmpty()) {
+					approvalUserIds.add(uid);
+				}
+			}
+		}
+		List<Map<String, String>> result = new ArrayList<>();
+		int shareSn = 1;
+		int appSn = 1;
+		for (Map<String, String> item : approvalList) {
+			boolean isShare = "공유".equals(item.get("gb")) || "TODODIV10".equals(item.get("todoDiv1CodeId"))
+					|| (item.get("todoDiv2CodeId") != null && item.get("todoDiv2CodeId").startsWith("TODODIV1"));
+			if (isShare) {
+				String uid = getApproverUserId(item);
+				if (uid != null && approvalUserIds.contains(uid)) {
+					continue; // 동일ID 결재선 존재 시 공유선 자동 제거
+				}
+				item.put("sanctnSn", String.valueOf(shareSn++));
+			} else {
+				item.put("sanctnSn", String.valueOf(appSn++));
+			}
+			result.add(item);
+		}
+		return result;
+	}
+
+	private String getApproverUserId(Map<String, String> item) {
+		if (item == null) return null;
+		String uid = item.get("todoId");
+		if (uid == null || uid.trim().isEmpty()) uid = item.get("usrNm");
+		if (uid == null || uid.trim().isEmpty()) uid = item.get("empNo");
+		if (uid == null || uid.trim().isEmpty()) uid = item.get("userId");
+		return uid == null ? null : uid.trim();
+	}
+
+	private String formatVacationTypeDisplay(Map<String, String> paramMap) {
+		String vacTypeNm = paramMap.get("vacTypeNm");
+		String vacTypeCd = paramMap.get("vacTypeCd");
+		String ampmCd = paramMap.get("ampmCd");
+		String ampmNm = paramMap.get("ampmNm");
+
+		// 1. 기본 휴가유형명 (괄호 부연설명 및 잔여정보 제거)
+		String baseNm = "";
+		if (vacTypeNm != null && !vacTypeNm.trim().isEmpty()) {
+			int parenIdx = vacTypeNm.indexOf('(');
+			baseNm = (parenIdx >= 0) ? vacTypeNm.substring(0, parenIdx).trim() : vacTypeNm.trim();
+		}
+		if (baseNm.isEmpty() && vacTypeCd != null) {
+			if ("PM07TYPE01".equals(vacTypeCd)) baseNm = "연차";
+			else if ("PM07TYPE02".equals(vacTypeCd)) baseNm = "반차";
+			else if ("PM07TYPE03".equals(vacTypeCd)) baseNm = "조퇴";
+			else if ("PM07TYPE04".equals(vacTypeCd)) baseNm = "외출";
+			else if ("PM07TYPE05".equals(vacTypeCd)) baseNm = "교육훈련";
+			else if ("PM07TYPE06".equals(vacTypeCd)) baseNm = "경조휴가";
+			else if ("PM07TYPE07".equals(vacTypeCd)) baseNm = "포상휴가";
+			else if ("PM07TYPE08".equals(vacTypeCd)) baseNm = "포상휴가반차";
+			else if ("PM07TYPE09".equals(vacTypeCd)) baseNm = "하계휴가";
+			else if ("PM07TYPE10".equals(vacTypeCd)) baseNm = "재택근무";
+			else if ("PM07TYPE11".equals(vacTypeCd)) baseNm = "대체휴가";
+			else if ("PM07TYPE12".equals(vacTypeCd)) baseNm = "대체휴가반차";
+			else if ("PM07TYPE13".equals(vacTypeCd)) baseNm = "병가무급";
+			else if ("PM07TYPE14".equals(vacTypeCd)) baseNm = "지각";
+			else baseNm = vacTypeCd;
+		}
+
+		// 2. 오전/오후 명칭 판별
+		String ampmLabel = "";
+		if (ampmNm != null && (ampmNm.contains("오전") || ampmNm.contains("오후"))) {
+			ampmLabel = ampmNm.contains("오전") ? "오전" : "오후";
+		} else if (ampmCd != null) {
+			if ("PM07AMPM01".equals(ampmCd) || ampmCd.contains("AM") || ampmCd.contains("오전") || "PM07AMPM10".equals(ampmCd)) {
+				ampmLabel = "오전";
+			} else if ("PM07AMPM02".equals(ampmCd) || ampmCd.contains("PM") || ampmCd.contains("오후") || "PM07AMPM20".equals(ampmCd)) {
+				ampmLabel = "오후";
+			}
+		}
+
+		// 3. 반차류(반차, 포상휴가반차, 대체휴가반차)인 경우 오전/오후 표기
+		boolean isHalf = "PM07TYPE02".equals(vacTypeCd) || "PM07TYPE08".equals(vacTypeCd) || "PM07TYPE12".equals(vacTypeCd)
+				|| baseNm.contains("반차");
+		if (isHalf && !ampmLabel.isEmpty()) {
+			return baseNm + " (" + ampmLabel + ")";
+		}
+		return baseNm;
+	}
+
+	private String buildVacationApprovalHtml(Map<String, String> paramMap) {
+		StringBuilder html = new StringBuilder();
+		html.append("<div class=\"approval-document\"><h3>휴가신청서</h3><table class=\"table table-bordered\">");
+		html.append("<tr><th>신청자</th><td>").append(escapeHtml(paramMap.get("reqTitl"))).append("</td></tr>");
+		html.append("<tr><th>휴가유형</th><td>").append(escapeHtml(formatVacationTypeDisplay(paramMap))).append("</td></tr>");
+		html.append("<tr><th>기간</th><td>").append(escapeHtml(paramMap.get("stDt"))).append(" ~ ").append(escapeHtml(paramMap.get("edDt"))).append("</td></tr>");
+		html.append("<tr><th>사유</th><td>").append(escapeHtml(paramMap.get("reqRmk"))).append("</td></tr>");
+		html.append("</table></div>");
+		return html.toString();
+	}
+
+	private String buildVacationApprovalTitle(Map<String, String> paramMap) {
+		String applicant = paramMap.get("reqTitl");
+		if (applicant == null || applicant.trim().isEmpty()) applicant = paramMap.get("userNm");
+		if (applicant == null || applicant.trim().isEmpty()) applicant = paramMap.get("reqId");
+		if (applicant == null) applicant = "";
+		String vacTypeCd = paramMap.get("vacTypeCd");
+		String vacTypeNm = paramMap.get("vacTypeNm");
+		boolean outing = "PM07TYPE04".equals(vacTypeCd)
+				|| (vacTypeNm != null && vacTypeNm.contains("외출"));
+		return applicant.trim() + " " + (outing ? "외출신청서" : "휴가신청서");
+	}
+
+	private String escapeHtml(String value) {
+		if (value == null) return "";
+		return value.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+				.replace("\"", "&quot;").replace("'", "&#39;");
+	}
 }

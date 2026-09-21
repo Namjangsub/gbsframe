@@ -156,6 +156,112 @@ public class PM30SvcImpl implements PM30Svc {
 	}
 
 	@Override
+	public List<Map<String, Object>> selectAttendanceComprehensiveList(Map<String, String> paramMap) {
+		List<Map<String, String>> mainList = pm30Mapper.selectComprehensiveMain(paramMap);
+		List<Map<String, String>> changeList = pm30Mapper.selectChangeSumByMonth(paramMap);
+		List<Map<String, String>> substOccurList = pm30Mapper.selectSubstWorkOccur(paramMap);
+		List<Map<String, String>> substVacUseList = pm30Mapper.selectSubstVacUse(paramMap);
+
+		Map<String, Map<String, String>> changeMap = new HashMap<>();
+		for (Map<String, String> row : changeList) {
+			changeMap.put((String) row.get("empNo"), row);
+		}
+
+		Map<String, Map<String, String>> substOccurMap = new HashMap<>();
+		for (Map<String, String> row : substOccurList) {
+			substOccurMap.put((String) row.get("empNo"), row);
+		}
+
+		Map<String, Map<String, String>> substVacUseMap = new HashMap<>();
+		for (Map<String, String> row : substVacUseList) {
+			substVacUseMap.put((String) row.get("empNo"), row);
+		}
+
+		List<Map<String, Object>> result = new ArrayList<>();
+		Map<String, List<Map<String, Object>>> groupByDept = new HashMap<>();
+
+		for (Map<String, String> mainRow : mainList) {
+			Map<String, Object> merged = new HashMap<>(mainRow);
+			String empNo = (String) mainRow.get("empNo");
+			String deptNm = (String) mainRow.get("deptNm");
+
+			Map<String, String> chg = changeMap.get(empNo);
+			Double substChgTm = chg != null ? safeParseDouble((String) chg.get("substChgTm")) : 0.0;
+
+			Double weekdayOtTm = safeParseDouble((String) mainRow.get("weekdayOtTm"));
+			Double holidayNormalTm = safeParseDouble((String) mainRow.get("holidayNormalTm"));
+			Double holidayOtTm = safeParseDouble((String) mainRow.get("holidayOtTm"));
+			Double subtotalB = weekdayOtTm + holidayNormalTm + holidayOtTm;
+
+			Map<String, String> substOccur = substOccurMap.get(empNo);
+			Double substOccurCnt = substOccur != null ? safeParseDouble((String) substOccur.get("substOccurCnt")) : 0.0;
+			Double substYtdOccurCnt = substOccur != null ? safeParseDouble((String) substOccur.get("substYtdOccurCnt")) : 0.0;
+
+			Map<String, String> substVacUse = substVacUseMap.get(empNo);
+			Double substVacUseCnt = substVacUse != null ? safeParseDouble((String) substVacUse.get("substVacUseCnt")) : 0.0;
+			Double substVacYtdUseCnt = substVacUse != null ? safeParseDouble((String) substVacUse.get("substVacYtdUseCnt")) : 0.0;
+
+			Double balance = substYtdOccurCnt - substVacYtdUseCnt;
+
+			String salesArea = (String) mainRow.get("salesArea");
+			String tripYn = (String) mainRow.get("tripYn");
+			String otColorFlag;
+			if ("SALESAREA60".equals(salesArea) || "Y".equals(tripYn)) {
+				otColorFlag = "none";
+			} else if (subtotalB > 52) {
+				otColorFlag = "red";
+			} else if (subtotalB < 10) {
+				otColorFlag = "green";
+			} else {
+				otColorFlag = "normal";
+			}
+
+			merged.put("substChgTm", substChgTm);
+			merged.put("subtotalB", subtotalB);
+			merged.put("substOccurCnt", substOccurCnt);
+			merged.put("substYtdOccurCnt", substYtdOccurCnt);
+			merged.put("substVacUseCnt", substVacUseCnt);
+			merged.put("substVacYtdUseCnt", substVacYtdUseCnt);
+			merged.put("balance", balance);
+			merged.put("otColorFlag", otColorFlag);
+			merged.put("remark", "");
+
+			result.add(merged);
+			String deptId = (String) mainRow.get("deptId");
+			String groupKey = (deptId != null && !deptId.isEmpty()) ? deptId : (deptNm != null ? deptNm : "UNKNOWN");
+			groupByDept.computeIfAbsent(groupKey, k -> new ArrayList<>()).add(merged);
+		}
+
+		for (List<Map<String, Object>> team : groupByDept.values()) {
+			if (team.isEmpty()) continue;
+			double teamSubtotalBSum = 0.0;
+			for (Map<String, Object> row : team) {
+				Double subtotalB = (Double) row.get("subtotalB");
+				if (subtotalB != null) {
+					teamSubtotalBSum += subtotalB;
+				}
+			}
+			double teamAvg = Math.round((teamSubtotalBSum / team.size()) * 10.0) / 10.0;
+			for (Map<String, Object> row : team) {
+				row.put("teamAvg", teamAvg);
+			}
+		}
+
+		return result;
+	}
+
+	private double safeParseDouble(String val) {
+		if (val == null || val.isEmpty()) {
+			return 0.0;
+		}
+		try {
+			return Double.parseDouble(val);
+		} catch (NumberFormatException e) {
+			return 0.0;
+		}
+	}
+
+	@Override
 	public Map<String, Object> saveAttendanceChange(Map<String, Object> paramMap) throws Exception {
 		Map<String, Object> result = new HashMap<>();
 

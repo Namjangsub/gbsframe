@@ -16,8 +16,8 @@
 	border-radius: 5px;
 	box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
 	padding: 10px 14px;
-	min-width: 240px;
-	max-width: 360px;
+	min-width: 260px;
+	max-width: 420px;
 	font-size: 12px;
 	color: #333333;
 	pointer-events: auto;
@@ -74,6 +74,26 @@
 	margin-bottom: 6px;
 	font-size: 12px;
 }
+.vacation-info-popover #popContent,
+#vacationInfoPopover #popContent {
+	max-height: 280px;
+	overflow-y: auto;
+	overflow-x: hidden;
+	padding-right: 4px;
+}
+.vacation-info-popover #popContent::-webkit-scrollbar,
+#vacationInfoPopover #popContent::-webkit-scrollbar {
+	width: 6px;
+}
+.vacation-info-popover #popContent::-webkit-scrollbar-thumb,
+#vacationInfoPopover #popContent::-webkit-scrollbar-thumb {
+	background-color: #cbd5e1;
+	border-radius: 3px;
+}
+.vacation-info-popover #popContent::-webkit-scrollbar-track,
+#vacationInfoPopover #popContent::-webkit-scrollbar-track {
+	background-color: #f1f5f9;
+}
 .vacation-info-popover .popover-item {
 	padding: 4px 0;
 	line-height: 1.4;
@@ -101,20 +121,28 @@
 
 	<!-- 검색 조건 테이블 영역 (FI0202M01.html 연도 셀렉트 & PM0101M01.html 사원검색 폼 패턴 적용, 팝업용 미사용 _S 규칙 엄수) -->
 	<div class="popup_table">
-		<table class="table_input">
+		<table class="table_input type04">
 			<colgroup>
-				<col width="10%">
-				<col width="22%">
-				<col width="10%">
-				<col width="34%">
-				<col width="10%">
+				<col width="8%">
+				<col width="15%">
+				<col width="8%">
 				<col width="14%">
+				<col width="8%">
+				<col width="28%">
+				<col width="9%">
+				<col width="10%">
 			</colgroup>
 			<tr>
+				<th>회사구분</th>
+				<td>
+					<select id="hrCoCd" name="hrCoCd" class="form-control input-sm" style="width: 100%;" data-kind="CO" onchange="searchGrantGrid();">
+						<option value="">전체</option>
+					</select>
+				</td>
 				<th>부여연도</th>
 				<td>
 					<!-- 조회연도 셀렉트박스 동적 옵션 생성 (기준연도 : 2025년 ~ 현재+1년) -->
-					<select id="yy" name="yy" class="form-control input-sm" style="width: 110px;" onchange="searchGrantGrid();"></select>
+					<select id="yy" name="yy" class="form-control input-sm" style="width: 100%;" onchange="searchGrantGrid();"></select>
 				</td>
 				<th>사원검색</th>
 				<td>
@@ -127,7 +155,7 @@
 				</td>
 				<th>퇴사자구분</th>
 				<td>
-					<select id="includeLeaveYn" name="includeLeaveYn" class="form-control input-sm" style="width: 110px;" onchange="searchGrantGrid();">
+					<select id="includeLeaveYn" name="includeLeaveYn" class="form-control input-sm" style="width: 100%;" onchange="searchGrantGrid();">
 						<option value="N" selected>퇴사자제외</option>
 						<option value="Y">퇴사자포함</option>
 					</select>
@@ -329,9 +357,10 @@
 							var g = Number(String(this.item.grantDays || 0).replace(/[^0-9.]/g, ''));
 							if (isNaN(g)) g = 0;
 							var u = Number(this.item.usedDays || 0);
+							var p = Number(this.item.prevDays || 0);
 							this.item.isManualEdited = true; // 담당자 직접 수기 수정 플래그
 							this.self.setValue(this.dindex, "grantDays", g);
-							this.self.setValue(this.dindex, "balanceDays", g - u);
+							this.self.setValue(this.dindex, "balanceDays", g + p - u);
 						}
 						if (this.key === "workSubstDays" || this.key === "workSubstUsedDays") {
 							var ws = Number(String(this.item.workSubstDays || 0).replace(/[^0-9.]/g, ''));
@@ -346,6 +375,19 @@
 							var svu = Number(this.item.summerVacUsedDays || 0);
 							this.self.setValue(this.dindex, "summerVacDays", sv);
 							this.self.setValue(this.dindex, "summerVacBalanceDays", sv - svu);
+						}
+						// 정산잔여(remDays) 수정 시 숫자 정제(음수 '-' 허용) 및 상태 갱신
+						if (this.key === "remDays") {
+							var strVal = String(this.item.remDays == null ? '' : this.item.remDays).trim();
+							var isNeg = (strVal.indexOf('-') !== -1);
+							var cleanNum = strVal.replace(/[^0-9.]/g, '');
+							var rd = 0;
+							if (cleanNum !== '') {
+								rd = Number((isNeg ? '-' : '') + cleanNum);
+								if (isNaN(rd)) rd = 0;
+							}
+							this.item.isManualEdited = true;
+							this.self.setValue(this.dindex, "remDays", rd);
 						}
 					}
 				},
@@ -369,9 +411,11 @@
 					,{
 						label: "년차휴가 일수",
 						columns: [
-							 {key: "grantDays",            label: "발생", width:  65, align: "center", editor: {type: "text"}, formatter: "zeroEmptyFormatter"}
+							 {key: "prevDays",             label: "이월", width:  65, align: "center", formatter: "balanceDaysFormatter"}
+							,{key: "grantDays",            label: "발생", width:  65, align: "center", editor: {type: "text"}, formatter: "zeroEmptyFormatter"}
 							,{key: "usedDays",             label: "사용", width:  65, align: "center", formatter: "usedDaysInfoFormatter"}
 							,{key: "balanceDays",          label: "잔여", width:  65, align: "center", formatter: "balanceDaysFormatter"}
+							,{key: "remDays",              label: "선사용", width: 65, align: "center", editor: {type: "text"}, formatter: "balanceDaysFormatter"}
 						]
 					}
 
@@ -522,6 +566,29 @@
 			top: (offset.top + $el.outerHeight() + 2) + 'px',
 			left: Math.max(10, offset.left - 20) + 'px'
 		}).show();
+
+		// 화면 하단/우측 넘침 방지 스마트 포지셔닝
+		var popHeight = $pop.outerHeight();
+		var popWidth = $pop.outerWidth();
+		var winHeight = $(window).height();
+		var winWidth = $(window).width();
+		var scrollTop = $(window).scrollTop();
+		var scrollLeft = $(window).scrollLeft();
+
+		var topPos = offset.top + $el.outerHeight() + 2;
+		if (topPos + popHeight > scrollTop + winHeight && (offset.top - popHeight - 2) >= scrollTop) {
+			topPos = offset.top - popHeight - 2;
+		}
+
+		var leftPos = Math.max(10, offset.left - 20);
+		if (leftPos + popWidth > scrollLeft + winWidth - 10) {
+			leftPos = Math.max(10, scrollLeft + winWidth - popWidth - 10);
+		}
+
+		$pop.css({
+			top: topPos + 'px',
+			left: leftPos + 'px'
+		});
 	}
 
 	function hideVacationPopover() {
@@ -608,6 +675,7 @@
 		var curYy = $('#yy').val() || moment().format("YYYY");
 		var formData = {
 			"coCd"           : "GUN",
+			"hrCoCd"         : $('#hrCoCd').val() || "",
 			"yy"             : curYy,
 			"userId"         : $('#userId').val(),
 			"searchValue"    : $('#userNm').val(),
@@ -647,7 +715,23 @@
 					}
 					var gDays = Number(item.grantDays || 0);
 					var uDays = Number(item.usedDays || 0);
-					item.balanceDays = gDays - uDays;
+					// 전년도(curYy - 1) 잔여갯수 이월 반영:
+					// 1) 백엔드 PREV_DAYS (전년도 TB_PM07M02의 정산잔여 rem_days 또는 전년도 발생 - 전년도 사용)
+					// 2) 전년도 미저장 사원인 경우(item.prevDays === null/undefined): 입사일 기준 전년도 발생일수 - 전년도 사용일수 자동계산
+					var pDays = 0;
+					if (item.prevDays !== null && item.prevDays !== undefined && item.prevDays !== "") {
+						pDays = Number(item.prevDays);
+					} else if (item.enterDt) {
+						var prevYy = String(Number(curYy) - 1);
+						var pCalcGrant = (window.PM07Annual && typeof window.PM07Annual.calculateGrantDays === "function")
+							? window.PM07Annual.calculateGrantDays(item.enterDt, prevYy, moment(prevYy + "1231", "YYYYMMDD"))
+							: calculateAnnualGrantDaysJS(item.enterDt, prevYy, moment(prevYy + "1231", "YYYYMMDD"));
+						var pUsed = Number(item.prevUsedDays || 0);
+						pDays = pCalcGrant - pUsed;
+					}
+					item.prevDays = pDays;
+					item.balanceDays = gDays + pDays - uDays;
+					item.remDays = (item.remDays !== null && item.remDays !== undefined && item.remDays !== "") ? Number(item.remDays) : "";
 				}
 			});
 
@@ -694,7 +778,8 @@
 		var searchParam = {
 			"coCd"           : "GUN",
 			"yy"             : curYy,
-			"includeLeaveYn" : $('#includeLeaveYn').val() || "N"
+			"includeLeaveYn" : $('#includeLeaveYn').val() || "N",
+			"hrCoCd"         : $('#hrCoCd').val() || ""
 		};
 
 		postAjax("/user/pm/pm07/selectAnnualGrantList", searchParam, null, function(grantData) {
@@ -733,7 +818,8 @@
 						var calcDays = calculateAnnualGrantDaysJS(enterDt, curYy, empBaseMom);
 						var oldGrantDays = Number(item.grantDays || 0);
 						var usedDays = latest ? Number(latest.usedDays || 0) : Number(item.usedDays || 0);
-						var newBal = calcDays - usedDays;
+						var pDays = Number(item.prevDays || (latest ? latest.prevDays : 0));
+						var newBal = calcDays + pDays - usedDays;
 
 						if (calcDays !== oldGrantDays || Number(item.usedDays || 0) !== usedDays) {
 							grantGridView.target.setValue(dindex, "grantDays", calcDays);
@@ -800,6 +886,7 @@
 				if (!existUserMap[item.userId]) {
 					var enterDtFormatted = formatDtStrJS(item.enterDt);
 					var gDays = calculateAnnualGrantDaysJS(enterDtFormatted, curYy);
+					var pDays = Number(item.prevDays || 0);
 					var wsDays = Number(item.workSubstDays || 0);
 					var wsUsed = Number(item.workSubstUsedDays || 0);
 					var svDays = Number(item.summerVacDays || 0);
@@ -813,15 +900,17 @@
 						deptNm                : item.deptNm,
 						enterDt               : enterDtFormatted,
 						leaveDt               : formatDtStrJS(item.leaveDt),
+						prevDays              : pDays,
 						grantDays             : gDays,
 						usedDays              : Number(item.usedDays || 0),
-						balanceDays           : gDays - Number(item.usedDays || 0),
+						balanceDays           : gDays + pDays - Number(item.usedDays || 0),
 						workSubstDays         : wsDays,
 						workSubstUsedDays     : wsUsed,
 						workSubstBalanceDays  : wsDays - wsUsed,
 						summerVacDays         : svDays,
 						summerVacUsedDays     : svUsed,
 						summerVacBalanceDays  : svDays - svUsed,
+						remDays               : Number(item.remDays || 0),
 						vacInfoList           : item.vacInfoList || "",
 						vacAnnualInfoList     : item.vacAnnualInfoList || "",
 						vacWorkSubstInfoList  : item.vacWorkSubstInfoList || "",
@@ -857,6 +946,7 @@
 			userId                : "",
 			userNm                : "",
 			deptNm                : "",
+			prevDays              : 0,
 			grantDays             : 15,
 			usedDays              : 0,
 			balanceDays           : 15,
@@ -866,6 +956,7 @@
 			summerVacDays         : 0,
 			summerVacUsedDays     : 0,
 			summerVacBalanceDays  : 0,
+			remDays               : 0,
 			summerVacGenInfoList  : "",
 			autoYn                : "N",
 			rmk                   : "수동 추가",
@@ -1023,6 +1114,9 @@
 	$(document).ready(function() {
 		// FI0202M01.html 스타일 연도 셀렉트박스 동적 생성 및 선택 초기화
 		setGrantYm();
+
+		// 회사구분 셀렉트박스 공통 코드 바인딩 (data-kind="CO")
+		setCommonSelect($(".popup_area [data-kind]"));
 
 		grantGridView.initView();
 		searchGrantGrid();

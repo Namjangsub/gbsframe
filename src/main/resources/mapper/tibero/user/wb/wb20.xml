@@ -671,6 +671,173 @@
 			AND TODO_DIV2_CODE_ID = #{todoDiv2CodeId}	--구분프로그램
 	</update>
 
+	<!-- WB20 결재취소 연동: 다음 순번 결재선 READY로 복원 -->
+	<update id="syncAmApprovalCancelNextLine" parameterType="Map">
+		UPDATE TB_AM11D01
+		   SET LINE_STATUS = 'READY',
+		       UDT_ID      = #{userId, jdbcType=VARCHAR},
+		       UDT_PGM     = 'WB20_CANCEL',
+		       UDT_DTTM    = SYSDATE
+		 WHERE DOC_ID IN (
+		       SELECT DOC_ID FROM TB_AM11M01 WHERE ERP_BIZ_KEY = #{todoNo, jdbcType=VARCHAR}
+		       <if test="coCd != null and coCd != ''">
+		         AND CO_CD = #{coCd, jdbcType=VARCHAR}
+		       </if>
+		 )
+		   AND LINE_STATUS = 'PENDING'
+		   AND (
+		       WB20_SANCTN_SN &gt; TO_NUMBER(#{sanctnSn, jdbcType=VARCHAR})
+		       OR LINE_SEQ &gt; NVL((
+		           SELECT MIN(LINE_SEQ)
+		             FROM TB_AM11D01
+		            WHERE DOC_ID IN (SELECT DOC_ID FROM TB_AM11M01 WHERE ERP_BIZ_KEY = #{todoNo, jdbcType=VARCHAR})
+		              AND (APPROVER_ID = #{userId, jdbcType=VARCHAR} OR WB20_SANCTN_SN = TO_NUMBER(#{sanctnSn, jdbcType=VARCHAR}))
+		       ), 9999)
+		   )
+	</update>
+
+	<!-- WB20 결재취소 연동: 본인 결재선 PENDING으로 복원 -->
+	<update id="syncAmApprovalCancelLine" parameterType="Map">
+		UPDATE TB_AM11D01
+		   SET LINE_STATUS    = 'PENDING',
+		       APPR_DT        = NULL,
+		       APPR_OPINION   = NULL,
+		       ACTUAL_USER_ID = NULL,
+		       ACTUAL_USER_NM = NULL,
+		       UDT_ID         = #{userId, jdbcType=VARCHAR},
+		       UDT_PGM        = 'WB20_CANCEL',
+		       UDT_DTTM       = SYSDATE
+		 WHERE DOC_ID IN (
+		       SELECT DOC_ID FROM TB_AM11M01 WHERE ERP_BIZ_KEY = #{todoNo, jdbcType=VARCHAR}
+		       <if test="coCd != null and coCd != ''">
+		         AND CO_CD = #{coCd, jdbcType=VARCHAR}
+		       </if>
+		 )
+		   AND (APPROVER_ID = #{userId, jdbcType=VARCHAR} OR WB20_SANCTN_SN = TO_NUMBER(#{sanctnSn, jdbcType=VARCHAR}))
+	</update>
+
+	<!-- WB20 결재취소 연동: 전자결재 이력 등록 -->
+	<insert id="syncAmApprovalCancelHist" parameterType="Map">
+		INSERT INTO TB_AM11D02 (
+		    HIST_SEQ,
+		    DOC_ID,
+		    ACT_TYPE,
+		    ACT_USER_ID,
+		    ACT_USER_NM,
+		    ACT_DEPT_NM,
+		    ACT_LEVEL_NM,
+		    PREV_STATUS,
+		    NEXT_STATUS,
+		    ACT_OPINION,
+		    ACT_DTTM
+		)
+		SELECT
+		    TO_CHAR(TB_AM11D02_SQ01.NEXTVAL),
+		    M.DOC_ID,
+		    'CANCEL',
+		    #{userId, jdbcType=VARCHAR},
+		    (SELECT NAME FROM TB_CM06M01 WHERE ID = #{userId, jdbcType=VARCHAR} AND ROWNUM = 1),
+		    (SELECT DEPT_NM FROM TB_CM04M01 D JOIN TB_CM06M01 U ON D.DEPT_ID = U.DEPT_ID WHERE U.ID = #{userId, jdbcType=VARCHAR} AND ROWNUM = 1),
+		    (SELECT LEVEL_NM FROM TB_CM07M01 L JOIN TB_CM06M01 U ON L.LEVEL_CD = U.LEVEL_CD WHERE U.ID = #{userId, jdbcType=VARCHAR} AND ROWNUM = 1),
+		    M.DOC_STATUS,
+		    CASE WHEN EXISTS (
+		        SELECT 1 FROM TB_AM11D01 L
+		         WHERE L.DOC_ID = M.DOC_ID
+		           AND L.LINE_STATUS = 'APPROVED'
+		           AND L.LINE_TYPE NOT IN ('REFERENCE', 'REF')
+		    ) THEN 'PROGRESS' ELSE 'REQUEST' END,
+		    'ERP(WB20) 결재취소',
+		    SYSDATE
+		  FROM TB_AM11M01 M
+		 WHERE M.ERP_BIZ_KEY = #{todoNo, jdbcType=VARCHAR}
+		   <if test="coCd != null and coCd != ''">
+		   AND M.CO_CD = #{coCd, jdbcType=VARCHAR}
+		   </if>
+		   AND ROWNUM = 1
+	</insert>
+
+	<!-- WB20 결재취소 연동: 전자결재 문서 마스터 상태 롤백 -->
+	<update id="syncAmApprovalCancelDocument" parameterType="Map">
+		UPDATE TB_AM11M01 M
+		   SET DOC_STATUS = CASE WHEN EXISTS (
+		           SELECT 1 FROM TB_AM11D01 L
+		            WHERE L.DOC_ID = M.DOC_ID
+		              AND L.LINE_STATUS = 'APPROVED'
+		              AND L.LINE_TYPE NOT IN ('REFERENCE', 'REF')
+		       ) THEN 'PROGRESS' ELSE 'REQUEST' END,
+		       COMPLETE_DT = NULL,
+		       CURR_LINE_SEQ = NVL((
+		           SELECT MIN(L.LINE_SEQ)
+		             FROM TB_AM11D01 L
+		            WHERE L.DOC_ID = M.DOC_ID
+		              AND L.LINE_STATUS = 'PENDING'
+		              AND L.LINE_TYPE NOT IN ('REFERENCE', 'REF')
+		       ), M.CURR_LINE_SEQ),
+		       CURR_APPROVER_ID = NVL((
+		           SELECT L.APPROVER_ID
+		             FROM TB_AM11D01 L
+		            WHERE L.DOC_ID = M.DOC_ID
+		              AND L.LINE_SEQ = (
+		                  SELECT MIN(L2.LINE_SEQ)
+		                    FROM TB_AM11D01 L2
+		                   WHERE L2.DOC_ID = M.DOC_ID
+		                     AND L2.LINE_STATUS = 'PENDING'
+		                     AND L2.LINE_TYPE NOT IN ('REFERENCE', 'REF')
+		              )
+		       ), M.CURR_APPROVER_ID),
+		       CURR_APPROVER_NM = NVL((
+		           SELECT L.APPROVER_NM
+		             FROM TB_AM11D01 L
+		            WHERE L.DOC_ID = M.DOC_ID
+		              AND L.LINE_SEQ = (
+		                  SELECT MIN(L2.LINE_SEQ)
+		                    FROM TB_AM11D01 L2
+		                   WHERE L2.DOC_ID = M.DOC_ID
+		                     AND L2.LINE_STATUS = 'PENDING'
+		                     AND L2.LINE_TYPE NOT IN ('REFERENCE', 'REF')
+		              )
+		       ), M.CURR_APPROVER_NM),
+		       UDT_ID = #{userId, jdbcType=VARCHAR},
+		       UDT_PGM = 'WB20_CANCEL',
+		       UDT_DTTM = SYSDATE
+		 WHERE M.ERP_BIZ_KEY = #{todoNo, jdbcType=VARCHAR}
+		   <if test="coCd != null and coCd != ''">
+		   AND M.CO_CD = #{coCd, jdbcType=VARCHAR}
+		   </if>
+	</update>
+
+	<!-- 결재 반려 처리 (TB_WB20M03) -->
+	<update id="rejectApprovalLine" parameterType="Map">
+		UPDATE TB_WB20M03
+		   SET SANCTN_STTUS   = 'N',
+		       APPR_REJECT_YN = 'Y',
+		       TODO_CF_OPN    = #{rejectOpinion, jdbcType=VARCHAR},
+		       TODO_CF_DT     = SYSDATE,
+		       UDT_ID         = #{userId, jdbcType=VARCHAR},
+		       UDT_PGM        = #{pgmId, jdbcType=VARCHAR},
+		       UDT_DTTM       = SYSDATE
+		 WHERE TODO_NO = #{todoNo}
+		   AND TODO_KEY = #{todoKey}
+		   AND TODO_ID = #{todoId}
+	</update>
+
+	<!-- 반려된 결재선 초기화 (재상신/수정 시 플래그 클리어) -->
+	<update id="resetRejectedApprovalLines" parameterType="Map">
+		UPDATE TB_WB20M03
+		   SET SANCTN_STTUS   = 'N',
+		       APPR_REJECT_YN = 'N',
+		       TODO_CF_OPN    = '',
+		       TODO_CF_DT     = NULL,
+		       UDT_ID         = #{userId, jdbcType=VARCHAR},
+		       UDT_PGM        = #{pgmId, jdbcType=VARCHAR},
+		       UDT_DTTM       = SYSDATE
+		 WHERE TODO_NO = #{todoNo}
+		   <if test="coCd != null and coCd != ''">
+		   AND CO_CD = #{coCd}
+		   </if>
+		   AND NVL(APPR_REJECT_YN, 'N') = 'Y'
+	</update>
+
 	<!-- 결재목록 불러오기 -->
 	<select id="selectSignResUserlst" parameterType="Map" resultType="camelMap">
 		SELECT *

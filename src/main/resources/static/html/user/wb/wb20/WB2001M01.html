@@ -63,6 +63,8 @@
 	<script src="/static/js/jquery.blockUI.js"></script>
 	<!-- 공통결재 -->
 	<script src="/static/js/commApproval.js"></script>
+	<!-- 결재 원천화면 팝업 공용 함수 -->
+	<script src="/static/js/approvalSourceOpen.js"></script>
 	<!-- 도움말 팝업 -->
 	<script src="/static/js/manualPopup.js"></script>
 
@@ -288,18 +290,7 @@ var gridView = {
 
 	},
     openFile: function (grid, dindex, doindex, item, $cell, colKey, evt) {
-//			console.log("openFile:", item);// 파일 열기/다운로드 등 공통 처리
-        if (!item) return;
-
-		//mode 추가
-		//승인처리용 파라메터 작업 "gridObj" : gridView
-		let addParam = {"viewMode": 1, "todoView": "INQ", "todoKey":item.todoKey, "gridObj" :item};
-		let paramObj = {};
-		if (item.todoDiv2CodeId != "TODODIV9999") {
-			paramObj = JSON.parse(item.pgParam);
-			Object.assign(paramObj, addParam);
-		}
-		
+		if (!item) return;
 		var reloadCallback = function() {
 			if (gridView && gridView.target && gridView.target.page) {
 				gridView.setData(gridView.target.page.currentPage);
@@ -307,36 +298,7 @@ var gridView = {
 				gridView.setData(0);
 			}
 		};
-
-		if (item.todoDiv2CodeId =="TODODIV1030" || item.todoDiv2CodeId =="TODODIV2060" ||
-			item.todoDiv2CodeId =="TODODIV1090" || item.todoDiv2CodeId =="TODODIV2090" ) { //이슈현황 화면 call
-			openModal("/static/html" + item.pgPath, 1200, 870, "", paramObj, reloadCallback);
-		} else if (item.todoDiv2CodeId =="TODODIV1060"){	//프로젝트 이슈 call
-			openModal("/static/html" + item.pgPath, 900, 880, "프로젝트이슈 To-Do", paramObj, reloadCallback);
-		} else if (item.todoDiv2CodeId =="TODODIV2100"){	//수주현황 결재 call
-			openModal("/static/html" + item.pgPath, $('body').width(), $('body').height()-40, "수주복표원가  To-Do", paramObj, reloadCallback);
-		} else if (item.todoDiv2CodeId =="TODODIV1120" || item.todoDiv2CodeId =="TODODIV2120"){	//PFU 결재 call
-			openModal("/static/html" + item.pgPath, 1700, $('body').height()-40, "PFU 결재 화면", paramObj, reloadCallback);
-		} else if (item.todoDiv2CodeId == "TODODIV2170") {
-				openModal("/static/html" + item.pgPath, 1600, 850, "", paramObj, reloadCallback)
-		} else if (item.todoDiv2CodeId == "TODODIV1201" || item.todoDiv2CodeId == "TODODIV2201" || item.todoDiv2CodeId == "TODODIV1200" || item.todoDiv2CodeId == "TODODIV2200"|| item.todoDiv2CodeId == "TODODIV2190" || item.todoDiv2CodeId == "TODODIV2191" || item.todoDiv2CodeId == "TODODIV1190" || item.todoDiv2CodeId == "TODODIV1191") {
-				openModal("/static/html" + item.pgPath, 1700, 860, "", paramObj, reloadCallback)
-		} else if (item.todoDiv2CodeId == "TODODIV2410" || item.todoDiv2CodeId == "TODODIV2420"
-				|| item.todoDiv2CodeId == "TODODIV1410" || item.todoDiv2CodeId == "TODODIV1420") {
-			// PM08 휴일대체근무 신청/결과 (결재/공유): 1100x800 규격 모달로 오픈
-			paramObj.reqNo = item.todoNo;
-			paramObj.coCd = item.coCd;
-			paramObj.actionType = 'A';
-			paramObj.openStage = (item.todoDiv2CodeId == 'TODODIV2420' || item.todoDiv2CodeId == 'TODODIV1420') ? 'RESULT' : 'REQ';
-			paramObj.todoDiv2CodeId = item.todoDiv2CodeId;
-			paramObj.todoKey = item.todoKey;
-			paramObj.gridObj = item;
-			openModal("/static/html" + item.pgPath, 1100, 800, "", paramObj, reloadCallback);
-		} else if (item.todoDiv2CodeId == "TODODIV9999") {			//문제현황임
-			 wbsIssModal(item);
-		} else {
-			openModal("/static/html" + item.pgPath, 1600, 850, "", paramObj, reloadCallback);
-		}
+		openApprovalSourceDoc(item, reloadCallback);
     },
 	setData: function(_pageNo) {
 		var targetObj = this.target;
@@ -764,6 +726,7 @@ function toDoConfirmApproval(gridObj){
 							, "todoFileTrgtKey":row.todoFileTrgtKey
 							, "pgmId": "WB2001M01"
 							, "userId": jwt.userId
+							, "todoId": row.todoId || jwt.userId
 							, "deptId": jwt.deptId.slice(0,5)
 					};
 					postAjaxSync("/user/wb/wb20/updateApprovalCancle", paramMap, null, function(data){

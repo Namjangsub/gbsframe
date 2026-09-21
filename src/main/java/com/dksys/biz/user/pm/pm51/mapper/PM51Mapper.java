@@ -12,6 +12,10 @@ public interface PM51Mapper {
 
 	List<Map<String, String>> selectTripReqList(Map<String, String> paramMap);
 
+	int selectTripStatusListCount(Map<String, String> paramMap);
+
+	List<Map<String, String>> selectTripStatusList(Map<String, String> paramMap);
+
 	Map<String, String> selectTripReqM01(Map<String, String> paramMap);
 	
 	List<Map<String, String>> selectTripRptExpenseSummaryByReqNo(Map<String, String> paramMap);
@@ -47,6 +51,9 @@ public interface PM51Mapper {
 	int updateTripReqPayAmounts(Map<String, String> paramMap);
 
 	int updateTripReqAprvStsCd(Map<String, String> paramMap);
+
+	// 일반결재(2190)+관리부서결재(2191)가 모두 완료되었는지 여부 ('Y'/'N')
+	String selectTripReqAllApprovalDone(Map<String, String> paramMap);
 
 	int updateTripReqPayDone(Map<String, String> paramMap);
 
@@ -155,4 +162,12 @@ public interface PM51Mapper {
 	List<Map<String, String>> selectTripScheduleByMonth(Map<String, String> paramMap);
 
 	Map<String, String> selectSalesCodeWbsSchedule(Map<String, String> paramMap);
+
+	String selectAmDocIdByTripReqNo(Map<String, String> paramMap);
+
+	int deleteAmApprovalLinesByBizKey(Map<String, String> paramMap);
+
+	int deleteAmApprovalDocByBizKey(Map<String, String> paramMap);
+
+	List<Map<String, String>> selectTrnContractList(Map<String, String> paramMap);
 }

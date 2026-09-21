@@ -13,6 +13,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.multipart.MultipartHttpServletRequest;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import com.dksys.biz.cmn.vo.PaginationInfo;
 import com.dksys.biz.user.pm.pm51.service.PM51Svc;
 import com.dksys.biz.util.MessageUtils;
@@ -20,6 +22,8 @@ import com.dksys.biz.util.MessageUtils;
 @Controller
 @RequestMapping("/user/pm/pm51")
 public class PM51Ctr {
+
+	private final Logger logger = LoggerFactory.getLogger(getClass());
 
 	@Autowired
 	MessageUtils messageUtils;
@@ -37,10 +41,27 @@ public class PM51Ctr {
 		return "jsonView";
 	}
 
+	@PostMapping("/selectTripStatusList")
+	public String selectTripStatusList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		int totalCnt = pm51Svc.selectTripStatusListCount(paramMap);
+		PaginationInfo paginationInfo = new PaginationInfo(paramMap, totalCnt);
+		model.addAttribute("paginationInfo", paginationInfo);
+		List<Map<String, String>> result = pm51Svc.selectTripStatusList(paramMap);
+		model.addAttribute("result", result);
+		return "jsonView";
+	}
+
 	@PostMapping("/selectTripReqDtl")
 	public String selectTripReqDtl(@RequestBody Map<String, String> paramMap, ModelMap model) {
-		Map<String, Object> result = pm51Svc.selectTripReqDtl(paramMap);
-		model.addAttribute("result", result);
+		try {
+			Map<String, Object> result = pm51Svc.selectTripReqDtl(paramMap);
+			model.addAttribute("result", result);
+			model.addAttribute("resultCode", 200);
+		} catch (Exception e) {
+			logger.error("출장신청서 상세 조회 오류: paramMap={}", paramMap, e);
+			model.addAttribute("resultCode", 500);
+			model.addAttribute("resultMessage", e.getMessage() != null ? e.getMessage() : e.toString());
+		}
 		return "jsonView";
 	}
 
@@ -334,6 +355,13 @@ public class PM51Ctr {
 	@PostMapping("/selectSalesCodeWbsSchedule")
 	public String selectSalesCodeWbsSchedule(@RequestBody Map<String, String> paramMap, ModelMap model) {
 		Map<String, String> result = pm51Svc.selectSalesCodeWbsSchedule(paramMap);
+		model.addAttribute("result", result);
+		return "jsonView";
+	}
+
+	@PostMapping("/selectTrnContractList")
+	public String selectTrnContractList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		List<Map<String, String>> result = pm51Svc.selectTrnContractList(paramMap);
 		model.addAttribute("result", result);
 		return "jsonView";
 	}

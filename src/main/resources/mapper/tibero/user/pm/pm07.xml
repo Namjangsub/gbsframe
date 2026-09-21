@@ -143,6 +143,7 @@
 				SELECT
 					TODO_NO,
 					CASE
+						WHEN SUM(CASE WHEN NVL(APPR_REJECT_YN, 'N') = 'Y' THEN 1 ELSE 0 END) &gt; 0 THEN 'RTN'
 						WHEN SUM(CASE WHEN TODO_CF_DT IS NOT NULL AND (SANCTN_STTUS = 'N' OR SANCTN_STTUS = 'R' OR SANCTN_STTUS = '4') THEN 1 ELSE 0 END) &gt; 0 THEN 'RTN'
 						WHEN COUNT(TODO_KEY) = 0 THEN 'TEMP'
 						WHEN COUNT(TODO_KEY) &gt; 0 AND COUNT(TODO_KEY) = SUM(CASE WHEN TODO_CF_DT IS NOT NULL AND SANCTN_STTUS != 'N' THEN 1 ELSE 0 END) THEN 'END'
@@ -589,6 +590,7 @@
 			GRANT_DAYS,
 			WORK_SUBST_DAYS,
 			SUMMER_VAC_DAYS,
+			REM_DAYS,
 			AUTO_YN,
 			RMK,
 			CREAT_ID,
@@ -601,6 +603,7 @@
 			#{grantDays, jdbcType=NUMERIC},
 			NVL(#{workSubstDays, jdbcType=NUMERIC}, 0),
 			NVL(#{summerVacDays, jdbcType=NUMERIC}, 0),
+			NVL(#{remDays, jdbcType=NUMERIC}, 0),
 			NVL(#{autoYn, jdbcType=VARCHAR}, 'N'),
 			#{rmk, jdbcType=VARCHAR},
 			#{userId, jdbcType=VARCHAR},
@@ -615,11 +618,12 @@
 			GRANT_DAYS = #{grantDays, jdbcType=NUMERIC},
 			WORK_SUBST_DAYS = NVL(#{workSubstDays, jdbcType=NUMERIC}, 0),
 			SUMMER_VAC_DAYS = NVL(#{summerVacDays, jdbcType=NUMERIC}, 0),
+			REM_DAYS = NVL(#{remDays, jdbcType=NUMERIC}, 0),
 			AUTO_YN = NVL(#{autoYn, jdbcType=VARCHAR}, 'N'),
 			RMK = #{rmk, jdbcType=VARCHAR},
-			UDT_ID = #{userId, jdbcType=VARCHAR},
-			UDT_PGM = 'PM0701P02',
-			UDT_DTTM = SYSDATE
+			UPD_ID = #{userId, jdbcType=VARCHAR},
+			UPD_PGM = 'PM0701P02',
+			UPD_DTTM = SYSDATE
 		WHERE YY = #{yy, jdbcType=VARCHAR}
 		  AND USER_ID = #{userId, jdbcType=VARCHAR}
 	</update>
@@ -651,7 +655,7 @@
 		3. VS    : 휴가 신청실적(TB_PM07M01) 단일 집계 (년차/근무대체/하계대체 사용일수 및 상세이력)
 	-->
 	<sql id="joinAnnualSubstAndUsage">
-		/* 1. 휴일대체근무(TB_PM08M01) 신청실적 집계 (LIKE 연산자로 B-Tree 인덱스 Range Scan 보장) */
+		/* 1. 휴일대체근무(TB_PM08M01) 신청실적 집계 (인덱스 Range Scan 및 사전 필터링 최적화) */
 		LEFT OUTER JOIN (
 			SELECT
 				SW.REQ_ID,
@@ -666,7 +670,11 @@
 			FROM TB_PM08M01 SW
 			WHERE (SW.REQ_STATUS IS NULL OR SW.REQ_STATUS != 'RTN')
 			<if test="yy != null and !yy.equals('')">
-			  AND SW.HOLIDAY_DT LIKE #{yy} || '%'
+			  AND SW.HOLIDAY_DT &gt;= #{yy} || '0101'
+			  AND SW.HOLIDAY_DT &lt;= #{yy} || '1231'
+			</if>
+			<if test="userId != null and !userId.equals('')">
+			  AND SW.REQ_ID = #{userId}
 			</if>
 			GROUP BY SW.REQ_ID
 		) SW_CNT ON SW_CNT.REQ_ID = U.ID
@@ -688,10 +696,13 @@
 			<if test="yy != null and !yy.equals('')">
 			  AND AWD.GRANT_YY = #{yy}
 			</if>
+			<if test="userId != null and !userId.equals('')">
+			  AND AWD.USER_ID = #{userId}
+			</if>
 			GROUP BY AWD.USER_ID
 		) SV_CNT ON SV_CNT.USER_ID = U.ID
 
-		/* 3. 휴가 신청실적 단일 집계 인라인 뷰 (EXISTS 서브쿼리 제거 + 문자열 연산 사전조립) */
+		/* 3. 휴가 신청실적 단일 집계 인라인 뷰 (EXISTS 서브쿼리 제거 + 인덱스 범위 검색 최적화) */
 		LEFT OUTER JOIN (
 			SELECT
 				T.REQ_ID,
@@ -737,9 +748,13 @@
 				                           AND SV_M4.GRANT_YY = #{yy}
 				                           </if>
 				                           AND REPLACE(V.ST_DT, '-', '') BETWEEN REPLACE(SV_M4.ST_DT, '-', '') AND REPLACE(SV_M4.ED_DT, '-', '')
-				WHERE 1=1
+				WHERE (V.SANCTN_STS IS NULL OR V.SANCTN_STS != 'RTN')
 				<if test="yy != null and !yy.equals('')">
-				  AND V.ST_DT LIKE #{yy} || '%'
+				  AND V.ST_DT &gt;= #{yy} || '0101'
+				  AND V.ST_DT &lt;= #{yy} || '1231'
+				</if>
+				<if test="userId != null and !userId.equals('')">
+				  AND V.REQ_ID = #{userId}
 				</if>
 			) T
 			GROUP BY T.REQ_ID
@@ -757,8 +772,13 @@
 			T.LEAVE_DT,
 			T.USE_YN,
 			T.GRANT_DAYS,
+			T.PREV_DAYS,
 			T.USED_DAYS,
-			(T.GRANT_DAYS - T.USED_DAYS) AS BALANCE_DAYS,
+			(T.GRANT_DAYS + NVL(T.PREV_DAYS, 0) - T.USED_DAYS) AS BALANCE_DAYS,
+			T.REM_DAYS,
+			T.PREV_REM_DAYS,
+			T.PREV_GRANT_DAYS,
+			T.PREV_USED_DAYS,
 			T.WORK_SUBST_DAYS,
 			T.WORK_SUBST_USED_DAYS,
 			(T.WORK_SUBST_DAYS - T.WORK_SUBST_USED_DAYS) AS WORK_SUBST_BALANCE_DAYS,
@@ -775,7 +795,11 @@
 			T.VAC_WORK_SUBST_INFO_LIST,
 			T.VAC_SUMMER_INFO_LIST,
 			T.WORK_SUBST_GEN_INFO_LIST,
-			T.SUMMER_VAC_GEN_INFO_LIST
+			T.SUMMER_VAC_GEN_INFO_LIST,
+			T.CREAT_ID,
+			T.CREAT_DTTM,
+			T.UPD_ID,
+			T.UPD_DTTM
 		FROM (
 			SELECT
 				NVL(M.CO_CD, NVL(#{coCd, jdbcType=VARCHAR}, 'GUN')) AS CO_CD,
@@ -802,15 +826,43 @@
 				NVL(AW_CNT.AWARD_GRANT_DAYS, 0) AS AWARD_GRANT_DAYS,
 				NVL(AW_USED.AWARD_USED_DAYS, 0) AS AWARD_USED_DAYS,
 				(NVL(AW_CNT.AWARD_GRANT_DAYS, 0) - NVL(AW_USED.AWARD_USED_DAYS, 0)) AS AWARD_BALANCE_DAYS,
+				M_PREV.REM_DAYS AS PREV_REM_DAYS,
+				NVL(M_PREV.GRANT_DAYS, 0) AS PREV_GRANT_DAYS,
+				NVL(VS_PREV.PREV_USED_DAYS, 0) AS PREV_USED_DAYS,
+				/* 이월 = 전년도(curYy-1) TB_PM07M02.REM_DAYS(정산잔여) 값을 그대로 반영.
+				   전년도 정산잔여가 없으면 0 (발생-사용 자동계산 fallback 없음 - 저장값만 사용) */
+				NVL(M_PREV.REM_DAYS, 0) AS PREV_DAYS,
+				M.REM_DAYS AS REM_DAYS,
 				NVL(M.AUTO_YN, 'Y') AS AUTO_YN,
-				M.RMK
+				M.RMK,
+				M.CREAT_ID,
+				M.CREAT_DTTM,
+				M.UPD_ID,
+				M.UPD_DTTM
 			FROM TB_CM06M01 U
 			LEFT OUTER JOIN TB_PM07M02 M ON M.YY = #{yy} AND M.USER_ID = U.ID
-			LEFT OUTER JOIN TB_CM04M01 D ON D.DEPT_ID = SUBSTR(NVL(U.VIEW_DEPT_ID, U.DEPT_ID), 1, 5)
+			LEFT OUTER JOIN TB_PM07M02 M_PREV ON M_PREV.YY = TO_CHAR(TO_NUMBER(#{yy}) - 1) AND M_PREV.USER_ID = U.ID
+			/* 전년도(yy - 1) 년차휴가 실사용일수 집계 (인덱스 Range Scan 및 사전 필터링 최적화) */
+			LEFT OUTER JOIN (
+				SELECT
+					V_PREV.REQ_ID,
+					SUM(V_PREV.DEDUCT_DAYS) AS PREV_USED_DAYS
+				FROM TB_PM07M01 V_PREV
+				WHERE (V_PREV.SANCTN_STS IS NULL OR V_PREV.SANCTN_STS != 'RTN')
+				  AND V_PREV.VAC_TYPE_CD IN ('PM07TYPE01','PM07TYPE02')
+				<if test="yy != null and !yy.equals('')">
+				  AND V_PREV.ST_DT &gt;= TO_CHAR(TO_NUMBER(#{yy}) - 1) || '0101'
+				  AND V_PREV.ST_DT &lt;= TO_CHAR(TO_NUMBER(#{yy}) - 1) || '1231'
+				</if>
+				<if test="userId != null and !userId.equals('')">
+				  AND V_PREV.REQ_ID = #{userId}
+				</if>
+				GROUP BY V_PREV.REQ_ID
+			) VS_PREV ON VS_PREV.REQ_ID = U.ID
+			<include refid="hrCriteria.targetJoin"><property name="u" value="U"/></include>
+			LEFT OUTER JOIN TB_CM04M01 D ON D.DEPT_ID = SUBSTR(NVL(HRD.HR_DEPT_ID, NVL(U.VIEW_DEPT_ID, U.DEPT_ID)), 1, 5)
 			<include refid="joinAnnualSubstAndUsage"/>
-			/* 포상휴가 발생(지급) 합계 : GRANT_YY(지급연도) 가 아니라 유효기간(ST_DT~ED_DT) 기준.
-			   현재일자(SYSDATE)가 사용가능시작일~사용가능종료일 사이인 지급건의 GRANT_DAYS 만 합산한다.
-			   (하계휴가대체 PM07M04TYPE51 제외) */
+			/* 포상휴가 발생(지급) 합계 : 현재일자 기준 유효기간 내 지급건 집계 최적화 */
 			LEFT OUTER JOIN (
 				SELECT
 					AWD.USER_ID,
@@ -819,22 +871,25 @@
 				WHERE AWD.AWARD_TYPE_CD != 'PM07M04TYPE51'
 				  AND AWD.ST_DT IS NOT NULL AND AWD.ED_DT IS NOT NULL
 				  AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN REPLACE(AWD.ST_DT, '-', '') AND REPLACE(AWD.ED_DT, '-', '')
+				<if test="userId != null and !userId.equals('')">
+				  AND AWD.USER_ID = #{userId}
+				</if>
 				GROUP BY AWD.USER_ID
 			) AW_CNT ON AW_CNT.USER_ID = U.ID
-			/* 포상휴가 실사용 합계 (PM07TYPE07/08) : 현재일자 기준으로 유효한 지급건의 유효기간(ST_DT~ED_DT) 내
-			   사용분만 인정. 발생과 동일하게 지급연도가 아니라 현재일자 유효기간 기준으로 집계한다. */
+			/* 포상휴가 실사용 합계 : 상관 서브쿼리 제거 및 정규 조인 인라인 뷰 최적화 */
 			LEFT OUTER JOIN (
 				SELECT V.REQ_ID, SUM(V.DEDUCT_DAYS) AS AWARD_USED_DAYS
 				FROM TB_PM07M01 V
+				JOIN TB_PM07M04 G2 ON G2.USER_ID = V.REQ_ID
+				                  AND G2.AWARD_TYPE_CD != 'PM07M04TYPE51'
+				                  AND G2.ST_DT IS NOT NULL AND G2.ED_DT IS NOT NULL
+				                  AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN REPLACE(G2.ST_DT, '-', '') AND REPLACE(G2.ED_DT, '-', '')
+				                  AND REPLACE(V.ST_DT, '-', '') BETWEEN REPLACE(G2.ST_DT, '-', '') AND REPLACE(G2.ED_DT, '-', '')
 				WHERE V.VAC_TYPE_CD IN ('PM07TYPE07','PM07TYPE08')
-				  AND EXISTS (
-					  SELECT 1 FROM TB_PM07M04 G2
-					  WHERE G2.USER_ID = V.REQ_ID
-					    AND G2.AWARD_TYPE_CD != 'PM07M04TYPE51'
-					    AND G2.ST_DT IS NOT NULL AND G2.ED_DT IS NOT NULL
-					    AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN REPLACE(G2.ST_DT, '-', '') AND REPLACE(G2.ED_DT, '-', '')
-					    AND REPLACE(V.ST_DT, '-', '') BETWEEN REPLACE(G2.ST_DT, '-', '') AND REPLACE(G2.ED_DT, '-', '')
-				  )
+				  AND (V.SANCTN_STS IS NULL OR V.SANCTN_STS != 'RTN')
+				<if test="userId != null and !userId.equals('')">
+				  AND V.REQ_ID = #{userId}
+				</if>
 				GROUP BY V.REQ_ID
 			) AW_USED ON AW_USED.REQ_ID = U.ID
 			WHERE 1=1
@@ -857,8 +912,8 @@
 			    AND (U.ENTER_DT IS NULL OR TO_CHAR(U.ENTER_DT, 'YYYYMMDD') &lt;= #{yy} || '1231')
 			  </otherwise>
 			</choose>
-			<!-- 임원실(GUN00), 실적관리용(GUN95) 부서는 기본 제외 -->
-			AND (SUBSTR(NVL(U.VIEW_DEPT_ID, U.DEPT_ID), 1, 5) NOT IN ('GUN00', 'GUN95'))
+			<include refid="hrCriteria.targetWhere"/>
+			<include refid="hrCriteria.coWhere"><property name="u" value="U"/></include>
 		) T
 		ORDER BY T.YY DESC, T.DEPT_SORT_NO ASC, T.DEPT_NM ASC, T.USER_NM ASC
 	</select>
@@ -888,7 +943,8 @@
 			VS.VAC_WORK_SUBST_INFO_LIST,
 			VS.VAC_SUMMER_INFO_LIST
 		FROM TB_CM06M01 U
-		LEFT OUTER JOIN TB_CM04M01 D ON D.DEPT_ID = SUBSTR(NVL(U.VIEW_DEPT_ID, U.DEPT_ID), 1, 5)
+		<include refid="hrCriteria.targetJoin"><property name="u" value="U"/></include>
+		LEFT OUTER JOIN TB_CM04M01 D ON D.DEPT_ID = SUBSTR(NVL(HRD.HR_DEPT_ID, NVL(U.VIEW_DEPT_ID, U.DEPT_ID)), 1, 5)
 		<include refid="joinAnnualSubstAndUsage"/>
 		WHERE 1=1
 		  <choose>
@@ -904,8 +960,8 @@
 		      AND (U.ENTER_DT IS NULL OR TO_CHAR(U.ENTER_DT, 'YYYYMMDD') &lt;= #{yy} || '1231')
 		    </otherwise>
 		  </choose>
-		  <!-- 임원실(GUN00), 실적관리용(GUN95) 부서는 제외 -->
-		  AND (SUBSTR(NVL(U.VIEW_DEPT_ID, U.DEPT_ID), 1, 5) NOT IN ('GUN00', 'GUN95'))
+		  <include refid="hrCriteria.targetWhere"/>
+		  <include refid="hrCriteria.coWhere"><property name="u" value="U"/></include>
 		  AND NOT EXISTS (
 			SELECT 1 FROM TB_PM07M02 M
 			WHERE M.YY = #{yy}
@@ -1112,7 +1168,7 @@
 		SELECT
 			U.ID AS USER_ID,
 			U.NAME AS USER_NM,
-			SUBSTR(NVL(U.VIEW_DEPT_ID, U.DEPT_ID), 1, 5) AS DEPT_ID,
+			SUBSTR(NVL(HRD.HR_DEPT_ID, NVL(U.VIEW_DEPT_ID, U.DEPT_ID)), 1, 5) AS DEPT_ID,
 			D.DEPT_NM,
 			NVL(D.SORT_NO, 999) AS SORT_NO,
 			U.LEVEL_CD,
@@ -1131,7 +1187,7 @@
 			NVL(G.GRANT_DAYS, 0) AS GRANT_DAYS,
 			NVL(G.WORK_SUBST_DAYS, 0) AS WORK_SUBST_DAYS,
 			NVL(G.SUMMER_VAC_DAYS, 0) AS SUMMER_VAC_DAYS,
-			0.0 AS PREV_DAYS,
+			NVL(G_PREV.REM_DAYS, 0) AS PREV_DAYS,
 			NVL(V.M01, 0) AS M01,
 			NVL(V.M02, 0) AS M02,
 			NVL(V.M03, 0) AS M03,
@@ -1157,7 +1213,7 @@
 			NULL AS M11_DETAIL,
 			NULL AS M12_DETAIL,
 			NVL(V.USED_DAYS_SUM, 0) AS USED_DAYS_SUM,
-			(NVL(G.GRANT_DAYS, 0) - NVL(G.WORK_SUBST_DAYS, 0) - NVL(G.SUMMER_VAC_DAYS, 0) - NVL(V.USED_DAYS_SUM, 0)) AS BALANCE_DAYS,
+			(NVL(G.GRANT_DAYS, 0) - NVL(G.WORK_SUBST_DAYS, 0) - NVL(G.SUMMER_VAC_DAYS, 0) + NVL(G_PREV.REM_DAYS, 0) - NVL(V.USED_DAYS_SUM, 0)) AS BALANCE_DAYS,
 			TO_CHAR(U.LEAVE_DT, 'YYYY-MM-DD') AS LEAVE_DT,
 			U.USE_YN,
 			U.SALES_AREA,
@@ -1168,8 +1224,10 @@
 				ELSE NVL(G.RMK, '')
 			END AS RMK
 		FROM TB_CM06M01 U
-		LEFT JOIN TB_CM04M01 D ON D.DEPT_ID = SUBSTR(NVL(U.VIEW_DEPT_ID, U.DEPT_ID), 1, 5)
+		<include refid="hrCriteria.targetJoin"><property name="u" value="U"/></include>
+		LEFT JOIN TB_CM04M01 D ON D.DEPT_ID = SUBSTR(NVL(HRD.HR_DEPT_ID, NVL(U.VIEW_DEPT_ID, U.DEPT_ID)), 1, 5)
 		LEFT JOIN TB_PM07M02 G ON G.YY = #{yy} AND G.USER_ID = U.ID
+		LEFT JOIN TB_PM07M02 G_PREV ON G_PREV.YY = TO_CHAR(TO_NUMBER(#{yy}) - 1) AND G_PREV.USER_ID = U.ID
 		LEFT JOIN (
 			/* 사원별 1~12월 연차 사용일수 사전 집계 인라인 뷰 (1인당 1행으로 집계하여 대규모 GROUP BY 및 I/O 병목 완전 제거) */
 			SELECT
@@ -1192,12 +1250,15 @@
 			WHERE D.VAC_DT &gt;= #{yy} || '0101'
 			  AND D.VAC_DT &lt;= #{yy} || '1231'
 			  AND M.VAC_TYPE_CD IN ('PM07TYPE01','PM07TYPE02')
+			  AND (M.SANCTN_STS IS NULL OR M.SANCTN_STS != 'RTN')
+			<if test="userId_S != null and !userId_S.equals('')">
+			  AND M.REQ_ID = #{userId_S}
+			</if>
 			GROUP BY M.REQ_ID
 		) V ON U.ID = V.REQ_ID
 		WHERE 1=1
-		  AND (NVL(U.VIEW_DEPT_ID, U.DEPT_ID) IS NULL OR (NVL(U.VIEW_DEPT_ID, U.DEPT_ID) NOT LIKE 'GUN95%' AND NVL(U.VIEW_DEPT_ID, U.DEPT_ID) NOT LIKE 'GUN00%'))
-		  AND (D.DEPT_NM IS NULL OR D.DEPT_NM NOT LIKE '%임원실%')
-		  AND (U.SALES_AREA IS NULL OR U.SALES_AREA != 'SALESAREA00')
+		  <include refid="hrCriteria.targetWhere"/>
+		  <include refid="hrCriteria.coWhere"><property name="u" value="U"/></include>
 		  <!-- 기준연도 근무 대상자만 조회 (기준연도 이후 입사자 및 기준연도 이전 퇴사자 제외) -->
 		  AND (U.ENTER_DT IS NULL OR TO_CHAR(U.ENTER_DT, 'YYYYMMDD') &lt;= #{yy} || '1231')
 		  AND (U.LEAVE_DT IS NULL OR TO_CHAR(U.LEAVE_DT, 'YYYYMMDD') &gt;= #{yy} || '0101')

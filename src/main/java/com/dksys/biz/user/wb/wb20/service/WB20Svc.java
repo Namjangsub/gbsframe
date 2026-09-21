@@ -30,6 +30,9 @@ public interface WB20Svc {
 	List<Map<String, String>> selectGetApprovalList(Map<String, String> paramMap);
 
 	Map<String, String> insertApprovalLine(Map<String, String> paramMap);
+	void syncApprovalLinesFromAm(Map<String, Object> paramMap);
+	Map<String, String> rejectApprovalLine(Map<String, String> paramMap);
+	int resetRejectedApprovalLines(Map<String, String> paramMap);
 
 	List<Map<String, String>> selectSignResUserlst(Map<String, String> paramMap);
 

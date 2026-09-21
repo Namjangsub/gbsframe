@@ -52,4 +52,10 @@ public interface PM08Mapper {
 
 	int deleteApprovalLineByReqNo(Map<String, String> paramMap);
 
+	String selectAmDocIdByReqNo(Map<String, String> paramMap);
+
+	int deleteAmD01ByDocId(Map<String, String> paramMap);
+
+	int deleteAmM01ByDocId(Map<String, String> paramMap);
+
 }

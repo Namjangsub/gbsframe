@@ -1,0 +1,450 @@
+<div id="approvalDraftModalArea">
+	<style>
+		#approvalDraftModalArea .popup_table table th {
+			text-align: center;
+			background: #f7f7f7;
+			font-size: 12px;
+		}
+		#approvalDraftModalArea .section-header {
+			font-size: 13px;
+			font-weight: bold;
+			color: #337ab7;
+			margin: 12px 0 6px 0;
+			display: flex;
+			justify-content: space-between;
+			align-items: center;
+		}
+		#approvalDraftModalArea .line-table th {
+			background: #f0f4f8;
+			font-size: 11px;
+			padding: 4px;
+		}
+		#approvalDraftModalArea .line-table td {
+			padding: 4px;
+			font-size: 11px;
+			text-align: center;
+		}
+		#approvalDraftModalArea .tmpl-container {
+			border: 1px solid #ddd;
+			padding: 15px;
+			background: #fafafa;
+			min-height: 200px;
+			border-radius: 4px;
+		}
+	</style>
+
+	<div class="tit_contents">
+		<h4 class="tit">전자결재 기안 작성</h4>
+	</div>
+
+	<form id="popForm" onSubmit="return false;">
+		<input type="hidden" id="docId" name="docId">
+		<input type="hidden" id="actionType" name="actionType" value="C">
+		<input type="hidden" id="coCd" name="coCd">
+		<input type="hidden" id="draUserId" name="draUserId">
+
+		<div class="form-group popup_table">
+			<!-- 1. 기본 문서 정보 -->
+			<div class="section-header">기본 정보</div>
+			<table class="table_input">
+				<colgroup>
+					<col width="12%">
+					<col width="38%">
+					<col width="12%">
+					<col width="38%">
+				</colgroup>
+				<tr>
+					<th class="hit">결재양식</th>
+					<td>
+						<select id="formCd" name="formCd" class="form-control input-sm" onchange="loadFormTemplate(this.value);" required></select>
+					</td>
+					<th>기안일자</th>
+					<td>
+						<input type="text" id="draftDt" name="draftDt" class="form-control input-sm" readonly style="background:#f4f4f4;">
+					</td>
+				</tr>
+				<tr>
+					<th>기안자</th>
+					<td>
+						<input type="text" id="draUserNm" name="draUserNm" class="form-control input-sm" readonly style="background:#f4f4f4;">
+					</td>
+					<th>기안부서</th>
+					<td>
+						<input type="text" id="draDeptNm" name="draDeptNm" class="form-control input-sm" readonly style="background:#f4f4f4;">
+					</td>
+				</tr>
+				<tr>
+					<th class="hit">문서제목</th>
+					<td colspan="3">
+						<input type="text" id="docTitle" name="docTitle" class="form-control input-sm" placeholder="문서 제목을 입력하세요." required>
+					</td>
+				</tr>
+			</table>
+
+			<!-- 2. 결재선 지정 영역 -->
+			<div class="section-header">
+				<span>결재선 지정</span>
+				<div style="display:flex; align-items:center; gap:6px;">
+					<select id="linePresetSelect" class="form-control input-sm" style="width:175px; height:24px; padding:1px 6px; font-size:11px;" onchange="applyLinePreset(this.value);">
+						<option value="">-- 개인 결재선 불러오기 --</option>
+					</select>
+					<button type="button" class="btn btn-default btn-xs" onclick="openApproverSearchModal();">
+						<i class="fa fa-user-plus"></i> 결재자 추가
+					</button>
+					<button type="button" class="btn btn-default btn-xs text-danger" onclick="removeSelectedApprover();">
+						<i class="fa fa-user-minus"></i> 삭제
+					</button>
+				</div>
+			</div>
+			<table class="table_input line-table" id="lineTable">
+				<colgroup>
+					<col width="8%">
+					<col width="15%">
+					<col width="22%">
+					<col width="25%">
+					<col width="20%">
+					<col width="10%">
+				</colgroup>
+				<thead>
+					<tr>
+						<th>선택</th>
+						<th>구분</th>
+						<th>성명</th>
+						<th>부서</th>
+						<th>직급</th>
+						<th>순번</th>
+					</tr>
+				</thead>
+				<tbody id="lineTableBody">
+					<!-- 결재선 동적 바인딩 -->
+				</tbody>
+			</table>
+
+			<!-- 3. 서식 본문 입력 영역 -->
+			<div class="section-header">문서 내용</div>
+			<div id="tmplContainer" class="tmpl-container">
+				<div class="form-group" style="margin-bottom:0;">
+					<label style="font-weight:normal; font-size:12px;">품의 / 기안 내용</label>
+					<textarea id="docContent" name="docContent" class="form-control input-sm" rows="8" placeholder="상세 내용을 입력하세요."></textarea>
+				</div>
+			</div>
+
+			<!-- 4. 첨부파일 영역 -->
+			<div class="section-header">첨부파일</div>
+			<div id="fileUploadArea" style="border:1px solid #ddd; padding:8px; border-radius:4px; background:#fff;">
+				<!-- fileTree.js 바인딩 영역 -->
+				<div id="treeArea"></div>
+			</div>
+		</div>
+
+		<!-- 하단 처리 버튼 -->
+		<div class="popup_bottom_btn">
+			<button type="button" class="btn btn-success btn-sm" onclick="submitApprovalDoc('REQUEST');">상신</button>
+			<button type="button" class="btn btn-primary btn-sm" onclick="submitApprovalDoc('DRAFT');">임시저장</button>
+			<button type="button" class="btn btn-default btn-sm" onclick="modalStack.close();">닫기</button>
+		</div>
+	</form>
+</div>
+
+<script type="text/javascript">
+	var selectedLineList = [];
+
+	$(document).ready(function() {
+		var $form = $('#popForm');
+		var param = modalStack.last().paramObj || {};
+
+		$form.find('#coCd').val(jwt.coCd || "GUN");
+		$form.find('#draUserId').val(jwt.userId);
+		$form.find('#draUserNm').val(jwt.userNm);
+		$form.find('#draDeptNm').val(jwt.deptNm || "본사");
+		$form.find('#draftDt').val(moment().format('YYYY-MM-DD'));
+
+		// 결재 양식 목록 로드
+		loadApprovalForms();
+
+		// 개인 결재선 프리셋 목록 로드
+		loadUserLinePresets();
+
+		// 기존 문서 수정인 경우
+		if (param.docId) {
+			$form.find('#docId').val(param.docId);
+			$form.find('#actionType').val("U");
+			loadExistingDocData(param.docId);
+		}
+	});
+
+	// 개인 결재선 프리셋 목록 로드
+	function loadUserLinePresets() {
+		postAjax("/user/am/am03/selectLinePresetList", { userId: jwt.userId }, null, function(data) {
+			var $sel = $('#approvalDraftModalArea').find('#linePresetSelect');
+			$sel.empty();
+			$sel.append('<option value="">-- 개인 결재선 불러오기 --</option>');
+			if (data && data.resultList && data.resultList.length > 0) {
+				$.each(data.resultList, function(idx, item) {
+					$sel.append('<option value="' + item.linePresetId + '">' + (item.presetNm || item.linePresetNm) + '</option>');
+				});
+			}
+		});
+	}
+
+	// 선택한 개인 결재선 기안서에 적용
+	function applyLinePreset(presetId) {
+		if (!presetId) return;
+		postAjax("/user/am/am03/selectLinePresetDetail", { linePresetId: presetId }, null, function(data) {
+			if (data && data.resultList && data.resultList.length > 0) {
+				selectedLineList = [];
+				$.each(data.resultList, function(idx, item) {
+					var uid = item.apprUserId || item.approverId;
+					if (uid) {
+						selectedLineList.push({
+							approverId: uid,
+							approverNm: item.apprUserNm || item.approverNm,
+							deptId: item.apprDeptId || item.deptId || "",
+							deptNm: item.apprDeptNm || item.deptNm || "",
+							levelCd: item.levelCd || "",
+							levelNm: item.levelNm || "",
+							lineType: item.apprType || item.lineType || "APPR"
+						});
+					}
+				});
+				renderLineTable();
+			} else {
+				alert("선택한 결재선에 지정된 결재자가 없습니다.");
+			}
+		});
+	}
+
+	// 양식 목록 로드
+	function loadApprovalForms() {
+		postAjax("/user/am/am02/selectFormList", { coCd: jwt.coCd, useYn: "Y" }, null, function(data) {
+			var $sel = $('#popForm').find('#formCd');
+			$sel.empty();
+			$sel.append('<option value="">-- 양식을 선택하세요 --</option>');
+			if (data && data.resultList) {
+				$.each(data.resultList, function(idx, item) {
+					$sel.append('<option value="' + item.formCd + '">' + item.formNm + ' [' + (item.formCatNm || '') + ']</option>');
+				});
+			}
+		});
+	}
+
+	// 양식 선택 시 서식 템플릿 로드
+	function loadFormTemplate(formCd) {
+		if (!formCd) {
+			$('#tmplContainer').html('<div class="text-muted" style="text-align:center; padding:30px;">결재 양식을 선택하면 서식이 표시됩니다.</div>');
+			return;
+		}
+		postAjax("/user/am/am02/selectFormDetail", { formCd: formCd }, null, function(data) {
+			if (data && data.formInfo) {
+				var tmpl = data.formInfo.formTmplHtml;
+				if (tmpl && tmpl.trim().length > 0) {
+					$('#tmplContainer').html(tmpl);
+				} else {
+					$('#tmplContainer').html('<textarea id="docContent" name="docContent" class="form-control input-sm" rows="8" placeholder="상세 내용을 입력하세요."></textarea>');
+				}
+			}
+		});
+	}
+
+	// 결재자 추가 모달 (사용자 검색 모달 호출)
+	function openApproverSearchModal() {
+		var paramObj = {
+			coCd: jwt.coCd || "GUN",
+			useYn: "Y"
+		};
+		// GBS 공통 사용자 검색 팝업 (cmn/modal/userSearch.html)
+		openModal("/static/html/cmn/modal/userSearch.html", 450, 650, "결재자 검색", paramObj, function(tree) {
+			if (!tree || typeof tree.get_checked !== 'function') return;
+			var checkedIds = tree.get_checked();
+			if (!checkedIds || checkedIds.length === 0) {
+				alert("선택된 사용자가 없습니다.");
+				return;
+			}
+			var node = tree.get_node(checkedIds[0]);
+			if (!node || node.type !== "person") {
+				alert("부서가 아닌 결재자(사용자)를 선택하십시오.");
+				return;
+			}
+			var orig = node.original || {};
+			var user = {
+				id: node.id,
+				userId: node.id,
+				name: node.text,
+				userNm: node.text,
+				deptId: orig.originDeptId || orig.deptId || orig.parent || "",
+				deptNm: orig.deptNm || "",
+				levelCd: orig.levelCd || "",
+				levelNm: orig.levelNm || ""
+			};
+			addApproverToLine(user);
+		});
+	}
+
+	// 결재선 테이블에 사용자 추가
+	function addApproverToLine(user) {
+		// 중복 체크
+		var exists = false;
+		$.each(selectedLineList, function(idx, item) {
+			if (item.approverId === (user.id || user.userId)) {
+				exists = true;
+				return false;
+			}
+		});
+		if (exists) {
+			alert("이미 결재선에 추가된 사용자입니다.");
+			return;
+		}
+
+		var approver = {
+			approverId: user.id || user.userId,
+			approverNm: user.name || user.userNm,
+			deptId: user.deptId || "",
+			deptNm: user.deptNm || "",
+			levelCd: user.levelCd || "",
+			levelNm: user.levelNm || "",
+			lineType: "APPR" // 기본 결재
+		};
+
+		selectedLineList.push(approver);
+		renderLineTable();
+	}
+
+	// 결재선 렌더링
+	function renderLineTable() {
+		var $body = $('#lineTableBody');
+		$body.empty();
+
+		if (selectedLineList.length === 0) {
+			$body.append('<tr><td colspan="6" style="padding:15px; color:#999;">지정된 결재선이 없습니다. 상단 [결재자 추가] 버튼을 눌러 결재자를 지정하십시오.</td></tr>');
+			return;
+		}
+
+		$.each(selectedLineList, function(idx, item) {
+			var tr = '<tr>'
+				+ '<td><input type="radio" name="selLineRow" value="' + idx + '"></td>'
+				+ '<td>'
+				+ '<select class="form-control input-sm line-type-sel" onchange="selectedLineList[' + idx + '].lineType = this.value;" style="height:22px; padding:1px 4px; font-size:11px;">'
+				+ '<option value="APPR"' + (item.lineType === 'APPR' ? ' selected' : '') + '>결재</option>'
+				+ '<option value="AGREE"' + (item.lineType === 'AGREE' ? ' selected' : '') + '>합의</option>'
+				+ '<option value="COOP"' + (item.lineType === 'COOP' ? ' selected' : '') + '>협조</option>'
+				+ '<option value="POST"' + (item.lineType === 'POST' ? ' selected' : '') + '>후결</option>'
+				+ '<option value="REF"' + (item.lineType === 'REF' ? ' selected' : '') + '>참조</option>'
+				+ '</select>'
+				+ '</td>'
+				+ '<td><b>' + item.approverNm + '</b> (' + item.approverId + ')</td>'
+				+ '<td>' + (item.deptNm || '-') + '</td>'
+				+ '<td>' + (item.levelNm || '-') + '</td>'
+				+ '<td>' + (idx + 1) + '</td>'
+				+ '</tr>';
+			$body.append(tr);
+		});
+	}
+
+	// 선택한 결재자 행 삭제
+	function removeSelectedApprover() {
+		var selIdx = $('input[name="selLineRow"]:checked').val();
+		if (selIdx === undefined) {
+			alert("삭제할 결재자를 선택하십시오.");
+			return;
+		}
+		selectedLineList.splice(Number(selIdx), 1);
+		renderLineTable();
+	}
+
+	// 기존 문서 데이터 로드
+	function loadExistingDocData(docId) {
+		postAjax("/user/am/am11/selectApprovalDocDetail", { docId: docId, coCd: jwt.coCd || "GUN" }, null, function(data) {
+			if (data && data.docInfo) {
+				var doc = data.docInfo;
+				var $form = $('#popForm');
+				$form.find('#formCd').val(doc.formCd);
+				$form.find('#docTitle').val(doc.docTitle);
+
+				// 본문 데이터
+				if (doc.docDataJson) {
+					try {
+						var json = JSON.parse(doc.docDataJson);
+						$form.find('#docContent').val(json.content || "");
+					} catch(e) {}
+				}
+
+				// 결재선 복원
+				if (data.lineList) {
+					selectedLineList = [];
+					$.each(data.lineList, function(idx, line) {
+						selectedLineList.push({
+							approverId: line.approverId,
+							approverNm: line.approverNm,
+							deptId: line.deptId,
+							deptNm: line.deptNm,
+							levelCd: line.levelCd,
+							levelNm: line.levelNm,
+							lineType: line.lineType
+						});
+					});
+					renderLineTable();
+				}
+			}
+		});
+	}
+
+	// 상신 또는 임시저장 실행
+	function submitApprovalDoc(targetStatus) {
+		var $form = $('#popForm');
+		var formCd = $form.find('#formCd').val();
+		var docTitle = $form.find('#docTitle').val();
+
+		if (!formCd) {
+			alert("결재 양식을 선택하십시오.");
+			$form.find('#formCd').focus();
+			return;
+		}
+		if (!docTitle || docTitle.trim().length === 0) {
+			alert("문서 제목을 입력하십시오.");
+			$form.find('#docTitle').focus();
+			return;
+		}
+		if (targetStatus === 'REQUEST' && selectedLineList.length === 0) {
+			alert("최소 1명 이상의 결재자를 지정해야 상신할 수 있습니다.");
+			return;
+		}
+
+		var confirmMsg = (targetStatus === 'REQUEST') 
+			? "입력하신 내용으로 결재를 상신하시겠습니까?" 
+			: "작성 중인 내용을 임시저장하시겠습니까?";
+
+		if (!confirm(confirmMsg)) return;
+
+		// 본문 데이터 및 렌더링 HTML 구성
+		var docDataObj = {
+			content: $form.find('#docContent').val() || ""
+		};
+		var docRenderHtml = $('#tmplContainer').html();
+
+		var param = {
+			docId: $form.find('#docId').val(),
+			coCd: $form.find('#coCd').val(),
+			formCd: formCd,
+			formVer: 1,
+			docTitle: docTitle,
+			docDataJson: JSON.stringify(docDataObj),
+			docRenderHtml: docRenderHtml,
+			userId: jwt.userId,
+			userNm: jwt.userNm,
+			lineList: selectedLineList
+		};
+
+		var url = (targetStatus === 'REQUEST') 
+			? "/user/am/am11/submitApproval" 
+			: "/user/am/am11/saveApprovalDraft";
+
+		postAjax(url, param, null, function(data) {
+			if (data && data.resultCode === '200') {
+				alert(data.resultMessage || "처리가 완료되었습니다.");
+				modalStack.close();
+			} else {
+				alert(data.resultMessage || "오류가 발생하였습니다.");
+			}
+		});
+	}
+</script>

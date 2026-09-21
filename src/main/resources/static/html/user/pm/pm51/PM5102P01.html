@@ -195,6 +195,34 @@
 			</div>
 			<div class="section-body section-body-1">
 
+			<!-- 외주계약 정보 (신청인 회사코드가 TRN인 경우에만 노출) -->
+			<div id="ctrtInfoArea" style="display: none; margin-bottom: 10px;">
+				<table>
+					<colgroup>
+						<col width="11%">
+						<col width="22%">
+						<col width="11%">
+						<col width="23%">
+					</colgroup>
+					<tr>
+						<th>계약결재번호</th>
+						<td>
+							<div class="search_form"><input type="text" id="ctrtApprovalNo" name="ctrtApprovalNo" class="form-control input-sm" readonly style="background: #fafafa !important;"><a onclick="openRptContractSearch();" authchk><i class="i_search_w"></i></a></div>
+						</td>
+						<th>외주계약번호</th>
+						<td>
+							<div class="search_form"><input type="text" id="ctrtNo" name="ctrtNo" class="form-control input-sm" readonly style="background: #fafafa !important;"><a onclick="openRptContractSearch();" authchk><i class="i_search_w"></i></a></div>
+						</td>
+					</tr>
+					<tr>
+						<th>외주계약업체명</th>
+						<td><input type="text" id="ctrtVendNm" class="form-control input-sm" readonly style="width: 100%; background: #fafafa !important;"></td>
+						<th>외주계약담당자명</th>
+						<td><input type="text" id="ctrtMngNm" class="form-control input-sm" readonly style="width: 100%; background: #fafafa !important;"></td>
+					</tr>
+				</table>
+			</div>
+
 			<!-- 프로젝트 / 복명서 출장자(출장기간): 좌우 Flex 2분할 레이아웃 (출장신청서와 동일 구도) -->
 			<div style="display: flex; justify-content: space-between; margin-top: 10px;">
 				<div style="width: 50%;">
@@ -2546,6 +2574,21 @@
 			calcSettlementUsd2();
 
 			applyRptEditPolicy();
+
+			// 신청인 회사코드 조회 (TRN 판정용) 및 인용 신청서(TB_PM51M01)의 외주계약 정보 승계
+			if (m01.userId) {
+				postAjaxSync("/admin/cm/cm06/selectUserInfo", { userId: m01.userId }, null, function(data) {
+					if (data && data.userInfo) {
+						reqApplicantCoCd = data.userInfo.coCd || '';
+						// 인용한 신청서의 계약결재번호/외주계약번호를 복명서 마스터 필드로 승계 (TRN 데이터 유실 방지)
+						$('#ctrtApprovalNo').val(m01.ctrtApprovalNo || '');
+						$('#ctrtNo').val(m01.ctrtNo || '');
+						loadRptContractInfo(m01.ctrtNo);
+						// TRN 표시토글 (마스터 필드 세팅 이후)
+						updateRptContractSearchButtonVisibility();
+					}
+				});
+			}
 		});
 	}
 
@@ -2905,6 +2948,23 @@
 			bindTripReqView(m01, d01);
 			updateRptCurrCdLabel(m01.currCdNm || m01.currCd);
 			bindRptTravelerGrid(filterOwnTraveler(d02 && d02.length > 0 ? d02 : d01, m01));
+
+			// 신청인 회사코드 조회 (TRN 판정용) 및 마스터 필드 세팅
+			if (m01.reqId) {
+				postAjaxSync("/admin/cm/cm06/selectUserInfo", { userId: m01.reqId }, null, function(data) {
+					if (data && data.userInfo) {
+						reqApplicantCoCd = data.userInfo.coCd || '';
+						// 마스터 필드 세팅 (currentTripRptMaster는 이미 loadTripRptDetail에서 m01로 설정됨)
+						if (currentTripRptMaster) {
+							$('#ctrtApprovalNo').val(currentTripRptMaster.ctrtApprovalNo || '');
+							$('#ctrtNo').val(currentTripRptMaster.ctrtNo || '');
+							loadRptContractInfo(currentTripRptMaster.ctrtNo);
+						}
+						// TRN 표시토글 (마스터 필드 세팅 이후)
+						updateRptContractSearchButtonVisibility();
+					}
+				});
+			}
 
 			var reqProjectList = data.result.reqProjectList || [];
 			var rptProjectList = data.result.rptProjectList || [];
@@ -3856,8 +3916,19 @@
 		});
 		formData.append('rptTravelerArr', JSON.stringify(rptTravelerList));
 
+		// 외주계약 정보 (마스터 필드)
+		formData.append('ctrtApprovalNo', $('#ctrtApprovalNo').val());
+		formData.append('ctrtNo', $('#ctrtNo').val());
+
 		var rptProjectList = (rptProjectGridView && rptProjectGridView.target) ? (rptProjectGridView.target.getList() || []) : [];
-		formData.append('rptProjectArr', JSON.stringify(rptProjectList));
+		// 프로젝트 그리드에서 ctrtApprovalNo, ctrtNo 필드 제거 (마스터 필드로 이동)
+		var cleanedProjectList = $.map(rptProjectList, function(row) {
+			var cleaned = $.extend({}, row);
+			delete cleaned.ctrtApprovalNo;
+			delete cleaned.ctrtNo;
+			return cleaned;
+		});
+		formData.append('rptProjectArr', JSON.stringify(cleanedProjectList));
 
 		// 카드사 명세는 회계담당자(편집 가능 상태)일 때만 전송한다.
 		// 파라미터를 생략하면 서버가 기존 데이터를 보존하므로, 그 외 사용자의 저장으로 명세가 지워지지 않는다.
@@ -3874,6 +3945,14 @@
 		var sanctnSnApproval = 0;
 		var sanctnSnShare = 0;
 
+		var seenAppIds = {};
+		$.each(approvalList, function(idx, elem) {
+			if (elem.gb == '결재') {
+				var uid = elem.usrNm || elem.todoId || elem.empNo;
+				if (uid) seenAppIds[uid] = true;
+			}
+		});
+
 		if(approvalList.length > 0) {
 			for(var i = 0; i < approvalList.length; i++) {
 				var elem = approvalList[i];
@@ -3882,6 +3961,10 @@
 				} else {
 					var approvalListObj = $.extend({}, elem);
 					if (elem.gb == '공유') {
+						var uid = elem.usrNm || elem.todoId || elem.empNo;
+						if (uid && seenAppIds[uid]) {
+							continue; // 결재선에 동일 ID 존재 시 공유선 제외
+						}
 						sanctnSnShare += 1;
 						approvalListObj["sanctnSn"] = sanctnSnShare;
 						approvalListObj["todoDiv2CodeId"] = "TODODIV1200";
@@ -3903,6 +3986,14 @@
 		var mngSanctnSnApproval = 0;
 		var mngSanctnSnShare = 0;
 
+		var seenMngAppIds = {};
+		$.each(mngApprovalList, function(idx, elem) {
+			if (elem.gb == '결재') {
+				var uid = elem.usrNm || elem.todoId || elem.empNo;
+				if (uid) seenMngAppIds[uid] = true;
+			}
+		});
+
 		if(mngApprovalList.length > 0) {
 			for(var i = 0; i < mngApprovalList.length; i++) {
 				var elem = mngApprovalList[i];
@@ -3910,6 +4001,10 @@
 				} else {
 					var approvalListObj = $.extend({}, elem);
 					if (elem.gb == '공유') {
+						var uid = elem.usrNm || elem.todoId || elem.empNo;
+						if (uid && seenMngAppIds[uid]) {
+							continue; // 결재선에 동일 ID 존재 시 공유선 제외
+						}
 						mngSanctnSnShare += 1;
 						approvalListObj["sanctnSn"] = mngSanctnSnShare;
 						approvalListObj["todoDiv2CodeId"] = "TODODIV1201";
@@ -4195,10 +4290,12 @@
 
 	// 유틸 함수: YYYYMMDDHH24MI -> YYYY-MM-DD
 	function formatToDate(yyyymmddhhmi) {
-		if (!yyyymmddhhmi || yyyymmddhhmi.length < 8) return '';
-		var year = yyyymmddhhmi.substring(0, 4);
-		var month = yyyymmddhhmi.substring(4, 6);
-		var day = yyyymmddhhmi.substring(6, 8);
+		if (!yyyymmddhhmi) return '';
+		var clean = String(yyyymmddhhmi).replace(/[^0-9]/g, '');
+		if (clean.length < 8) return yyyymmddhhmi;
+		var year = clean.substring(0, 4);
+		var month = clean.substring(4, 6);
+		var day = clean.substring(6, 8);
 		return year + '-' + month + '-' + day;
 	}
 
@@ -4391,7 +4488,33 @@
 		return completed;
 	}
 
+	// 결재선 중 반려(APPR_REJECT_YN = 'Y' 또는 sanctnSttusNm = '반려')된 행이 있는지 검사
+	function hasRejectedRptApproval() {
+		var isRejected = false;
+		if (gridViewApproval && gridViewApproval.target && gridViewApproval.target.getList) {
+			$.each(gridViewApproval.target.getList(), function(idx, elem) {
+				if (elem.gb === '결재' && (elem.apprRejectYn === 'Y' || elem.sanctnSttusNm === '반려')) {
+					isRejected = true;
+					return false;
+				}
+			});
+		}
+		if (!isRejected && gridViewApprovalMng && gridViewApprovalMng.target && gridViewApprovalMng.target.getList) {
+			$.each(gridViewApprovalMng.target.getList(), function(idx, elem) {
+				if (elem.gb === '결재' && (elem.apprRejectYn === 'Y' || elem.sanctnSttusNm === '반려')) {
+					isRejected = true;
+					return false;
+				}
+			});
+		}
+		return isRejected;
+	}
+
 	function hasCompletedRptApproval() {
+		// 반려된 문서인 경우 작성자가 수정할 수 있도록 타인 승인이 있더라도 완료(잠금) 상태로 보지 않는다.
+		if (hasRejectedRptApproval()) {
+			return false;
+		}
 		var hasCompleted = false;
 		if (gridViewApproval && gridViewApproval.target && gridViewApproval.target.getList) {
 			var reqId = String($('#reqViewReqId').val() || $('#userId').val() || (currentTripRptMaster ? (currentTripRptMaster.userId || currentTripRptMaster.creatId) : '') || jwt.userId || '').trim().toLowerCase();
@@ -5046,7 +5169,7 @@
 			, "todoDiv2CodeId": todoDiv2CodeId
 			, "todoDiv1CodeNm": sanctnDiv2
 			, "title": buildTripRptGanttStyleTitle()
-			, "customBusinessContents": buildTripRptKakaoBusinessContents()
+			, "customBusinessContents": buildTripRptKakaoMessage(sanctnDiv2, clntNm, teleNo)
 			, "sanctnDiv2": sanctnDiv2				//템플릿 결재구분2 #{sanctnDiv2}
 			, "todoNo": docNo
 			, "clntCd": "1"
@@ -5055,6 +5178,7 @@
 			, "ordrgMngTelNo": teleNo				//담당자전화번호
 			, "creatPgm": "PM5102P01"
 			, "chkSentYn": "Y"					//기발송 수신자 제외(중복방지)
+//			, "customMessage": buildTripRptKakaoMessage(sanctnDiv2, clntNm, teleNo)	//본문은 복명서 정보로 직접 조립 (제목은 기존 그대로)
 		};
 		if (sanctnSn) {
 			param.sanctnSn = sanctnSn;	// 순차결재: 지정 시 해당 순번(현재 차례)의 결재자에게만 발송
@@ -5062,9 +5186,8 @@
 		commKaKaoSendTodo(param);
 	}
 
-
-	// 10003 고정 본문이 아닌 요청업무 변수에 넣을 출장 상세 내용
-	function buildTripRptKakaoBusinessContents() {
+	// 알림톡 본문 조립 - 표준 양식(내용/업무/요청일시/요청자/확인문구/회사연락처) 참고: mobile/modal/WB2001P01.html
+	function buildTripRptKakaoMessage(sanctnDiv2, clntNm, teleNo) {
 		var tripPlace = $('#reqViewTripPlace').val() || '';
 		var clntPjtNm = $('#reqViewClntPjtNm').val() || '';
 		var tripDivNm = $('#reqViewTripDiv option:selected').text() || '';
@@ -5083,11 +5206,16 @@
 		var period = (stDt && edDt) ? stDt + '~' + edDt : '';
 
 		var info = tripPlace + ', ' + clntPjtNm + ', ' + tripDivNm;
-		var msg = info + ', ' + period + ' ' + travelerTxt;
+		var msg = '내용 : [출장복명서, ' + info + '] ' + sanctnDiv2 + ' 요청 건';
+		msg += '\n업무 : ' + info + ', ' + period + ' ' + travelerTxt;
 		var tripResult = $('#tripResult').val() || '';
 		if (tripResult) {
 			msg += '\n' + tripResult;
 		}
+		msg += '\n\n요청일시 : #{sendDt}';			//수신자 loop에서 치환됨
+		msg += '\n요청자 : ' + jwt.userNm;
+		msg += '\n\n' + sanctnDiv2 + ' 확인 바랍니다.';
+		msg += '\n\n' + clntNm + '/' + teleNo;
 		return msg;
 	}
 
@@ -5244,5 +5372,81 @@
 		} else {
 			$('#fileUpBtn').hide();
 		}
+	}
+
+	// 프로젝트 그리드 컬럼 설정 재적용 (TRN 판정에 따라 외주계약 컬럼 표시/숨김)
+
+	// 외주계약 정보 영역(wrapper + 버튼) 표시/숨김
+	function updateRptContractSearchButtonVisibility() {
+		var isTrn = reqApplicantCoCd === 'TRN';
+		if (isTrn) {
+			$('#ctrtInfoArea').show();
+		} else {
+			$('#ctrtInfoArea').hide();
+		}
+	}
+
+	// 계약검색 모달 오픈
+	function openRptContractSearch() {
+		// 계약선택이 참고 프로젝트 그리드를 수정하므로, 프로젝트 편집이 잠긴 상태(조회/결재 등)에서는 열지 않는다.
+		if (typeof isRptProjectGridEditBlocked === 'function' && isRptProjectGridEditBlocked()) return;
+		var paramObj = {};
+		paramObj["coCd"] = reqApplicantCoCd || '';
+		openAutoModal("/static/html/cmn/modal/contractSearch.html", 700, 550, "외주계약 검색", paramObj, function (selectedContract) {
+			handleRptContractSelection(selectedContract);
+		});
+	}
+
+	// 계약 선택 콜백
+	function handleRptContractSelection(contract) {
+		if (!contract) return;
+
+		$('#ctrtApprovalNo').val(contract.ctrtApprovalNo || '');
+		$('#ctrtNo').val(contract.ctrtNo || '');
+		$('#ctrtVendNm').val(contract.ctrtVendNm || '');
+		$('#ctrtMngNm').val(contract.ctrtMngNm || '');
+
+		// (c) 계약 영업정보로 참고 프로젝트 그리드 1행(index 0)을 덮어쓴다.
+		// - 영업/프로젝트 식별정보(수주번호/영업코드/고객사/프로젝트/PM/설비)만 덮고, 사용자가 입력하는 시작일/종료일/M/D/비고는 보존한다.
+		// - 원 신청서 읽기전용 표시(#reqView*)는 변경하지 않는다.
+		if (contract.salesCd && rptProjectGridView && rptProjectGridView.target) {
+			var primaryRow = {
+				ordrsNo:   contract.ordrsNo || '',
+				salesCd:   contract.salesCd || '',
+				coCd:      contract.coCd || '',
+				clntPjt:   contract.clntPjt || '',
+				clntPjtNm: contract.clntPjtNm || '',
+				clntCd:    contract.ordrsClntCd || '',
+				clntNm:    contract.ordrsClntNm || '',
+				equipNm:   contract.eqpNm || '',
+				pmId:      contract.pmId || '',
+				pmNm:      contract.pmNm || ''
+			};
+			var list = rptProjectGridView.target.getList() || [];
+			if (list.length > 0) {
+				$.each(primaryRow, function(key, value) {
+					rptProjectGridView.target.setValue(0, key, value);
+				});
+				rptProjectGridView.target.repaint();
+			} else {
+				rptProjectGridView.target.addRow($.extend({ stDt: '', edDt: '', md: '', etc: '' }, primaryRow), "last");
+			}
+			if (typeof resizeRptProjectGrid === 'function') resizeRptProjectGrid();
+		}
+	}
+
+	// 저장된 계약번호로 외주계약 표시정보를 조회한다. 계약번호/업체명/담당자명은 마스터에 저장하지 않는다.
+	function loadRptContractInfo(ctrtNo) {
+		$('#ctrtVendNm').val('');
+		$('#ctrtMngNm').val('');
+		if (!ctrtNo || reqApplicantCoCd !== 'TRN') return;
+		postAjaxSync('/user/pm/pm51/selectTrnContractList', { coCd: reqApplicantCoCd, ctrtNo: ctrtNo }, null, function(res) {
+			var list = (res && res.result) ? res.result : (res && res.list ? res.list : res);
+			var row = (list && list.length > 0) ? list[0] : null;
+			if (row) {
+				$('#ctrtVendNm').val(row.ctrtVendNm || '');
+				$('#ctrtMngNm').val(row.ctrtMngNm || '');
+			}
+		});
 	}
 </script>

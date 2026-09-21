@@ -38,6 +38,25 @@ public interface WB20Mapper {
 	List<Map<String, String>> selectGetApprovalList(Map<String, String> paramMap);
 
 	int updateApprovalLine(Map<String, String> paramMap);
+	int updateApprovalLineForAmLink(Map<String, String> paramMap);
+
+	int updateApprovalLineByTodoNo(Map<String, String> paramMap);
+
+	int updateApprovalLineByTodoNoAndUser(Map<String, String> paramMap);
+
+	int updateApprovalLineByTodoNoAndSn(Map<String, String> paramMap);
+	int syncAmApprovalLine(Map<String, String> paramMap);
+	int syncAmApprovalDocument(Map<String, String> paramMap);
+	int syncAmApprovalCancelNextLine(Map<String, String> paramMap);
+	int syncAmApprovalCancelLine(Map<String, String> paramMap);
+	int syncAmApprovalCancelHist(Map<String, String> paramMap);
+	int syncAmApprovalCancelDocument(Map<String, String> paramMap);
+	List<Map<String, String>> selectApprovalLinesForAmSync(Map<String, String> paramMap);
+	int deletePendingApprovalLinesForAmSync(Map<String, Object> paramMap);
+	int updatePendingApprovalLineOrder(Map<String, Object> paramMap);
+	int insertApprovalLineByCopy(Map<String, String> paramMap);
+	int rejectApprovalLine(Map<String, String> paramMap);
+	int resetRejectedApprovalLines(Map<String, String> paramMap);
 
 	List<Map<String, String>> selectSignResUserlst(Map<String, String> paramMap);
 
@@ -56,6 +75,8 @@ public interface WB20Mapper {
 	int deleteAllTodoMaster(Map<String, String> param);
 
 	int deleteTodoMasterByTodoNo(Map<String, String> param);
+	int selectAmDeleteBlockCount(Map<String, String> param);
+	int cancelAmDocumentByErpKey(Map<String, String> param);
 
 	//결재 todo 삭제시 순번
 	int updateTodoMasterSanctnSn(Map<String, String> paramMap);

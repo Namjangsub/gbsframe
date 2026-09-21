@@ -80,13 +80,16 @@ public class CM06SvcImpl implements CM06Svc {
 		cm06Mapper.insertUser(paramMap);
 		cm06Mapper.insertUserOauth(paramMap);
 
+		// 인사관리 기준정보 저장 (근태관리 대상자, 휴직구분, 인사소속부서, 회사구분)
+		cm06Mapper.mergeUserHrCriteria(paramMap);
+
 		// 이미지 업로드를 위한 로직 (타입 변경 및 필요 매개변수 삽입)
 		// 이미지 Insert 및 Update에 관한 모듈로 분리
 		if (paramMap.containsKey("userImg")) {
 			Map<String, Object> imgParam = new HashMap<>();
 			imgParam.put("userId", paramMap.get("userId"));
 			imgParam.put("userImg", paramMap.get("userImg"));
-			
+
 			cm06Svc.updateUserImg(imgParam);
 		}
 	}
@@ -95,13 +98,16 @@ public class CM06SvcImpl implements CM06Svc {
 	public void updateUser(Map<String, String> paramMap) throws Exception {
 		cm06Mapper.updateUser(paramMap);
 
+		// 인사관리 기준정보 저장 (근태관리 대상자, 휴직구분, 인사소속부서, 회사구분)
+		cm06Mapper.mergeUserHrCriteria(paramMap);
+
 		// 이미지 업로드를 위한 로직 (타입 변경 및 필요 매개변수 삽입)
 		// 이미지 Insert 및 Update에 관한 모듈로 분리
 		if (paramMap.containsKey("userImg")) {
 			Map<String, Object> imgParam = new HashMap<>();
 			imgParam.put("userId", paramMap.get("userId"));
 			imgParam.put("userImg", paramMap.get("userImg"));
-			
+
 			cm06Svc.updateUserImg(imgParam);
 		}
 	}

@@ -11,6 +11,10 @@ public interface PM51Svc {
 
 	List<Map<String, String>> selectTripReqList(Map<String, String> paramMap);
 
+	int selectTripStatusListCount(Map<String, String> paramMap);
+
+	List<Map<String, String>> selectTripStatusList(Map<String, String> paramMap);
+
 	Map<String, Object> selectTripReqDtl(Map<String, String> paramMap);
 
 	int insertTripReq(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
@@ -60,4 +64,6 @@ public interface PM51Svc {
 	List<Map<String, String>> selectTripScheduleByMonth(Map<String, String> paramMap);
 
 	Map<String, String> selectSalesCodeWbsSchedule(Map<String, String> paramMap);
+
+	List<Map<String, String>> selectTrnContractList(Map<String, String> paramMap);
 }

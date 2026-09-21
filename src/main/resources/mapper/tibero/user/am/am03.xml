@@ -1,0 +1,204 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.dksys.biz.user.am.am03.mapper.AM03Mapper">
+
+    <!-- 1. 개인 결재선 프리셋 목록 조회 -->
+    <select id="selectLinePresetList" parameterType="Map" resultType="CamelMap">
+        SELECT M.LINE_PRESET_ID,
+               M.USER_ID,
+               M.PRESET_NM,
+               M.CO_CD,
+               M.SORT_NO,
+               M.USE_YN,
+               TO_CHAR(M.CREAT_DTTM, 'YYYY-MM-DD') AS CREAT_DTTM
+          FROM TB_AM03M01 M
+         WHERE M.USER_ID = #{userId}
+           AND M.USE_YN = 'Y'
+         ORDER BY M.SORT_NO ASC, M.PRESET_NM ASC
+    </select>
+
+    <!-- 개인 결재선 상세 조회 -->
+    <select id="selectLinePresetDetail" parameterType="Map" resultType="CamelMap">
+        SELECT M.LINE_PRESET_ID,
+               M.PRESET_NM,
+               M.USE_YN,
+               D.LINE_SEQ,
+               D.APPR_TYPE,
+               FN_CM05M01_CD_TO_NM(D.APPR_TYPE) AS APPR_TYPE_NM,
+               D.APPR_USER_ID,
+               NVL(U.NAME, D.APPR_USER_ID) AS APPR_USER_NM,
+               D.APPR_DEPT_ID,
+               NVL(DEP.DEPT_NM, D.APPR_DEPT_ID) AS APPR_DEPT_NM,
+               U.LEVEL_CD,
+               L.LEVEL_NM
+          FROM TB_AM03M01 M
+               LEFT OUTER JOIN TB_AM03D01 D ON M.LINE_PRESET_ID = D.LINE_PRESET_ID
+               LEFT OUTER JOIN TB_CM06M01 U ON D.APPR_USER_ID = U.ID
+               LEFT OUTER JOIN TB_CM04M01 DEP ON D.APPR_DEPT_ID = DEP.DEPT_ID
+               LEFT OUTER JOIN TB_CM07M01 L ON U.LEVEL_CD = L.LEVEL_CD
+         WHERE M.LINE_PRESET_ID = #{linePresetId}
+         ORDER BY D.LINE_SEQ ASC
+    </select>
+
+    <!-- 개인 결재선 마스터 등록 -->
+    <insert id="insertLinePreset" parameterType="Map">
+        <selectKey keyProperty="linePresetId" resultType="String" order="BEFORE">
+            SELECT TO_CHAR(TB_AM03M01_SQ01.NEXTVAL) FROM DUAL
+        </selectKey>
+        INSERT INTO TB_AM03M01
+        (
+            LINE_PRESET_ID,
+            USER_ID,
+            PRESET_NM,
+            CO_CD,
+            SORT_NO,
+            USE_YN,
+            CREAT_ID,
+            CREAT_PGM,
+            CREAT_DTTM,
+            UDT_ID,
+            UDT_PGM,
+            UDT_DTTM
+        )
+        VALUES
+        (
+            #{linePresetId},
+            #{userId},
+            #{presetNm},
+            #{coCd, jdbcType=VARCHAR},
+            NVL(#{sortNo, jdbcType=INTEGER}, 1),
+            'Y',
+            #{userId},
+            #{pgmId},
+            SYSDATE,
+            #{userId},
+            #{pgmId},
+            SYSDATE
+        )
+    </insert>
+
+    <!-- 개인 결재선 상세 등록 -->
+    <insert id="insertLinePresetDetail" parameterType="Map">
+        INSERT INTO TB_AM03D01
+        (
+            LINE_PRESET_ID,
+            LINE_SEQ,
+            APPR_TYPE,
+            APPR_USER_ID,
+            APPR_DEPT_ID,
+            SORT_NO,
+            CREAT_ID,
+            CREAT_PGM,
+            CREAT_DTTM,
+            UDT_ID,
+            UDT_PGM,
+            UDT_DTTM
+        )
+        VALUES
+        (
+            #{linePresetId},
+            #{lineSeq},
+            #{apprType},
+            #{apprUserId},
+            #{apprDeptId, jdbcType=VARCHAR},
+            #{lineSeq},
+            #{userId},
+            #{pgmId},
+            SYSDATE,
+            #{userId},
+            #{pgmId},
+            SYSDATE
+        )
+    </insert>
+
+    <!-- 개인 결재선 삭제 -->
+    <delete id="deleteLinePreset" parameterType="Map">
+        DELETE FROM TB_AM03M01
+         WHERE LINE_PRESET_ID = #{linePresetId}
+           AND USER_ID = #{userId}
+    </delete>
+
+    <delete id="deleteLinePresetDetail" parameterType="Map">
+        DELETE FROM TB_AM03D01
+         WHERE LINE_PRESET_ID = #{linePresetId}
+    </delete>
+
+    <!-- 2. 대결/위임 설정 목록 조회 -->
+    <select id="selectDelegateList" parameterType="Map" resultType="CamelMap">
+        SELECT G.DELEGATE_ID,
+               G.ORIGIN_USER_ID,
+               U1.NAME AS ORIGIN_USER_NM,
+               G.DELEGATE_USER_ID,
+               U2.NAME AS DELEGATE_USER_NM,
+               D2.DEPT_NM AS DELEGATE_DEPT_NM,
+               L2.LEVEL_NM AS DELEGATE_LEVEL_NM,
+               G.START_DT,
+               G.END_DT,
+               G.DELEGATE_RSN,
+               G.USE_YN,
+               CASE WHEN TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN G.START_DT AND G.END_DT AND G.USE_YN = 'Y' THEN '진행중'
+                    WHEN TO_CHAR(SYSDATE, 'YYYYMMDD') <![CDATA[ < ]]> G.START_DT AND G.USE_YN = 'Y' THEN '예정'
+                    ELSE '종료' END AS STATUS_NM
+          FROM TB_AM03M02 G
+               LEFT OUTER JOIN TB_CM06M01 U1 ON G.ORIGIN_USER_ID = U1.ID
+               LEFT OUTER JOIN TB_CM06M01 U2 ON G.DELEGATE_USER_ID = U2.ID
+               LEFT OUTER JOIN TB_CM04M01 D2 ON U2.DEPT_ID = D2.DEPT_ID
+               LEFT OUTER JOIN TB_CM07M01 L2 ON U2.LEVEL_CD = L2.LEVEL_CD
+         WHERE G.ORIGIN_USER_ID = #{userId}
+         ORDER BY G.START_DT DESC
+    </select>
+
+    <!-- 대결/위임 등록 -->
+    <insert id="insertDelegate" parameterType="Map">
+        <selectKey keyProperty="delegateId" resultType="String" order="BEFORE">
+            SELECT TO_CHAR(TB_AM03M02_SQ01.NEXTVAL) FROM DUAL
+        </selectKey>
+        INSERT INTO TB_AM03M02
+        (
+            DELEGATE_ID,
+            ORIGIN_USER_ID,
+            DELEGATE_USER_ID,
+            START_DT,
+            END_DT,
+            DELEGATE_RSN,
+            USE_YN,
+            CO_CD,
+            CREAT_ID,
+            CREAT_PGM,
+            CREAT_DTTM,
+            UDT_ID,
+            UDT_PGM,
+            UDT_DTTM
+        )
+        VALUES
+        (
+            #{delegateId},
+            #{userId},
+            #{delegateUserId},
+            REPLACE(#{startDt}, '-', ''),
+            REPLACE(#{endDt}, '-', ''),
+            #{delegateRsn, jdbcType=VARCHAR},
+            NVL(#{useYn, jdbcType=VARCHAR}, 'Y'),
+            #{coCd, jdbcType=VARCHAR},
+            #{userId},
+            #{pgmId},
+            SYSDATE,
+            #{userId},
+            #{pgmId},
+            SYSDATE
+        )
+    </insert>
+
+    <!-- 대결/위임 사용여부 수정/해제 -->
+    <update id="updateDelegate" parameterType="Map">
+        UPDATE TB_AM03M02
+           SET USE_YN   = #{useYn},
+               UDT_ID   = #{userId},
+               UDT_PGM  = #{pgmId},
+               UDT_DTTM = SYSDATE
+         WHERE DELEGATE_ID = #{delegateId}
+           AND ORIGIN_USER_ID = #{userId}
+    </update>
+
+</mapper>

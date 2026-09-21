@@ -179,4 +179,18 @@ public class PM30Ctr {
 		return "jsonView";
 	}
 
+	@PostMapping(value = "/selectAttendanceComprehensiveList")
+	public String selectAttendanceComprehensiveList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		try {
+			List<Map<String, Object>> resultList = pm30Svc.selectAttendanceComprehensiveList(paramMap);
+			model.addAttribute("resultCode", "0000");
+			model.addAttribute("resultMessage", "성공");
+			model.addAttribute("result", resultList);
+		} catch (Exception e) {
+			model.addAttribute("resultCode", "9999");
+			model.addAttribute("resultMessage", "조회 실패: " + e.getMessage());
+		}
+		return "jsonView";
+	}
+
 }

@@ -40,6 +40,8 @@ public interface CM06Mapper {
 
 	int updateUserStatus(Map<String, String> paramMap);
 
+	int mergeUserHrCriteria(Map<String, String> paramMap);
+
 	List<Map<String, String>> selectEmployeeStatusList(Map<String, String> paramMap);
 
 	Map<String, String> checkUserIdImage(Map<String, String> paramMap);

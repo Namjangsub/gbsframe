@@ -50,45 +50,52 @@
 	
 	<select id="selectUserInfo" resultType="CamelMap">
 		SELECT
-			ID,
-			EMP_NO, 
-			NAME, 
-			DEPT_ID,
+			U.ID,
+			U.EMP_NO,
+			U.NAME,
+			U.DEPT_ID,
 			(SELECT DEPT_NM FROM TB_CM04M01 WHERE DEPT_ID = U.DEPT_ID) DEPT_NM,
-			LEVEL_CD,
+			U.LEVEL_CD,
 			(SELECT LEVEL_NM FROM TB_CM07M01 WHERE LEVEL_CD = U.LEVEL_CD) AS LEVEL_NM,
-			EMAIL, 
-			TEL_NO,
-			AUTH_INFO,
-			TO_CHAR(ENTER_DT, 'yyyy-MM-dd') ENTER_DT,
-			TO_CHAR(LEAVE_DT, 'yyyy-MM-dd') LEAVE_DT,
-			USE_YN,
-			TO_CHAR(CREAT_DTTM, 'yyyy-MM-dd') CREAT_DTTM,
-			TO_CHAR(UDT_DTTM, 'yyyy-MM-dd') UDT_DTTM,
-			MNG_CO_CD,
-			FN_CM05M01_CD_TO_NM(MNG_CO_CD) MNG_CO_CD_NM,
-			PASS_ERR_CNT,
-			PWD_DTTM,
-			SALES_AREA,
-			FAX_NO,
-			OFF_TEL_NO,
-			VIEW_DEPT_ID,
+			U.EMAIL,
+			U.TEL_NO,
+			U.AUTH_INFO,
+			TO_CHAR(U.ENTER_DT, 'yyyy-MM-dd') ENTER_DT,
+			TO_CHAR(U.LEAVE_DT, 'yyyy-MM-dd') LEAVE_DT,
+			U.USE_YN,
+			TO_CHAR(U.CREAT_DTTM, 'yyyy-MM-dd') CREAT_DTTM,
+			TO_CHAR(U.UDT_DTTM, 'yyyy-MM-dd') UDT_DTTM,
+			U.MNG_CO_CD,
+			FN_CM05M01_CD_TO_NM(U.MNG_CO_CD) MNG_CO_CD_NM,
+			U.PASS_ERR_CNT,
+			U.PWD_DTTM,
+			U.SALES_AREA,
+			U.FAX_NO,
+			U.OFF_TEL_NO,
+			U.VIEW_DEPT_ID,
 			(SELECT DEPT_NM FROM TB_CM04M01 WHERE DEPT_ID = U.VIEW_DEPT_ID) VIEW_DEPT_ID_NM,
 			NVL((SELECT CODE_ETC FROM TB_CM05M01 WHERE CODE_ID = 'PASSYN'),'N') PASS_YN , --암호규칙사용여부
-		  <![CDATA[CASE WHEN (PWD_DTTM < ADD_MONTHS(SYSDATE, (-1 * NVL((SELECT CODE_ETC FROM TB_CM05M01 WHERE CODE_ID = 'PASSCHG'),9999)))) THEN 1 ELSE 0 END PASS_CHG,]]>  --암호변경주기(월)
+		  <![CDATA[CASE WHEN (U.PWD_DTTM < ADD_MONTHS(SYSDATE, (-1 * NVL((SELECT CODE_ETC FROM TB_CM05M01 WHERE CODE_ID = 'PASSCHG'),9999)))) THEN 1 ELSE 0 END PASS_CHG,]]>  --암호변경주기(월)
 		    NVL((SELECT CODE_ETC FROM TB_CM05M01 WHERE CODE_ID = 'PASSERRCNT'),10) PASS_CHK_CNT, --암호오류허용횟수
-			USER_GRADE,
-			FN_CM05M01_CD_TO_NM(USER_GRADE) USER_GRADE_NM,
-			CLNT_CD,
+			U.USER_GRADE,
+			FN_CM05M01_CD_TO_NM(U.USER_GRADE) USER_GRADE_NM,
+			U.CLNT_CD,
 			(SELECT CLNT_NM FROM TB_BM02M01 WHERE CLNT_CD = U.CLNT_CD) AS CLNT_NM,
-			VIEW_DEPT_ID,
+			U.VIEW_DEPT_ID,
 			(SELECT DEPT_NM FROM TB_CM04M01 WHERE DEPT_ID = U.VIEW_DEPT_ID) VIEW_DEPT_NM,
-			TEAM_MANAGER,
-			MNG_ID
+			U.TEAM_MANAGER,
+			U.MNG_ID,
+			NVL(D.ATT_TARGET_YN, 'Y') ATT_TARGET_YN,
+			D.LOA_CD,
+			D.HR_DEPT_ID,
+			(SELECT DEPT_NM FROM TB_CM04M01 WHERE DEPT_ID = D.HR_DEPT_ID) HR_DEPT_NM,
+			D.HR_CO_CD,
+			FN_CM05M01_CD_TO_NM(D.LOA_CD) LOA_CD_NM
 		FROM
 			TB_CM06M01 U
+			LEFT OUTER JOIN TB_CM06D01 D ON U.ID = D.ID
 		WHERE
-			ID = #{userId}
+			U.ID = #{userId}
 	</select>
 	
 	<select id="selectUserTree" resultType="CamelMap">
@@ -443,9 +450,49 @@
 			, SYSDATE
 			, #{pgmId}
 			, #{message, jdbcType=VARCHAR}
-		)    
+		)
 	</update>
-	
+
+	<update id="mergeUserHrCriteria">
+		MERGE INTO TB_CM06D01
+			USING DUAL
+			ON (
+				ID = #{userId, jdbcType=VARCHAR}
+				)
+		WHEN MATCHED THEN
+			UPDATE SET
+				ATT_TARGET_YN = #{attTargetYn, jdbcType=VARCHAR},
+				LOA_CD = #{loaCd, jdbcType=VARCHAR},
+				HR_DEPT_ID = #{hrDeptId, jdbcType=VARCHAR},
+				HR_CO_CD = #{hrCoCd, jdbcType=VARCHAR},
+				UDT_DTTM = SYSDATE,
+				UDT_ID = #{userId, jdbcType=VARCHAR},
+				UDT_PGM = 'CM06'
+		WHEN NOT MATCHED THEN
+		INSERT
+		(
+			ID,
+			ATT_TARGET_YN,
+			LOA_CD,
+			HR_DEPT_ID,
+			HR_CO_CD,
+			CREAT_ID,
+			CREAT_DTTM,
+			CREAT_PGM
+		)
+		VALUES
+		(
+			#{userId, jdbcType=VARCHAR},
+			#{attTargetYn, jdbcType=VARCHAR},
+			#{loaCd, jdbcType=VARCHAR},
+			#{hrDeptId, jdbcType=VARCHAR},
+			#{hrCoCd, jdbcType=VARCHAR},
+			#{userId, jdbcType=VARCHAR},
+			SYSDATE,
+			'CM06'
+		)
+	</update>
+
 	<select id="selectEmployeeStatusList" resultType="CamelMap">
 		SELECT
 			A.ID AS ID,

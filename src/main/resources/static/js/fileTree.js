@@ -859,35 +859,80 @@ var approvalWorkingGrid; //팝업화면에서 결재정보 저장용
 				return;
 			}
 		} else if( row.todoDiv1CodeNm == "결재" ) {
-			var paramObj = {
-					"coCd":row.coCd
-					, "salesCd":row.salesCd
-					, "issNo":row.todoNo
-					, "todoDiv1CodeId":row.todoDiv1CodeId
-					, "todoDiv1CodeNm":row.todoDiv1CodeNm
-					, "todoDiv2CodeId":row.todoDiv2CodeId
-					, "todoDiv2CodeNm":row.todoDiv2CodeNm
-					, "todoFileTrgtKey":row.todoFileTrgtKey
-					, "todoTitl":row.todoTitl
-					, "sanctnSn":row.sanctnSn
-					, "pgmId": "WB2001M01"
-					, "userId": jwt.userId
-					, "histNo" : row.etcField2
+			// AM 전자결재 연동 문서(PM51, PM07, PM08 등)의 DOC_ID 우선 조회
+			var amDocId = "";
+			var amSearchParam = {
+				erpBizKey: row.todoNo,
+				todoKey: row.todoKey,
+				todoDiv2CodeId: row.todoDiv2CodeId,
+				coCd: row.coCd || jwt.coCd || "GUN",
+				userId: jwt.userId
 			};
-			if (row.todoDiv2CodeId === "TODODIV2020") {
-				paramObj.sameTimeResultChk = sameTimeResultChk;
+			try {
+				postAjaxSync("/user/am/am12/selectDocIdByBizKey", amSearchParam, null, function(res) {
+					if (res && res.resultCode === "200" && res.docId) {
+						amDocId = res.docId;
+					}
+				});
+			} catch (e) {
+				console.warn("AM 전자결재 docId 조회 예외:", e);
 			}
-			openThirdModal("/static/html/user/wb/wb20/WB2001P01.html", 730, 300, "", paramObj, function(data){
-			// openFourthModal("/static/html/user/wb/wb20/WB2001P01.html", 730, 300, "", paramObj, function(data){
-				if (data == "승인완료") {
-					$('.callApprovalWorking').last().remove();		//마지막 callApprovalWorking class에서 버튼 제거
+
+			if (amDocId) {
+				// AM 전자결재 결재 모달(AM1201P01.html) 오픈 (기존 WB2001P01과 동일한 thirdModal 레이어 사용)
+				var amParamObj = {
+					docId: amDocId,
+					coCd: row.coCd || jwt.coCd || "GUN",
+					userId: jwt.userId,
+					userNm: jwt.userNm,
+					todoKey: row.todoKey,
+					todoNo: row.todoNo,
+					todoDiv2CodeId: row.todoDiv2CodeId
+				};
+
+				openThirdModal("/static/html/user/am/am12/AM1201P01.html", 980, 840, "전자결재 문서 상세", amParamObj, function(data) {
+					$('.callApprovalWorking').last().remove();
 					if (typeof gridView !== 'undefined') {
-						gridView.initView().setData(0);
+						if (typeof gridView.initView === 'function') {
+							gridView.initView().setData(0);
+						} else if (typeof gridView.setData === 'function') {
+							gridView.setData(0);
+						}
 					}
 					modalStack.close();
-					if ($('#areaApproval').length && jwt.userId == 'EMJ8105') updateApprovalHold();
+				});
+			} else {
+				// 기존 레거시 결재 모달(WB2001P01.html) 호출 (하위 호환 유지)
+				var paramObj = {
+						"coCd":row.coCd
+						, "salesCd":row.salesCd
+						, "issNo":row.todoNo
+						, "todoDiv1CodeId":row.todoDiv1CodeId
+						, "todoDiv1CodeNm":row.todoDiv1CodeNm
+						, "todoDiv2CodeId":row.todoDiv2CodeId
+						, "todoDiv2CodeNm":row.todoDiv2CodeNm
+						, "todoFileTrgtKey":row.todoFileTrgtKey
+						, "todoTitl":row.todoTitl
+						, "sanctnSn":row.sanctnSn
+						, "pgmId": "WB2001M01"
+						, "userId": jwt.userId
+						, "histNo" : row.etcField2
+				};
+				if (row.todoDiv2CodeId === "TODODIV2020") {
+					paramObj.sameTimeResultChk = sameTimeResultChk;
 				}
-			});
+				openThirdModal("/static/html/user/wb/wb20/WB2001P01.html", 730, 300, "", paramObj, function(data){
+				// openFourthModal("/static/html/user/wb/wb20/WB2001P01.html", 730, 300, "", paramObj, function(data){
+					if (data == "승인완료") {
+						$('.callApprovalWorking').last().remove();		//마지막 callApprovalWorking class에서 버튼 제거
+						if (typeof gridView !== 'undefined') {
+							gridView.initView().setData(0);
+						}
+						modalStack.close();
+						if ($('#areaApproval').length && jwt.userId == 'EMJ8105') updateApprovalHold();
+					}
+				});
+			}
 		}
 	}
 

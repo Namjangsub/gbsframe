@@ -8,6 +8,7 @@
 		(
 			SELECT
 				CASE
+					WHEN SUM(CASE WHEN NVL(W.APPR_REJECT_YN, 'N') = 'Y' THEN 1 ELSE 0 END) > 0 THEN 'RTN'
 					WHEN COUNT(W.TODO_KEY) = 0 THEN NULL
 					WHEN COUNT(W.TODO_KEY) &gt; 0 AND COUNT(W.TODO_KEY) = SUM(CASE WHEN W.TODO_CF_DT IS NOT NULL AND W.SANCTN_STTUS != 'N' THEN 1 ELSE 0 END) THEN 'END'
 					WHEN SUM(CASE WHEN W.SANCTN_SN &gt; 1 AND W.TODO_CF_DT IS NOT NULL AND W.SANCTN_STTUS != 'N' THEN 1 ELSE 0 END) &gt; 0 THEN 'ING'
@@ -25,6 +26,7 @@
 		(
 			SELECT
 				CASE
+					WHEN SUM(CASE WHEN NVL(W.APPR_REJECT_YN, 'N') = 'Y' THEN 1 ELSE 0 END) > 0 THEN 'RTN'
 					WHEN COUNT(W.TODO_KEY) = 0 THEN NULL
 					WHEN COUNT(W.TODO_KEY) &gt; 0 AND COUNT(W.TODO_KEY) = SUM(CASE WHEN W.TODO_CF_DT IS NOT NULL AND W.SANCTN_STTUS != 'N' THEN 1 ELSE 0 END) THEN 'END'
 					WHEN SUM(CASE WHEN W.SANCTN_SN &gt; 1 AND W.TODO_CF_DT IS NOT NULL AND W.SANCTN_STTUS != 'N' THEN 1 ELSE 0 END) &gt; 0 THEN 'ING'
@@ -398,12 +400,12 @@
 				TO_CHAR(U.LEAVE_DT, 'YYYYMMDD') AS LEAVE_DT,
 				U.USE_YN
 			FROM TB_CM06M01 U
-			LEFT JOIN TB_CM04M01 D ON D.DEPT_ID = SUBSTR(NVL(U.VIEW_DEPT_ID, U.DEPT_ID), 1, 5)
+			<include refid="hrCriteria.targetJoin"><property name="u" value="U"/></include>
+			LEFT JOIN TB_CM04M01 D ON D.DEPT_ID = SUBSTR(NVL(HRD.HR_DEPT_ID, NVL(U.VIEW_DEPT_ID, U.DEPT_ID)), 1, 5)
 			LEFT JOIN TB_CM07M01 L ON L.LEVEL_CD = U.LEVEL_CD
 			WHERE 1=1
-			  AND (NVL(U.VIEW_DEPT_ID, U.DEPT_ID) IS NULL OR (NVL(U.VIEW_DEPT_ID, U.DEPT_ID) NOT LIKE 'GUN95%' AND NVL(U.VIEW_DEPT_ID, U.DEPT_ID) NOT LIKE 'GUN00%'))
-			  AND (D.DEPT_NM IS NULL OR D.DEPT_NM NOT LIKE '%임원실%')
-			  AND (U.SALES_AREA IS NULL OR U.SALES_AREA != 'SALESAREA00')
+			  <include refid="hrCriteria.targetWhere"/>
+			  <include refid="hrCriteria.coWhere"><property name="u" value="U"/></include>
 			<if test="useYn_S != null and !useYn_S.equals('')">
 			  <choose>
 			    <when test="useYn_S.equals('Y')">
@@ -787,5 +789,35 @@
 		  AND FILE_TRGT_KEY = #{fileTrgtKey}
 		ORDER BY FILE_KEY ASC
 	</select>
+
+	<!-- 휴일대체근무 전자결재 연동: DOC_ID 조회 -->
+	<select id="selectAmDocIdByReqNo" parameterType="Map" resultType="String">
+		SELECT DOC_ID
+		FROM (
+			SELECT DOC_ID
+			FROM TB_AM11M01
+			WHERE ERP_BIZ_KEY = #{reqNo}
+				AND ERP_BIZ_TYPE = 'PM08'
+				<if test="todoDiv2CodeId != null and todoDiv2CodeId != ''">
+				AND DOC_ID IN (
+					SELECT DOC_ID
+					FROM TB_AM11D01
+					WHERE WB20_DIV2_CODE_ID = #{todoDiv2CodeId}
+				)
+				</if>
+			ORDER BY TO_NUMBER(DOC_ID) DESC
+		)
+		WHERE ROWNUM = 1
+	</select>
+
+	<!-- 휴일대체근무 전자결재 삭제: 결재선 삭제 -->
+	<delete id="deleteAmD01ByDocId" parameterType="Map">
+		DELETE FROM TB_AM11D01 WHERE DOC_ID = #{docId}
+	</delete>
+
+	<!-- 휴일대체근무 전자결재 삭제: 마스터 삭제 -->
+	<delete id="deleteAmM01ByDocId" parameterType="Map">
+		DELETE FROM TB_AM11M01 WHERE DOC_ID = #{docId}
+	</delete>
 
 </mapper>

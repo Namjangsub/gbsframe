@@ -187,7 +187,7 @@ public class WB20SvcImpl implements WB20Svc {
 		validatePm51SalesApproval(paramMap);
 		validatePm51SequentialApproval(paramMap);
 		result += wb20Mapper.updateApprovalLine(paramMap);
-		
+
 		// 출장신청 관리부서 회계 승인(TODODIV2191) 시 신청서 자동 지급완료 처리 연동
 		if ("TODODIV2191".equals(todoDiv2CodeId) && "Y".equals(paramMap.get("sanctnSttus"))) {
 			java.util.Map<String, String> payParam = new java.util.HashMap<>(paramMap);
@@ -610,18 +610,22 @@ public class WB20SvcImpl implements WB20Svc {
 	}
 
 	private void updatePm51AprvSts(Map<String, String> paramMap, String aprvStsCd) {
-		if (!hasText(paramMap.get("todoNo"))) {
+		if (paramMap == null || !hasText(paramMap.get("todoNo"))) {
 			return;
+		}
+		String operatorId = hasText(paramMap.get("todoId")) ? paramMap.get("todoId") : paramMap.get("userId");
+		if (!hasText(operatorId)) {
+			throw new RuntimeException("결재 처리자 ID(todoId/userId)가 누락되어 출장신청서 결재상태를 갱신할 수 없습니다.");
 		}
 		Map<String, String> tripParam = new HashMap<>();
 		tripParam.put("tripReqNo", paramMap.get("todoNo"));
 		tripParam.put("aprvStsCd", aprvStsCd);
-		tripParam.put("todoId", paramMap.get("todoId"));
+		tripParam.put("todoId", operatorId);
 		pm51Mapper.updateTripReqAprvStsCd(tripParam);
 	}
 
 	private boolean isSalesDept(String deptId) {
-		return deptId != null && deptId.startsWith("GUN30");
+		return deptId != null && (deptId.startsWith("GUN30") || deptId.startsWith("TRN30"));
 	}
 
 	private boolean checked(String value) {
@@ -634,10 +638,10 @@ public class WB20SvcImpl implements WB20Svc {
 
 	@Override
 	public Map<String, String> insertApprovalMemoComment(Map<String, String> paramMap) {
-		
+
 		int result = 0;
 		result += wb20Mapper.insertApprovalMemoComment(paramMap);
-		
+
 		// 최종결재 완료시 알림톡 발송 대상인지 확인
 		Map<String, String> resultMap = wb20Mapper.selectMobileTodoSelect(paramMap);
 		resultMap.put("resultCount", Integer.toString(result));
@@ -769,7 +773,17 @@ public class WB20SvcImpl implements WB20Svc {
 		validatePm51SequentialCancel(paramMap);
 		int result = wb20Mapper.updateApprovalCancle(paramMap);
 
-		
+		// 기존 WB20 결재취소 결과를 동일 업무의 AM 전자결재 문서/결재선/이력에 반영
+		wb20Mapper.syncAmApprovalCancelNextLine(paramMap);
+		wb20Mapper.syncAmApprovalCancelLine(paramMap);
+		wb20Mapper.syncAmApprovalCancelHist(paramMap);
+		wb20Mapper.syncAmApprovalCancelDocument(paramMap);
+		// PM51 신청결재 완료를 취소하면 업무 상태도 진행중으로 복구한다.
+		if ("TODODIV2190".equals(paramMap.get("todoDiv2CodeId"))) {
+			updatePm51AprvSts(paramMap, "APRVSTS02");
+		}
+
+
 		/***************************************************************************************
 		 * 결재 취소 처리시 팀장인경우에만 투입공수 Clear 처리 가능함 -- 처리시작
 		 ***************************************************************************************/
@@ -779,7 +793,7 @@ public class WB20SvcImpl implements WB20Svc {
 		boolean isManagerDept = deptId != null && (deptId.startsWith("GUN30")|| deptId.startsWith("GUN40")|| deptId.startsWith("TRN50")|| deptId.startsWith("GUN60"));
 		// deptId 로 팀장 id 가져오기~~
 		Map<String, String> detailMap = wb24Mapper.selectDept2TeamManagerInfo(paramMap);
-		
+
 		if (detailMap != null && detailMap.get("id").equals(paramMap.get("userId")) && isManagerDept) {
 			if ("TODODIV2030".equals(paramMap.get("todoDiv2CodeId"))) {	// 발주요청서 따로 결과등록
 				if ("GUN30".equals(paramMap.get("deptId")) ||
@@ -931,9 +945,9 @@ public class WB20SvcImpl implements WB20Svc {
 		int result = 0;
 		String pgParam =
 			createPgParam(
-					"T", 
-					paramMap.get("todoFileTrgtKey"), 
-					paramMap.get("coCd"), 
+					"T",
+					paramMap.get("todoFileTrgtKey"),
+					paramMap.get("coCd"),
 					paramMap.get("salesCd").substring(0, 5),
 					paramMap.get("salesCd")
 			);
@@ -970,13 +984,37 @@ public class WB20SvcImpl implements WB20Svc {
 	}
 
 	private String createPgParam(String actionType, String fileTrgtKey, String coCd, String ordrsNo, String salesCd) {
-        return String.format("{\"actionType\":\"%s\",\"fileTrgtKey\":\"%s\",\"coCd\":\"%s\",\"ordrsNo\":\"%s\",\"salesCd\":\"%s\"}", 
+        return String.format("{\"actionType\":\"%s\",\"fileTrgtKey\":\"%s\",\"coCd\":\"%s\",\"ordrsNo\":\"%s\",\"salesCd\":\"%s\"}",
                              actionType, fileTrgtKey, coCd, ordrsNo, salesCd);
     }
 
 	@Override
 	public List<Map<String, String>> selectToDoMindMap(Map<String, String> paramMap) {
 		return wb20Mapper.selectToDoMindMap(paramMap);
+	}
+
+	@Override
+	@Transactional(rollbackFor = Exception.class)
+	public Map<String, String> rejectApprovalLine(Map<String, String> paramMap) {
+		Map<String, String> result = new HashMap<>();
+		int count = wb20Mapper.rejectApprovalLine(paramMap);
+		result.put("resultCount", String.valueOf(count));
+		result.put("RESULT_COUNT", String.valueOf(count));
+		return result;
+	}
+
+	@Override
+	@Transactional(rollbackFor = Exception.class)
+	public int resetRejectedApprovalLines(Map<String, String> paramMap) {
+		return wb20Mapper.resetRejectedApprovalLines(paramMap);
+	}
+
+	@Override
+	@Transactional(rollbackFor = Exception.class)
+	public void syncApprovalLinesFromAm(Map<String, Object> paramMap) {
+		if (paramMap == null || paramMap.get("todoNo") == null) {
+			return;
+		}
 	}
 
 }

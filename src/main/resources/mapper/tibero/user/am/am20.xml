@@ -1,0 +1,412 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.dksys.biz.user.am.am20.mapper.AM20Mapper">
+
+    <!-- 공통 검색 조건 -->
+    <sql id="approvalSearchCondition">
+        <if test="coCd != null and !coCd.equals('')">
+            AND M.CO_CD = #{coCd, jdbcType=VARCHAR}
+        </if>
+        <if test="formCd != null and !formCd.equals('')">
+            AND M.FORM_CD = #{formCd}
+        </if>
+        <if test="docNo != null and !docNo.equals('')">
+            AND M.DOC_NO LIKE '%' || #{docNo} || '%'
+        </if>
+        <if test="docTitle != null and !docTitle.equals('')">
+            AND M.DOC_TITLE LIKE '%' || #{docTitle} || '%'
+        </if>
+        <if test="draUserNm != null and !draUserNm.equals('')">
+            AND M.DRA_USER_NM LIKE '%' || #{draUserNm} || '%'
+        </if>
+        <if test="draDeptNm != null and !draDeptNm.equals('')">
+            AND M.DRA_DEPT_NM LIKE '%' || #{draDeptNm} || '%'
+        </if>
+        <if test="fromDt != null and !fromDt.equals('')">
+            AND M.DRAFT_DT <![CDATA[ >= ]]> TO_DATE(#{fromDt}, 'YYYY-MM-DD')
+        </if>
+        <if test="toDt != null and !toDt.equals('')">
+            AND M.DRAFT_DT <![CDATA[ < ]]> TO_DATE(#{toDt}, 'YYYY-MM-DD') + 1
+        </if>
+    </sql>
+
+    <!-- 1. 결재 대기함 (Inbox) - 내가 지금 결재해야 할 차례인 문서 -->
+    <select id="selectInboxCount" parameterType="Map" resultType="int">
+        SELECT COUNT(*)
+          FROM TB_AM11M01 M
+         WHERE M.DOC_STATUS IN ('REQUEST', 'PROGRESS')
+           AND (
+                M.CURR_APPROVER_ID = #{userId}
+                OR EXISTS (
+                    SELECT 1 FROM TB_AM11D01 P
+                     WHERE P.DOC_ID = M.DOC_ID
+                       AND P.LINE_STATUS = 'PENDING'
+                       AND P.APPROVER_ID = #{userId}
+                )
+                OR EXISTS (
+                    SELECT 1
+                      FROM TB_AM03M02 G
+                     WHERE G.ORIGIN_USER_ID = M.CURR_APPROVER_ID
+                       AND G.DELEGATE_USER_ID = #{userId}
+                       AND G.USE_YN = 'Y'
+                       AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN G.START_DT AND G.END_DT
+                )
+           )
+           <include refid="approvalSearchCondition"/>
+    </select>
+
+    <select id="selectInboxList" parameterType="Map" resultType="CamelMap">
+        SELECT *
+          FROM (
+                SELECT ROWNUM AS RN, A.*
+                  FROM (
+                        SELECT M.DOC_ID,
+                               M.DOC_NO,
+                               M.CO_CD,
+                               FN_CM05M01_CD_TO_NM(M.CO_CD) AS CO_NM,
+                               M.FORM_CD,
+                               NVL(F.FORM_NM, CASE WHEN M.FORM_CD = 'PM0701' THEN '휴가신청서' WHEN M.FORM_CD = 'PM5101' THEN '출장신청서' WHEN M.FORM_CD = 'PM5102' THEN '출장복명서' WHEN M.FORM_CD = 'PM0801' THEN '휴일대체근무신청서' ELSE M.FORM_CD END) AS FORM_NM,
+                               M.DOC_TITLE,
+                               M.DOC_STATUS,
+                               FN_CM05M01_CD_TO_NM(M.DOC_STATUS) AS DOC_STATUS_NM,
+                               M.DRA_USER_ID,
+                               M.DRA_USER_NM,
+                               M.DRA_DEPT_NM,
+                               M.DRA_LEVEL_NM,
+                               TO_CHAR(M.DRAFT_DT, 'YYYY-MM-DD HH24:MI') AS DRAFT_DT,
+                               M.CURR_LINE_SEQ,
+                               M.CURR_APPROVER_ID,
+                               M.CURR_APPROVER_NM,
+                               (SELECT LINE_TYPE FROM TB_AM11D01 WHERE DOC_ID = M.DOC_ID AND LINE_SEQ = M.CURR_LINE_SEQ) AS MY_LINE_TYPE,
+                               CASE WHEN M.CURR_APPROVER_ID != #{userId} THEN 'Y' ELSE 'N' END AS IS_DELEGATED
+                          FROM TB_AM11M01 M
+                               LEFT OUTER JOIN TB_AM02M01 F ON M.FORM_CD = F.FORM_CD
+                         WHERE M.DOC_STATUS IN ('REQUEST', 'PROGRESS')
+                           AND (
+                                M.CURR_APPROVER_ID = #{userId}
+                                OR EXISTS (
+                                    SELECT 1 FROM TB_AM11D01 P
+                                     WHERE P.DOC_ID = M.DOC_ID
+                                       AND P.LINE_STATUS = 'PENDING'
+                                       AND P.APPROVER_ID = #{userId}
+                                )
+                                OR EXISTS (
+                                    SELECT 1
+                                      FROM TB_AM03M02 G
+                                     WHERE G.ORIGIN_USER_ID = M.CURR_APPROVER_ID
+                                       AND G.DELEGATE_USER_ID = #{userId}
+                                       AND G.USE_YN = 'Y'
+                                       AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN G.START_DT AND G.END_DT
+                                )
+                           )
+                           <include refid="approvalSearchCondition"/>
+                         ORDER BY M.DRAFT_DT ASC, M.DOC_ID ASC
+                  ) A
+                 WHERE ROWNUM <![CDATA[ <= ]]> #{lastIndex}
+          )
+         WHERE RN <![CDATA[ >= ]]> #{firstIndex}
+    </select>
+
+    <!-- 2. 진행 문서함 (Progress) - 기안자 또는 결재선에 포함되어 있으며 현재 진행 중인 문서 -->
+    <select id="selectProgressCount" parameterType="Map" resultType="int">
+        SELECT COUNT(*)
+          FROM TB_AM11M01 M
+         WHERE M.DOC_STATUS IN ('REQUEST', 'PROGRESS')
+           AND (
+                M.DRA_USER_ID = #{userId}
+                OR EXISTS (
+                    SELECT 1
+                      FROM TB_AM11D01 D
+                     WHERE D.DOC_ID = M.DOC_ID
+                       AND D.APPROVER_ID = #{userId}
+                )
+           )
+           <include refid="approvalSearchCondition"/>
+    </select>
+
+    <select id="selectProgressList" parameterType="Map" resultType="CamelMap">
+        SELECT *
+          FROM (
+                SELECT ROWNUM AS RN, A.*
+                  FROM (
+                        SELECT M.DOC_ID,
+                               M.DOC_NO,
+                               M.CO_CD,
+                               FN_CM05M01_CD_TO_NM(M.CO_CD) AS CO_NM,
+                               M.FORM_CD,
+                               NVL(F.FORM_NM, CASE WHEN M.FORM_CD = 'PM0701' THEN '휴가신청서' WHEN M.FORM_CD = 'PM5101' THEN '출장신청서' WHEN M.FORM_CD = 'PM5102' THEN '출장복명서' WHEN M.FORM_CD = 'PM0801' THEN '휴일대체근무신청서' ELSE M.FORM_CD END) AS FORM_NM,
+                               M.DOC_TITLE,
+                               M.DOC_STATUS,
+                               FN_CM05M01_CD_TO_NM(M.DOC_STATUS) AS DOC_STATUS_NM,
+                               M.DRA_USER_ID,
+                               M.DRA_USER_NM,
+                               M.DRA_DEPT_NM,
+                               M.DRA_LEVEL_NM,
+                               TO_CHAR(M.DRAFT_DT, 'YYYY-MM-DD HH24:MI') AS DRAFT_DT,
+                               M.CURR_LINE_SEQ,
+                               M.CURR_APPROVER_ID,
+                               M.CURR_APPROVER_NM
+                          FROM TB_AM11M01 M
+                               LEFT OUTER JOIN TB_AM02M01 F ON M.FORM_CD = F.FORM_CD
+                         WHERE M.DOC_STATUS IN ('REQUEST', 'PROGRESS')
+                           AND (
+                                M.DRA_USER_ID = #{userId}
+                                OR EXISTS (
+                                    SELECT 1
+                                      FROM TB_AM11D01 D
+                                     WHERE D.DOC_ID = M.DOC_ID
+                                       AND D.APPROVER_ID = #{userId}
+                                )
+                           )
+                           <include refid="approvalSearchCondition"/>
+                         ORDER BY M.DRAFT_DT DESC, M.DOC_ID DESC
+                  ) A
+                 WHERE ROWNUM <![CDATA[ <= ]]> #{lastIndex}
+          )
+         WHERE RN <![CDATA[ >= ]]> #{firstIndex}
+    </select>
+
+    <!-- 3. 상신 문서함 (Drafted) - 내가 기안한 문서 전체 (진행/완료/반려 포함) -->
+    <select id="selectDraftedCount" parameterType="Map" resultType="int">
+        SELECT COUNT(*)
+          FROM TB_AM11M01 M
+         WHERE M.DRA_USER_ID = #{userId}
+           AND M.DOC_STATUS != 'DRAFT'
+           <include refid="approvalSearchCondition"/>
+    </select>
+
+    <select id="selectDraftedList" parameterType="Map" resultType="CamelMap">
+        SELECT *
+          FROM (
+                SELECT ROWNUM AS RN, A.*
+                  FROM (
+                        SELECT M.DOC_ID,
+                               M.DOC_NO,
+                               M.CO_CD,
+                               FN_CM05M01_CD_TO_NM(M.CO_CD) AS CO_NM,
+                               M.FORM_CD,
+                               NVL(F.FORM_NM, CASE WHEN M.FORM_CD = 'PM0701' THEN '휴가신청서' WHEN M.FORM_CD = 'PM5101' THEN '출장신청서' WHEN M.FORM_CD = 'PM5102' THEN '출장복명서' WHEN M.FORM_CD = 'PM0801' THEN '휴일대체근무신청서' ELSE M.FORM_CD END) AS FORM_NM,
+                               M.DOC_TITLE,
+                               M.DOC_STATUS,
+                               FN_CM05M01_CD_TO_NM(M.DOC_STATUS) AS DOC_STATUS_NM,
+                               M.DRA_USER_ID,
+                               M.DRA_USER_NM,
+                               M.DRA_DEPT_NM,
+                               TO_CHAR(M.DRAFT_DT, 'YYYY-MM-DD HH24:MI') AS DRAFT_DT,
+                               TO_CHAR(M.COMPLETE_DT, 'YYYY-MM-DD HH24:MI') AS COMPLETE_DT,
+                               M.CURR_APPROVER_NM
+                          FROM TB_AM11M01 M
+                               LEFT OUTER JOIN TB_AM02M01 F ON M.FORM_CD = F.FORM_CD
+                         WHERE M.DRA_USER_ID = #{userId}
+                           AND M.DOC_STATUS != 'DRAFT'
+                           <include refid="approvalSearchCondition"/>
+                         ORDER BY M.DRAFT_DT DESC, M.DOC_ID DESC
+                  ) A
+                 WHERE ROWNUM <![CDATA[ <= ]]> #{lastIndex}
+          )
+         WHERE RN <![CDATA[ >= ]]> #{firstIndex}
+    </select>
+
+    <!-- 4. 완료 문서함 (Completed) - 최종 승인 완료된 문서 -->
+    <select id="selectCompletedCount" parameterType="Map" resultType="int">
+        SELECT COUNT(*)
+          FROM TB_AM11M01 M
+         WHERE M.DOC_STATUS = 'COMPLETED'
+           AND (
+                M.DRA_USER_ID = #{userId}
+                OR EXISTS (
+                    SELECT 1
+                      FROM TB_AM11D01 D
+                     WHERE D.DOC_ID = M.DOC_ID
+                       AND D.APPROVER_ID = #{userId}
+                )
+           )
+           <include refid="approvalSearchCondition"/>
+    </select>
+
+    <select id="selectCompletedList" parameterType="Map" resultType="CamelMap">
+        SELECT *
+          FROM (
+                SELECT ROWNUM AS RN, A.*
+                  FROM (
+                        SELECT M.DOC_ID,
+                               M.DOC_NO,
+                               M.CO_CD,
+                               FN_CM05M01_CD_TO_NM(M.CO_CD) AS CO_NM,
+                               M.FORM_CD,
+                               NVL(F.FORM_NM, CASE WHEN M.FORM_CD = 'PM0701' THEN '휴가신청서' WHEN M.FORM_CD = 'PM5101' THEN '출장신청서' WHEN M.FORM_CD = 'PM5102' THEN '출장복명서' WHEN M.FORM_CD = 'PM0801' THEN '휴일대체근무신청서' ELSE M.FORM_CD END) AS FORM_NM,
+                               M.DOC_TITLE,
+                               M.DOC_STATUS,
+                               FN_CM05M01_CD_TO_NM(M.DOC_STATUS) AS DOC_STATUS_NM,
+                               M.DRA_USER_ID,
+                               M.DRA_USER_NM,
+                               M.DRA_DEPT_NM,
+                               TO_CHAR(M.DRAFT_DT, 'YYYY-MM-DD HH24:MI') AS DRAFT_DT,
+                               TO_CHAR(M.COMPLETE_DT, 'YYYY-MM-DD HH24:MI') AS COMPLETE_DT
+                          FROM TB_AM11M01 M
+                               LEFT OUTER JOIN TB_AM02M01 F ON M.FORM_CD = F.FORM_CD
+                         WHERE M.DOC_STATUS = 'COMPLETED'
+                           AND (
+                                M.DRA_USER_ID = #{userId}
+                                OR EXISTS (
+                                    SELECT 1
+                                      FROM TB_AM11D01 D
+                                     WHERE D.DOC_ID = M.DOC_ID
+                                       AND D.APPROVER_ID = #{userId}
+                                )
+                           )
+                           <include refid="approvalSearchCondition"/>
+                         ORDER BY M.COMPLETE_DT DESC, M.DOC_ID DESC
+                  ) A
+                 WHERE ROWNUM <![CDATA[ <= ]]> #{lastIndex}
+          )
+         WHERE RN <![CDATA[ >= ]]> #{firstIndex}
+    </select>
+
+    <!-- 5. 반려 문서함 (Rejected) -->
+    <select id="selectRejectedCount" parameterType="Map" resultType="int">
+        SELECT COUNT(*)
+          FROM TB_AM11M01 M
+         WHERE M.DOC_STATUS = 'REJECTED'
+           AND (
+                M.DRA_USER_ID = #{userId}
+                OR EXISTS (
+                    SELECT 1
+                      FROM TB_AM11D01 D
+                     WHERE D.DOC_ID = M.DOC_ID
+                       AND D.APPROVER_ID = #{userId}
+                )
+           )
+           <include refid="approvalSearchCondition"/>
+    </select>
+
+    <select id="selectRejectedList" parameterType="Map" resultType="CamelMap">
+        SELECT *
+          FROM (
+                SELECT ROWNUM AS RN, A.*
+                  FROM (
+                        SELECT M.DOC_ID,
+                               M.DOC_NO,
+                               M.CO_CD,
+                               FN_CM05M01_CD_TO_NM(M.CO_CD) AS CO_NM,
+                               M.FORM_CD,
+                               NVL(F.FORM_NM, CASE WHEN M.FORM_CD = 'PM0701' THEN '휴가신청서' WHEN M.FORM_CD = 'PM5101' THEN '출장신청서' WHEN M.FORM_CD = 'PM5102' THEN '출장복명서' WHEN M.FORM_CD = 'PM0801' THEN '휴일대체근무신청서' ELSE M.FORM_CD END) AS FORM_NM,
+                               M.DOC_TITLE,
+                               M.DOC_STATUS,
+                               FN_CM05M01_CD_TO_NM(M.DOC_STATUS) AS DOC_STATUS_NM,
+                               M.DRA_USER_ID,
+                               M.DRA_USER_NM,
+                               M.DRA_DEPT_NM,
+                               TO_CHAR(M.DRAFT_DT, 'YYYY-MM-DD HH24:MI') AS DRAFT_DT,
+                               TO_CHAR(M.COMPLETE_DT, 'YYYY-MM-DD HH24:MI') AS COMPLETE_DT
+                          FROM TB_AM11M01 M
+                               LEFT OUTER JOIN TB_AM02M01 F ON M.FORM_CD = F.FORM_CD
+                         WHERE M.DOC_STATUS = 'REJECTED'
+                           AND (
+                                M.DRA_USER_ID = #{userId}
+                                OR EXISTS (
+                                    SELECT 1
+                                      FROM TB_AM11D01 D
+                                     WHERE D.DOC_ID = M.DOC_ID
+                                       AND D.APPROVER_ID = #{userId}
+                                )
+                           )
+                           <include refid="approvalSearchCondition"/>
+                         ORDER BY M.COMPLETE_DT DESC, M.DOC_ID DESC
+                  ) A
+                 WHERE ROWNUM <![CDATA[ <= ]]> #{lastIndex}
+          )
+         WHERE RN <![CDATA[ >= ]]> #{firstIndex}
+    </select>
+
+    <!-- 6. 참조 문서함 (Referenced) -->
+    <select id="selectReferencedCount" parameterType="Map" resultType="int">
+        SELECT COUNT(*)
+          FROM TB_AM11M01 M
+         WHERE EXISTS (
+                SELECT 1
+                  FROM TB_AM11D01 D
+                 WHERE D.DOC_ID = M.DOC_ID
+                   AND D.APPROVER_ID = #{userId}
+                   AND D.LINE_TYPE = 'REF'
+         )
+         <include refid="approvalSearchCondition"/>
+    </select>
+
+    <select id="selectReferencedList" parameterType="Map" resultType="CamelMap">
+        SELECT *
+          FROM (
+                SELECT ROWNUM AS RN, A.*
+                  FROM (
+                        SELECT M.DOC_ID,
+                               M.DOC_NO,
+                               M.CO_CD,
+                               FN_CM05M01_CD_TO_NM(M.CO_CD) AS CO_NM,
+                               M.FORM_CD,
+                               NVL(F.FORM_NM, CASE WHEN M.FORM_CD = 'PM0701' THEN '휴가신청서' WHEN M.FORM_CD = 'PM5101' THEN '출장신청서' WHEN M.FORM_CD = 'PM5102' THEN '출장복명서' WHEN M.FORM_CD = 'PM0801' THEN '휴일대체근무신청서' ELSE M.FORM_CD END) AS FORM_NM,
+                               M.DOC_TITLE,
+                               M.DOC_STATUS,
+                               FN_CM05M01_CD_TO_NM(M.DOC_STATUS) AS DOC_STATUS_NM,
+                               M.DRA_USER_ID,
+                               M.DRA_USER_NM,
+                               M.DRA_DEPT_NM,
+                               TO_CHAR(M.DRAFT_DT, 'YYYY-MM-DD HH24:MI') AS DRAFT_DT,
+                               M.CURR_APPROVER_NM
+                          FROM TB_AM11M01 M
+                               LEFT OUTER JOIN TB_AM02M01 F ON M.FORM_CD = F.FORM_CD
+                         WHERE EXISTS (
+                                SELECT 1
+                                  FROM TB_AM11D01 D
+                                 WHERE D.DOC_ID = M.DOC_ID
+                                   AND D.APPROVER_ID = #{userId}
+                                   AND D.LINE_TYPE = 'REF'
+                         )
+                         <include refid="approvalSearchCondition"/>
+                         ORDER BY M.DRAFT_DT DESC, M.DOC_ID DESC
+                  ) A
+                 WHERE ROWNUM <![CDATA[ <= ]]> #{lastIndex}
+          )
+         WHERE RN <![CDATA[ >= ]]> #{firstIndex}
+    </select>
+
+    <!-- 7. 임시저장함 (Temporary Draft) -->
+    <select id="selectTempCount" parameterType="Map" resultType="int">
+        SELECT COUNT(*)
+          FROM TB_AM11M01 M
+         WHERE M.DRA_USER_ID = #{userId}
+           AND M.DOC_STATUS = 'DRAFT'
+           <include refid="approvalSearchCondition"/>
+    </select>
+
+    <select id="selectTempList" parameterType="Map" resultType="CamelMap">
+        SELECT *
+          FROM (
+                SELECT ROWNUM AS RN, A.*
+                  FROM (
+                        SELECT M.DOC_ID,
+                               M.DOC_NO,
+                               M.CO_CD,
+                               FN_CM05M01_CD_TO_NM(M.CO_CD) AS CO_NM,
+                               M.FORM_CD,
+                               NVL(F.FORM_NM, CASE WHEN M.FORM_CD = 'PM0701' THEN '휴가신청서' WHEN M.FORM_CD = 'PM5101' THEN '출장신청서' WHEN M.FORM_CD = 'PM5102' THEN '출장복명서' WHEN M.FORM_CD = 'PM0801' THEN '휴일대체근무신청서' ELSE M.FORM_CD END) AS FORM_NM,
+                               M.DOC_TITLE,
+                               M.DOC_STATUS,
+                               FN_CM05M01_CD_TO_NM(M.DOC_STATUS) AS DOC_STATUS_NM,
+                               M.DRA_USER_ID,
+                               M.DRA_USER_NM,
+                               M.DRA_DEPT_NM,
+                               TO_CHAR(M.CREAT_DTTM, 'YYYY-MM-DD HH24:MI') AS CREAT_DTTM
+                          FROM TB_AM11M01 M
+                               LEFT OUTER JOIN TB_AM02M01 F ON M.FORM_CD = F.FORM_CD
+                         WHERE M.DRA_USER_ID = #{userId}
+                           AND M.DOC_STATUS = 'DRAFT'
+                           <include refid="approvalSearchCondition"/>
+                         ORDER BY M.CREAT_DTTM DESC, M.DOC_ID DESC
+                  ) A
+                 WHERE ROWNUM <![CDATA[ <= ]]> #{lastIndex}
+          )
+         WHERE RN <![CDATA[ >= ]]> #{firstIndex}
+    </select>
+
+</mapper>
