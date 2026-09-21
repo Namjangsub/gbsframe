@@ -41,7 +41,12 @@ public class CustomAuthenticationProvider implements AuthenticationProvider {
         if ((!passwordEncoder.matches(password, user.getPassword())) || ("N".equals(user.getUseYn()))) {
 //            throw new BadCredentialsException("비밀번호가 일치하지 않습니다.");
             throw new LoginFailureException("INVALID_CREDENTIALS", user);
-            
+
+        }
+
+        // 휴직구분(LOA_CD)이 재직(CM06LOA00)이 아니면 USE_YN='Y'이어도 로그인 차단
+        if (!"CM06LOA00".equals(user.getLoaCd() == null ? "CM06LOA00" : user.getLoaCd())) {
+            throw new LoginFailureException("LEAVE_OF_ABSENCE", user);
         }
 
         UsernamePasswordAuthenticationToken result = new UsernamePasswordAuthenticationToken(user, password, user.getAuthorities());

@@ -43,10 +43,12 @@ public class CustomLoginFailureHandler implements AuthenticationFailureHandler {
 
             if ("N".equals(user.getUseYn())) {
                 body.put("msg", "비활성화된 계정입니다 ...");
+            } else if ("LEAVE_OF_ABSENCE".equals(ex.getMessage())) {
+                body.put("msg", "휴직 상태의 계정입니다. 관리자에게 문의하세요.");
             } else {
                 body.put("msg", "비밀번호를 확인해주세요.");
                 Map<String,String> param = new HashMap<String,String>();
-                param.put("isPwErr","Y"); 
+                param.put("isPwErr","Y");
                 param.put("userId", user.getId());
                 Map<String, String> rawUsrInfo = cm06Svc.updatePwErrCnt(param);
                 Map<String, Object> usrInfo = new LinkedHashMap<String, Object>();
