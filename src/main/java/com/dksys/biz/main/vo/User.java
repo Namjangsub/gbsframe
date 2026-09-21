@@ -33,6 +33,7 @@ public class User implements UserDetails {
     private String enterDt;
     private String authInfo;
     private String useYn;
+    private String loaCd;
     private Date pwdDttm;
     private String passErrCnt;
     private String passYn;
