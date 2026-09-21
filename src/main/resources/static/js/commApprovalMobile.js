@@ -244,6 +244,10 @@ function Approval(htmlParam, param, popParam) {
 				postAjaxSync("/user/wb/wb20/selectGetApprovalList", this.param, null
 					, function(data){
 						var list = data.resultList;
+						// 자료 생성순서(결재 순번) 오름차순 정렬 → 위에서 아래로 순차 배열 (표시 순서만 변경, 조회 SQL은 백엔드 로직 공유로 미변경)
+						if (list && typeof list.sort === "function") {
+							list.sort(function(a, b) { return (Number(a.sanctnSn) || 0) - (Number(b.sanctnSn) || 0); });
+						}
 						var todoCfOpnHid = "";
 		 				if( data.resultList.length > 0 ) {
 

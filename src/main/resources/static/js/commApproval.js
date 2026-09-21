@@ -415,7 +415,7 @@ function Approval(htmlParam, param, popParam) {
 		        </h3>
 		        -->
 				<!--결재 테이블 -->
-		        <div clss="contents" id="applist" style="height: 100%; padding: 5px">
+		        <div clss="contents" id="applist" style="height: 100%; overflow-y: auto; padding: 5px">
 			    	<!-- 결재라인 table -->
 			    	<table id="appLine" style="border: 1px solid #dbdbdb; border-collapse: collapse" >
 			    		<colgroup>
@@ -424,6 +424,7 @@ function Approval(htmlParam, param, popParam) {
 			    			<col width="8%">
 			    			<col width="*%">
 			    			<col width="10%">
+			    			<col width="13%">
 			    			<col width="15%">
 			    		</colgroup>
 			    		<tr id="appH" stye="text-align:center; border-bottom:1px solid #dbdbdb; height:25px;">
@@ -432,6 +433,7 @@ function Approval(htmlParam, param, popParam) {
 			    			<th class="appTh">투입공수</th>
 			    			<th class="appTh">결재의견</th>
 			    			<th class="appTh">상태</th>
+			    			<th class="appTh">요청일자</th>
 			    			<th class="appTh">결재일자</th>
 			    		</tr>
 			    	</table>
@@ -468,6 +470,10 @@ function Approval(htmlParam, param, popParam) {
 			postAjaxSync("/user/wb/wb20/selectGetApprovalList", this.param, null
 				, function(data){
 					var list = data.resultList;
+					// 자료 생성순서(결재 순번) 오름차순 정렬 → 위에서 아래로 순차 배열 (표시 순서만 변경, 조회 SQL은 백엔드 로직 공유로 미변경)
+					if (list && typeof list.sort === "function") {
+						list.sort(function(a, b) { return (Number(a.sanctnSn) || 0) - (Number(b.sanctnSn) || 0); });
+					}
 					var todoCfOpnHid = "";
 	 				if( data.resultList.length > 0 ) {
 	 					var htmlTr = "";
@@ -571,7 +577,12 @@ function Approval(htmlParam, param, popParam) {
 							}
 
 							// ==============================================================================================
-							html = html.replace(/@@item5@@/gi, data.sanctnSttusNm);		//상태명
+							var __wbStsNm = data.sanctnSttusNm || '';
+							var __wbStsHtml = (__wbStsNm === '승인') ? '<span style="color:#2e6da4;font-weight:bold;">승인</span>'
+											: (__wbStsNm === '미승인') ? '<span style="color:#d9534f;font-weight:bold;">미승인</span>'
+											: __wbStsNm;
+							html = html.replace(/@@item5@@/gi, __wbStsHtml);		//상태명(색상)
+							html = html.replace(/@@item7@@/gi, data.reqDate || '');		//요청일자
 							html = html.replace(/@@item6@@/gi, data.todoCfDt);		//확인(결재)일자
 							htmlTr += html;
 						});
@@ -646,6 +657,7 @@ function Approval(htmlParam, param, popParam) {
     			<td class="appTd">@@item3@@</td>
     			<td class="appTd" style='text-align:left; padding-left:5px; height:25px;'><textarea type='text' name='todoCfOpn' class="form-control" readonly="readonly">@@item4@@</textarea></td>
     			<td class="appTd">@@item5@@</td>
+    			<td class="appTd">@@item7@@</td>
     			<td class="appTd">@@item6@@</td>
     		</tr>
 			`;
