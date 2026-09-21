@@ -2,7 +2,10 @@
 	========================================================================================
 	[PM0810M01.html] 대체휴가 현황 화면 (대체근무/대체휴가/월근무시간/작업일보 월별 집계)
 	----------------------------------------------------------------------------------------
-	구조: 직원별 4개 항목 행(대체근무일/대체휴가/월근무시간/작업일보) + 월별 컬럼 매트릭스
+	1. 직원별 동적 항목 행: 연차사용/대체근무일/대체휴가/월근무시간/작업일보 + 월별 컬럼 매트릭스
+	2. 사원 검색 시 백엔드(selectUserInfo) 5자리 부서코드/부서명 자동 연동
+	3. 사용개수/발생개수 및 일자 토큰 마우스 호버 시 실시간 신청서 이력 팝오버 툴팁 표출
+	4. 팝오버 내역 항목 클릭 시 해당 신청서(휴가/휴일대체근무) 상세 모달 오픈 및 확인 가능
 	========================================================================================
 -->
 <!DOCTYPE html>
@@ -119,6 +122,10 @@
 		.subst-vac-table .balance-col.highlight {
 			color: #d9534f;
 		}
+		/* 입사전월 및 퇴사일 이후 셀의 주황색 배경 스타일 (PM0711M01 계승) */
+		.grid-cell-pre-enter {
+			background-color: #fed7aa !important; /* 주황색 */
+		}
 		.subst-vac-table td.user-divider {
 			border-bottom: 2px solid #808080 !important;
 		}
@@ -138,38 +145,54 @@
 			color: #23527c;
 			background-color: #eef6fc;
 		}
-/* PM0711M01.html 메모 팝오버 디자인 톤앤매너 100% 계승 툴팁 레이어 */
+/* 마우스 호버 시 표시되는 근태 상세 팝오버 툴팁 레이어 (PM0702M01 100% 동일 톤앤매너) */
 .vacation-info-popover {
-	position: absolute;
+	position: fixed;
 	z-index: 999999;
 	display: none;
 	background: #ffffff;
-	border: 1px solid #337ab7;
-	border-radius: 5px;
-	box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+	border: 1px solid #3b62b1;
+	border-radius: 6px;
+	box-shadow: 0 4px 18px rgba(0, 0, 0, 0.22);
 	padding: 10px 14px;
 	min-width: 240px;
-	max-width: 360px;
+	max-width: 380px;
+	max-height: 420px;
+	overflow-y: auto;
 	font-size: 12px;
 	color: #333333;
 	pointer-events: auto;
 }
 .vacation-info-popover .popover-title {
 	font-weight: bold;
-	color: #337ab7;
+	color: #3b62b1;
 	border-bottom: 1px solid #e9ecef;
 	padding-bottom: 5px;
 	margin-bottom: 6px;
 	font-size: 12px;
 }
 .vacation-info-popover .popover-item {
-	padding: 4px 0;
+	padding: 3px 0;
 	line-height: 1.4;
 	color: #444444;
-	border-bottom: 1px dashed #f0f0f0;
 }
-.vacation-info-popover .popover-item:last-child {
-	border-bottom: none;
+.vacation-info-popover .popover-item.clickable {
+	cursor: pointer;
+	border-radius: 4px;
+	padding: 5px 8px;
+	margin: 2px 0;
+	transition: background-color 0.15s ease, color 0.15s ease;
+}
+.vacation-info-popover .popover-item.clickable:hover {
+	background-color: #ebf5fb;
+	color: #1e40af;
+}
+.vacation-info-popover .popover-item.clickable:hover .pop-link-icon {
+	color: #1e40af;
+}
+/* 호버 트리거 내부 아이콘/자식 엘리먼트 간 마우스 이벤트 핑퐁 방지 */
+.used-info-trigger *, .day-token * {
+	pointer-events: none !important;
 }
 	</style>
 </head>
@@ -217,7 +240,7 @@
 						<td>
 							<div class="search_form" style="width: 100%;">
 								<input type="hidden" id="userId_S" name="userId_S" data-search="userId">
-								<input type="text" id="userNm_S" name="userNm_S" data-search="userNm" placeholder="사원 검색" onkeyup="(event.keyCode == 8 || event.keyCode == 46) ? (userId_S.value = '', userNm_S.value = '') : event.keyCode == 13 ? searchSubstVacationStatus() : '';">
+								<input type="text" id="userNm_S" name="userNm_S" data-search="userNm" placeholder="사원 검색" onkeyup="(event.keyCode == 8 || event.keyCode == 46) ? (userId_S.value = '', userNm_S.value = '', deptCd_S.value = 'GUN40', deptNm_S.value = '기술연구소') : event.keyCode == 13 ? searchSubstVacationStatus() : '';">
 								<a onclick="openReqUserTree('S');"><i class="i_search_w"></i></a>
 							</div>
 						</td>
@@ -242,7 +265,7 @@
 							</label>
 						</td>
 					</tr>
-					<tr>
+					<tr style="display: none;">
 						<th>회사구분</th>
 						<td>
 							<select id="hrCoCd_S" name="hrCoCd_S" data-search="hrCoCd" data-kind="CO" onchange="searchSubstVacationStatus();">
@@ -259,6 +282,7 @@
 			<div class="contents_tit">
 				<span style="height: 30px; line-height: 30px; font-size: 15px;">
 					<span id="displayYyTitle">2025</span>년도 대체휴가 현황
+					<span style="font-size: 11px; margin-left: 15px; color: #555; vertical-align: middle;"><span style="display:inline-block; width:12px; height:12px; background-color:#fed7aa; border:1px solid #fbd38d; vertical-align:middle; margin-right:4px; border-radius:2px;"></span>입사전/퇴사후</span>
 				</span>
 				<div class="add_btn_small pdl10">
 					<a onclick="excelDown();" style="height: 30px; line-height: 28px; width: 95px;"><i class="fas fa-file-excel"></i> 엑셀다운로드</a>
@@ -387,6 +411,42 @@
 			});
 		}
 
+		// 입사전월 및 퇴사일 이후 월 cell 판정 함수 (PM0711M01 계승: 주황색 배경 .grid-cell-pre-enter 적용 대상)
+		function isMonthOutOfService(row, monthNum) {
+			if (!row) return false;
+			var currentYy = parseInt($('#yy_S').val() || moment().format("YYYY"), 10);
+
+			// 1. 입사전월 체크
+			if (row.enterDt) {
+				var enterDt = String(row.enterDt).replace(/[^0-9]/g, '');
+				if (enterDt.length >= 6) {
+					var enterYear = parseInt(enterDt.substring(0, 4), 10);
+					var enterMonth = parseInt(enterDt.substring(4, 6), 10);
+
+					// 조회연도가 입사연도보다 이전이면 1~12월 모두 입사전월
+					if (currentYy < enterYear) return true;
+					// 조회연도가 입사연도와 같고 해당 월이 입사월 이전이면 입사전월
+					if (currentYy === enterYear && monthNum < enterMonth) return true;
+				}
+			}
+
+			// 2. 퇴사월 이후 체크
+			if (row.leaveDt) {
+				var leaveDt = String(row.leaveDt).replace(/[^0-9]/g, '');
+				if (leaveDt.length >= 6) {
+					var leaveYear = parseInt(leaveDt.substring(0, 4), 10);
+					var leaveMonth = parseInt(leaveDt.substring(4, 6), 10);
+
+					// 조회연도가 퇴사연도보다 이후이면 1~12월 모두 퇴사후월
+					if (currentYy > leaveYear) return true;
+					// 조회연도가 퇴사연도와 같고 해당 월이 퇴사월 이후이면 퇴사후월
+					if (currentYy === leaveYear && monthNum > leaveMonth) return true;
+				}
+			}
+
+			return false;
+		}
+
 		// 모든 시간/일수 값은 소숫점 이하 1자리까지 표시
 		function fmt1(val) {
 			var n = Number(val);
@@ -412,10 +472,60 @@
 			return htmlParts.join(', ');
 		}
 
-		// PM0711M01.html showVacationPopover() 톤앤매너 100% 계승 - 일자 호버 시 실시간 신청서 상세 팝오버
+		// 결재상태 배지 렌더링 헬퍼 함수 (PM0702M01 100% 동일)
+		function getSanctnBadgeHtml(sts, label) {
+			var prefix = label ? (label + ': ') : '';
+			if (sts === 'END') return '<span class="badge" style="background-color:#28a745;font-size:10px;padding:2px 5px;">' + prefix + '승인완료</span>';
+			if (sts === 'ING') return '<span class="badge" style="background-color:#007bff;font-size:10px;padding:2px 5px;">' + prefix + '결재중</span>';
+			if (sts === 'RTN') return '<span class="badge" style="background-color:#dc3545;font-size:10px;padding:2px 5px;">' + prefix + '반려</span>';
+			if (sts === 'REQ') return '<span class="badge" style="background-color:#ffc107;color:#000;font-size:10px;padding:2px 5px;">' + prefix + '결재요청</span>';
+			return '<span class="badge" style="background-color:#6c757d;font-size:10px;padding:2px 5px;">' + prefix + '임시저장</span>';
+		}
+
+		// 팝오버 툴팁 마우스 위치 추적 및 화면 경계 반전 함수 (문서 좌표 및 커서 오버랩 방지)
+		function positionDayPopover(e) {
+			var $pop = $('#dayInfoPopover');
+			if (!$pop.is(':visible')) return;
+
+			var pageX = e ? (e.pageX || (e.clientX + $(window).scrollLeft())) : 0;
+			var pageY = e ? (e.pageY || (e.clientY + $(window).scrollTop())) : 0;
+			var clientX = e ? (e.clientX || 0) : 0;
+			var clientY = e ? (e.clientY || 0) : 0;
+			if (!pageX && !pageY) return;
+
+			var popW = $pop.outerWidth() || 280;
+			var popH = $pop.outerHeight() || 180;
+			var winW = $(window).width();
+			var winH = $(window).height();
+
+			// 마우스 커서 아래 16px, 오른쪽 10px에 배치 (커서 히트박스와 절대 겹치지 않음)
+			var posX = pageX + 10;
+			var posY = pageY + 16;
+
+			// 우측 화면 밖으로 넘어가면 마우스 왼쪽으로
+			if (clientX + popW + 15 > winW) {
+				posX = pageX - popW - 10;
+			}
+			// 하단 화면 밖으로 넘어가면 마우스 위쪽으로
+			if (clientY + popH + 20 > winH) {
+				posY = pageY - popH - 16;
+			}
+			if (posX < 10) posX = 10;
+			if (posY < 10) posY = 10;
+
+			$pop.css({
+				'top': posY + 'px',
+				'left': posX + 'px'
+			});
+		}
+
+		// PM0702M01 마우스 호버 기능 계승 - 해당일 호버 시 실시간 신청서 상세 팝오버
 		var DAY_POPOVER_TIMER = null;
-		var DAY_POPOVER_REQUEST_ID = 0; // 마우스를 빠르게 여러 일자로 옮길 때 늦게 도착한 이전 요청의 응답이 현재 팝업을 덮어쓰는 것을 막기 위한 순번
-		var DAY_POPOVER_SHOW_TIMER = null; // 마우스 호버 후 0.3초 이상 머물렀을 때만 조회하기 위한 지연 타이머
+		var DAY_POPOVER_REQUEST_ID = 0;
+		var DAY_POPOVER_SHOW_TIMER = null;
+		var DAY_POPOVER_CURRENT_KEY = null; // 현재 열려있는 팝오버 대상 식별자 (마우스 이동 시 중복 refresh 차단)
+		var IS_OVER_DAY_TRIGGER = false; // 트리거 호버 상태 추적
+		var IS_OVER_DAY_POPOVER = false; // 팝오버 호버 상태 추적
 
 		function cancelDayPopoverShow() {
 			if (DAY_POPOVER_SHOW_TIMER) {
@@ -424,55 +534,101 @@
 			}
 		}
 
-		function showDayPopover($el) {
+		// 트리거와 팝오버 둘 다에서 마우스가 완전히 벗어났을 때만 안전 닫기 (400ms 유예)
+		function checkAndHideDayPopover(delayMs) {
+			if (DAY_POPOVER_TIMER) clearTimeout(DAY_POPOVER_TIMER);
+			DAY_POPOVER_TIMER = setTimeout(function() {
+				if (!IS_OVER_DAY_TRIGGER && !IS_OVER_DAY_POPOVER) {
+					$('#dayInfoPopover').hide();
+					DAY_POPOVER_TIMER = null;
+					DAY_POPOVER_CURRENT_KEY = null;
+				}
+			}, delayMs || 400);
+		}
+
+		function showDayPopover($el, e) {
 			if (DAY_POPOVER_TIMER) {
 				clearTimeout(DAY_POPOVER_TIMER);
 				DAY_POPOVER_TIMER = null;
 			}
 
-			var myRequestId = ++DAY_POPOVER_REQUEST_ID;
-
-			if (!$el || $el.length === 0 || typeof $el.offset !== 'function') return;
-			var offset = $el.offset();
-			if (!offset || typeof offset.top === 'undefined') return;
+			if (!$el || $el.length === 0) return;
 
 			var kind = $el.data('kind');
 			var reqNo = $el.data('reqno');
 			var userId = $el.data('userid');
 			var userNm = $el.data('usernm') || '사원';
-			if (!reqNo) return;
+			if (!reqNo && kind !== 'vac_all' && kind !== 'sw_all' && kind !== 'ann_all') return;
+
+			var isDayToken = $el.hasClass('day-token');
 
 			var $pop = $('#dayInfoPopover');
 			if ($pop.length === 0) {
 				$('body').append(
 					'<div id="dayInfoPopover" class="vacation-info-popover">' +
-						'<div class="popover-title"><i class="fas fa-calendar-check"></i> <span id="popDayUserNm"></span> 님의 신청서 이력</div>' +
 						'<div id="popDayContent"></div>' +
 					'</div>'
 				);
 				$pop = $('#dayInfoPopover');
 
+				// 팝오버 창 위에 마우스가 위치했을 때 닫힘 방지 및 지연 닫힘 (Hover Group 패턴)
 				$pop.on('mouseenter', function() {
+					IS_OVER_DAY_POPOVER = true;
 					if (DAY_POPOVER_TIMER) {
 						clearTimeout(DAY_POPOVER_TIMER);
 						DAY_POPOVER_TIMER = null;
 					}
 				}).on('mouseleave', function() {
-					hideDayPopoverImmediately();
+					IS_OVER_DAY_POPOVER = false;
+					checkAndHideDayPopover(400);
+				});
+
+				// 팝오버 항목/제목 클릭 시 해당 신청서 모달 오픈
+				$pop.on('click', '.clickable, [data-req-no]', function(e) {
+					e.stopPropagation();
+					var targetReqNo = $(this).attr('data-req-no');
+					var targetKind = $(this).attr('data-kind') || 'vac';
+					if (targetReqNo) {
+						hideDayPopoverImmediately();
+						openReqDetailModal(targetKind, targetReqNo);
+					}
 				});
 			}
 
-			$('#popDayUserNm').text(userNm);
+			// 동일 대상 팝오버가 이미 열려 있는 경우: 재조회(refresh) 없이 닫기 타이머만 해제하고 그대로 유지
+			var targetKey = kind + '_' + (reqNo || userId || '') + '_' + (isDayToken ? 'day' : 'col');
+			if ($pop.is(':visible') && DAY_POPOVER_CURRENT_KEY === targetKey) {
+				if (DAY_POPOVER_TIMER) {
+					clearTimeout(DAY_POPOVER_TIMER);
+					DAY_POPOVER_TIMER = null;
+				}
+				return;
+			}
+			DAY_POPOVER_CURRENT_KEY = targetKey;
 
-			var elHeight = (typeof $el.outerHeight === 'function') ? $el.outerHeight() : 20;
-			$pop.css({
-				top: (offset.top + elHeight + 2) + 'px',
-				left: Math.max(10, offset.left - 20) + 'px'
-			}).show();
-			$('#popDayContent').html('<div class="popover-item" style="color: #888888;"><i class="fas fa-spinner fa-spin"></i> 실시간 신청서 백엔드 조회 중...</div>');
+			var myRequestId = ++DAY_POPOVER_REQUEST_ID;
+
+			$pop.css('pointer-events', 'auto').show();
+			if (e) {
+				positionDayPopover(e);
+			} else {
+				var offset = $el.offset();
+				var elHeight = (typeof $el.outerHeight === 'function') ? $el.outerHeight() : 20;
+				$pop.css({
+					'top': (offset ? (offset.top + elHeight + 6) : 100) + 'px',
+					'left': (offset ? Math.max(10, offset.left - 20) : 100) + 'px'
+				});
+			}
+
+			if (isDayToken) {
+				$('#popDayContent').html('<div class="popover-item" style="color: #888888;"><i class="fas fa-spinner fa-spin"></i> 상세 정보 조회 중...</div>');
+			} else {
+				$('#popDayContent').html('<div class="popover-item" style="color: #888888;"><i class="fas fa-spinner fa-spin"></i> 실시간 신청서 백엔드 조회 중...</div>');
+			}
 
 			var coCd = $('#coCd_S').val() || 'GUN';
 
+			// 1) 단일 대체근무(sw) 해당일 호버: PM0702M01 SUBST 상세 팝오버 100% 동일
 			if (kind === 'sw') {
 				postAjax("/user/pm/pm08/selectSubstituteWorkDtl", { "coCd": coCd, "reqNo": reqNo }, null, function(data) {
 					if (myRequestId !== DAY_POPOVER_REQUEST_ID) return;
@@ -481,79 +637,243 @@
 						$('#popDayContent').html('<div class="popover-item" style="color: #888888;">신청서 정보를 찾을 수 없습니다.</div>');
 						return;
 					}
-					var dtText = dtl.holidayDt || '';
-					var tmText = (dtl.stTm && dtl.edTm) ? (' (' + dtl.stTm + '~' + dtl.edTm + ')') : '';
-
-					var st = String(dtl.realStTm || dtl.stTm || '').replace(/[^0-9]/g, '');
-					var ed = String(dtl.realEdTm || dtl.edTm || '').replace(/[^0-9]/g, '');
-					var reasonRaw = String(dtl.specialReason || '') + ' ' + String(dtl.workResult || '');
-					var isHalf = (reasonRaw.indexOf('반차') !== -1);
-					if (st.length >= 4 && ed.length >= 4) {
-						var mSt = moment(st.substring(0, 4), 'HHmm');
-						var mEd = moment(ed.substring(0, 4), 'HHmm');
-						if (mSt.isValid() && mEd.isValid()) {
-							var diffMin = mEd.diff(mSt, 'minutes');
-							if (diffMin < 0) diffMin += 24 * 60;
-							var diffHrs = diffMin / 60;
-							if (diffHrs > 0 && diffHrs <= 4.5) {
-								isHalf = true;
-							}
-						}
+					var reqIdNm = dtl.reqNm || userNm || "신청자";
+					var deptNm = dtl.deptNm || "";
+					var st = dtl.holidayDt || "";
+					if (st.length === 8) {
+						st = moment(st, "YYYYMMDD").format("YYYY-MM-DD");
 					}
-					var halfText = isHalf ? ' (반차)' : '';
-					var daysText = isHalf ? ' (0.5일)' : ' (1.0일)';
-					var reason = dtl.specialReason ? (' [' + $.trim(dtl.specialReason) + (isHalf && dtl.specialReason.indexOf('반차') === -1 ? ' - 반차' : '') + ']') : '';
-					var htmlStr = '<div class="popover-item"><i class="fas fa-check-circle" style="color: #337ab7; margin-right: 5px;"></i> ' + dtText + tmText + ' 휴일대체근무' + halfText + daysText + reason + '</div>';
-					$('#popDayContent').html(htmlStr);
+
+					var reqSts = dtl.reqStatus || dtl.sanctnSts || "";
+					var resSts = dtl.resultStatus || dtl.resultSanctnSts || "";
+					var reqStsBadge = getSanctnBadgeHtml(reqSts, "신청");
+					var resStsBadge = (resSts && resSts !== 'TEMP') ? getSanctnBadgeHtml(resSts, "결과") : '';
+
+					var html = '';
+					html += '<div class="popover-title clickable" data-kind="sw" data-req-no="' + reqNo + '" style="color: #c67c00; border-bottom: 2px solid #f9ab00; cursor: pointer;" title="클릭 시 휴일대체근무 신청서 확인">'
+					      + '<i class="fas fa-business-time" style="margin-right: 5px;"></i>' + reqIdNm + (deptNm ? ' (' + deptNm + ')' : '') + ' - 휴일대체근무'
+					      + ' <i class="fas fa-external-link-alt" style="font-size: 10px; margin-left: 5px;"></i>'
+					      + '</div>';
+					html += '<div class="popover-item"><b>근무일자:</b> <span style="font-weight:600; color:#333;">' + st + '</span></div>';
+
+					var planTm = (dtl.stTm || dtl.edTm) ? ((dtl.stTm || '') + ' ~ ' + (dtl.edTm || '')) : '';
+					if (planTm) {
+						html += '<div class="popover-item"><b>근무시간(계획):</b> ' + planTm + '</div>';
+					}
+					var realTm = (dtl.realStTm || dtl.realEdTm) ? ((dtl.realStTm || '') + ' ~ ' + (dtl.realEdTm || '')) : '';
+					if (realTm) {
+						html += '<div class="popover-item"><b>실근무시간:</b> ' + realTm + '</div>';
+					}
+
+					var pjtNames = [];
+					var clntNames = [];
+					var salesCodes = [];
+					if (dtl.projectList && dtl.projectList.length > 0) {
+						$.each(dtl.projectList, function(idx, p) {
+							if (p.pjtNm) pjtNames.push(p.pjtNm);
+							if (p.clntNm) clntNames.push(p.clntNm);
+							if (p.salesCd) salesCodes.push(p.salesCd);
+						});
+					}
+					var pjtNm = dtl.pjtNm || pjtNames.join(', ');
+					var salesCd = dtl.salesCd || salesCodes.join(', ');
+					var clntNm = dtl.clntNm || clntNames.join(', ');
+
+					if (pjtNm) {
+						html += '<div class="popover-item"><b>프로젝트:</b> ' + pjtNm + (salesCd ? ' [' + salesCd + ']' : '') + '</div>';
+					}
+					if (clntNm) {
+						html += '<div class="popover-item"><b>고객사:</b> ' + clntNm + '</div>';
+					}
+
+					var reason = dtl.specialReason || dtl.reqRmk || "";
+					if (reason) {
+						html += '<div class="popover-item" style="word-break: break-all;"><b>신청사유:</b> ' + reason + '</div>';
+					}
+					if (dtl.workResult) {
+						html += '<div class="popover-item" style="word-break: break-all; color:#1a73e8;"><b>근무결과:</b> ' + dtl.workResult + '</div>';
+					}
+
+					html += '<div class="popover-item" style="margin-top: 5px; padding-top: 5px; border-top: 1px dashed #dadce0;">'
+					      + '<b>결재상태:</b> ' + reqStsBadge + (resStsBadge ? (' ' + resStsBadge) : '')
+					      + '</div>';
+					html += '<div class="popover-item clickable" data-kind="sw" data-req-no="' + reqNo + '" style="margin-top: 4px; padding-top: 4px; border-top: 1px dashed #dadce0; color: #337ab7; font-size: 11px; text-align: right; cursor: pointer;" title="클릭 시 신청서 확인">'
+					      + '<i class="fas fa-mouse-pointer" style="margin-right: 3px;"></i>클릭 시 신청서 확인'
+					      + '</div>';
+
+					$('#popDayContent').html(html);
 				});
-			} else if (kind === 'vac') {
+			}
+			// 2) 단일 대체휴가/연차(vac) 해당일 호버: PM0702M01 휴가 상세 팝오버 100% 동일
+			else if (kind === 'vac') {
+				postAjax("/user/pm/pm07/selectVacationDtl", { "coCd": coCd, "reqNo": reqNo }, null, function(data) {
+					if (myRequestId !== DAY_POPOVER_REQUEST_ID) return;
+					var dtl = (data && data.result) ? data.result : null;
+					if (!dtl || Object.keys(dtl).length === 0) {
+						$('#popDayContent').html('<div class="popover-item" style="color: #888888;">신청서 정보를 찾을 수 없습니다.</div>');
+						return;
+					}
+					var reqIdNm = dtl.reqIdNm || userNm || "신청자";
+					var deptNm = dtl.reqDeptNm || dtl.deptNm || "";
+					var rawNm = String(dtl.vacTypeNm || "");
+					var vacTypeNm = (typeof cleanVacationTypeNm === 'function') ? cleanVacationTypeNm(rawNm) : rawNm;
+					if (!vacTypeNm) vacTypeNm = "휴가";
+					var ampmLabel = (dtl.ampmNm) ? (" (" + dtl.ampmNm + ")") : "";
+					var vacStsBadge = getSanctnBadgeHtml(dtl.sanctnSts, "");
+					var reqRmk = dtl.reqRmk || "";
+
+					var st = dtl.stDt || "";
+					var ed = dtl.edDt || "";
+					if (st.length === 8) st = moment(st, "YYYYMMDD").format("YYYY-MM-DD");
+					if (ed.length === 8) ed = moment(ed, "YYYYMMDD").format("YYYY-MM-DD");
+					var periodStr = (st && ed && st !== ed) ? (st + " ~ " + ed) : (st || ed);
+					var vDays = Number(dtl.deductDays || dtl.vacDays || 0);
+					if (vDays > 0) {
+						periodStr += ' (' + fmt1(vDays) + '일)';
+					}
+
+					var html = '';
+					html += '<div class="popover-title clickable" data-kind="vac" data-req-no="' + reqNo + '" style="color: #3b62b1; border-bottom: 2px solid #3b62b1; cursor: pointer;" title="클릭 시 휴가 신청서 확인">'
+					      + '<i class="fas fa-user-clock" style="margin-right: 5px;"></i>' + reqIdNm + (deptNm ? ' (' + deptNm + ')' : '') + ' - ' + vacTypeNm
+					      + ' <i class="fas fa-external-link-alt" style="font-size: 10px; margin-left: 5px;"></i>'
+					      + '</div>';
+					html += '<div class="popover-item"><b>유형:</b> ' + vacTypeNm + ampmLabel + '</div>';
+					html += '<div class="popover-item"><b>기간:</b> ' + periodStr + '</div>';
+					if (reqRmk) {
+						html += '<div class="popover-item" style="word-break: break-all;"><b>사유/비고:</b> ' + reqRmk + '</div>';
+					}
+					html += '<div class="popover-item" style="margin-top: 5px; padding-top: 5px; border-top: 1px dashed #dadce0;">'
+					      + '<b>결재상태:</b> ' + vacStsBadge
+					      + '</div>';
+					html += '<div class="popover-item clickable" data-kind="vac" data-req-no="' + reqNo + '" style="margin-top: 4px; padding-top: 4px; border-top: 1px dashed #dadce0; color: #337ab7; font-size: 11px; text-align: right; cursor: pointer;" title="클릭 시 신청서 확인">'
+					      + '<i class="fas fa-mouse-pointer" style="margin-right: 3px;"></i>클릭 시 신청서 확인'
+					      + '</div>';
+
+					$('#popDayContent').html(html);
+				});
+			}
+			// 3) 전체 대체휴가 사용(vac_all) 컬럼
+			else if (kind === 'vac_all') {
+				var curYy = $('#yy_S').val() || (window.moment ? moment().format('YYYY') : '2026');
 				postAjax("/user/pm/pm07/selectVacationCalendarList", {
 					"coCd": coCd,
 					"reqId": userId,
 					"userId": userId,
-					"reqDtFrom": "19000101",
-					"reqDtTo": "99991231",
-					"stDt": "19000101",
-					"edDt": "99991231"
+					"reqDtFrom": curYy + "0101",
+					"reqDtTo": curYy + "1231",
+					"stDt": curYy + "0101",
+					"edDt": curYy + "1231"
 				}, null, function(data) {
 					if (myRequestId !== DAY_POPOVER_REQUEST_ID) return;
 					var list = data.result || data.resultList || data.list || [];
-					var htmlStr = '';
+					var htmlStr = '<div class="popover-title"><i class="fas fa-calendar-check"></i> ' + userNm + ' 님의 대체휴가 사용 이력</div>';
+					var count = 0;
 					$.each(list, function(i, row) {
-						if (String(row.reqNo || row.req_no) !== String(reqNo)) return true;
-						var vNm = cleanVacationTypeNm(row.vacTypeNm || row.vac_type_nm) || '대체휴가';
-						var stDisp = row.stDt || row.st_dt || '';
-						var edDisp = row.edDt || row.ed_dt || '';
-						var dtText = formatVacationDateRange(stDisp, edDisp);
-						var vDays = Number(row.deductDays || row.deduct_days || row.vacDays || row.vac_days || 0);
 						var vacTypeCd = row.vacTypeCd || row.vac_type_cd || '';
 						var rawNm = String(row.vacTypeNm || row.vac_type_nm || '');
+						if (vacTypeCd !== 'PM07TYPE11' && vacTypeCd !== 'PM07TYPE12' && rawNm.indexOf('대체') === -1) {
+							return true;
+						}
+						count++;
+						var vNm = (typeof cleanVacationTypeNm === 'function') ? cleanVacationTypeNm(rawNm) : rawNm;
+						if (!vNm) vNm = '대체휴가';
+						var stDisp = row.stDt || row.st_dt || '';
+						var edDisp = row.edDt || row.ed_dt || '';
+						var dtText = (typeof formatVacationDateRange === 'function') ? formatVacationDateRange(stDisp, edDisp) : (stDisp + ' ~ ' + edDisp);
+						var vDays = Number(row.deductDays || row.deduct_days || row.vacDays || row.vac_days || 0);
 						var ampm = String(row.ampmNm || '').trim();
 
-						var isHalf = (vDays === 0.5) || (vacTypeCd === 'PM07TYPE02') || (vacTypeCd === 'PM07TYPE12') || (rawNm.indexOf('반차') !== -1) || (ampm.length > 0);
+						var isHalf = (vDays === 0.5) || (vacTypeCd === 'PM07TYPE12') || (rawNm.indexOf('반차') !== -1) || (ampm.length > 0);
 						if (isHalf && vDays === 0) vDays = 0.5;
 						if (!isHalf && vDays === 0) vDays = 1.0;
 
-						var halfBadge = '';
-						if (isHalf) {
-							if (ampm) {
-								halfBadge = ' (' + ampm + '반차)';
-							} else {
-								halfBadge = ' (반차)';
-							}
-						}
-						if (vNm.indexOf('반차') !== -1) {
-							halfBadge = ampm ? (' (' + ampm + ')') : '';
-						}
-
+						var halfBadge = isHalf ? (ampm ? ' (' + ampm + '반차)' : ' (반차)') : '';
 						var daysText = ' (' + fmt1(vDays) + '일)';
 						var rmk = row.reqRmk || row.req_rmk || row.rmk || '';
-						var rmkText = rmk ? (' [' + $.trim(rmk) + (isHalf && rmk.indexOf('반차') === -1 ? ' - 반차' : '') + ']') : '';
-						htmlStr += '<div class="popover-item"><i class="fas fa-check-circle" style="color: #337ab7; margin-right: 5px;"></i> ' + dtText + ' ' + vNm + halfBadge + daysText + rmkText + '</div>';
-						return true;
+						var rmkText = rmk ? (' [' + $.trim(rmk) + ']') : '';
+						var targetReqNo = row.reqNo || row.req_no || '';
+						htmlStr += '<div class="popover-item clickable" data-kind="vac" data-req-no="' + targetReqNo + '" title="클릭 시 휴가신청서 확인">' +
+									'<i class="fas fa-check-circle" style="color: #337ab7; margin-right: 5px;"></i> ' +
+									dtText + ' ' + vNm + halfBadge + daysText + rmkText +
+									' <i class="fas fa-external-link-alt pop-link-icon" style="font-size: 10px; color: #337ab7; margin-left: 5px;" title="신청서 열기"></i>' +
+									'</div>';
 					});
-					if (!htmlStr) {
-						htmlStr = '<div class="popover-item" style="color: #888888;">등록된 신청 이력이 없습니다.</div>';
+					if (count === 0) {
+						htmlStr += '<div class="popover-item" style="color: #888888;">등록된 대체휴가 사용 이력이 없습니다.</div>';
+					}
+					$('#popDayContent').html(htmlStr);
+				});
+			}
+			// 4) 전체 연차사용(ann_all) 컬럼
+			else if (kind === 'ann_all') {
+				var curYy = $('#yy_S').val() || (window.moment ? moment().format('YYYY') : '2026');
+				postAjax("/user/pm/pm07/selectVacationCalendarList", {
+					"coCd": coCd,
+					"reqId": userId,
+					"userId": userId,
+					"reqDtFrom": curYy + "0101",
+					"reqDtTo": curYy + "1231",
+					"stDt": curYy + "0101",
+					"edDt": curYy + "1231"
+				}, null, function(data) {
+					if (myRequestId !== DAY_POPOVER_REQUEST_ID) return;
+					var list = data.result || data.resultList || data.list || [];
+					var htmlStr = '<div class="popover-title"><i class="fas fa-calendar-check"></i> ' + userNm + ' 님의 연차사용 이력</div>';
+					var count = 0;
+					$.each(list, function(i, row) {
+						var vacTypeCd = row.vacTypeCd || row.vac_type_cd || '';
+						if (vacTypeCd !== 'PM07TYPE01' && vacTypeCd !== 'PM07TYPE02') return true;
+						count++;
+						var rawNm = String(row.vacTypeNm || row.vac_type_nm || '');
+						var vNm = (typeof cleanVacationTypeNm === 'function') ? cleanVacationTypeNm(rawNm) : rawNm;
+						if (!vNm) vNm = '연차';
+						var stDisp = row.stDt || row.st_dt || '';
+						var edDisp = row.edDt || row.ed_dt || '';
+						var dtText = (typeof formatVacationDateRange === 'function') ? formatVacationDateRange(stDisp, edDisp) : (stDisp + ' ~ ' + edDisp);
+						var vDays = Number(row.deductDays || row.deduct_days || row.vacDays || row.vac_days || 0);
+						var daysText = ' (' + fmt1(vDays || 1) + '일)';
+						var rmk = row.reqRmk || row.req_rmk || row.rmk || '';
+						var rmkText = rmk ? (' [' + $.trim(rmk) + ']') : '';
+						var targetReqNo = row.reqNo || row.req_no || '';
+						htmlStr += '<div class="popover-item clickable" data-kind="vac" data-req-no="' + targetReqNo + '" title="클릭 시 휴가신청서 확인">' +
+									'<i class="fas fa-check-circle" style="color: #337ab7; margin-right: 5px;"></i> ' +
+									dtText + ' ' + vNm + daysText + rmkText +
+									' <i class="fas fa-external-link-alt pop-link-icon" style="font-size: 10px; color: #337ab7; margin-left: 5px;" title="신청서 열기"></i>' +
+									'</div>';
+					});
+					if (count === 0) {
+						htmlStr += '<div class="popover-item" style="color: #888888;">등록된 연차 사용 이력이 없습니다.</div>';
+					}
+					$('#popDayContent').html(htmlStr);
+				});
+			}
+			// 5) 전체 대체근무 발생(sw_all) 컬럼
+			else if (kind === 'sw_all') {
+				var curYy = $('#yy_S').val() || (window.moment ? moment().format('YYYY') : '2026');
+				postAjax("/user/pm/pm08/selectSubstituteWorkList", {
+					"coCd": coCd,
+					"userId": userId,
+					"reqDtFrom": curYy + "0101",
+					"reqDtTo": curYy + "1231"
+				}, null, function(data) {
+					if (myRequestId !== DAY_POPOVER_REQUEST_ID) return;
+					var list = data.result || data.resultList || data.list || [];
+					var htmlStr = '<div class="popover-title"><i class="fas fa-calendar-check"></i> ' + userNm + ' 님의 대체근무 발생 이력</div>';
+					var count = 0;
+					$.each(list, function(i, row) {
+						count++;
+						var dtText = row.holidayDt || row.reqDt || '';
+						var tmText = (row.stTm && row.edTm) ? (' (' + row.stTm + '~' + row.edTm + ')') : '';
+						var targetReqNo = row.reqNo || row.req_no || '';
+						var reason = row.specialReason ? (' [' + $.trim(row.specialReason) + ']') : '';
+						htmlStr += '<div class="popover-item clickable" data-kind="sw" data-req-no="' + targetReqNo + '" title="클릭 시 휴일대체근무 신청서 확인">' +
+									'<i class="fas fa-check-circle" style="color: #337ab7; margin-right: 5px;"></i> ' +
+									dtText + tmText + ' 휴일대체근무' + reason +
+									' <i class="fas fa-external-link-alt pop-link-icon" style="font-size: 10px; color: #337ab7; margin-left: 5px;" title="신청서 열기"></i>' +
+									'</div>';
+					});
+					if (count === 0) {
+						htmlStr += '<div class="popover-item" style="color: #888888;">등록된 대체근무 발생 이력이 없습니다.</div>';
 					}
 					$('#popDayContent').html(htmlStr);
 				});
@@ -562,11 +882,7 @@
 
 		function hideDayPopover() {
 			cancelDayPopoverShow();
-			if (DAY_POPOVER_TIMER) clearTimeout(DAY_POPOVER_TIMER);
-			DAY_POPOVER_TIMER = setTimeout(function() {
-				$('#dayInfoPopover').hide();
-				DAY_POPOVER_TIMER = null;
-			}, 300);
+			checkAndHideDayPopover(300);
 		}
 
 		function hideDayPopoverImmediately() {
@@ -575,24 +891,53 @@
 				clearTimeout(DAY_POPOVER_TIMER);
 				DAY_POPOVER_TIMER = null;
 			}
+			IS_OVER_DAY_TRIGGER = false;
+			IS_OVER_DAY_POPOVER = false;
 			$('#dayInfoPopover').hide();
+			DAY_POPOVER_CURRENT_KEY = null;
 		}
 
-		$(document).off('mouseenter mouseleave', '#tableContainer .day-token').on({
-			mouseenter: function() {
+		// 1) 해당일(day-token) 마우스 호버 이벤트: Hover Group 패턴 적용으로 포커스/마우스 이동 시 무한 깜빡임 완벽 차단
+		$(document).off('mouseenter mouseleave mousemove', '#tableContainer .day-token').on({
+			mouseenter: function(e) {
+				IS_OVER_DAY_TRIGGER = true;
 				var $el = $(this);
-				cancelDayPopoverShow();
-				DAY_POPOVER_SHOW_TIMER = setTimeout(function() {
-					DAY_POPOVER_SHOW_TIMER = null;
-					showDayPopover($el);
-				}, 300);
+				if (DAY_POPOVER_TIMER) {
+					clearTimeout(DAY_POPOVER_TIMER);
+					DAY_POPOVER_TIMER = null;
+				}
+				showDayPopover($el, e);
 			},
 			mouseleave: function() {
+				IS_OVER_DAY_TRIGGER = false;
 				hideDayPopover();
 			}
 		}, '#tableContainer .day-token');
 
-		// 대체근무일(sw)/대체휴가일(vac) 일자 더블클릭 시 해당 신청서 팝업 오픈
+		// 2) 집계 컬럼(.used-info-trigger) 마우스 호버 이벤트: 목록 클릭/선택 유지 지원
+		$(document).off('mouseenter mouseleave', '#tableContainer .used-info-trigger').on({
+			mouseenter: function(e) {
+				IS_OVER_DAY_TRIGGER = true;
+				var $el = $(this);
+				if (DAY_POPOVER_TIMER) {
+					clearTimeout(DAY_POPOVER_TIMER);
+					DAY_POPOVER_TIMER = null;
+				}
+				cancelDayPopoverShow();
+				DAY_POPOVER_SHOW_TIMER = setTimeout(function() {
+					DAY_POPOVER_SHOW_TIMER = null;
+					if (!IS_OVER_DAY_TRIGGER && !IS_OVER_DAY_POPOVER) return;
+					showDayPopover($el, e);
+				}, 150);
+			},
+			mouseleave: function() {
+				IS_OVER_DAY_TRIGGER = false;
+				cancelDayPopoverShow();
+				hideDayPopover();
+			}
+		}, '#tableContainer .used-info-trigger');
+
+		// 대체근무일(sw)/대체휴가일(vac) 일자 클릭 시 해당 신청서 팝업 오픈
 		function openReqDetailModal(kind, reqNo) {
 			if (!reqNo) return;
 			var coCd = $('#coCd_S').val() || 'GUN';
@@ -616,7 +961,9 @@
 			}
 		}
 
-		$(document).off('dblclick', '#tableContainer .day-token').on('dblclick', '#tableContainer .day-token', function() {
+		$(document).off('click', '#tableContainer .day-token').on('click', '#tableContainer .day-token', function(e) {
+			e.stopPropagation();
+			hideDayPopoverImmediately();
 			openReqDetailModal($(this).data('kind'), $(this).data('reqno'));
 		});
 
@@ -681,8 +1028,19 @@
 						html += '<td rowspan="' + totalRows + '" class="fixed-col user-divider">' + rowNum + '</td>';
 						html += '<td rowspan="' + totalRows + '" class="fixed-col left user-divider ' + (isLeave ? 'leave-user' : '') + '">' + (row['userNm'] || '') + leaveBadge + leaveDtText + '</td>';
 						html += '<td rowspan="' + totalRows + '" class="fixed-col user-divider">' + (row['levelNm'] || '') + '</td>';
-						html += '<td rowspan="' + totalRows + '" class="grant-col user-divider" style="background-color: #ffffcc;"><strong>' + fmt1(grantDays) + '</strong></td>';
-						html += '<td rowspan="' + totalRows + '" class="used-col user-divider" style="background-color: #ffffcc;"><strong>' + fmt1(usedDays) + '</strong></td>';
+						// 발생된 대체휴가
+						if (grantDays > 0) {
+							html += '<td rowspan="' + totalRows + '" class="grant-col user-divider used-info-trigger" data-kind="sw_all" data-userid="' + (row['userId'] || '') + '" data-usernm="' + (row['userNm'] || '') + '" style="background-color: #ffffcc; cursor: pointer;" title="마우스 호버 시 발생내역 확인"><strong>' + fmt1(grantDays) + '</strong></td>';
+						} else {
+							html += '<td rowspan="' + totalRows + '" class="grant-col user-divider" style="background-color: #ffffcc;"><strong>' + fmt1(grantDays) + '</strong></td>';
+						}
+
+						// 사용한 대체휴가
+						if (usedDays > 0) {
+							html += '<td rowspan="' + totalRows + '" class="used-col user-divider used-info-trigger" data-kind="vac_all" data-userid="' + (row['userId'] || '') + '" data-usernm="' + (row['userNm'] || '') + '" style="background-color: #ffffcc; cursor: pointer;" title="마우스 호버 시 사용내역 확인"><strong>' + fmt1(usedDays) + '</strong></td>';
+						} else {
+							html += '<td rowspan="' + totalRows + '" class="used-col user-divider" style="background-color: #ffffcc;"><strong>' + fmt1(usedDays) + '</strong></td>';
+						}
 						html += '<td rowspan="' + totalRows + '" class="balance-col user-divider ' + (balanceDays > 0 ? 'highlight' : '') + '"><strong>' + fmt1(balanceDays) + '</strong></td>';
 					}
 
@@ -692,26 +1050,41 @@
 						var annSum = Number(row['annSum']) || 0;
 						for (var m = 0; m < months.length; m++) {
 							var annDayKey = 'annDay' + 'M' + months[m];
-							html += '<td class="' + divCls + '">' + renderDayCell(row[annDayKey], 'vac', row['userId'], row['userNm']) + '</td>';
+							var preEnterCls = isMonthOutOfService(row, m + 1) ? ' grid-cell-pre-enter' : '';
+							html += '<td class="' + divCls + preEnterCls + '">' + renderDayCell(row[annDayKey], 'vac', row['userId'], row['userNm']) + '</td>';
 						}
-						html += '<td class="' + divCls + '" style="font-weight: 600;">' + (annSum > 0 ? fmt1(annSum) : '') + '</td>';
+						if (annSum > 0) {
+							html += '<td class="' + divCls + ' used-info-trigger" data-kind="ann_all" data-userid="' + (row['userId'] || '') + '" data-usernm="' + (row['userNm'] || '') + '" style="font-weight: 600; cursor: pointer;" title="마우스 호버 시 연차사용내역 확인">' + fmt1(annSum) + '</td>';
+						} else {
+							html += '<td class="' + divCls + '" style="font-weight: 600;"></td>';
+						}
 					} else if (itemType === 'sw') {
 						// 대체근무일 행
 						html += '<td class="' + divCls + '" style="font-weight: 600;">대체근무</td>';
 						for (var m = 0; m < months.length; m++) {
 							var swKey = 'sw' + 'M' + months[m];
-							html += '<td class="' + divCls + '">' + renderDayCell(row[swKey], 'sw', row['userId'], row['userNm']) + '</td>';
+							var preEnterCls = isMonthOutOfService(row, m + 1) ? ' grid-cell-pre-enter' : '';
+							html += '<td class="' + divCls + preEnterCls + '">' + renderDayCell(row[swKey], 'sw', row['userId'], row['userNm']) + '</td>';
 						}
 						var swSum = Number(row['swSum']) || 0;
-						html += '<td class="' + divCls + '" style="font-weight: 600;">' + (swSum > 0 ? fmt1(swSum) : '') + '</td>';
+						if (swSum > 0) {
+							html += '<td class="' + divCls + ' used-info-trigger" data-kind="sw_all" data-userid="' + (row['userId'] || '') + '" data-usernm="' + (row['userNm'] || '') + '" style="font-weight: 600; cursor: pointer;" title="마우스 호버 시 대체근무 발생내역 확인">' + fmt1(swSum) + '</td>';
+						} else {
+							html += '<td class="' + divCls + '" style="font-weight: 600;"></td>';
+						}
 					} else if (itemType === 'vac') {
 						// 대체휴가일 행
 						html += '<td class="' + divCls + '" style="font-weight: 600;">대체휴가</td>';
 						for (var m = 0; m < months.length; m++) {
 							var vacDayKey = 'vacDay' + 'M' + months[m];
-							html += '<td class="' + divCls + '">' + renderDayCell(row[vacDayKey], 'vac', row['userId'], row['userNm']) + '</td>';
+							var preEnterCls = isMonthOutOfService(row, m + 1) ? ' grid-cell-pre-enter' : '';
+							html += '<td class="' + divCls + preEnterCls + '">' + renderDayCell(row[vacDayKey], 'vac', row['userId'], row['userNm']) + '</td>';
 						}
-						html += '<td class="' + divCls + '" style="font-weight: 600;">' + (usedDays > 0 ? fmt1(usedDays) : '') + '</td>';
+						if (usedDays > 0) {
+							html += '<td class="' + divCls + ' used-info-trigger" data-kind="vac_all" data-userid="' + (row['userId'] || '') + '" data-usernm="' + (row['userNm'] || '') + '" style="font-weight: 600; cursor: pointer;" title="마우스 호버 시 대체휴가 사용내역 확인">' + fmt1(usedDays) + '</td>';
+						} else {
+							html += '<td class="' + divCls + '" style="font-weight: 600;"></td>';
+						}
 					} else if (itemType === 'work') {
 						// 월 근무시간 행
 						html += '<td class="' + divCls + '" style="font-weight: 600;">월 근무<br>(정상+연장)</td>';
@@ -740,7 +1113,8 @@
 							}
 
 							var displayVal = (tot > 0) ? fmt1(tot) + '<br>(' + fmt1(norm) + '+' + fmt1(ot) + ')' : '';
-							html += '<td class="' + divCls + '">' + displayVal + '</td>';
+							var preEnterCls = isMonthOutOfService(row, m + 1) ? ' grid-cell-pre-enter' : '';
+							html += '<td class="' + divCls + preEnterCls + '">' + displayVal + '</td>';
 						}
 						var yearWorkDisplay = (yearTotSum > 0) ? fmt1(yearTotSum) + '<br>(' + fmt1(yearNormSum) + '+' + fmt1(yearOtSum) + ')' : '';
 						html += '<td class="' + divCls + '" style="font-weight: 600;">' + yearWorkDisplay + '</td>';
@@ -753,7 +1127,8 @@
 							var val = Number(row[rptKey]) || 0;
 							yearRptSum += val;
 							var displayVal = val > 0 ? fmt1(val) : '';
-							html += '<td class="' + divCls + '">' + displayVal + '</td>';
+							var preEnterCls = isMonthOutOfService(row, m + 1) ? ' grid-cell-pre-enter' : '';
+							html += '<td class="' + divCls + preEnterCls + '">' + displayVal + '</td>';
 						}
 						html += '<td class="' + divCls + '" style="font-weight: 600;">' + (yearRptSum > 0 ? fmt1(yearRptSum) : '') + '</td>';
 					}
@@ -802,6 +1177,7 @@
 				'  .grant-col, .used-col { background-color: #ffffcc !important; }' +
 				'  .balance-col { font-weight: bold; }' +
 				'  .balance-col.highlight { color: #d9534f; }' +
+				'  .grid-cell-pre-enter { background-color: #fed7aa !important; }' +
 				'  .fixed-col { background-color: #fafafa; font-weight: 500; }' +
 				'  .leave-user { background-color: #fafafa; color: #777777; }' +
 				'  td.user-divider { border-bottom: 1.5pt solid #808080 !important; }' +
@@ -847,6 +1223,18 @@
 				}
 				$('#userId' + sfx).val(checkedNode.id);
 				$('#userNm' + sfx).val(checkedNode.text);
+
+				// 신청자 선택 시 백엔드(selectUserInfo)에서 5자리 부서코드와 해당 부서명을 반영
+				postAjaxSync("/admin/cm/cm06/selectUserInfo", { "userId": checkedNode.id }, null, function(data) {
+					if (data && data.userInfo) {
+						$('#deptCd' + sfx).val(data.userInfo.deptId || '');
+						$('#deptNm' + sfx).val(data.userInfo.deptNm || '');
+					} else if (checkedNode.parent) {
+						var pDept = checkedNode.parent.length >= 5 ? checkedNode.parent.substring(0, 5) : checkedNode.parent;
+						$('#deptCd' + sfx).val(pDept);
+					}
+				});
+
 				if (gbn == 'S') searchSubstVacationStatus();
 			});
 		}
@@ -856,7 +1244,7 @@
 			var rawDeptId = $('#deptCd' + sfx).val() || '';
 			var paramObj = {
 				"coCd": $('#coCd' + sfx).val() || "GUN",
-				"deptId": rawDeptId.length > 5 ? rawDeptId.substring(0, 5) : rawDeptId,
+				"deptId": rawDeptId.length >= 5 ? rawDeptId.substring(0, 5) : rawDeptId,
 				"deptNm": $('#deptNm' + sfx).val(),
 				"useYn": "Y"
 			};
@@ -864,9 +1252,16 @@
 				var checkedId = tree.get_checked()[0];
 				var checkedNode = tree.get_node(checkedId);
 				var fullDeptId = (checkedNode && checkedNode.id) ? checkedNode.id : '';
-				var deptId5 = fullDeptId.length > 5 ? fullDeptId.substring(0, 5) : fullDeptId;
+				var deptId5 = (fullDeptId && fullDeptId.length >= 5) ? fullDeptId.substring(0, 5) : fullDeptId;
 				$('#deptCd' + sfx).val(deptId5);
-				$('#deptNm' + sfx).val(checkedNode.text);
+				if (deptId5 && deptId5 !== fullDeptId) {
+					postAjaxSync("/admin/cm/cm04/selectDeptInfo", { "deptId": deptId5 }, null, function(deptData) {
+						var deptInfo = (deptData && deptData.deptInfo) ? deptData.deptInfo : (deptData || {});
+						$('#deptNm' + sfx).val(deptInfo.deptNm || (checkedNode ? checkedNode.text : ''));
+					});
+				} else {
+					$('#deptNm' + sfx).val(checkedNode ? checkedNode.text : '');
+				}
 				if (gbn == 'S') searchSubstVacationStatus();
 			});
 		}

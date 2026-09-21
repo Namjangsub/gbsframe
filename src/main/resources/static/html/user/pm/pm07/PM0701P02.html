@@ -6,22 +6,6 @@
 	-ms-user-select: text !important;
 	user-select: text !important;
 }
-/* WB0701M01 메모 팝오버 디자인 톤앤매너 100% 계승 툴팁 레이어 */
-.vacation-info-popover {
-	position: absolute;
-	z-index: 999999;
-	display: none;
-	background: #ffffff;
-	border: 1px solid #337ab7;
-	border-radius: 5px;
-	box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
-	padding: 10px 14px;
-	min-width: 260px;
-	max-width: 420px;
-	font-size: 12px;
-	color: #333333;
-	pointer-events: auto;
-}
 /* 연차부여 내역 3개 휴가 그룹별 구분을 위한 그리드 수직 경계 테두리선 강화 */
 [data-ax5grid="grantGrid"] .ax5grid-panel-scroll-col[data-ax5grid-column-attr="col-grantDays"],
 [data-ax5grid="grantGrid"] .ax5grid-header-column[data-ax5grid-column-attr="col-grantDays"] {
@@ -65,43 +49,6 @@
 }
 [data-ax5grid="grantGrid"] tr.grid-row-leave td.ax5grid-cell-pink {
 	background-color: #ffdeeb !important;
-}
-.vacation-info-popover .popover-title {
-	font-weight: bold;
-	color: #337ab7;
-	border-bottom: 1px solid #e9ecef;
-	padding-bottom: 5px;
-	margin-bottom: 6px;
-	font-size: 12px;
-}
-.vacation-info-popover #popContent,
-#vacationInfoPopover #popContent {
-	max-height: 280px;
-	overflow-y: auto;
-	overflow-x: hidden;
-	padding-right: 4px;
-}
-.vacation-info-popover #popContent::-webkit-scrollbar,
-#vacationInfoPopover #popContent::-webkit-scrollbar {
-	width: 6px;
-}
-.vacation-info-popover #popContent::-webkit-scrollbar-thumb,
-#vacationInfoPopover #popContent::-webkit-scrollbar-thumb {
-	background-color: #cbd5e1;
-	border-radius: 3px;
-}
-.vacation-info-popover #popContent::-webkit-scrollbar-track,
-#vacationInfoPopover #popContent::-webkit-scrollbar-track {
-	background-color: #f1f5f9;
-}
-.vacation-info-popover .popover-item {
-	padding: 4px 0;
-	line-height: 1.4;
-	color: #444444;
-	border-bottom: 1px dashed #f0f0f0;
-}
-.vacation-info-popover .popover-item:last-child {
-	border-bottom: none;
 }
 </style>
 <div class="popup_area of_a" style="width: 100%; height: 100%;">
@@ -498,6 +445,7 @@
 	};
 
 	var VACATION_POPOVER_TIMER = null;
+	var VACATION_POPOVER_REQUEST_ID = 0;
 
 	// 휴가종류 괄호 설명 정제 헬퍼 함수
 	function cleanVacationTypeNm(txt) {
@@ -505,174 +453,65 @@
 		return String(txt).replace(/\(.*?\)/g, "").trim();
 	}
 
-	// 사용/발생 일수 마우스 호버 시 휴가/대체근무 신청 이력 팝오버 툴팁 표출 함수 (WB0701M01 메모 팝오버 패턴)
-	function showVacationPopover($el, item, colKey) {
-		if (VACATION_POPOVER_TIMER) {
-			clearTimeout(VACATION_POPOVER_TIMER);
-			VACATION_POPOVER_TIMER = null;
+	// 날짜 범위 포맷터 헬퍼 함수
+	function formatVacationDateRange(stDt, edDt) {
+		if (stDt && edDt) {
+			return stDt === edDt ? stDt : (stDt + " ~ " + edDt);
 		}
+		return stDt || edDt || "";
+	}
 
-		var $pop = $('#vacationInfoPopover');
-		if ($pop.length === 0) {
-			$('body').append(
-				'<div id="vacationInfoPopover" class="vacation-info-popover">' +
-					'<div class="popover-title"><i class="fas fa-calendar-check"></i> <span id="popTitleText"></span></div>' +
-					'<div id="popContent"></div>' +
-				'</div>'
-			);
-			$pop = $('#vacationInfoPopover');
-
-			// 팝오버 창 위에 마우스가 위치했을 때 닫힘 방지
-			$pop.on('mouseenter', function() {
-				if (VACATION_POPOVER_TIMER) {
-					clearTimeout(VACATION_POPOVER_TIMER);
-					VACATION_POPOVER_TIMER = null;
-				}
-			}).on('mouseleave', function() {
-				hideVacationPopoverImmediately();
-			});
-		}
-
-		var userNm = (item && item.userNm) ? item.userNm : '사원';
-		var titleText = userNm + ' 님의 휴가신청 이력';
-		var infoText = "";
-
-		if (colKey === "workSubstDays") {
-			titleText = userNm + ' 님의 휴일대체근무(발생) 신청 이력';
-			infoText = (item && item.workSubstGenInfoList) ? item.workSubstGenInfoList : "";
-		} else if (colKey === "workSubstUsedDays") {
-			titleText = userNm + ' 님의 근무대체(사용) 신청 이력';
-			infoText = (item && item.vacWorkSubstInfoList) ? item.vacWorkSubstInfoList : "";
-		} else if (colKey === "summerVacDays") {
-			titleText = userNm + ' 님의 하계휴가대체(발생) 등록 이력';
-			infoText = (item && item.summerVacGenInfoList) ? item.summerVacGenInfoList : "";
-		} else if (colKey === "summerVacUsedDays") {
-			titleText = userNm + ' 님의 하계휴가대체(사용) 신청 이력';
-			infoText = (item && item.vacSummerInfoList) ? item.vacSummerInfoList : "";
-		} else if (colKey === "usedDays") {
-			titleText = userNm + ' 님의 연차/반차(사용) 신청 이력';
-			infoText = (item && item.vacAnnualInfoList) ? item.vacAnnualInfoList : "";
-		} else {
-			infoText = (item && item.vacInfoList) ? item.vacInfoList : "";
-		}
-
-		$('#popTitleText').text(titleText);
-
-		var htmlStr = '';
-		var validCount = 0;
-
-		if (infoText) {
-			var items = infoText.split(';');
-			$.each(items, function(i, val) {
-				var rawVal = $.trim(val);
-				if (!rawVal) return;
-
-				// rawVal 포맷:
-				// 휴일대체 발생: "YYYY-MM-DD (휴일근무/사유 1일)"
-				// 하계대체 발생: "YYYY-MM-DD~YYYY-MM-DD (하계대체휴가 N일)"
-				// 휴가 사용: "YYYY-MM-DD(~MM-DD)? (휴가종류 N일)"
-				htmlStr += '<div class="popover-item"><i class="fas fa-check-circle" style="color: #337ab7; margin-right: 5px;"></i> ' + rawVal + '</div>';
-				validCount++;
-			});
-		}
-
-		if (validCount === 0) {
-			var emptyMsg = "등록된 상세 신청 이력이 없습니다.";
-			if (colKey === "workSubstDays") emptyMsg = "등록된 휴일대체근무(발생) 신청 이력이 없습니다.";
-			else if (colKey === "workSubstUsedDays") emptyMsg = "등록된 근무대체(사용) 신청 이력이 없습니다.";
-			else if (colKey === "summerVacDays") emptyMsg = "등록된 하계휴가대체(발생) 등록 이력이 없습니다.";
-			else if (colKey === "summerVacUsedDays") emptyMsg = "등록된 하계휴가대체(사용) 신청 이력이 없습니다.";
-			else if (colKey === "usedDays") emptyMsg = "등록된 연차/반차 상세 신청 이력이 없습니다.";
-
-			htmlStr = '<div class="popover-item" style="color: #888888;">' + emptyMsg + '</div>';
-		}
-
-		$('#popContent').html(htmlStr);
-
-		var offset = $el.offset();
-		$pop.css({
-			top: (offset.top + $el.outerHeight() + 2) + 'px',
-			left: Math.max(10, offset.left - 20) + 'px'
-		}).show();
-
-		// 화면 하단/우측 넘침 방지 스마트 포지셔닝
-		var popHeight = $pop.outerHeight();
-		var popWidth = $pop.outerWidth();
-		var winHeight = $(window).height();
-		var winWidth = $(window).width();
-		var scrollTop = $(window).scrollTop();
-		var scrollLeft = $(window).scrollLeft();
-
-		var topPos = offset.top + $el.outerHeight() + 2;
-		if (topPos + popHeight > scrollTop + winHeight && (offset.top - popHeight - 2) >= scrollTop) {
-			topPos = offset.top - popHeight - 2;
-		}
-
-		var leftPos = Math.max(10, offset.left - 20);
-		if (leftPos + popWidth > scrollLeft + winWidth - 10) {
-			leftPos = Math.max(10, scrollLeft + winWidth - popWidth - 10);
-		}
-
-		$pop.css({
-			top: topPos + 'px',
-			left: leftPos + 'px'
+	// 상세 정보 모달 (휴가신청서 PM0701P01.html)
+	function openVacationDetailModal(reqNo) {
+		PM07Annual.Popover.openDetailModal('vac', reqNo, function() {
+			searchGrantGrid();
 		});
 	}
 
-	function hideVacationPopover() {
-		if (VACATION_POPOVER_TIMER) {
-			clearTimeout(VACATION_POPOVER_TIMER);
-		}
-		VACATION_POPOVER_TIMER = setTimeout(function() {
-			$('#vacationInfoPopover').hide();
-			VACATION_POPOVER_TIMER = null;
-		}, 300);
+	// 상세 정보 모달 (휴일대체근무신청서 PM0801P01.html)
+	function openSubstWorkDetailModal(reqNo) {
+		PM07Annual.Popover.openDetailModal('sw', reqNo, function() {
+			searchGrantGrid();
+		});
 	}
 
-	function hideVacationPopoverImmediately() {
-		if (VACATION_POPOVER_TIMER) {
-			clearTimeout(VACATION_POPOVER_TIMER);
-			VACATION_POPOVER_TIMER = null;
-		}
-		$('#vacationInfoPopover').hide();
+	// 팝오버 표출/숨김 하위 호환 헬퍼
+	function showVacationPopover($el, item, colKey, e) {
+		PM07Annual.Popover.show($el, {
+			coCd: (item && item.coCd) || (typeof jwt !== 'undefined' ? jwt.coCd : 'GUN') || 'GUN',
+			userId: (item && (item.userId || item.id)) ? (item.userId || item.id) : '',
+			userNm: (item && item.userNm) ? item.userNm : '사원',
+			yy: $('#yy').val() || (item && item.yy) || '2026',
+			colKey: colKey,
+			infoText: (item && item.summerVacGenInfoList) ? item.summerVacGenInfoList : '',
+			onClose: function() { searchGrantGrid(); }
+		}, e);
 	}
 
-	// 그리드 사용/발생 일수 마우스 호버/클릭 이벤트 바인딩 (used-days-info-trigger 전용)
-	$(document).off('mouseenter mouseleave click', '.used-days-info-trigger');
-	$(document).on({
-		mouseenter: function(e) {
-			var $el = $(this);
-			var colKey = $el.attr('data-colkey') || '';
-			var $row = $el.closest('tr[data-ax5grid-tr-index], [data-ax5grid-data-index], [data-ax5grid-tr-index], tr');
-			var rowIdx = $row.attr('data-ax5grid-tr-index') || $row.attr('data-ax5grid-data-index') || $row.attr('data-ax5grid-index');
-			if (typeof rowIdx === 'undefined' || rowIdx === null || rowIdx === '') {
-				rowIdx = $row.index();
-			}
 
-			if (rowIdx !== undefined && grantGridView && grantGridView.target && grantGridView.target.list && grantGridView.target.list[rowIdx]) {
-				var item = grantGridView.target.list[rowIdx];
-				showVacationPopover($el, item, colKey);
-			}
-		},
-		mouseleave: function(e) {
-			hideVacationPopover();
-		},
-		click: function(e) {
-			e.stopPropagation();
-			var $el = $(this);
-			var colKey = $el.attr('data-colkey') || '';
-			var $row = $el.closest('tr[data-ax5grid-tr-index], [data-ax5grid-data-index], [data-ax5grid-tr-index], tr');
-			var rowIdx = $row.attr('data-ax5grid-tr-index') || $row.attr('data-ax5grid-data-index') || $row.attr('data-ax5grid-index');
-			if (typeof rowIdx === 'undefined' || rowIdx === null || rowIdx === '') {
-				rowIdx = $row.index();
-			}
-
-			if (rowIdx !== undefined && grantGridView && grantGridView.target && grantGridView.target.list && grantGridView.target.list[rowIdx]) {
-				var item = grantGridView.target.list[rowIdx];
-				showVacationPopover($el, item, colKey);
-			}
+	// 공용 팝오버 호버 이벤트 바인딩 (PM0810M01과 100% 동일한 200ms 진입 디바운스 및 350ms 퇴장 지연)
+	PM07Annual.Popover.bindHover('[data-ax5grid="grantGrid"] .used-days-info-trigger', function($el) {
+		var colKey = $el.attr('data-colkey') || '';
+		var $row = $el.closest('tr[data-ax5grid-tr-index], [data-ax5grid-data-index], tr');
+		var rowIdx = $row.attr('data-ax5grid-tr-index') || $row.attr('data-ax5grid-data-index') || $row.attr('data-ax5grid-index');
+		if (typeof rowIdx === 'undefined' || rowIdx === null || rowIdx === '') {
+			rowIdx = $row.index();
 		}
-	}, '.used-days-info-trigger');
+
+		if (rowIdx !== undefined && grantGridView && grantGridView.target && grantGridView.target.list && grantGridView.target.list[rowIdx]) {
+			var item = grantGridView.target.list[rowIdx];
+			return {
+				coCd: (item && item.coCd) || (typeof jwt !== 'undefined' ? jwt.coCd : 'GUN') || 'GUN',
+				userId: (item && (item.userId || item.id)) ? (item.userId || item.id) : '',
+				userNm: (item && item.userNm) ? item.userNm : '사원',
+				yy: $('#yy').val() || (item && item.yy) || '2026',
+				colKey: colKey,
+				infoText: (item && item.summerVacGenInfoList) ? item.summerVacGenInfoList : '',
+				onClose: function() { searchGrantGrid(); }
+			};
+		}
+		return null;
+	});
 
 	// 그리드 데이터 수정/추가/삭제 감지 시 저장 버튼 주황색(#f0ad4e) 강조 스타일 제어 함수
 	function markGrantGridDirty(isDirty) {

@@ -621,6 +621,18 @@
 			}
 			$('#reqId' + sfx).val(checkedNode.id);
 			$('#reqIdNm' + sfx).val(checkedNode.text);
+
+			// 신청자 선택 시 백엔드(selectUserInfo)에서 5자리 부서코드와 해당 부서명을 반영
+			postAjaxSync("/admin/cm/cm06/selectUserInfo", { "userId": checkedNode.id }, null, function(data) {
+				if (data && data.userInfo) {
+					$('#reqDeptId' + sfx).val(data.userInfo.deptId || '');
+					$('#reqDeptNm' + sfx).val(data.userInfo.deptNm || '');
+				} else if (checkedNode.parent) {
+					var pDept = checkedNode.parent.length >= 5 ? checkedNode.parent.substring(0, 5) : checkedNode.parent;
+					$('#reqDeptId' + sfx).val(pDept);
+				}
+			});
+
 			if (gbn == 'S') DataSearch();
 		});
 	}
@@ -628,17 +640,27 @@
 	// 부서 검색
 	function openReqDeptTree(gbn) {
 		var sfx = (gbn == 'S') ? '_S' : '';
+		var rawDeptId = $('#reqDeptId' + sfx).val() || '';
 		var paramObj = {
 			 "coCd"   : ''
-			,"deptId" : $('#reqDeptId' + sfx).val()
+			,"deptId" : rawDeptId.length >= 5 ? rawDeptId.substring(0, 5) : rawDeptId
 			,"deptNm" : $('#reqDeptNm' + sfx).val()
 			,"useYn"  : "Y"
 		};
 		openSecondModal("/static/html/cmn/modal/deptSearch.html", 300, 500, "부서 검색", paramObj, function(tree) {
 			var checkedId = tree.get_checked()[0];
 			var checkedNode = tree.get_node(checkedId);
-			$('#reqDeptId' + sfx).val(checkedNode.id);
-			$('#reqDeptNm' + sfx).val(checkedNode.text);
+			var fullDeptId = (checkedNode && checkedNode.id) ? checkedNode.id : '';
+			var deptId5 = (fullDeptId && fullDeptId.length >= 5) ? fullDeptId.substring(0, 5) : fullDeptId;
+			$('#reqDeptId' + sfx).val(deptId5);
+			if (deptId5 && deptId5 !== fullDeptId) {
+				postAjaxSync("/admin/cm/cm04/selectDeptInfo", { "deptId": deptId5 }, null, function(deptData) {
+					var deptInfo = (deptData && deptData.deptInfo) ? deptData.deptInfo : (deptData || {});
+					$('#reqDeptNm' + sfx).val(deptInfo.deptNm || (checkedNode ? checkedNode.text : ''));
+				});
+			} else {
+				$('#reqDeptNm' + sfx).val(checkedNode ? checkedNode.text : '');
+			}
 			if (gbn == 'S') DataSearch();
 		});
 	}

@@ -1,19 +1,26 @@
 <!--
 	========================================================================================
-	[PM0711M01.html] 연차 사용 현황 화면 (PM0701P02.html 팝오버 톤앤매너 계승)
+	[PM0711M01.html] 연차 사용 현황 화면
 	----------------------------------------------------------------------------------------
 	1. 직종 구분 (TB_CM06M01.SALES_AREA 기준):
 	   - SALESAREA60 : 생산직
 	   - SALESAREA00 : 임원 (※ 연차 대상 제외: U.SALES_AREA != 'SALESAREA00')
 	   - 기타/NULL   : 사무직 (U.SALES_AREA IS NULL OR U.SALES_AREA != 'SALESAREA60')
-	2. 부서 코드 및 정렬:
-	   - 부서 매핑: VIEW_DEPT_ID (SUBSTR(NVL(U.VIEW_DEPT_ID, U.DEPT_ID), 1, 5)) 상위 5자리
+	2. 부서 코드 및 검색 조건 연동:
+	   - 부서 매핑: 인사기준 부서 5자리 매핑 (SUBSTR(NVL(U.VIEW_DEPT_ID, U.DEPT_ID), 1, 5))
+	   - 신청자 검색: 사원 검색 팝업에서 신청자 선택 시 해당 사원의 5자리 부서코드/부서명 자동 연동
 	   - 제외 부서: GUN95xx (실적관리용/특수부서 제외)
 	   - 정렬 순서: D.SORT_NO ASC, A.DEPT_NM ASC, A.USER_NM ASC (조직도 기본 정렬순)
-	3. 실시간 팝오버 호버 툴팁 기능 (showVacationPopover):
-	   - 1월~12월 수치 셀 마우스 호버/클릭 시 /user/pm/pm07/selectVacationCalendarList 실시간 호출
-	   - PM0701P02.html 의 vacation-info-popover 디자인 및 파란색 돋보기 포맷터 100% 동일 계승
-	   - 연차 (1일), 반차/오전/오후반차 (0.5일) 상세 신청서 사유 [REQ_RMK] 실시간 표시
+	3. 연차 및 잔여일수(미사용일수) 산정 공식:
+	   - 미사용일수 = 발생일수 + 전년도이월/선사용일수 - 실사용일수
+	   - 휴일대체휴가 = 휴일대체휴가발생 - 대체휴가사용
+	   - 하계휴가 = 하계휴가발생 - 하계휴가사용
+	   - 포상휴가 = 포상휴가발생 - 포상휴가사용
+	   - 각 구분별 잔여일수 독립 계산 및 실시간 정합성 유지
+	4. 실시간 팝오버 툴팁 및 신청서 상세 모달 연동:
+	   - 1월~12월 월별 사용일수 셀 마우스 호버 시 selectVacationCalendarList 실시간 호출
+	   - 휴가구분(연차, 반차 등), 일자, 사유(REQ_RMK) 팝오버 툴팁 표시
+	   - 팝오버 항목 클릭 시 휴가신청서 상세 모달(PM0701P01.html) 호출 및 상세 확인/결재 연동
 	========================================================================================
 -->
 <!DOCTYPE html>
@@ -128,6 +135,20 @@
 }
 .vacation-info-popover .popover-item:last-child {
 	border-bottom: none;
+}
+.vacation-info-popover .popover-item.clickable {
+	cursor: pointer;
+	border-radius: 4px;
+	padding: 5px 8px;
+	margin: 2px 0;
+	transition: background-color 0.15s ease, color 0.15s ease;
+}
+.vacation-info-popover .popover-item.clickable:hover {
+	background-color: #ebf5fb;
+	color: #1e40af;
+}
+.vacation-info-popover .popover-item.clickable:hover .pop-link-icon {
+	color: #1e40af;
 }
 </style>
 </head>
@@ -451,6 +472,16 @@
 				}).on('mouseleave', function() {
 					hideVacationPopoverImmediately();
 				});
+
+				// 팝오버 항목 클릭 시 해당 휴가신청서 모달 오픈
+				$pop.on('click', '.popover-item.clickable', function(e) {
+					e.stopPropagation();
+					var reqNo = $(this).attr('data-req-no');
+					if (reqNo) {
+						hideVacationPopoverImmediately();
+						openVacationDetailModal(reqNo);
+					}
+				});
 			}
 
 			var userNm = (item ? (item.userNm || item.USER_NM || item.name) : '') || '사원';
@@ -535,8 +566,13 @@
 							var daysText = ' (' + vDays + '일)';
 							var rmk = row.reqRmk || row.req_rmk || row.rmk || '';
 							var rmkText = rmk ? (' [' + $.trim(rmk) + ']') : '';
+							var reqNo = row.reqNo || row.req_no || '';
 
-							htmlStr += '<div class="popover-item"><i class="fas fa-check-circle" style="color: #337ab7; margin-right: 5px;"></i> ' + dtText + ' ' + vNm + daysText + rmkText + '</div>';
+							htmlStr += '<div class="popover-item clickable" data-req-no="' + reqNo + '" title="클릭 시 휴가신청서 확인">' +
+										'<i class="fas fa-check-circle" style="color: #337ab7; margin-right: 5px;"></i>' +
+										dtText + ' ' + vNm + daysText + rmkText +
+										' <i class="fas fa-external-link-alt pop-link-icon" style="font-size: 10px; color: #337ab7; margin-left: 5px;" title="신청서 열기"></i>' +
+									   '</div>';
 							validCount++;
 						}
 					});
@@ -591,6 +627,20 @@
 				VACATION_POPOVER_TIMER = null;
 			}
 			$('#vacationInfoPopover').hide();
+		}
+
+		// 상세 정보 모달 (휴가신청서 PM0701P01.html)
+		function openVacationDetailModal(reqNo) {
+			if (!reqNo) return;
+			var paramObj = {
+				 "actionType" : "U"
+				,"reqNo"      : reqNo
+				,"pgmId"      : "PM0701P01"
+			};
+
+			openModal("/static/html/user/pm/pm07/PM0701P01.html", 1100, 700, "휴가 신청서 상세", paramObj, function(res) {
+				searchAnnualUseStatusGrid();
+			});
 		}
 
 		// PM0701P02.html 그리드 셀 마우스 호버/클릭 이벤트 바인딩 100% 동일 구현
@@ -715,11 +765,12 @@
 							// 선사용 = 전년도 TB_PM07M02.REM_DAYS(전년도 정산잔여). 미입력 시 0, 음수(-)도 허용
 							var prevDays = Number(item.prevDays || 0);
 							item.prevDays = !isNaN(prevDays) ? prevDays : 0;
-							// 사용일수 = 1~12월 사용 합계 − 선사용
+							// 사용일수 = 1~12월 연차 실사용일수 합계
 							var usedSum  = Number(item.usedDaysSum || 0);
-							item.usedDaysSum = usedSum - item.prevDays;
-							// 미사용일수 = 발생일수 − 사용일수
-							item.balanceDays = autoDays - item.usedDaysSum;
+							item.usedDaysSum = usedSum;
+							// 미사용일수 = 발생일수 + 전년도이월/선사용일수 − 실사용일수
+							var balDays = autoDays + item.prevDays - usedSum;
+							item.balanceDays = Math.round(balDays * 10) / 10;
 						}
 					});
 					statusGridView.setData(data.result);
@@ -763,6 +814,18 @@
 				}
 				$('#userId' + sfx).val(checkedNode.id);
 				$('#userNm' + sfx).val(checkedNode.text);
+
+				// 사원 선택 시 백엔드(selectUserInfo)에서 5자리 부서코드와 해당 부서명을 반영
+				postAjaxSync("/admin/cm/cm06/selectUserInfo", { "userId": checkedNode.id }, null, function(data) {
+					if (data && data.userInfo) {
+						$('#deptCd' + sfx).val(data.userInfo.deptId || '');
+						$('#deptNm' + sfx).val(data.userInfo.deptNm || '');
+					} else if (checkedNode.parent) {
+						var pDept = checkedNode.parent.length >= 5 ? checkedNode.parent.substring(0, 5) : checkedNode.parent;
+						$('#deptCd' + sfx).val(pDept);
+					}
+				});
+
 				if (gbn == 'S') searchAnnualUseStatusGrid();
 			});
 		}
@@ -773,7 +836,7 @@
 			var rawDeptId = $('#deptCd' + sfx).val() || '';
 			var paramObj = {
 				"coCd": $('#coCd' + sfx).val() || "GUN",
-				"deptId": rawDeptId.length > 5 ? rawDeptId.substring(0, 5) : rawDeptId,
+				"deptId": rawDeptId.length >= 5 ? rawDeptId.substring(0, 5) : rawDeptId,
 				"deptNm": $('#deptNm' + sfx).val(),
 				"useYn": "Y"
 			};
@@ -781,9 +844,16 @@
 				var checkedId = tree.get_checked()[0];
 				var checkedNode = tree.get_node(checkedId);
 				var fullDeptId = (checkedNode && checkedNode.id) ? checkedNode.id : '';
-				var deptId5 = fullDeptId.length > 5 ? fullDeptId.substring(0, 5) : fullDeptId;
+				var deptId5 = (fullDeptId && fullDeptId.length >= 5) ? fullDeptId.substring(0, 5) : fullDeptId;
 				$('#deptCd' + sfx).val(deptId5);
-				$('#deptNm' + sfx).val(checkedNode.text);
+				if (deptId5 && deptId5 !== fullDeptId) {
+					postAjaxSync("/admin/cm/cm04/selectDeptInfo", { "deptId": deptId5 }, null, function(deptData) {
+						var deptInfo = (deptData && deptData.deptInfo) ? deptData.deptInfo : (deptData || {});
+						$('#deptNm' + sfx).val(deptInfo.deptNm || (checkedNode ? checkedNode.text : ''));
+					});
+				} else {
+					$('#deptNm' + sfx).val(checkedNode ? checkedNode.text : '');
+				}
 				if (gbn == 'S') searchAnnualUseStatusGrid();
 			});
 		}

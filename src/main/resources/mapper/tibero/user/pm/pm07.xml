@@ -118,7 +118,7 @@
 				M.CO_CD,
 				M.REQ_NO,
 				M.REQ_ID,
-				M.REQ_DEPT_ID,
+				SUBSTR(M.REQ_DEPT_ID, 1, 5) AS REQ_DEPT_ID,
 				M.VAC_TYPE_CD,
 				C1.CODE_NM AS VAC_TYPE_NM,
 				U.NAME AS REQ_ID_NM,
@@ -133,7 +133,17 @@
 				NVL(W.CALC_SANCTN_STS, NVL(M.SANCTN_STS, 'TEMP')) AS SANCTN_STS,
 				'VACATION' AS SRC_TYPE,
 				'VACATION' AS DOC_TYPE,
-				M.REQ_NO AS DOC_NO
+				M.REQ_NO AS DOC_NO,
+				NULL AS ST_TM,
+				NULL AS ED_TM,
+				NULL AS REAL_ST_TM,
+				NULL AS REAL_ED_TM,
+				NULL AS PJT_NM,
+				NULL AS CLNT_NM,
+				NULL AS SALES_CD,
+				M.REQ_RMK AS SPECIAL_REASON,
+				NULL AS WORK_RESULT,
+				NULL AS RESULT_SANCTN_STS
 			FROM TB_PM07M01 M
 			LEFT OUTER JOIN TB_CM06M01 U ON M.REQ_ID = U.ID
 			LEFT OUTER JOIN TB_CM04M01 D ON D.DEPT_ID = SUBSTR(M.REQ_DEPT_ID, 1, 5)
@@ -160,7 +170,14 @@
 			  AND M.ED_DT &gt;= #{reqDtFrom}
 			</if>
 			<if test="vacTypeCd != null and !vacTypeCd.equals('')">
-			  AND M.VAC_TYPE_CD = #{vacTypeCd}
+				<choose>
+					<when test="vacTypeCd.equals('TRIP') or vacTypeCd.equals('SUBST')">
+						AND 1=2
+					</when>
+					<otherwise>
+						AND M.VAC_TYPE_CD = #{vacTypeCd}
+					</otherwise>
+				</choose>
 			</if>
 			<if test="reqId != null and !reqId.equals('')">
 			  AND M.REQ_ID = #{reqId}
@@ -200,7 +217,17 @@
 				NVL(WT.CALC_SANCTN_STS, 'TEMP') AS SANCTN_STS,
 				'TRIP' AS SRC_TYPE,
 				'TRIP_RPT' AS DOC_TYPE,
-				RPT.TRIP_RPT_NO AS DOC_NO
+				RPT.TRIP_RPT_NO AS DOC_NO,
+				SUBSTR(D.TRIP_ST_DTM, 9, 4) AS ST_TM,
+				SUBSTR(D.TRIP_ED_DTM, 9, 4) AS ED_TM,
+				SUBSTR(D.TRIP_ST_DTM, 9, 4) AS REAL_ST_TM,
+				SUBSTR(D.TRIP_ED_DTM, 9, 4) AS REAL_ED_TM,
+				RM.TRIP_PLACE AS PJT_NM,
+				NULL AS CLNT_NM,
+				NULL AS SALES_CD,
+				RM.TRIP_PLACE AS SPECIAL_REASON,
+				NULL AS WORK_RESULT,
+				NULL AS RESULT_SANCTN_STS
 			FROM TB_PM52M01 RPT
 			JOIN TB_PM52D02 D ON D.TRIP_RPT_NO = RPT.TRIP_RPT_NO
 			JOIN TB_PM51M01 RM ON RM.TRIP_REQ_NO = RPT.TRIP_REQ_NO
@@ -208,6 +235,7 @@
 				SELECT
 					TODO_NO,
 					CASE
+						WHEN SUM(CASE WHEN NVL(APPR_REJECT_YN, 'N') = 'Y' THEN 1 ELSE 0 END) &gt; 0 THEN 'RTN'
 						WHEN SUM(CASE WHEN TODO_CF_DT IS NOT NULL AND (SANCTN_STTUS = 'N' OR SANCTN_STTUS = 'R' OR SANCTN_STTUS = '4') THEN 1 ELSE 0 END) &gt; 0 THEN 'RTN'
 						WHEN COUNT(TODO_KEY) = 0 THEN 'TEMP'
 						WHEN COUNT(TODO_KEY) &gt; 0 AND COUNT(TODO_KEY) = SUM(CASE WHEN TODO_CF_DT IS NOT NULL AND SANCTN_STTUS != 'N' THEN 1 ELSE 0 END) THEN 'END'
@@ -223,6 +251,16 @@
 			  AND SUBSTR(D.TRIP_ST_DTM, 1, 8) &lt;= #{reqDtTo}
 			  AND SUBSTR(D.TRIP_ED_DTM, 1, 8) &gt;= #{reqDtFrom}
 			</if>
+			<if test="vacTypeCd != null and !vacTypeCd.equals('')">
+				<choose>
+					<when test="vacTypeCd.equals('TRIP')">
+						/* 출장만 조회 */
+					</when>
+					<otherwise>
+						AND 1=2
+					</otherwise>
+				</choose>
+			</if>
 			<if test="reqId != null and !reqId.equals('')">
 			  AND D.USER_ID = #{reqId}
 			</if>
@@ -231,6 +269,9 @@
 			</if>
 			<if test="reqDeptNm != null and !reqDeptNm.equals('')">
 			  AND D.DEPT_NM LIKE '%' || #{reqDeptNm} || '%'
+			</if>
+			<if test="sanctnSts != null and !sanctnSts.equals('')">
+			  AND NVL(WT.CALC_SANCTN_STS, 'TEMP') = #{sanctnSts}
 			</if>
 
 			UNION ALL
@@ -255,13 +296,24 @@
 				NVL(WT.CALC_SANCTN_STS, 'TEMP') AS SANCTN_STS,
 				'TRIP' AS SRC_TYPE,
 				'TRIP_REQ' AS DOC_TYPE,
-				RM.TRIP_REQ_NO AS DOC_NO
+				RM.TRIP_REQ_NO AS DOC_NO,
+				SUBSTR(D.TRIP_ST_DTM, 9, 4) AS ST_TM,
+				SUBSTR(D.TRIP_ED_DTM, 9, 4) AS ED_TM,
+				NULL AS REAL_ST_TM,
+				NULL AS REAL_ED_TM,
+				RM.TRIP_PLACE AS PJT_NM,
+				NULL AS CLNT_NM,
+				NULL AS SALES_CD,
+				RM.TRIP_PLACE AS SPECIAL_REASON,
+				NULL AS WORK_RESULT,
+				NULL AS RESULT_SANCTN_STS
 			FROM TB_PM51M01 RM
 			JOIN TB_PM51D01 D ON D.TRIP_REQ_NO = RM.TRIP_REQ_NO
 			LEFT OUTER JOIN (
 				SELECT
 					TODO_NO,
 					CASE
+						WHEN SUM(CASE WHEN NVL(APPR_REJECT_YN, 'N') = 'Y' THEN 1 ELSE 0 END) &gt; 0 THEN 'RTN'
 						WHEN SUM(CASE WHEN TODO_CF_DT IS NOT NULL AND (SANCTN_STTUS = 'N' OR SANCTN_STTUS = 'R' OR SANCTN_STTUS = '4') THEN 1 ELSE 0 END) &gt; 0 THEN 'RTN'
 						WHEN COUNT(TODO_KEY) = 0 THEN 'TEMP'
 						WHEN COUNT(TODO_KEY) &gt; 0 AND COUNT(TODO_KEY) = SUM(CASE WHEN TODO_CF_DT IS NOT NULL AND SANCTN_STTUS != 'N' THEN 1 ELSE 0 END) THEN 'END'
@@ -277,6 +329,16 @@
 			  AND SUBSTR(D.TRIP_ST_DTM, 1, 8) &lt;= #{reqDtTo}
 			  AND SUBSTR(D.TRIP_ED_DTM, 1, 8) &gt;= #{reqDtFrom}
 			</if>
+			<if test="vacTypeCd != null and !vacTypeCd.equals('')">
+				<choose>
+					<when test="vacTypeCd.equals('TRIP')">
+						/* 출장만 조회 */
+					</when>
+					<otherwise>
+						AND 1=2
+					</otherwise>
+				</choose>
+			</if>
 			<if test="reqId != null and !reqId.equals('')">
 			  AND D.USER_ID = #{reqId}
 			</if>
@@ -286,6 +348,9 @@
 			<if test="reqDeptNm != null and !reqDeptNm.equals('')">
 			  AND D.DEPT_NM LIKE '%' || #{reqDeptNm} || '%'
 			</if>
+			<if test="sanctnSts != null and !sanctnSts.equals('')">
+			  AND NVL(WT.CALC_SANCTN_STS, 'TEMP') = #{sanctnSts}
+			</if>
 
 			UNION ALL
 
@@ -294,29 +359,49 @@
 				M.CO_CD,
 				M.REQ_NO,
 				M.REQ_ID,
-				M.DEPT_ID AS REQ_DEPT_ID,
+				SUBSTR(M.DEPT_ID, 1, 5) AS REQ_DEPT_ID,
 				NULL AS VAC_TYPE_CD,
 				'대체근무' AS VAC_TYPE_NM,
 				NVL(U.NAME, M.REQ_NM) AS REQ_ID_NM,
-				NVL(M.DEPT_NM, D.DEPT_NM) AS REQ_DEPT_NM,
+				NVL(D.DEPT_NM, M.DEPT_NM) AS REQ_DEPT_NM,
 				NULL AS AMPM_CD,
 				NULL AS AMPM_NM,
-				TO_CHAR(TO_DATE(M.HOLIDAY_DT, 'YYYYMMDD'), 'YYYY-MM-DD') AS ST_DT,
-				TO_CHAR(TO_DATE(M.HOLIDAY_DT, 'YYYYMMDD'), 'YYYY-MM-DD') AS ED_DT,
-				M.HOLIDAY_DT AS RAW_ST_DT,
-				M.HOLIDAY_DT AS RAW_ED_DT,
+				TO_CHAR(TO_DATE(REPLACE(M.HOLIDAY_DT, '-', ''), 'YYYYMMDD'), 'YYYY-MM-DD') AS ST_DT,
+				TO_CHAR(TO_DATE(REPLACE(M.HOLIDAY_DT, '-', ''), 'YYYYMMDD'), 'YYYY-MM-DD') AS ED_DT,
+				REPLACE(M.HOLIDAY_DT, '-', '') AS RAW_ST_DT,
+				REPLACE(M.HOLIDAY_DT, '-', '') AS RAW_ED_DT,
 				M.SPECIAL_REASON AS REQ_RMK,
 				NVL(WP.CALC_SANCTN_STS, 'TEMP') AS SANCTN_STS,
 				'SUBST' AS SRC_TYPE,
 				'SUBST' AS DOC_TYPE,
-				M.REQ_NO AS DOC_NO
+				M.REQ_NO AS DOC_NO,
+				M.ST_TM,
+				M.ED_TM,
+				M.REAL_ST_TM,
+				M.REAL_ED_TM,
+				D1.PJT_NM,
+				D1.CLNT_NM,
+				D1.SALES_CD,
+				M.SPECIAL_REASON,
+				M.WORK_RESULT,
+				NVL(WR.CALC_SANCTN_STS, 'TEMP') AS RESULT_SANCTN_STS
 			FROM TB_PM08M01 M
 			LEFT OUTER JOIN TB_CM06M01 U ON U.ID = M.REQ_ID
 			LEFT OUTER JOIN TB_CM04M01 D ON D.DEPT_ID = SUBSTR(M.DEPT_ID, 1, 5)
 			LEFT OUTER JOIN (
 				SELECT
+					REQ_NO,
+					LISTAGG(SALES_CD, ', ') WITHIN GROUP (ORDER BY SEQ) AS SALES_CD,
+					LISTAGG(CLNT_NM, ', ') WITHIN GROUP (ORDER BY SEQ) AS CLNT_NM,
+					LISTAGG(PJT_NM, ', ') WITHIN GROUP (ORDER BY SEQ) AS PJT_NM
+				FROM TB_PM08D01
+				GROUP BY REQ_NO
+			) D1 ON D1.REQ_NO = M.REQ_NO
+			LEFT OUTER JOIN (
+				SELECT
 					TODO_NO,
 					CASE
+						WHEN SUM(CASE WHEN NVL(APPR_REJECT_YN, 'N') = 'Y' THEN 1 ELSE 0 END) &gt; 0 THEN 'RTN'
 						WHEN SUM(CASE WHEN TODO_CF_DT IS NOT NULL AND (SANCTN_STTUS = 'N' OR SANCTN_STTUS = 'R' OR SANCTN_STTUS = '4') THEN 1 ELSE 0 END) &gt; 0 THEN 'RTN'
 						WHEN COUNT(TODO_KEY) = 0 THEN 'TEMP'
 						WHEN COUNT(TODO_KEY) &gt; 0 AND COUNT(TODO_KEY) = SUM(CASE WHEN TODO_CF_DT IS NOT NULL AND SANCTN_STTUS != 'N' THEN 1 ELSE 0 END) THEN 'END'
@@ -327,10 +412,35 @@
 				WHERE TODO_DIV1_CODE_ID = 'TODODIV20' AND TODO_DIV2_CODE_ID = 'TODODIV2410'
 				GROUP BY TODO_NO
 			) WP ON WP.TODO_NO = M.REQ_NO
+			LEFT OUTER JOIN (
+				SELECT
+					TODO_NO,
+					CASE
+						WHEN SUM(CASE WHEN NVL(APPR_REJECT_YN, 'N') = 'Y' THEN 1 ELSE 0 END) &gt; 0 THEN 'RTN'
+						WHEN SUM(CASE WHEN TODO_CF_DT IS NOT NULL AND (SANCTN_STTUS = 'N' OR SANCTN_STTUS = 'R' OR SANCTN_STTUS = '4') THEN 1 ELSE 0 END) &gt; 0 THEN 'RTN'
+						WHEN COUNT(TODO_KEY) = 0 THEN 'TEMP'
+						WHEN COUNT(TODO_KEY) &gt; 0 AND COUNT(TODO_KEY) = SUM(CASE WHEN TODO_CF_DT IS NOT NULL AND SANCTN_STTUS != 'N' THEN 1 ELSE 0 END) THEN 'END'
+						WHEN SUM(CASE WHEN SANCTN_SN &gt; 1 AND TODO_CF_DT IS NOT NULL AND SANCTN_STTUS != 'N' THEN 1 ELSE 0 END) &gt; 0 THEN 'ING'
+						ELSE 'REQ'
+					END AS CALC_SANCTN_STS
+				FROM TB_WB20M03
+				WHERE TODO_DIV1_CODE_ID = 'TODODIV20' AND TODO_DIV2_CODE_ID = 'TODODIV2420'
+				GROUP BY TODO_NO
+			) WR ON WR.TODO_NO = M.REQ_NO
 			WHERE 1=1
 			<if test="reqDtFrom != null and !reqDtFrom.equals('') and reqDtTo != null and !reqDtTo.equals('')">
-			  AND M.HOLIDAY_DT &lt;= #{reqDtTo}
-			  AND M.HOLIDAY_DT &gt;= #{reqDtFrom}
+			  AND REPLACE(M.HOLIDAY_DT, '-', '') &lt;= #{reqDtTo}
+			  AND REPLACE(M.HOLIDAY_DT, '-', '') &gt;= #{reqDtFrom}
+			</if>
+			<if test="vacTypeCd != null and !vacTypeCd.equals('')">
+				<choose>
+					<when test="vacTypeCd.equals('SUBST')">
+						/* 대체근무만 조회 */
+					</when>
+					<otherwise>
+						AND 1=2
+					</otherwise>
+				</choose>
 			</if>
 			<if test="reqId != null and !reqId.equals('')">
 			  AND M.REQ_ID = #{reqId}
@@ -343,6 +453,9 @@
 			</if>
 			<if test="reqDeptNm != null and !reqDeptNm.equals('')">
 			  AND NVL(M.DEPT_NM, D.DEPT_NM) LIKE '%' || #{reqDeptNm} || '%'
+			</if>
+			<if test="sanctnSts != null and !sanctnSts.equals('')">
+			  AND NVL(WP.CALC_SANCTN_STS, 'TEMP') = #{sanctnSts}
 			</if>
 		) UT
 		ORDER BY UT.ST_DT ASC, UT.REQ_NO ASC
@@ -359,7 +472,7 @@
 					M.REQ_DT,
 					M.REQ_TITL,
 					M.REQ_ID,
-					M.REQ_DEPT_ID,
+					SUBSTR(M.REQ_DEPT_ID, 1, 5) AS REQ_DEPT_ID,
 					M.VAC_TYPE_CD,
 					C1.CODE_NM AS VAC_TYPE_NM,
 					NVL(U.NAME, M.REQ_TITL) AS REQ_ID_NM,
@@ -422,8 +535,8 @@
 			M.REQ_DT,
 			M.REQ_TITL,
 			M.REQ_ID,
-			/* 개인 정보(TB_CM06M01) 사원 마스터의 실제 부서코드를 최우선으로 적용 */
-			NVL((SELECT U.DEPT_ID FROM TB_CM06M01 U WHERE U.ID = M.REQ_ID), M.REQ_DEPT_ID) AS REQ_DEPT_ID,
+			/* 개인 정보(TB_CM06M01) 사원 마스터의 실제 부서코드를 최우선으로 적용 (앞 5자리) */
+			SUBSTR(NVL((SELECT U.DEPT_ID FROM TB_CM06M01 U WHERE U.ID = M.REQ_ID), M.REQ_DEPT_ID), 1, 5) AS REQ_DEPT_ID,
 			M.VAC_TYPE_CD,
 			(SELECT CODE_NM FROM TB_CM05M01 WHERE CODE_ID = M.VAC_TYPE_CD) AS VAC_TYPE_NM,
 			(SELECT CODE_ETC FROM TB_CM05M01 WHERE CODE_ID = M.VAC_TYPE_CD) AS CODE_ETC,
@@ -535,15 +648,12 @@
 	</delete>
 
 	<select id="selectAnnualBalance" parameterType="Map" resultType="int">
-		SELECT (NVL(M.GRANT_DAYS, 0) - NVL(M.WORK_SUBST_DAYS, 0) -
-		        COALESCE((SELECT SUM(AWD.GRANT_DAYS) FROM TB_PM07M04 AWD
-		                  WHERE AWD.USER_ID = #{userId} AND AWD.AWARD_TYPE_CD = 'PM07M04TYPE51'
-		                    AND AWD.GRANT_YY = #{yy}),
-		                 M.SUMMER_VAC_DAYS, 0)) -
+		SELECT (NVL(M.GRANT_DAYS, 0) + NVL(M_PREV.REM_DAYS, 0)) -
 		        COALESCE((SELECT SUM(DEDUCT_DAYS) FROM TB_PM07M01
 		WHERE REQ_ID = #{userId} AND ST_DT &gt;= #{yy} || '0101' AND ST_DT &lt;= #{yy} || '1231' AND VAC_TYPE_CD IN ('PM07TYPE01','PM07TYPE02')), 0) AS BALANCE
 		FROM TB_CM06M01 U
 		LEFT OUTER JOIN TB_PM07M02 M ON M.YY = #{yy} AND M.USER_ID = U.ID
+		LEFT OUTER JOIN TB_PM07M02 M_PREV ON M_PREV.YY = TO_CHAR(TO_NUMBER(#{yy}) - 1) AND M_PREV.USER_ID = U.ID
 		WHERE U.ID = #{userId}
 	</select>
 
@@ -1229,7 +1339,7 @@
 			NULL AS M11_DETAIL,
 			NULL AS M12_DETAIL,
 			NVL(V.USED_DAYS_SUM, 0) AS USED_DAYS_SUM,
-			(NVL(G.GRANT_DAYS, 0) - NVL(G.WORK_SUBST_DAYS, 0) - NVL(G.SUMMER_VAC_DAYS, 0) + NVL(G_PREV.REM_DAYS, 0) - NVL(V.USED_DAYS_SUM, 0)) AS BALANCE_DAYS,
+			(NVL(G.GRANT_DAYS, 0) + NVL(G_PREV.REM_DAYS, 0) - NVL(V.USED_DAYS_SUM, 0)) AS BALANCE_DAYS,
 			TO_CHAR(U.LEAVE_DT, 'YYYY-MM-DD') AS LEAVE_DT,
 			U.USE_YN,
 			U.SALES_AREA,
@@ -1292,7 +1402,7 @@
 		  </choose>
 		</if>
 		<if test="deptCd_S != null and !deptCd_S.equals('')">
-		  AND SUBSTR(NVL(U.VIEW_DEPT_ID, U.DEPT_ID), 1, 5) = SUBSTR(#{deptCd_S}, 1, 5)
+		  AND SUBSTR(NVL(HRD.HR_DEPT_ID, NVL(U.VIEW_DEPT_ID, U.DEPT_ID)), 1, 5) = SUBSTR(#{deptCd_S}, 1, 5)
 		</if>
 		<if test="deptNm_S != null and !deptNm_S.equals('')">
 		  AND D.DEPT_NM LIKE '%' || #{deptNm_S} || '%'

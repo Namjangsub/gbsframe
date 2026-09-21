@@ -6,6 +6,7 @@
      여기 fragment 안에 직접 include해두면 그리드 초기화 시점엔 이미 로드가 끝나 있다. -->
 <link rel="stylesheet" href="/static/css/ax5/ax5select.css" />
 <script src="/static/js/ax5/ax5select.min.js"></script>
+<script src="/static/js/common/PM07AnnualCommon.js"></script>
 
 <!-- 사용가능시작일/종료일은 AX5-Grid 자체 date 에디터를 쓰지 않는다. 대신 PM3001M01.html의
      inDttm/outDttm 컬럼과 동일한 패턴으로 - 이 컬럼들은 editor를 아예 지정하지 않아
@@ -44,39 +45,6 @@
 }
 [data-ax5grid="awardGrid"] tr.grid-row-leave td.grid-cell-pink {
 	background-color: #ffdeeb !important;
-}
-/* 사용내역 팝오버 툴팁 레이어 (PM0701P02 연차내역 톤앤매너 계승) */
-.vacation-info-popover {
-	position: absolute;
-	z-index: 999999;
-	display: none;
-	background: #ffffff;
-	border: 1px solid #337ab7;
-	border-radius: 5px;
-	box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
-	padding: 10px 14px;
-	min-width: 240px;
-	max-width: 380px;
-	font-size: 12px;
-	color: #333333;
-	pointer-events: auto;
-}
-.vacation-info-popover .popover-title {
-	font-weight: bold;
-	color: #337ab7;
-	border-bottom: 1px solid #e9ecef;
-	padding-bottom: 5px;
-	margin-bottom: 6px;
-	font-size: 12px;
-}
-.vacation-info-popover .popover-item {
-	padding: 4px 0;
-	line-height: 1.4;
-	color: #444444;
-	border-bottom: 1px dashed #f0f0f0;
-}
-.vacation-info-popover .popover-item:last-child {
-	border-bottom: none;
 }
 </style>
 
@@ -148,7 +116,7 @@
 
 	<!-- 하단 버튼 영역 -->
 	<div class="col-xs-12 text-right popup_bottom_btn" style="margin-top: 15px; margin-bottom: 15px; padding-right: 0; clear: both;">
-		<button type="button" class="btn btn-default btn-sm" onclick="hideAwardVacationPopoverImmediately(); $('#awardVacationInfoPopover').remove(); modalStack.close();">닫 기</button>
+		<button type="button" class="btn btn-default btn-sm" onclick="PM07Annual.Popover.hideImmediately(); modalStack.close();">닫 기</button>
 	</div>
 </div>
 
@@ -796,7 +764,7 @@
 
 	// 모달 스택 레벨에 맞추어 2차/3차 모달 동적 호출
 	// (PM0701M01에서 직접 열렸을 때는 openSecondModal, PM0701P02에서 2차 모달로 열렸을 때는 openThirdModal 호출)
-	function openAwardUserModal(url, width, height, title, paramObj, callback) {
+	function openAwardSubModal(url, width, height, title, paramObj, callback) {
 		window.deviceType = window.deviceType || 'desktop';
 		var stackDepth = 0;
 		if (typeof modalStack !== 'undefined' && modalStack) {
@@ -811,8 +779,8 @@
 			if (typeof thirdModal !== 'undefined' && thirdModal && thirdModal.config) {
 				thirdModal.config.zIndex = 2001;
 			}
-			openThirdModal(url, width, height, title, paramObj, function(tree) {
-				if (typeof callback === 'function') callback(tree);
+			openThirdModal(url, width, height, title, paramObj, function(res) {
+				if (typeof callback === 'function') callback(res);
 			});
 			setTimeout(function() {
 				if (typeof thirdModal !== 'undefined' && thirdModal && thirdModal.activeModal) {
@@ -821,8 +789,28 @@
 				$('.ax-mask').last().css("z-index", "2000");
 			}, 50);
 		} else {
-			openSecondModal(url, width, height, title, paramObj, callback);
+			openSecondModal(url, width, height, title, paramObj, function(res) {
+				if (typeof callback === 'function') callback(res);
+			});
 		}
+	}
+
+	function openAwardUserModal(url, width, height, title, paramObj, callback) {
+		openAwardSubModal(url, width, height, title, paramObj, callback);
+	}
+
+	// 상세 정보 모달 (휴가신청서 PM0701P01.html)
+	function openAwardVacationDetailModal(reqNo) {
+		if (!reqNo) return;
+		var paramObj = {
+			 "actionType" : "U"
+			,"reqNo"      : reqNo
+			,"pgmId"      : "PM0701P01"
+		};
+
+		openAwardSubModal("/static/html/user/pm/pm07/PM0701P01.html", 1100, 700, "휴가 신청서 상세", paramObj, function(res) {
+			searchAwardGrid();
+		});
 	}
 
 	// 사용자 검색 팝업 (사번/성명 더블클릭)
@@ -928,123 +916,32 @@
 		});
 	}
 
-	// ── 포상휴가 사용내역 팝오버 툴팁 제어 (PM0701P02 연차내역 톤앤매너 100% 동일) ──
-	var AWARD_VACATION_POPOVER_TIMER = null;
+	// ── 포상휴가 사용내역 팝오버 툴팁 제어 (PM07Annual.Popover 공용 모듈 연동) ──
 
-	function showAwardVacationPopover($el, item) {
-		if (AWARD_VACATION_POPOVER_TIMER) {
-			clearTimeout(AWARD_VACATION_POPOVER_TIMER);
-			AWARD_VACATION_POPOVER_TIMER = null;
+	// 공용 팝오버 호버 이벤트 바인딩 (PM0810M01과 100% 동일한 200ms 진입 디바운스 및 350ms 퇴장 지연)
+	PM07Annual.Popover.bindHover('[data-ax5grid="awardGrid"] .award-used-days-trigger', function($el) {
+		var $row = $el.closest('tr[data-ax5grid-tr-index], [data-ax5grid-data-index], tr');
+		var rowIdx = $row.attr('data-ax5grid-tr-index') || $row.attr('data-ax5grid-data-index') || $row.attr('data-ax5grid-index');
+		if (typeof rowIdx === 'undefined' || rowIdx === null || rowIdx === '') {
+			rowIdx = $row.index();
 		}
 
-		var $pop = $('#awardVacationInfoPopover');
-		if ($pop.length === 0) {
-			$('body').append(
-				'<div id="awardVacationInfoPopover" class="vacation-info-popover">' +
-					'<div class="popover-title"><i class="fas fa-calendar-check"></i> <span id="awardPopTitleText"></span></div>' +
-					'<div id="awardPopContent"></div>' +
-				'</div>'
-			);
-			$pop = $('#awardVacationInfoPopover');
-
-			$pop.on('mouseenter', function() {
-				if (AWARD_VACATION_POPOVER_TIMER) {
-					clearTimeout(AWARD_VACATION_POPOVER_TIMER);
-					AWARD_VACATION_POPOVER_TIMER = null;
-				}
-			}).on('mouseleave', function() {
-				hideAwardVacationPopoverImmediately();
-			});
+		if (rowIdx !== undefined && awardGridView && awardGridView.target && awardGridView.target.list && awardGridView.target.list[rowIdx]) {
+			var item = awardGridView.target.list[rowIdx];
+			return {
+				coCd: (item && item.coCd) || 'GUN',
+				userId: (item && item.userId) ? item.userId : (item && item.empNo ? item.empNo : ''),
+				userNm: (item && item.empNm) ? item.empNm : '사원',
+				yy: $('#awardYy').val() || (item && item.grantYy) || '2026',
+				colKey: 'awardUsedDays',
+				awardTypeCd: (item && item.awardTypeCd) ? item.awardTypeCd : '',
+				awardTypeNm: (item && item.awardTypeNm) ? item.awardTypeNm : '',
+				stDt: (item && item.stDt) ? item.stDt : '',
+				edDt: (item && item.edDt) ? item.edDt : '',
+				onClose: function() { searchAwardGrid(); }
+			};
 		}
-
-		var empNm = (item && item.empNm) ? item.empNm : '사원';
-		var awardNm = (item && item.awardTypeNm) ? item.awardTypeNm : (item && item.awardTypeCd === 'PM07M04TYPE51' ? '하계대체휴가일수' : '포상휴가');
-		var titleText = empNm + ' 님의 [' + awardNm + '] 사용 이력';
-		var infoText = (item && item.vacInfoList) ? item.vacInfoList : "";
-
-		$('#awardPopTitleText').text(titleText);
-
-		var htmlStr = '';
-		var validCount = 0;
-
-		if (infoText) {
-			var items = infoText.split(';');
-			$.each(items, function(i, val) {
-				var rawVal = $.trim(val);
-				if (!rawVal) return;
-				htmlStr += '<div class="popover-item"><i class="fas fa-check-circle" style="color: #337ab7; margin-right: 5px;"></i> ' + rawVal + '</div>';
-				validCount++;
-			});
-		}
-
-		if (validCount === 0) {
-			htmlStr = '<div class="popover-item" style="color: #888888;">해당 기간 내 등록된 [' + awardNm + '] 사용(신청) 이력이 없습니다.</div>';
-		}
-
-		$('#awardPopContent').html(htmlStr);
-
-		var offset = $el.offset();
-		$pop.css({
-			top: (offset.top + $el.outerHeight() + 2) + 'px',
-			left: Math.max(10, offset.left - 20) + 'px'
-		}).show();
-	}
-
-	function hideAwardVacationPopover() {
-		if (AWARD_VACATION_POPOVER_TIMER) {
-			clearTimeout(AWARD_VACATION_POPOVER_TIMER);
-		}
-		AWARD_VACATION_POPOVER_TIMER = setTimeout(function() {
-			$('#awardVacationInfoPopover').hide();
-			AWARD_VACATION_POPOVER_TIMER = null;
-		}, 300);
-	}
-
-	function hideAwardVacationPopoverImmediately() {
-		if (AWARD_VACATION_POPOVER_TIMER) {
-			clearTimeout(AWARD_VACATION_POPOVER_TIMER);
-			AWARD_VACATION_POPOVER_TIMER = null;
-		}
-		$('#awardVacationInfoPopover').hide();
-	}
-
-	// 그리드 사용일수 셀 마우스 호버/클릭 이벤트 위임 바인딩 (부모 모달과의 클래스/이벤트 완전 격리)
-	$(document).off('mouseenter mouseleave click', '[data-ax5grid="awardGrid"] .award-used-days-trigger');
-	$(document).on({
-		mouseenter: function(e) {
-			e.stopPropagation();
-			e.stopImmediatePropagation();
-			var $el = $(this);
-			var $row = $el.closest('tr[data-ax5grid-tr-index], [data-ax5grid-data-index], tr');
-			var rowIdx = $row.attr('data-ax5grid-tr-index') || $row.attr('data-ax5grid-data-index') || $row.attr('data-ax5grid-index');
-			if (typeof rowIdx === 'undefined' || rowIdx === null || rowIdx === '') {
-				rowIdx = $row.index();
-			}
-
-			if (rowIdx !== undefined && awardGridView && awardGridView.target && awardGridView.target.list && awardGridView.target.list[rowIdx]) {
-				var item = awardGridView.target.list[rowIdx];
-				showAwardVacationPopover($el, item);
-			}
-		},
-		mouseleave: function(e) {
-			e.stopPropagation();
-			hideAwardVacationPopover();
-		},
-		click: function(e) {
-			e.stopPropagation();
-			e.stopImmediatePropagation();
-			var $el = $(this);
-			var $row = $el.closest('tr[data-ax5grid-tr-index], [data-ax5grid-data-index], tr');
-			var rowIdx = $row.attr('data-ax5grid-tr-index') || $row.attr('data-ax5grid-data-index') || $row.attr('data-ax5grid-index');
-			if (typeof rowIdx === 'undefined' || rowIdx === null || rowIdx === '') {
-				rowIdx = $row.index();
-			}
-
-			if (rowIdx !== undefined && awardGridView && awardGridView.target && awardGridView.target.list && awardGridView.target.list[rowIdx]) {
-				var item = awardGridView.target.list[rowIdx];
-				showAwardVacationPopover($el, item);
-			}
-		}
-	}, '[data-ax5grid="awardGrid"] .award-used-days-trigger');
+		return null;
+	});
 
 </script>

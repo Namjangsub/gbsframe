@@ -208,7 +208,9 @@
 			box-shadow: 0 4px 18px rgba(0, 0, 0, 0.22);
 			padding: 10px 14px;
 			min-width: 220px;
-			max-width: 340px;
+			max-width: 360px;
+			max-height: 380px;
+			overflow-y: auto;
 			font-size: 12px;
 			color: #333333;
 			pointer-events: none;
@@ -306,10 +308,16 @@
 			<div class="contents_tit">
 				<span style="height: 30px; line-height: 30px; font-size: 15px;">휴가 신청자 현황 캘린더 (구글 캘린더 방식)</span>
 				<div class="legend-box">
-					<span style="color:#5f6368; font-size:11px;"><i class="fas fa-info-circle"></i> 사람(신청자)별 고유 색상 구글 캘린더 멀티데이 수평 바 표출</span>
+					<span style="color:#5f6368; font-size:11px;"><i class="fas fa-info-circle"></i> 범례:</span>
+					<span class="badge" style="background-color:#34a853; font-size:11px; padding:3px 6px;">출장</span>
+					<span class="badge" style="background-color:#f9ab00; color:#3c2f00; font-size:11px; padding:3px 6px;">휴일대체</span>
+					<span style="color:#666; font-size:11px;">(휴가는 유형별 고유 색상 표출)</span>
 				</div>
 				<div class="add_btn_small pdl10">
 					<a onclick="openVacationModal('C');" style="height: 30px; line-height: 28px; width: 85px;" authchk><i class="fas fa-pen"></i> 신청등록</a>
+					<a onclick="moveMonth(-1);" style="height: 30px; line-height: 28px; width: 75px;" title="이전달 이동"><i class="fas fa-chevron-circle-left"></i> 이전달</a>
+					<a onclick="goToday();" style="height: 30px; line-height: 28px; width: 65px;" title="오늘로 이동"><i class="fas fa-calendar-alt"></i> 오늘</a>
+					<a onclick="moveMonth(1);" style="height: 30px; line-height: 28px; width: 75px;" title="다음달 이동"><i class="fas fa-chevron-circle-right"></i> 다음달</a>
 					<a href="/static/html/user/pm/pm07/PM0701M01.html" style="height: 30px; line-height: 28px; width: 85px;" title="목록 화면으로 이동"><i class="fas fa-list"></i> 목록보기</a>
 				</div>
 			</div>
@@ -380,6 +388,7 @@
 		mainDefaultLoad("생산관리", "휴가신청자 캘린더 현황");
 		// 공통코드 set
 		setCommonSelect($("#main_area .contents.search select[data-kind]"));
+		$('#vacTypeCd_S').append('<option value="TRIP">출장</option><option value="SUBST">휴일대체근무</option>');
 
 		// 년/월 셀렉트박스 옵션 생성
 		initYearMonthCombo();
@@ -722,7 +731,17 @@
 					            + 'onmousemove="moveGcalEventPopover(event);" '
 					            + 'onmouseleave="hideGcalEventPopover();" '
 					            + (isOwnEvent ? 'onclick="handleGcalEventClick(' + ev.itemIdx + ');"' : '') + '>';
-					barHtml += '<i class="fas fa-user-clock"></i> ' + reqIdNm + ' ' + vacTypeNm + ampmLabel;
+
+					if (item.srcType === 'SUBST') {
+						var tmText = (item.stTm && item.edTm) ? (' (' + item.stTm + '~' + item.edTm + ')') : '';
+						var detailText = item.pjtNm ? (' ' + item.pjtNm) : (item.specialReason ? (' ' + item.specialReason) : '');
+						barHtml += '<i class="fas fa-business-time"></i> ' + reqIdNm + ' [대체]' + tmText + detailText;
+					} else if (item.srcType === 'TRIP') {
+						var tripText = item.reqRmk ? (' ' + item.reqRmk) : '';
+						barHtml += '<i class="fas fa-plane-departure"></i> ' + reqIdNm + ' [출장]' + tripText;
+					} else {
+						barHtml += '<i class="fas fa-user-clock"></i> ' + reqIdNm + ' ' + vacTypeNm + ampmLabel;
+					}
 					barHtml += '</a>';
 
 					$eventsLayer.append(barHtml);
@@ -737,6 +756,16 @@
 		}
 
 		adjustCalendarHeightToWindow();
+	}
+
+	// 결재상태 배지 렌더링 헬퍼 함수
+	function getSanctnBadgeHtml(sts, label) {
+		var prefix = label ? (label + ': ') : '';
+		if (sts === 'END') return '<span class="badge" style="background-color:#28a745;font-size:10px;padding:2px 5px;">' + prefix + '승인완료</span>';
+		if (sts === 'ING') return '<span class="badge" style="background-color:#007bff;font-size:10px;padding:2px 5px;">' + prefix + '결재중</span>';
+		if (sts === 'RTN') return '<span class="badge" style="background-color:#dc3545;font-size:10px;padding:2px 5px;">' + prefix + '반려</span>';
+		if (sts === 'REQ') return '<span class="badge" style="background-color:#ffc107;color:#000;font-size:10px;padding:2px 5px;">' + prefix + '결재요청</span>';
+		return '<span class="badge" style="background-color:#6c757d;font-size:10px;padding:2px 5px;">' + prefix + '임시저장</span>';
 	}
 
 	// 구글 캘린더 수평 이벤트 바 마우스 호버 근태 팝오버 툴팁 함수
@@ -761,53 +790,126 @@
 
 		var reqIdNm = item.reqIdNm || item.userNm || "신청자";
 		var deptNm = item.deptNm || item.reqDeptNm || "부서미지정";
-		var vacTypeNm = item.vacTypeNm || "휴가";
-		var ampmLabel = (item.ampmNm) ? (" (" + item.ampmNm + ")") : "";
 		var st = item.stDt || item.rawStDt || "";
 		var ed = item.edDt || item.rawEdDt || "";
-		var reqRmk = item.reqRmk || "없음";
 
-		var html = '<div class="popover-title"><i class="fas fa-user-clock" style="margin-right: 5px;"></i>' + reqIdNm + ' (' + deptNm + ')</div>';
-		html += '<div class="popover-item"><b>유형:</b> ' + vacTypeNm + ampmLabel + '</div>';
-		html += '<div class="popover-item"><b>기간:</b> ' + st + ' ~ ' + ed + '</div>';
-		html += '<div class="popover-item"><b>비고:</b> ' + reqRmk + '</div>';
+		var html = '';
+		if (item.srcType === 'SUBST') {
+			// 휴일대체근무 전용 상세 팝오버
+			var reqStsBadge = getSanctnBadgeHtml(item.sanctnSts, "신청");
+			var resStsBadge = (item.resultSanctnSts && item.resultSanctnSts !== 'TEMP') ? getSanctnBadgeHtml(item.resultSanctnSts, "결과") : '';
+
+			html += '<div class="popover-title" style="color: #c67c00; border-bottom: 2px solid #f9ab00;">'
+			      + '<i class="fas fa-business-time" style="margin-right: 5px;"></i>' + reqIdNm + ' (' + deptNm + ') - 휴일대체근무'
+			      + '</div>';
+			html += '<div class="popover-item"><b>근무일자:</b> <span style="font-weight:600; color:#333;">' + st + '</span></div>';
+
+			var planTm = (item.stTm || item.edTm) ? ((item.stTm || '') + ' ~ ' + (item.edTm || '')) : '';
+			if (planTm) {
+				html += '<div class="popover-item"><b>근무시간(계획):</b> ' + planTm + '</div>';
+			}
+			var realTm = (item.realStTm || item.realEdTm) ? ((item.realStTm || '') + ' ~ ' + (item.realEdTm || '')) : '';
+			if (realTm) {
+				html += '<div class="popover-item"><b>실근무시간:</b> ' + realTm + '</div>';
+			}
+
+			if (item.pjtNm) {
+				html += '<div class="popover-item"><b>프로젝트:</b> ' + item.pjtNm + (item.salesCd ? ' [' + item.salesCd + ']' : '') + '</div>';
+			}
+			if (item.clntNm) {
+				html += '<div class="popover-item"><b>고객사:</b> ' + item.clntNm + '</div>';
+			}
+
+			var reason = item.specialReason || item.reqRmk || "";
+			if (reason) {
+				html += '<div class="popover-item" style="word-break: break-all;"><b>신청사유:</b> ' + reason + '</div>';
+			}
+			if (item.workResult) {
+				html += '<div class="popover-item" style="word-break: break-all; color:#1a73e8;"><b>근무결과:</b> ' + item.workResult + '</div>';
+			}
+
+			html += '<div class="popover-item" style="margin-top: 5px; padding-top: 5px; border-top: 1px dashed #dadce0;">'
+			      + '<b>결재상태:</b> ' + reqStsBadge + (resStsBadge ? (' ' + resStsBadge) : '')
+			      + '</div>';
+
+		} else if (item.srcType === 'TRIP') {
+			// 출장 상세 팝오버
+			var tripStsBadge = getSanctnBadgeHtml(item.sanctnSts, "");
+			html += '<div class="popover-title" style="color: #1e7e34; border-bottom: 2px solid #34a853;">'
+			      + '<i class="fas fa-plane-departure" style="margin-right: 5px;"></i>' + reqIdNm + ' (' + deptNm + ') - 출장'
+			      + '</div>';
+			html += '<div class="popover-item"><b>기간:</b> ' + st + ' ~ ' + ed + '</div>';
+			if (item.stTm || item.edTm) {
+				html += '<div class="popover-item"><b>시간:</b> ' + (item.stTm || '') + ' ~ ' + (item.edTm || '') + '</div>';
+			}
+			if (item.reqRmk) {
+				html += '<div class="popover-item"><b>출장지/내용:</b> ' + item.reqRmk + '</div>';
+			}
+			html += '<div class="popover-item" style="margin-top: 5px; padding-top: 5px; border-top: 1px dashed #dadce0;">'
+			      + '<b>결재상태:</b> ' + tripStsBadge
+			      + '</div>';
+
+		} else {
+			// 일반 휴가 상세 팝오버
+			var vacTypeNm = item.vacTypeNm || "휴가";
+			var ampmLabel = (item.ampmNm) ? (" (" + item.ampmNm + ")") : "";
+			var vacStsBadge = getSanctnBadgeHtml(item.sanctnSts, "");
+			var reqRmk = item.reqRmk || "";
+
+			html += '<div class="popover-title">'
+			      + '<i class="fas fa-user-clock" style="margin-right: 5px;"></i>' + reqIdNm + ' (' + deptNm + ')'
+			      + '</div>';
+			html += '<div class="popover-item"><b>유형:</b> ' + vacTypeNm + ampmLabel + '</div>';
+			html += '<div class="popover-item"><b>기간:</b> ' + st + ' ~ ' + ed + '</div>';
+			if (reqRmk) {
+				html += '<div class="popover-item"><b>사유/비고:</b> ' + reqRmk + '</div>';
+			}
+			html += '<div class="popover-item" style="margin-top: 5px; padding-top: 5px; border-top: 1px dashed #dadce0;">'
+			      + '<b>결재상태:</b> ' + vacStsBadge
+			      + '</div>';
+		}
+
 		$pop.html(html);
+		$pop.show();
+		positionPopover(e);
+	}
+
+	function moveGcalEventPopover(e) {
+		positionPopover(e);
+	}
+
+	function positionPopover(e) {
+		var $pop = $('#vacationInfoPopover');
+		if (!$pop.is(':visible')) return;
 
 		var mouseX = e.clientX || (e.originalEvent ? e.originalEvent.clientX : 0);
 		var mouseY = e.clientY || (e.originalEvent ? e.originalEvent.clientY : 0);
 
-		$pop.css({
-			'top': (mouseY + 15) + 'px',
-			'left': (mouseX + 15) + 'px',
-			'display': 'block'
-		});
-	}
+		var popW = $pop.outerWidth() || 280;
+		var popH = $pop.outerHeight() || 180;
+		var winW = $(window).width();
+		var winH = $(window).height();
 
-	function moveGcalEventPopover(e) {
-		var $pop = $('#vacationInfoPopover');
-		if ($pop.is(':visible')) {
-			var mouseX = e.clientX || (e.originalEvent ? e.originalEvent.clientX : 0);
-			var mouseY = e.clientY || (e.originalEvent ? e.originalEvent.clientY : 0);
-			$pop.css({
-				'top': (mouseY + 15) + 'px',
-				'left': (mouseX + 15) + 'px'
-			});
+		var posX = mouseX + 15;
+		var posY = mouseY + 15;
+
+		if (posX + popW > winW - 10) {
+			posX = mouseX - popW - 15;
 		}
+		if (posY + popH > winH - 10) {
+			posY = mouseY - popH - 15;
+		}
+		if (posX < 10) posX = 10;
+		if (posY < 10) posY = 10;
+
+		$pop.css({
+			'top': posY + 'px',
+			'left': posX + 'px'
+		});
 	}
 
 	function hideGcalEventPopover() {
 		$('#vacationInfoPopover').hide();
-	}
-
-	// 검색조건 초기화
-	function initSearch() {
-		$(".contents.search input[type='text']").val("");
-		$(".contents.search input[type='hidden']").val("");
-		$('#coCd_S').val("GUN");
-		$('#vacTypeCd_S').val("");
-		$('#sanctnSts_S').val("");
-		initYearMonthCombo();
-		DataSearch();
 	}
 
 	// 신청 등록 / 상세 수정 모달
@@ -903,6 +1005,18 @@
 			}
 			$('#reqId' + sfx).val(checkedNode.id);
 			$('#reqIdNm' + sfx).val(checkedNode.text);
+
+			// 신청자 선택 시 백엔드(selectUserInfo)에서 5자리 부서코드와 해당 부서명을 반영
+			postAjaxSync("/admin/cm/cm06/selectUserInfo", { "userId": checkedNode.id }, null, function(data) {
+				if (data && data.userInfo) {
+					$('#reqDeptId' + sfx).val(data.userInfo.deptId || '');
+					$('#reqDeptNm' + sfx).val(data.userInfo.deptNm || '');
+				} else if (checkedNode.parent) {
+					var pDept = checkedNode.parent.length >= 5 ? checkedNode.parent.substring(0, 5) : checkedNode.parent;
+					$('#reqDeptId' + sfx).val(pDept);
+				}
+			});
+
 			if (gbn == 'S') DataSearch();
 		});
 	}
@@ -910,17 +1024,27 @@
 	// 부서 검색
 	function openReqDeptTree(gbn) {
 		var sfx = (gbn == 'S') ? '_S' : '';
+		var rawDeptId = $('#reqDeptId' + sfx).val() || '';
 		var paramObj = {
 			 "coCd"   : ''
-			,"deptId" : $('#reqDeptId' + sfx).val()
+			,"deptId" : rawDeptId.length >= 5 ? rawDeptId.substring(0, 5) : rawDeptId
 			,"deptNm" : $('#reqDeptNm' + sfx).val()
 			,"useYn"  : "Y"
 		};
 		openSecondModal("/static/html/cmn/modal/deptSearch.html", 300, 500, "부서 검색", paramObj, function(tree) {
 			var checkedId = tree.get_checked()[0];
 			var checkedNode = tree.get_node(checkedId);
-			$('#reqDeptId' + sfx).val(checkedNode.id);
-			$('#reqDeptNm' + sfx).val(checkedNode.text);
+			var fullDeptId = (checkedNode && checkedNode.id) ? checkedNode.id : '';
+			var deptId5 = (fullDeptId && fullDeptId.length >= 5) ? fullDeptId.substring(0, 5) : fullDeptId;
+			$('#reqDeptId' + sfx).val(deptId5);
+			if (deptId5 && deptId5 !== fullDeptId) {
+				postAjaxSync("/admin/cm/cm04/selectDeptInfo", { "deptId": deptId5 }, null, function(deptData) {
+					var deptInfo = (deptData && deptData.deptInfo) ? deptData.deptInfo : (deptData || {});
+					$('#reqDeptNm' + sfx).val(deptInfo.deptNm || (checkedNode ? checkedNode.text : ''));
+				});
+			} else {
+				$('#reqDeptNm' + sfx).val(checkedNode ? checkedNode.text : '');
+			}
 			if (gbn == 'S') DataSearch();
 		});
 	}

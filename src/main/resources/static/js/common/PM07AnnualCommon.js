@@ -239,19 +239,35 @@
 			}
 
 			var uDays = Number(item.usedDays || 0);
-			var balDays = gDays - uDays;
 
 			var wsDays = Number(item.workSubstDays || 0);
 			var wsUsed = Number(item.workSubstUsedDays || 0);
-			var wsBal  = wsDays - wsUsed;
+			var wsBal  = Math.round((wsDays - wsUsed) * 10) / 10;
 
 			var svDays = Number(item.summerVacDays || 0);
 			var svUsed = Number(item.summerVacUsedDays || 0);
-			var svBal  = svDays - svUsed;
+			var svBal  = Math.round((svDays - svUsed) * 10) / 10;
 
 			var awDays = Number(item.awardGrantDays || 0);
 			var awUsed = Number(item.awardUsedDays || 0);
-			var awBal  = awDays - awUsed;
+			var awBal  = Math.round((awDays - awUsed) * 10) / 10;
+
+			// 전년도 이월/선사용 (PREV_DAYS: TB_PM07M02.REM_DAYS)
+			var pDays = 0;
+			if (item.prevDays !== null && item.prevDays !== undefined && item.prevDays !== "") {
+				pDays = Number(item.prevDays);
+			} else if (enterDt) {
+				var prevYy = String(Number(curYy) - 1);
+				var pCalcGrant = PM07Annual.calculateGrantDays(enterDt, prevYy, moment(prevYy + "1231", "YYYYMMDD"));
+				var pUsed = Number(item.prevUsedDays || 0);
+				pDays = pCalcGrant - pUsed;
+			}
+
+			// 연차 잔여일수(미사용일수) 계산 (PM0711M01 미사용일수 공식과 100% 동일):
+			// 발생일수(gDays) + 전년도이월/선사용(pDays) - 연차실사용일수(uDays)
+			// ※ 휴일대체휴가(wsBal), 하계휴가(svBal), 포상휴가(awBal)는 연차에서 차감하지 않고 각각 독립적으로 계산
+			var balDays = gDays + pDays - uDays;
+			balDays = Math.round(balDays * 10) / 10;
 
 			var res = {
 				yy                   : curYy,
@@ -305,10 +321,10 @@
 			var code = $opt.val();
 			if (!code) return; // '선택하세요' 건너뜀
 
-			// 원본 텍스트 보관
+			// 원본 텍스트 보관 (기존 잔여일 표시 패턴을 말끔히 제거하고 순수 코드명 보존)
 			var origText = $opt.attr('data-orig-text');
 			if (!origText) {
-				origText = $opt.text().replace(/\s*\(잔여:?[^\)]*\)/g, '').trim();
+				origText = $opt.text().replace(/\s*\([^\)]*잔여[^\)]*\)/g, '').trim();
 				$opt.attr('data-orig-text', origText);
 			}
 
@@ -317,7 +333,7 @@
 			// 1) 하계휴가 (PM07TYPE09)
 			if (code === 'PM07TYPE09') {
 				if (summerVacBal > 0 || isSavedType) {
-					$opt.prop('disabled', false).css('color', '');
+					$opt.prop('disabled', false).removeAttr('disabled').css('color', '');
 					$opt.text(origText + ' (잔여: ' + summerVacBal + '일)');
 				} else {
 					$opt.prop('disabled', true).css('color', '#aaa');
@@ -327,7 +343,7 @@
 			// 2) 포상휴가 (PM07TYPE07 - 1일 단위)
 			else if (code === 'PM07TYPE07') {
 				if (awardBal >= 1.0 || isSavedType) {
-					$opt.prop('disabled', false).css('color', '');
+					$opt.prop('disabled', false).removeAttr('disabled').css('color', '');
 					$opt.text(origText + ' (잔여: ' + awardBal + '일)');
 				} else {
 					$opt.prop('disabled', true).css('color', '#aaa');
@@ -337,7 +353,7 @@
 			// 3) 포상휴가반차 (PM07TYPE08 - 0.5일 단위)
 			else if (code === 'PM07TYPE08') {
 				if (awardBal >= 0.5 || isSavedType) {
-					$opt.prop('disabled', false).css('color', '');
+					$opt.prop('disabled', false).removeAttr('disabled').css('color', '');
 					$opt.text(origText + ' (잔여: ' + awardBal + '일)');
 				} else {
 					$opt.prop('disabled', true).css('color', '#aaa');
@@ -347,7 +363,7 @@
 			// 4) 대체휴가 (PM07TYPE11 - 1일 단위)
 			else if (code === 'PM07TYPE11') {
 				if (workSubstBal >= 1.0 || isSavedType) {
-					$opt.prop('disabled', false).css('color', '');
+					$opt.prop('disabled', false).removeAttr('disabled').css('color', '');
 					$opt.text(origText + ' (잔여: ' + workSubstBal + '일)');
 				} else {
 					$opt.prop('disabled', true).css('color', '#aaa');
@@ -357,7 +373,7 @@
 			// 5) 대체휴가반차 (PM07TYPE12 - 0.5일 단위)
 			else if (code === 'PM07TYPE12') {
 				if (workSubstBal >= 0.5 || isSavedType) {
-					$opt.prop('disabled', false).css('color', '');
+					$opt.prop('disabled', false).removeAttr('disabled').css('color', '');
 					$opt.text(origText + ' (잔여: ' + workSubstBal + '일)');
 				} else {
 					$opt.prop('disabled', true).css('color', '#aaa');
@@ -365,25 +381,28 @@
 				}
 			}
 			// 6) 연차 (PM07TYPE01) & 반차 (PM07TYPE02)
-			// ※ 휴가일수가 모자라더라도(0 이하/음수) 항상 선택 및 등록 가능해야 함 (선사용/마이너스 연차 허용 정책)
+			// ※ 연차 및 반차는 잔여일수가 0이거나 음수(-)여도 무조건 선택 및 신청 가능해야 함 (선사용/마이너스 연차 허용 정책)
 			else if (code === 'PM07TYPE01' || code === 'PM07TYPE02') {
-				$opt.prop('disabled', false).css('color', '');
-				$opt.text(origText + ' (잔여: ' + annualBal + '일)');
+				$opt.prop('disabled', false).removeAttr('disabled').css('color', '');
+				var dispBal = (Math.round(annualBal * 10) / 10);
+				$opt.text(origText + ' (잔여: ' + dispBal + '일)');
 			}
 			else {
 				// 기타 유형도 기본 활성화 상태 유지
-				$opt.prop('disabled', false).css('color', '');
+				$opt.prop('disabled', false).removeAttr('disabled').css('color', '');
 			}
 		});
 
-		// 비활성화된 옵션이 현재 선택되어 있다면 선택 해제
+		// 비활성화된 옵션이 현재 선택되어 있다면 선택 해제 (단, 연차/반차는 0 또는 음수여도 절대 선택 해제 금지)
 		var currentVal = $sel.val();
 		if (currentVal && (!savedVacTypeCd || savedVacTypeCd !== currentVal)) {
-			var $currOpt = $sel.find('option[value="' + currentVal + '"]');
-			if ($currOpt.prop('disabled')) {
-				$sel.val('');
-				if (typeof onVacTypeChanged === 'function') {
-					onVacTypeChanged();
+			if (currentVal !== 'PM07TYPE01' && currentVal !== 'PM07TYPE02') {
+				var $currOpt = $sel.find('option[value="' + currentVal + '"]');
+				if ($currOpt.prop('disabled')) {
+					$sel.val('');
+					if (typeof onVacTypeChanged === 'function') {
+						onVacTypeChanged();
+					}
 				}
 			}
 		}
@@ -434,6 +453,487 @@
 		}
 
 		return { isValid: true, message: "" };
+	};
+
+	// ========================================================================================
+	// [PM07Annual.Popover] 공용 마우스 호버 신청서 상세 팝오버 & 모달 오픈 엔진
+	// ----------------------------------------------------------------------------------------
+	// PM0701P02, PM0701P04, PM0711M01, PM0810M01 등 모든 연차/대체휴가 화면에서 공용 사용
+	// ========================================================================================
+	var POPOVER_TIMER = null;
+	var POPOVER_SHOW_TIMER = null;
+	var POPOVER_REQUEST_ID = 0;
+	var POPOVER_CURRENT_KEY = null; // 현재 열려있는 팝오버 대상 식별자 (마우스 이동 시 불필요한 refresh 차단)
+	var POPOVER_ON_CLOSE_CALLBACK = null;
+	var IS_OVER_TRIGGER = false; // 트리거 요소 호버 상태 추적
+	var IS_OVER_POPOVER = false; // 팝오버 컨테이너 호버 상태 추적
+
+	// 트리거와 팝오버 둘 다에서 마우스가 완전히 벗어났을 때만 안전 닫기 (400ms 유예, PM0810M01 동일)
+	function checkAndHidePopover(delayMs) {
+		if (POPOVER_TIMER) clearTimeout(POPOVER_TIMER);
+		POPOVER_TIMER = setTimeout(function() {
+			if (!IS_OVER_TRIGGER && !IS_OVER_POPOVER) {
+				$('#pm07CommonVacationPopover').hide();
+				POPOVER_TIMER = null;
+				POPOVER_CURRENT_KEY = null;
+			}
+		}, delayMs || 400);
+	}
+
+	// 휴가유형 명칭 정제 헬퍼
+	function cleanTypeName(txt) {
+		if (!txt) return "";
+		return String(txt).replace(/\(.*?\)/g, "").trim();
+	}
+
+	// 날짜 범위 포맷터 헬퍼
+	function formatRange(st, ed) {
+		if (st && ed) return st === ed ? st : (st + " ~ " + ed);
+		return st || ed || "";
+	}
+
+	// 모달 스택 깊이에 따른 안전한 모달 오픈 (1차: openModal/openSecondModal, 2차 이상: openThirdModal)
+	function openSmartModal(url, width, height, title, paramObj, callback) {
+		window.deviceType = window.deviceType || 'desktop';
+		var stackDepth = 0;
+		if (typeof modalStack !== 'undefined' && modalStack) {
+			if (typeof modalStack.size === 'function') {
+				stackDepth = modalStack.size();
+			} else if (modalStack.modalArr) {
+				stackDepth = modalStack.modalArr.length;
+			}
+		}
+
+		if (stackDepth >= 2 && typeof openThirdModal === 'function') {
+			if (typeof thirdModal !== 'undefined' && thirdModal && thirdModal.config) {
+				thirdModal.config.zIndex = 2001;
+			}
+			openThirdModal(url, width, height, title, paramObj, function(res) {
+				if (typeof callback === 'function') callback(res);
+			});
+			setTimeout(function() {
+				if (typeof thirdModal !== 'undefined' && thirdModal && thirdModal.activeModal) {
+					thirdModal.activeModal.css("z-index", "2001");
+				}
+				$('.ax-mask').last().css("z-index", "2000");
+			}, 50);
+		} else if (stackDepth >= 1 && typeof openSecondModal === 'function') {
+			openSecondModal(url, width, height, title, paramObj, function(res) {
+				if (typeof callback === 'function') callback(res);
+			});
+		} else if (typeof openModal === 'function') {
+			openModal(url, width, height, title, paramObj, function(res) {
+				if (typeof callback === 'function') callback(res);
+			});
+		}
+	}
+
+	PM07Annual.Popover = {
+		// 공통 스타일 자동 1회 주입 (PM0810M01과 100% 동일 톤앤매너, ::before 가상 요소 배제로 마우스 커서 침범 원천 차단)
+		injectStyle: function() {
+			if ($('#pm07CommonPopoverStyle').length === 0) {
+				var css = '<style id="pm07CommonPopoverStyle">' +
+					'.pm07-common-popover {' +
+					'	position: fixed !important;' +
+					'	z-index: 999999;' +
+					'	display: none;' +
+					'	background: #ffffff;' +
+					'	border: 1px solid #3b62b1;' +
+					'	border-radius: 6px;' +
+					'	box-shadow: 0 4px 18px rgba(0, 0, 0, 0.22);' +
+					'	padding: 10px 14px;' +
+					'	min-width: 250px;' +
+					'	max-width: 420px;' +
+					'	max-height: 420px;' +
+					'	overflow-y: auto;' +
+					'	font-size: 12px;' +
+					'	color: #333333;' +
+					'	pointer-events: auto;' +
+					'}' +
+					'.pm07-common-popover .popover-title {' +
+					'	font-weight: bold; color: #3b62b1; border-bottom: 1px solid #e9ecef;' +
+					'	padding-bottom: 5px; margin-bottom: 6px; font-size: 12px;' +
+					'}' +
+					'.pm07-common-popover .popover-content {' +
+					'	max-height: 280px; overflow-y: auto; overflow-x: hidden; padding-right: 4px;' +
+					'}' +
+					'.pm07-common-popover .popover-content::-webkit-scrollbar { width: 6px; }' +
+					'.pm07-common-popover .popover-content::-webkit-scrollbar-thumb { background-color: #cbd5e1; border-radius: 3px; }' +
+					'.pm07-common-popover .popover-content::-webkit-scrollbar-track { background-color: #f1f5f9; }' +
+					'.pm07-common-popover .popover-item {' +
+					'	padding: 4px 0; line-height: 1.4; color: #444444; border-bottom: 1px dashed #f0f0f0;' +
+					'}' +
+					'.pm07-common-popover .popover-item:last-child { border-bottom: none; }' +
+					'.pm07-common-popover .popover-item.clickable {' +
+					'	cursor: pointer; border-radius: 4px; padding: 5px 8px; margin: 2px 0;' +
+					'	transition: background-color 0.15s ease, color 0.15s ease;' +
+					'}' +
+					'.pm07-common-popover .popover-item.clickable:hover {' +
+					'	background-color: #ebf5fb; color: #1e40af;' +
+					'}' +
+					'.pm07-common-popover .popover-item.clickable:hover .pop-link-icon {' +
+					'	color: #1e40af;' +
+					'}' +
+					'/* 호버 트리거 내부 아이콘/텍스트 노드 간 마우스 이벤트 핑퐁 방지 */' +
+					'.used-days-info-trigger *, .award-used-days-trigger * {' +
+					'	pointer-events: none !important;' +
+					'}' +
+					'</style>';
+				$('head').append(css);
+			}
+		},
+
+		// 공통 팝오버 DOM 컨테이너 반환 (없으면 생성 및 이벤트 바인딩)
+		getContainer: function() {
+			PM07Annual.Popover.injectStyle();
+			var $pop = $('#pm07CommonVacationPopover');
+			if ($pop.length === 0) {
+				$('body').append(
+					'<div id="pm07CommonVacationPopover" class="pm07-common-popover">' +
+						'<div class="popover-title"><i class="fas fa-calendar-check"></i> <span id="pm07CommonPopTitle"></span></div>' +
+						'<div id="pm07CommonPopContent" class="popover-content"></div>' +
+					'</div>'
+				);
+				$pop = $('#pm07CommonVacationPopover');
+			}
+
+			// 팝오버 창 위에 마우스가 위치했을 때 닫힘 방지 및 지연 닫힘 (Hover Group 패턴)
+			$pop.off('mouseenter mouseleave').on({
+				mouseenter: function() {
+					IS_OVER_POPOVER = true;
+					if (POPOVER_TIMER) {
+						clearTimeout(POPOVER_TIMER);
+						POPOVER_TIMER = null;
+					}
+				},
+				mouseleave: function() {
+					IS_OVER_POPOVER = false;
+					checkAndHidePopover(400);
+				}
+			});
+
+			// 팝오버 항목 클릭 시 해당 신청서 모달 오픈
+			$pop.off('click', '.popover-item.clickable').on('click', '.popover-item.clickable', function(e) {
+				e.stopPropagation();
+				var targetReqNo = $(this).attr('data-req-no');
+				var targetKind = $(this).attr('data-kind') || 'vac';
+				if (targetReqNo) {
+					PM07Annual.Popover.hideImmediately();
+					PM07Annual.Popover.openDetailModal(targetKind, targetReqNo, POPOVER_ON_CLOSE_CALLBACK);
+				}
+			});
+
+			return $pop;
+		},
+
+		// 마우스 커서 위치 기반 정밀 배치 함수 (PM0810M01과 100% 동일: 커서 아래 16px, 오른쪽 10px로 커서 히트박스와 절대 겹치지 않음)
+		positionPopover: function(e, $triggerEl) {
+			var $pop = $('#pm07CommonVacationPopover');
+			if (!$pop.length || !$pop.is(':visible')) return;
+
+			var clientX = 0, clientY = 0;
+			if (e && (typeof e.clientX !== 'undefined')) {
+				clientX = e.clientX;
+				clientY = e.clientY;
+			} else if ($triggerEl && $triggerEl.length) {
+				var rect = $triggerEl[0].getBoundingClientRect();
+				clientX = rect.left + 10;
+				clientY = rect.bottom;
+			}
+
+			if (!clientX && !clientY) return;
+
+			var popW = $pop.outerWidth() || 280;
+			var popH = $pop.outerHeight() || 180;
+			var winW = $(window).width();
+			var winH = $(window).height();
+
+			// 마우스 커서 아래 16px, 오른쪽 10px에 배치 (커서 히트박스와 절대 겹치지 않음)
+			var posX = clientX + 10;
+			var posY = clientY + 16;
+
+			// 우측 화면 밖으로 넘어가면 마우스 왼쪽으로
+			if (clientX + popW + 15 > winW) {
+				posX = clientX - popW - 10;
+			}
+			// 하단 화면 밖으로 넘어가면 마우스 위쪽으로
+			if (clientY + popH + 20 > winH) {
+				posY = clientY - popH - 16;
+			}
+			if (posX < 10) posX = 10;
+			if (posY < 10) posY = 10;
+
+			$pop.css({
+				'top': posY + 'px',
+				'left': posX + 'px'
+			});
+		},
+
+		// 상세 모달 오픈
+		openDetailModal: function(kind, reqNo, callback) {
+			if (!reqNo) return;
+			var paramObj = {
+				"actionType": "U",
+				"reqNo": reqNo
+			};
+			if (kind === 'sw') {
+				paramObj.pgmId = "PM0801P01";
+				openSmartModal("/static/html/user/pm/pm08/PM0801P01.html", 1100, 800, "휴일대체근무 신청서 상세", paramObj, callback);
+			} else {
+				paramObj.pgmId = "PM0701P01";
+				openSmartModal("/static/html/user/pm/pm07/PM0701P01.html", 1100, 700, "휴가 신청서 상세", paramObj, callback);
+			}
+		},
+
+		// 지연 숨김 (400ms 유예 및 Hover Group 검증)
+		hide: function() {
+			if (POPOVER_SHOW_TIMER) {
+				clearTimeout(POPOVER_SHOW_TIMER);
+				POPOVER_SHOW_TIMER = null;
+			}
+			checkAndHidePopover(400);
+		},
+
+		// 즉시 숨김
+		hideImmediately: function() {
+			if (POPOVER_SHOW_TIMER) {
+				clearTimeout(POPOVER_SHOW_TIMER);
+				POPOVER_SHOW_TIMER = null;
+			}
+			if (POPOVER_TIMER) {
+				clearTimeout(POPOVER_TIMER);
+				POPOVER_TIMER = null;
+			}
+			IS_OVER_TRIGGER = false;
+			IS_OVER_POPOVER = false;
+			$('#pm07CommonVacationPopover').hide();
+			POPOVER_CURRENT_KEY = null;
+		},
+
+		// 팝오버 표출 (PM0810M01과 100% 동일 로직: e 수신 및 positionPopover 적용)
+		show: function($triggerEl, opt, e) {
+			if (POPOVER_TIMER) {
+				clearTimeout(POPOVER_TIMER);
+				POPOVER_TIMER = null;
+			}
+			var $pop = PM07Annual.Popover.getContainer();
+
+			POPOVER_ON_CLOSE_CALLBACK = (opt && typeof opt.onClose === 'function') ? opt.onClose : null;
+
+			var coCd = (opt && opt.coCd) || (typeof jwt !== 'undefined' ? jwt.coCd : 'GUN') || 'GUN';
+			var userId = (opt && (opt.userId || opt.id)) ? (opt.userId || opt.id) : '';
+			var userNm = (opt && opt.userNm) ? opt.userNm : '사원';
+			var curYy = (opt && opt.yy) ? opt.yy : (window.moment ? moment().format('YYYY') : '2026');
+			var colKey = (opt && opt.colKey) ? opt.colKey : '';
+			var awardTypeCd = (opt && opt.awardTypeCd) ? opt.awardTypeCd : '';
+			var awardNm = (opt && opt.awardTypeNm) ? opt.awardTypeNm : (awardTypeCd === 'PM07M04TYPE51' ? '하계대체휴가일수' : '포상휴가');
+			var rawSt = (opt && opt.stDt) ? String(opt.stDt).replace(/[^0-9]/g, '') : '';
+			var rawEd = (opt && opt.edDt) ? String(opt.edDt).replace(/[^0-9]/g, '') : '';
+
+			// 동일 대상 팝오버가 이미 열려 있는 경우: 닫기 타이머를 즉시 해제하고 그대로 유지 (재조회 및 깜빡임 방지)
+			var targetKey = userId + '_' + colKey + '_' + curYy + '_' + awardTypeCd + '_' + rawSt + '_' + rawEd;
+			if ($pop.is(':visible') && POPOVER_CURRENT_KEY === targetKey) {
+				if (POPOVER_TIMER) {
+					clearTimeout(POPOVER_TIMER);
+					POPOVER_TIMER = null;
+				}
+				return;
+			}
+			POPOVER_CURRENT_KEY = targetKey;
+
+			var myRequestId = ++POPOVER_REQUEST_ID;
+
+			// 타이틀 결정
+			var titleText = userNm + ' 님의 신청 이력';
+			if (colKey === "workSubstDays" || colKey === "sw" || colKey === "sw_all") {
+				titleText = userNm + ' 님의 휴일대체근무(발생) 이력';
+			} else if (colKey === "workSubstUsedDays" || colKey === "vac" || colKey === "vac_all") {
+				titleText = userNm + ' 님의 근무대체(사용) 이력';
+			} else if (colKey === "summerVacDays") {
+				titleText = userNm + ' 님의 하계휴가대체(발생) 이력';
+			} else if (colKey === "summerVacUsedDays") {
+				titleText = userNm + ' 님의 하계휴가대체(사용) 이력';
+			} else if (colKey === "usedDays" || colKey === "ann" || colKey === "ann_all") {
+				titleText = userNm + ' 님의 연차/반차(사용) 이력';
+			} else if (colKey === "awardUsedDays" || colKey === "award") {
+				titleText = userNm + ' 님의 [' + awardNm + '] 사용 이력';
+			}
+			$('#pm07CommonPopTitle').text(titleText);
+			$('#pm07CommonPopContent').html('<div class="popover-item" style="color: #888888;"><i class="fas fa-spinner fa-spin"></i> 실시간 신청서 백엔드 조회 중...</div>');
+
+			// 팝오버 표시 및 커서 안전거리 위치 계산
+			$pop.css('pointer-events', 'auto').show();
+			PM07Annual.Popover.positionPopover(e, $triggerEl);
+
+			// 1) 휴일대체근무 발생 (workSubstDays)
+			if (colKey === "workSubstDays" || colKey === "sw" || colKey === "sw_all") {
+				var reqParam = {
+					"coCd": coCd,
+					"userId": userId,
+					"reqDtFrom": curYy + "0101",
+					"reqDtTo": curYy + "1231"
+				};
+				postAjax("/user/pm/pm08/selectSubstituteWorkList", reqParam, null, function(data) {
+					if (myRequestId !== POPOVER_REQUEST_ID) return;
+					var list = (data && (data.result || data.resultList || data.list)) ? (data.result || data.resultList || data.list) : [];
+					var htmlStr = '';
+					$.each(list, function(i, row) {
+						var dtText = row.holidayDt || row.reqDt || '';
+						var tmText = (row.stTm && row.edTm) ? (' (' + row.stTm + '~' + row.edTm + ')') : '';
+						var targetReqNo = row.reqNo || row.req_no || '';
+						var reason = row.specialReason ? (' [' + $.trim(row.specialReason) + ']') : '';
+						htmlStr += '<div class="popover-item clickable" data-kind="sw" data-req-no="' + targetReqNo + '" title="클릭 시 휴일대체근무 신청서 확인">' +
+									'<i class="fas fa-check-circle" style="color: #337ab7; margin-right: 5px;"></i> ' +
+									dtText + tmText + ' 휴일대체근무' + reason +
+									' <i class="fas fa-external-link-alt pop-link-icon" style="font-size: 10px; color: #337ab7; margin-left: 5px;" title="신청서 열기"></i>' +
+									'</div>';
+					});
+					if (!htmlStr) {
+						htmlStr = '<div class="popover-item" style="color: #888888;">등록된 휴일대체근무(발생) 신청 이력이 없습니다.</div>';
+					}
+					$('#pm07CommonPopContent').html(htmlStr);
+				}, false);
+			}
+			// 2) 하계휴가대체 발생 (summerVacDays) - 등록 문자열
+			else if (colKey === "summerVacDays") {
+				var infoText = (opt && opt.infoText) ? opt.infoText : "";
+				var htmlStr = '';
+				if (infoText) {
+					var items = infoText.split(';');
+					$.each(items, function(i, val) {
+						var rawVal = $.trim(val);
+						if (!rawVal) return;
+						htmlStr += '<div class="popover-item"><i class="fas fa-check-circle" style="color: #337ab7; margin-right: 5px;"></i> ' + rawVal + '</div>';
+					});
+				}
+				if (!htmlStr) {
+					htmlStr = '<div class="popover-item" style="color: #888888;">등록된 하계휴가대체(발생) 등록 이력이 없습니다.</div>';
+				}
+				$('#pm07CommonPopContent').html(htmlStr);
+			}
+			// 3) 그 외 휴가 사용일수 (연차, 대체휴가사용, 하계휴가사용, 포상휴가사용)
+			else {
+				var rawSt = (opt && opt.stDt) ? String(opt.stDt).replace(/[^0-9]/g, '') : '';
+				var rawEd = (opt && opt.edDt) ? String(opt.edDt).replace(/[^0-9]/g, '') : '';
+				var calParam = {
+					"coCd": coCd,
+					"reqId": userId,
+					"userId": userId,
+					"reqDtFrom": (rawSt || (curYy + "0101")),
+					"reqDtTo": (rawEd || (curYy + "1231")),
+					"stDt": (rawSt || (curYy + "0101")),
+					"edDt": (rawEd || (curYy + "1231"))
+				};
+
+				postAjax("/user/pm/pm07/selectVacationCalendarList", calParam, null, function(data) {
+					if (myRequestId !== POPOVER_REQUEST_ID) return;
+					var list = (data && (data.result || data.resultList || data.list)) ? (data.result || data.resultList || data.list) : [];
+					var htmlStr = '';
+
+					$.each(list, function(i, row) {
+						var vacTypeCd = row.vacTypeCd || row.vac_type_cd || '';
+						var rawNm = String(row.vacTypeNm || row.vac_type_nm || '');
+
+						// 컬럼별 필터링
+						if (colKey === "usedDays" || colKey === "ann" || colKey === "ann_all") {
+							if (vacTypeCd !== 'PM07TYPE01' && vacTypeCd !== 'PM07TYPE02') return true;
+						} else if (colKey === "workSubstUsedDays" || colKey === "vac" || colKey === "vac_all") {
+							if (vacTypeCd !== 'PM07TYPE11' && vacTypeCd !== 'PM07TYPE12' && rawNm.indexOf('대체') === -1) return true;
+						} else if (colKey === "summerVacUsedDays") {
+							if (vacTypeCd !== 'PM07TYPE09' && rawNm.indexOf('하계') === -1) return true;
+						} else if (colKey === "awardUsedDays" || colKey === "award") {
+							if (awardTypeCd === 'PM07M04TYPE51') {
+								if (vacTypeCd !== 'PM07TYPE09' && rawNm.indexOf('하계') === -1) return true;
+							} else {
+								if (vacTypeCd !== 'PM07TYPE07' && vacTypeCd !== 'PM07TYPE08' && rawNm.indexOf('포상') === -1) return true;
+							}
+						}
+
+						// 날짜 유효기간 필터링
+						var rowDt = String(row.rawStDt || row.stDt || row.st_dt || '').replace(/[^0-9]/g, '');
+						if (rawSt && rawEd && rowDt) {
+							if (rowDt < rawSt || rowDt > rawEd) return true;
+						}
+
+						var vNm = cleanTypeName(rawNm) || (colKey === "usedDays" ? "연차" : "휴가");
+						var stDisp = row.stDt || row.st_dt || '';
+						var edDisp = row.edDt || row.ed_dt || '';
+						var dtText = formatRange(stDisp, edDisp);
+						var vDays = Number(row.deductDays || row.deduct_days || row.vacDays || row.vac_days || 0);
+						if (!vDays || isNaN(vDays) || vDays === 0) vDays = 1;
+						var daysText = ' (' + (Math.round(vDays * 10) / 10) + '일)';
+						var rmk = row.reqRmk || row.req_rmk || row.rmk || '';
+						var rmkText = rmk ? (' [' + $.trim(rmk) + ']') : '';
+						var targetReqNo = row.reqNo || row.req_no || '';
+
+						htmlStr += '<div class="popover-item clickable" data-kind="vac" data-req-no="' + targetReqNo + '" title="클릭 시 휴가신청서 확인">' +
+									'<i class="fas fa-check-circle" style="color: #337ab7; margin-right: 5px;"></i> ' +
+									dtText + ' ' + vNm + daysText + rmkText +
+									' <i class="fas fa-external-link-alt pop-link-icon" style="font-size: 10px; color: #337ab7; margin-left: 5px;" title="신청서 열기"></i>' +
+									'</div>';
+					});
+
+					if (!htmlStr) {
+						var emptyMsg = "등록된 상세 신청 이력이 없습니다.";
+						if (colKey === "workSubstUsedDays") emptyMsg = "등록된 근무대체(사용) 신청 이력이 없습니다.";
+						else if (colKey === "summerVacUsedDays") emptyMsg = "등록된 하계휴가대체(사용) 신청 이력이 없습니다.";
+						else if (colKey === "usedDays") emptyMsg = "등록된 연차/반차 상세 신청 이력이 없습니다.";
+						else if (colKey === "awardUsedDays" || colKey === "award") emptyMsg = "등록된 [" + awardNm + "] 사용 이력이 없습니다.";
+
+						htmlStr = '<div class="popover-item" style="color: #888888;">' + emptyMsg + '</div>';
+					}
+
+					$('#pm07CommonPopContent').html(htmlStr);
+				}, false);
+			}
+		},
+
+		// 간편 이벤트 바인딩 헬퍼 (Hover Group 패턴 적용으로 포커스/마우스 이동 시 무한 깜빡임 완벽 차단)
+		bindHover: function(selector, optionsGetter) {
+			$(document).off('mouseenter mouseleave click', selector).on({
+				mouseenter: function(e) {
+					IS_OVER_TRIGGER = true;
+					var $el = $(this);
+					if (POPOVER_TIMER) {
+						clearTimeout(POPOVER_TIMER);
+						POPOVER_TIMER = null;
+					}
+					if (POPOVER_SHOW_TIMER) {
+						clearTimeout(POPOVER_SHOW_TIMER);
+						POPOVER_SHOW_TIMER = null;
+					}
+					POPOVER_SHOW_TIMER = setTimeout(function() {
+						POPOVER_SHOW_TIMER = null;
+						if (!IS_OVER_TRIGGER && !IS_OVER_POPOVER) return;
+						var opt = (typeof optionsGetter === 'function') ? optionsGetter($el) : optionsGetter;
+						if (opt) {
+							PM07Annual.Popover.show($el, opt, e);
+						}
+					}, 150);
+				},
+				mouseleave: function(e) {
+					IS_OVER_TRIGGER = false;
+					if (POPOVER_SHOW_TIMER) {
+						clearTimeout(POPOVER_SHOW_TIMER);
+						POPOVER_SHOW_TIMER = null;
+					}
+					PM07Annual.Popover.hide();
+				},
+				click: function(e) {
+					e.stopPropagation();
+					IS_OVER_TRIGGER = true;
+					var $el = $(this);
+					if (POPOVER_SHOW_TIMER) {
+						clearTimeout(POPOVER_SHOW_TIMER);
+						POPOVER_SHOW_TIMER = null;
+					}
+					var opt = (typeof optionsGetter === 'function') ? optionsGetter($el) : optionsGetter;
+					if (opt) {
+						PM07Annual.Popover.show($el, opt, e);
+					}
+				}
+			}, selector);
+		}
 	};
 
 	// 전역 호환 함수 등록
