@@ -747,6 +747,9 @@ public class PM07SvcImpl implements PM07Svc {
 		// 2-3. 혹시 다른 결재/공유코드로 등록된 잔여 결재선까지 REQ_NO 기준으로 100% CASCADE 삭제
 		pm07Mapper.deleteApprovalLineByReqNo(paramMap);
 
+		// AM11 결재함 문서(TB_AM11M01/D01) 물리 삭제 (PM08 패턴 동일)
+		deleteVacationAmDocs(paramMap.get("reqNo"), paramMap.get("coCd"));
+
 		// 3. 휴가 일자 디테일 및 휴가 신청 본체 삭제
 		pm07Mapper.deleteVacationDates(paramMap);
 		int deleteResult = pm07Mapper.deleteVacation(paramMap);
@@ -784,6 +787,26 @@ public class PM07SvcImpl implements PM07Svc {
 		}
 
 		return result;
+	}
+
+	private void deleteVacationAmDocs(String reqNo, String coCd) {
+		if (reqNo == null || reqNo.trim().isEmpty()) {
+			return;
+		}
+		try {
+			Map<String, String> param = new HashMap<String, String>();
+			param.put("reqNo", reqNo);
+			param.put("coCd", (coCd != null && !coCd.trim().isEmpty()) ? coCd : "GUN");
+			String docId = pm07Mapper.selectAmDocIdByReqNo(param);
+			if (docId != null && !docId.trim().isEmpty()) {
+				Map<String, String> delParam = new HashMap<String, String>();
+				delParam.put("docId", docId);
+				pm07Mapper.deleteAmD01ByDocId(delParam);
+				pm07Mapper.deleteAmM01ByDocId(delParam);
+			}
+		} catch (Exception e) {
+			throw new RuntimeException("전자결재 문서 삭제 처리 중 오류가 발생했습니다: " + e.getMessage(), e);
+		}
 	}
 
 	@Override

@@ -93,4 +93,10 @@ public interface PM07Mapper {
 
 	List<Map<String, String>> selectUserIdByEmpNo(Map<String, String> paramMap);
 
+	String selectAmDocIdByReqNo(Map<String, String> paramMap);
+
+	int deleteAmD01ByDocId(Map<String, String> paramMap);
+
+	int deleteAmM01ByDocId(Map<String, String> paramMap);
+
 }
