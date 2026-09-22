@@ -637,6 +637,92 @@
 		  AND TODO_DIV2_CODE_ID = #{todoDiv2CodeId}
 	</update>
 
+	<!-- 영업 PM(WB20) 결재 승인 시 AM 결재선 진행 상태 동기화 -->
+	<update id="syncAmApprovalLine" parameterType="Map">
+		UPDATE TB_AM11D01 L
+		   SET LINE_STATUS = CASE
+		           WHEN L.WB20_SANCTN_SN = TO_NUMBER(#{sanctnSn, jdbcType=VARCHAR}) THEN 'APPROVED'
+		           WHEN L.LINE_SEQ = (
+		               SELECT MIN(N.LINE_SEQ)
+		                 FROM TB_AM11D01 N
+		                WHERE N.DOC_ID = L.DOC_ID
+		                  AND N.LINE_SEQ &gt; TO_NUMBER(#{sanctnSn, jdbcType=VARCHAR})
+		                  AND N.LINE_TYPE NOT IN ('REFERENCE', 'REF', 'POST')
+		                  AND N.LINE_STATUS = 'READY'
+		           ) THEN 'PENDING'
+		           ELSE L.LINE_STATUS
+		       END,
+		       APPR_DT = CASE
+		           WHEN L.WB20_SANCTN_SN = TO_NUMBER(#{sanctnSn, jdbcType=VARCHAR}) THEN SYSDATE
+		           ELSE L.APPR_DT
+		       END,
+		       APPR_OPINION = CASE
+		           WHEN L.WB20_SANCTN_SN = TO_NUMBER(#{sanctnSn, jdbcType=VARCHAR}) THEN #{todoCfOpn, jdbcType=VARCHAR}
+		           ELSE L.APPR_OPINION
+		       END,
+		       UDT_ID = #{todoId, jdbcType=VARCHAR},
+		       UDT_PGM = 'WB20',
+		       UDT_DTTM = SYSDATE
+		 WHERE L.DOC_ID IN (
+		       SELECT M.DOC_ID
+		         FROM TB_AM11M01 M
+		        WHERE M.ERP_BIZ_KEY = #{todoNo, jdbcType=VARCHAR}
+		          <if test="coCd != null and coCd != ''">
+		          AND M.CO_CD = #{coCd, jdbcType=VARCHAR}
+		          </if>
+		 )
+		   AND (L.WB20_SANCTN_SN = TO_NUMBER(#{sanctnSn, jdbcType=VARCHAR})
+		        OR L.LINE_STATUS = 'READY')
+	</update>
+
+	<!-- 영업 PM(WB20) 결재 승인 시 AM 문서 상태/현재 결재자 동기화 -->
+	<update id="syncAmApprovalDocument" parameterType="Map">
+		UPDATE TB_AM11M01 M
+		   SET DOC_STATUS = CASE WHEN EXISTS (
+		           SELECT 1 FROM TB_AM11D01 L
+		            WHERE L.DOC_ID = M.DOC_ID
+		              AND L.LINE_STATUS IN ('PENDING', 'READY')
+		              AND L.LINE_TYPE NOT IN ('REFERENCE', 'REF', 'POST')
+		       ) THEN 'PROGRESS' ELSE 'COMPLETED' END,
+		       COMPLETE_DT = CASE WHEN EXISTS (
+		           SELECT 1 FROM TB_AM11D01 L
+		            WHERE L.DOC_ID = M.DOC_ID
+		              AND L.LINE_STATUS IN ('PENDING', 'READY')
+		              AND L.LINE_TYPE NOT IN ('REFERENCE', 'REF', 'POST')
+		       ) THEN NULL ELSE SYSDATE END,
+		       CURR_LINE_SEQ = NVL((
+		           SELECT MIN(L.LINE_SEQ) FROM TB_AM11D01 L
+		            WHERE L.DOC_ID = M.DOC_ID
+		              AND L.LINE_STATUS = 'PENDING'
+		              AND L.LINE_TYPE NOT IN ('REFERENCE', 'REF', 'POST')
+		       ), M.CURR_LINE_SEQ),
+		       CURR_APPROVER_ID = NVL((
+		           SELECT L.APPROVER_ID FROM TB_AM11D01 L
+		            WHERE L.DOC_ID = M.DOC_ID
+		              AND L.LINE_STATUS = 'PENDING'
+		              AND L.LINE_TYPE NOT IN ('REFERENCE', 'REF', 'POST')
+		              AND L.LINE_SEQ = (SELECT MIN(L2.LINE_SEQ) FROM TB_AM11D01 L2
+		                                 WHERE L2.DOC_ID = M.DOC_ID
+		                                   AND L2.LINE_STATUS = 'PENDING'
+		                                   AND L2.LINE_TYPE NOT IN ('REFERENCE', 'REF', 'POST'))
+		       ), ''),
+		       CURR_APPROVER_NM = NVL((
+		           SELECT L.APPROVER_NM FROM TB_AM11D01 L
+		            WHERE L.DOC_ID = M.DOC_ID
+		              AND L.LINE_STATUS = 'PENDING'
+		              AND L.LINE_TYPE NOT IN ('REFERENCE', 'REF', 'POST')
+		              AND L.LINE_SEQ = (SELECT MIN(L2.LINE_SEQ) FROM TB_AM11D01 L2
+		                                 WHERE L2.DOC_ID = M.DOC_ID
+		                                   AND L2.LINE_STATUS = 'PENDING'
+		                                   AND L2.LINE_TYPE NOT IN ('REFERENCE', 'REF', 'POST'))
+		       ), ''),
+		       UDT_ID = #{todoId, jdbcType=VARCHAR}, UDT_PGM = 'WB20', UDT_DTTM = SYSDATE
+		 WHERE M.ERP_BIZ_KEY = #{todoNo, jdbcType=VARCHAR}
+		   <if test="coCd != null and coCd != ''">
+		   AND M.CO_CD = #{coCd, jdbcType=VARCHAR}
+		   </if>
+	</update>
+
 	<!-- PM51 순차결재 강제용: 특정 문서/결재구분의 결재(gb 아님, TODO_DIV1_CODE_ID='TODODIV20') 행을 순번(SANCTN_SN) 순으로 조회 -->
 	<select id="selectApprovalLineOrder" parameterType="Map" resultType="camelMap">
 		SELECT

@@ -187,6 +187,11 @@ public class WB20SvcImpl implements WB20Svc {
 		validatePm51SalesApproval(paramMap);
 		validatePm51SequentialApproval(paramMap);
 		result += wb20Mapper.updateApprovalLine(paramMap);
+		// 영업 PM 결재는 동일 출장신청서의 AM 결재선도 함께 진행시킨다.
+		if (isPm51SalesApproval(paramMap)) {
+			wb20Mapper.syncAmApprovalLine(paramMap);
+			wb20Mapper.syncAmApprovalDocument(paramMap);
+		}
 
 		// 출장신청 관리부서 회계 승인(TODODIV2191) 시 신청서 자동 지급완료 처리 연동
 		if ("TODODIV2191".equals(todoDiv2CodeId) && "Y".equals(paramMap.get("sanctnSttus"))) {
