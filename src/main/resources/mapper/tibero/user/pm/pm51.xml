@@ -1209,7 +1209,7 @@
 			T.TRIP_RPT_CURR,
 			FN_CM05M01_CD_TO_NM(T.TRIP_RPT_CURR) AS TRIP_RPT_CURR_NM,
 			T.TRIP_RPT_AMT,
-			T.TRIP_RPT_NO,
+			S.TRIP_RPT_NO,
 			S.TRIP_RPT_ROUND AS SAVED_TRIP_RPT_ROUND,
 			S.TRIP_RPT_RSV_DIV AS SAVED_TRIP_RPT_RSV_DIV,
 			S.TRIP_RPT_CARD_EXRATE AS TRIP_RPT_CARD_EXRATE,
@@ -1228,12 +1228,7 @@
 			<foreach collection="userIds" item="userId" open="(" separator="," close=")">
 				#{userId}
 			</foreach>
-			<!-- 다른 복명서(TB_PM52D01 또는 T.TRIP_RPT_NO)에 이미 등록/반영된 경비 내역은 제외 (현재 복명서 건만 포함) -->
-			AND (T.TRIP_RPT_NO IS NULL
-			<if test="tripRptNo != null and tripRptNo != ''">
-				OR T.TRIP_RPT_NO = #{tripRptNo}
-			</if>
-			)
+			<!-- 다른 복명서(TB_PM52D01)에 이미 등록/반영된 경비 내역은 제외 (현재 복명서 건만 포함) -->
 			AND NOT EXISTS (
 				SELECT 1 FROM TB_PM52D01 X
 				WHERE X.WORK_RPT_NO = T.WORK_RPT_NO
@@ -1309,22 +1304,22 @@
 	<!-- 지급확정 전 점유 충돌 검사: 다른 복명서가 이미 점유한 출장경비 조회 -->
 	<select id="selectTripExpenseOccupiedByOther" parameterType="Map" resultType="CamelMap">
 		SELECT
-			T.CO_CD,
-			T.WORK_RPT_NO,
-			T.WORK_RPT_NO_SEQ,
-			T.TRIP_RPT_NO,
+			D.CO_CD,
+			D.WORK_RPT_NO,
+			D.WORK_RPT_NO_SEQ,
+			D.TRIP_RPT_NO,
 			TO_CHAR(M.WORK_RPT_DT, 'YYYY-MM-DD') AS WORK_RPT_DT,
 			T.TRIP_RPT_AMT
-		FROM TB_PM01D01 T
+		FROM TB_PM52D01 D
+		INNER JOIN TB_PM01D01 T ON T.WORK_RPT_NO = D.WORK_RPT_NO AND T.WORK_RPT_NO_SEQ = D.WORK_RPT_NO_SEQ
 		INNER JOIN TB_PM01M01 M ON T.WORK_RPT_NO = M.WORK_RPT_NO
-		WHERE T.TRIP_RPT_NO IS NOT NULL
-			AND T.TRIP_RPT_NO != #{tripRptNo}
+		WHERE D.TRIP_RPT_NO != #{tripRptNo}
 			AND (
 			<foreach collection="rows" item="row" separator=" OR ">
-				(T.WORK_RPT_NO = #{row.workRptNo} AND T.WORK_RPT_NO_SEQ = #{row.workRptNoSeq})
+				(D.WORK_RPT_NO = #{row.workRptNo} AND D.WORK_RPT_NO_SEQ = #{row.workRptNoSeq})
 			</foreach>
 			)
-		ORDER BY M.WORK_RPT_DT, T.WORK_RPT_NO, T.WORK_RPT_NO_SEQ
+		ORDER BY M.WORK_RPT_DT, D.WORK_RPT_NO, D.WORK_RPT_NO_SEQ
 	</select>
 
 	<!-- 지급완료 처리 시: 해당 복명서의 기존 출장경비 연결 초기화 -->
