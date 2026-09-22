@@ -57,6 +57,8 @@ public interface PM51Svc {
 
 	int updateTripRptAcctSettle(Map<String, Object> paramMap) throws Exception;
 
+	Map<String, Object> approveTripRptApprovalLine(Map<String, String> paramMap) throws Exception;
+
 	int updateTripRptPayCancel(Map<String, String> paramMap) throws Exception;
 
 	List<Map<String, String>> selectTripDateOverlapList(Map<String, String> paramMap);

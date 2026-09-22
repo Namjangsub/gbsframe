@@ -352,6 +352,20 @@ public class PM51Ctr {
 		return "jsonView";
 	}
 
+	@PostMapping("/approveTripRptApprovalLine")
+	public String approveTripRptApprovalLine(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		try {
+			Map<String, Object> result = pm51Svc.approveTripRptApprovalLine(paramMap);
+			model.addAttribute("resultCode", 200);
+			model.addAttribute("resultMessage", "결재 승인되었습니다.");
+			model.addAttribute("result", result);
+		} catch (Exception e) {
+			model.addAttribute("resultCode", 900);
+			model.addAttribute("resultMessage", e.getMessage());
+		}
+		return "jsonView";
+	}
+
 	@PostMapping("/selectSalesCodeWbsSchedule")
 	public String selectSalesCodeWbsSchedule(@RequestBody Map<String, String> paramMap, ModelMap model) {
 		Map<String, String> result = pm51Svc.selectSalesCodeWbsSchedule(paramMap);
