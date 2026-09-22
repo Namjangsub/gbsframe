@@ -308,6 +308,10 @@ public class AM11SvcImpl implements AM11Svc {
         String userId = (String) paramMap.get("userId");
         String userNm = (String) paramMap.get("userNm");
         String apprOpinion = (String) paramMap.get("apprOpinion");
+        Object pgmIdObj = paramMap.get("pgmId");
+        if (pgmIdObj == null || String.valueOf(pgmIdObj).trim().isEmpty()) {
+            paramMap.put("pgmId", "AM11_APPR");
+        }
 
         // 1. 동시성 비관적 Lock (FOR UPDATE NOWAIT)
         Map<String, Object> docLock;
@@ -1244,6 +1248,15 @@ public class AM11SvcImpl implements AM11Svc {
             paramMap.put("draDutyNm", orgInfo.get("dutyNm"));
             if (!paramMap.containsKey("coCd") || paramMap.get("coCd") == null) {
                 paramMap.put("coCd", orgInfo.get("coCd"));
+            }
+            if (!paramMap.containsKey("userNm") || paramMap.get("userNm") == null || String.valueOf(paramMap.get("userNm")).trim().isEmpty()) {
+                paramMap.put("userNm", orgInfo.get("userNm"));
+            }
+            if (!paramMap.containsKey("deptNm") || paramMap.get("deptNm") == null || String.valueOf(paramMap.get("deptNm")).trim().isEmpty()) {
+                paramMap.put("deptNm", orgInfo.get("deptNm"));
+            }
+            if (!paramMap.containsKey("levelNm") || paramMap.get("levelNm") == null || String.valueOf(paramMap.get("levelNm")).trim().isEmpty()) {
+                paramMap.put("levelNm", orgInfo.get("levelNm"));
             }
         }
     }

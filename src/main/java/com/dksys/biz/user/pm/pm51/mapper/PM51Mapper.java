@@ -165,6 +165,8 @@ public interface PM51Mapper {
 
 	String selectAmDocIdByTripReqNo(Map<String, String> paramMap);
 
+	Map<String, String> selectAmDocInfoByTripReqNo(Map<String, String> paramMap);
+
 	int deleteAmApprovalLinesByBizKey(Map<String, String> paramMap);
 
 	int deleteAmApprovalDocByBizKey(Map<String, String> paramMap);

@@ -20,6 +20,7 @@
     </select>
 
     <!-- 동시성 제어용 문서 Lock 조회 (FOR UPDATE NOWAIT) -->
+    <!-- DOC_ID는 TB_AM11M01의 단독 PK이므로 DOC_ID 단독으로 문서를 특정하여 비관적 락을 건다 -->
     <select id="selectApprovalDocForUpdate" parameterType="Map" resultType="CamelMap">
         SELECT DOC_ID,
                DOC_NO,
@@ -31,9 +32,7 @@
                ERP_BIZ_TYPE,
                ERP_BIZ_KEY
           FROM TB_AM11M01
-         WHERE DOC_ID = #{docId, jdbcType=VARCHAR}
-           AND CO_CD = #{coCd, jdbcType=VARCHAR}
-           FOR UPDATE
+         WHERE DOC_ID = #{docId}
     </select>
 
     <!-- 문서 마스터 상세 조회 -->
@@ -72,12 +71,11 @@
                TO_CHAR(M.CREAT_DTTM, 'YYYY-MM-DD HH24:MI') AS CREAT_DTTM
           FROM TB_AM11M01 M
           LEFT OUTER JOIN TB_AM02M01 F ON M.FORM_CD = F.FORM_CD
-         WHERE M.DOC_ID = #{docId, jdbcType=VARCHAR}
-           AND M.CO_CD = #{coCd, jdbcType=VARCHAR}
-           AND (M.DRA_USER_ID = #{userId, jdbcType=VARCHAR}
+         WHERE M.DOC_ID = #{docId}
+           AND (M.DRA_USER_ID = #{userId}
                 OR EXISTS (SELECT 1 FROM TB_AM11D01 P
                             WHERE P.DOC_ID = M.DOC_ID
-                              AND (P.APPROVER_ID = #{userId, jdbcType=VARCHAR} OR P.ACTUAL_USER_ID = #{userId, jdbcType=VARCHAR})))
+                              AND (P.APPROVER_ID = #{userId} OR P.ACTUAL_USER_ID = #{userId})))
     </select>
 
     <!-- 결재선 상세 목록 조회 (Snapshot 보존 + 열람 상태 조인) -->
@@ -85,8 +83,8 @@
         SELECT NVL((
                    SELECT CASE WHEN B.MNG_ID = A.ID THEN 'Y' ELSE 'N' END
                      FROM TB_CM06M01 A
-                     JOIN TB_CM06M01 B ON B.ID = #{draUserId, jdbcType=VARCHAR}
-                    WHERE A.ID = #{approverId, jdbcType=VARCHAR}
+                     JOIN TB_CM06M01 B ON B.ID = #{draUserId}
+                    WHERE A.ID = #{approverId}
                ), 'N')
           FROM DUAL
     </select>
@@ -135,7 +133,7 @@
                     THEN 1 ELSE 0 END AS READ_CNT
           FROM TB_AM11D01 D
           LEFT OUTER JOIN TB_AM11D03 R ON D.DOC_ID = R.DOC_ID AND D.APPROVER_ID = R.USER_ID
-         WHERE D.DOC_ID = #{docId, jdbcType=VARCHAR}
+         WHERE D.DOC_ID = #{docId}
          ORDER BY D.LINE_SEQ ASC
     </select>
 
@@ -298,7 +296,7 @@
         UPDATE TB_AM11M01
            SET DOC_DATA_JSON = #{docDataJson, jdbcType=CLOB},
                DOC_RENDER_HTML = #{docRenderHtml, jdbcType=CLOB},
-               UDT_ID = #{userId}, UDT_PGM = #{pgmId}, UDT_DTTM = SYSDATE
+               UDT_ID = NVL(#{userId, jdbcType=VARCHAR}, 'SYSTEM'), UDT_PGM = NVL(#{pgmId, jdbcType=VARCHAR}, 'AM11'), UDT_DTTM = SYSDATE
          WHERE DOC_ID = #{docId}
     </update>
 
@@ -311,8 +309,8 @@
                <if test='nextStatus == "COMPLETED" or nextStatus == "REJECTED" or nextStatus == "CANCELLED"'>
                COMPLETE_DT      = SYSDATE,
                </if>
-               UDT_ID           = #{userId},
-               UDT_PGM          = #{pgmId},
+               UDT_ID           = NVL(#{userId, jdbcType=VARCHAR}, 'SYSTEM'),
+               UDT_PGM          = NVL(#{pgmId, jdbcType=VARCHAR}, 'AM11'),
                UDT_DTTM         = SYSDATE
          WHERE DOC_ID = #{docId}
     </update>
@@ -409,8 +407,8 @@
                APPR_DT         = SYSDATE,
                APPR_OPINION    = #{apprOpinion, jdbcType=VARCHAR},
                ARBIT_YN        = NVL(#{arbitYn, jdbcType=VARCHAR}, 'N'),
-               UDT_ID          = #{userId},
-               UDT_PGM         = #{pgmId},
+               UDT_ID          = NVL(#{userId, jdbcType=VARCHAR}, 'SYSTEM'),
+               UDT_PGM         = NVL(#{pgmId, jdbcType=VARCHAR}, 'AM11_APPR'),
                UDT_DTTM        = SYSDATE
          WHERE DOC_ID = #{docId}
            AND LINE_SEQ = #{lineSeq}
@@ -420,8 +418,8 @@
     <update id="updateNextLinePending" parameterType="Map">
         UPDATE TB_AM11D01
            SET LINE_STATUS = 'PENDING',
-               UDT_ID      = #{userId},
-               UDT_PGM     = #{pgmId},
+               UDT_ID      = NVL(#{userId, jdbcType=VARCHAR}, 'SYSTEM'),
+               UDT_PGM     = NVL(#{pgmId, jdbcType=VARCHAR}, 'AM11_APPR'),
                UDT_DTTM    = SYSDATE
          WHERE DOC_ID = #{docId}
            AND LINE_SEQ = #{nextLineSeq}
@@ -554,9 +552,9 @@
             #{docId},
             #{actType},
             #{userId},
-            #{userNm, jdbcType=VARCHAR},
-            #{deptNm, jdbcType=VARCHAR},
-            #{levelNm, jdbcType=VARCHAR},
+            NVL(#{userNm, jdbcType=VARCHAR}, NVL(#{draUserNm, jdbcType=VARCHAR}, (SELECT NAME FROM TB_CM06M01 WHERE ID = #{userId} AND ROWNUM = 1))),
+            NVL(#{deptNm, jdbcType=VARCHAR}, NVL(#{draDeptNm, jdbcType=VARCHAR}, (SELECT DEPT_NM FROM TB_CM04M01 WHERE DEPT_ID = (SELECT DEPT_ID FROM TB_CM06M01 WHERE ID = #{userId} AND ROWNUM = 1) AND ROWNUM = 1))),
+            NVL(#{levelNm, jdbcType=VARCHAR}, NVL(#{draLevelNm, jdbcType=VARCHAR}, (SELECT LEVEL_NM FROM TB_CM07M01 WHERE LEVEL_CD = (SELECT LEVEL_CD FROM TB_CM06M01 WHERE ID = #{userId} AND ROWNUM = 1) AND ROWNUM = 1))),
             #{prevStatus, jdbcType=VARCHAR},
             #{nextStatus, jdbcType=VARCHAR},
             #{actOpinion, jdbcType=VARCHAR},

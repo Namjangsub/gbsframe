@@ -139,6 +139,7 @@
 				<div class="add_btn_small pdl10">
 					<a onclick="insertTripRptModal();" style="height: 30px; line-height: 28px; width: 60px;" authchk><i class="fas fa-plus"></i>신규</a>
 					<a onclick="deleteTripRptM01();" style="height: 30px; line-height: 28px; width: 60px;" authchk><i class="fas fa-trash"></i>삭제</a>
+					<a onclick="updateRptPayDone();" style="height: 30px; line-height: 28px; width: 115px;" authchk><i class="fas fa-check-circle"></i> 지급완료처리</a>
 					<a onclick="updateRptPayCancel();" style="height: 30px; line-height: 28px; width: 115px;" authchk><i class="fas fa-undo"></i> 지급완료취소</a>
 					<a onclick="printTripRptM01();" style="height: 30px; line-height: 28px; width: 120px;" title="출장복명서가 출력됩니다."><i class="fas fa-print"></i>출장복명서출력</a>
 					<a onclick="excelDown();" style="height: 30px; line-height: 28px; width: 90px;"><i class="fas fa-file-excel"></i>엑셀다운로드</a>
@@ -160,7 +161,7 @@
 
 	<!-- 복명대상 신청서 선택 모달 (숨김 상태) -->
 	<div id="selectReqModal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 9999; align-items: center; justify-content: center;">
-		<div style="background: white; width: 800px; max-height: 90vh; border-radius: 4px; display: flex; flex-direction: column; box-shadow: 0 4px 8px rgba(0,0,0,0.2);">
+		<div style="background: white; width: 1000px; max-height: 90vh; border-radius: 4px; display: flex; flex-direction: column; box-shadow: 0 4px 8px rgba(0,0,0,0.2);">
 			<div style="padding: 15px; border-bottom: 1px solid #ddd; display: flex; justify-content: space-between; align-items: center;">
 				<h4 style="margin: 0;">복명대상 신청서 선택</h4>
 				<button type="button" onclick="closeSelectReqModal();" style="background: none; border: none; font-size: 20px; cursor: pointer;">&times;</button>
@@ -355,6 +356,17 @@
 					return;
 				}
 
+				list = list.map(function(row) {
+					if (!row.tripPeriod && (row.tripStDtm || row.tripEdDtm)) {
+						var st = (row.tripStDtm || '').replace(/[^0-9]/g, '');
+						var ed = (row.tripEdDtm || '').replace(/[^0-9]/g, '');
+						var stStr = st.length >= 8 ? (st.substring(0,4) + '-' + st.substring(4,6) + '-' + st.substring(6,8)) : (row.tripStDtm || '');
+						var edStr = ed.length >= 8 ? (ed.substring(0,4) + '-' + ed.substring(4,6) + '-' + ed.substring(6,8)) : (row.tripEdDtm || '');
+						row.tripPeriod = (stStr && edStr) ? (stStr + ' ~ ' + edStr) : (stStr || edStr);
+					}
+					return row;
+				});
+
 				// 모달을 먼저 보이게 한 뒤 그리드를 초기화해야 함 (display:none 상태에서 그리드를 초기화하면
 				// 컨테이너 크기가 0으로 계산되어 데이터를 넣어도 화면에 표시되지 않음)
 				$('#selectReqModal').css('display', 'flex');
@@ -397,11 +409,16 @@
 			},
 			page: { display: false },
 			columns: [
-				{ key: 'tripReqNo', label: '신청번호', width: 120, align: 'center' },
-				{ key: 'tripDiv', label: '구분', width: 80, align: 'center' },
-				{ key: 'tripPlace', label: '출장지', width: 150, align: 'left' },
+				{ key: 'tripReqNo', label: '신청번호', width: 110, align: 'center' },
+				{ key: 'tripDivNm', label: '구분', width: 60, align: 'center', formatter: function() {
+					return this.item.tripDivNm || this.value || (this.item.tripDiv === 'TRIPDIV01' ? '국내' : (this.item.tripDiv === 'TRIPDIV02' ? '해외' : this.item.tripDiv));
+				}},
+				{ key: 'userNm', label: '출장신청자', width: 80, align: 'center' },
+				{ key: 'tripPeriod', label: '기간', width: 160, align: 'center' },
+				{ key: 'clntNm', label: '고객사', width: 130, align: 'left' },
+				{ key: 'clntPjtNm', label: '프로젝트명', width: 120, align: 'left' },
 				{ key: 'equipNm', label: '설비명', width: 120, align: 'left' },
-				{ key: 'tripPeriod', label: '기간', width: 150, align: 'center' }
+				{ key: 'tripPlace', label: '출장지', width: 140, align: 'left' }
 			]
 		});
 	}
@@ -519,6 +536,43 @@
 			}
 		});
 		return auth;
+	}
+
+	// 지급완료처리
+	function updateRptPayDone() {
+		if (!isAccountingUserM01()) {
+			alert("회계담당자만 지급완료 처리할 수 있습니다.");
+			return;
+		}
+		var selectedRows = gridView.target.getList("selected");
+		if (selectedRows.length === 0) {
+			alert("지급완료 처리할 행을 선택해주세요.");
+			return;
+		}
+		if (selectedRows.length > 1) {
+			alert("지급완료 처리는 1건씩 가능합니다.");
+			return;
+		}
+		var row = selectedRows[0];
+		if (row.payDt) {
+			alert("이미 지급완료 처리된 출장복명서입니다.");
+			return;
+		}
+		var appTotCnt = Number(row.appTotCnt || 0);
+		var appDoneCnt = Number(row.appDoneCnt || 0);
+		if (appTotCnt === 0 || appTotCnt !== appDoneCnt) {
+			alert("일반결재가 완료되지 않은 출장복명서는 지급완료 처리할 수 없습니다.");
+			return;
+		}
+
+		openModal("/static/html/user/pm/pm51/PM5102P01.html", 1500, 900, "출장복명서 지급처리", {
+			actionType: "PAY",
+			tripRptNo: row.tripRptNo,
+			appTotCnt: appTotCnt,
+			appDoneCnt: appDoneCnt
+		}, function () {
+			gridView.setData(0);
+		});
 	}
 
 	// 지급완료취소

@@ -1005,12 +1005,13 @@ public class PM51SvcImpl implements PM51Svc {
 		if (!isCurrentManagementApproverPending(paramMap)) return;
 		Map<String, String> docParam = new HashMap<>();
 		docParam.put("tripReqNo", paramMap.get("tripReqNo"));
-		docParam.put("coCd", paramMap.get("coCd"));
-		String docId = pm51Mapper.selectAmDocIdByTripReqNo(docParam);
-		if (!hasText(docId)) throw new RuntimeException("전자결재 문서를 찾을 수 없어 지급완료 처리할 수 없습니다.");
+		Map<String, String> amDoc = pm51Mapper.selectAmDocInfoByTripReqNo(docParam);
+		if (amDoc == null || !hasText(amDoc.get("docId"))) throw new RuntimeException("전자결재 문서를 찾을 수 없어 지급완료 처리할 수 없습니다.");
 		Map<String, Object> approvalParam = new HashMap<>();
-		approvalParam.put("docId", docId);
+		approvalParam.put("docId", amDoc.get("docId"));
+		approvalParam.put("coCd", amDoc.get("coCd"));
 		approvalParam.put("userId", paramMap.get("userId"));
+		approvalParam.put("pgmId", hasText(paramMap.get("pgmId")) ? paramMap.get("pgmId") : "PM5101P01");
 		approvalParam.put("apprOpinion", paramMap.get("apprOpinion"));
 		Map<String, Object> result = am11Svc.approveDocument(approvalParam);
 		if (result == null || !"200".equals(String.valueOf(result.get("resultCode")))) {
@@ -1036,6 +1037,62 @@ public class PM51SvcImpl implements PM51Svc {
 		int pendingSn = 0;
 		for (Map<String, String> line : reqLines) {
 			if ("Y".equals(line.get("sanctnSttus"))) {
+				continue;
+			}
+			int sn;
+			try {
+				sn = Integer.parseInt(String.valueOf(line.get("sanctnSn")));
+			} catch (Exception e) {
+				continue;
+			}
+			if (pendingLine == null || sn < pendingSn) {
+				pendingLine = line;
+				pendingSn = sn;
+			}
+		}
+		if (pendingLine == null) {
+			return;
+		}
+
+		String suffix = "\n일반결재가 완료되어야 지급완료 처리할 수 있습니다.";
+		String name = pendingLine.get("todoNm") == null ? "" : String.valueOf(pendingLine.get("todoNm")).trim();
+		String jik = pendingLine.get("jik") == null ? "" : String.valueOf(pendingLine.get("jik")).replaceAll("\\s", "");
+		String nameWithJik = name + jik;
+		if (nameWithJik.isEmpty()) {
+			throw new RuntimeException("일반결재자가 승인하지 않은 상태입니다." + suffix);
+		}
+		char last = nameWithJik.charAt(nameWithJik.length() - 1);
+		String particle = (last >= 0xAC00 && last <= 0xD7A3 && ((last - 0xAC00) % 28) == 0) ? "가" : "이";
+		throw new RuntimeException("일반결재자 " + nameWithJik + particle + " 승인하지 않은 상태입니다." + suffix);
+	}
+
+	// 지급완료 처리 전 신청부서(일반) 결재선(TODODIV2200)이 모두 승인되었는지 검증한다 (PM5101과 동일).
+	private void validateTripRptGeneralApprovalDone(String tripRptNo) {
+		if (!hasText(tripRptNo)) {
+			return;
+		}
+		Map<String, String> lineParam = new HashMap<>();
+		lineParam.put("todoNo", tripRptNo);
+		lineParam.put("todoDiv2CodeId", "TODODIV2200");
+		List<Map<String, String>> rptLines = wb20Svc.selectGetApprovalList(lineParam);
+		if (rptLines == null || rptLines.isEmpty()) {
+			// 혹시 AM 연동 문서가 있으면 AM 문서 상태 확인
+			Map<String, String> amDocParam = new HashMap<>();
+			amDocParam.put("tripReqNo", tripRptNo);
+			Map<String, String> amDoc = pm51Mapper.selectAmDocInfoByTripReqNo(amDocParam);
+			if (amDoc != null && hasText(amDoc.get("docId"))) {
+				String docStatus = amDoc.get("docStatus");
+				if ("PROGRESS".equalsIgnoreCase(docStatus) || "APPROVED".equalsIgnoreCase(docStatus) || "COMPLETED".equalsIgnoreCase(docStatus)) {
+					return;
+				}
+			}
+			throw new RuntimeException("일반결재선이 등록되지 않아 지급완료 처리할 수 없습니다.");
+		}
+
+		Map<String, String> pendingLine = null;
+		int pendingSn = 0;
+		for (Map<String, String> line : rptLines) {
+			if ("Y".equals(line.get("sanctnSttus")) || hasText(line.get("todoCfDt"))) {
 				continue;
 			}
 			int sn;
@@ -1491,20 +1548,58 @@ public class PM51SvcImpl implements PM51Svc {
 
 		int result = pm51Mapper.updateTripRptMngEval(paramMap);
 
-		// 부서장평가 저장과 동시에, 호출자 본인의 미결 결재선(TODODIV2200)이 있으면 결재처리(승인완료)까지 진행
-		Map<String, String> approvalLineParam = new HashMap<>();
-		approvalLineParam.put("todoNo", paramMap.get("tripRptNo"));
-		approvalLineParam.put("todoDiv2CodeId", "TODODIV2200");
-		List<Map<String, String>> approvalLines = wb20Svc.selectGetApprovalList(approvalLineParam);
-		if (approvalLines != null) {
-			for (Map<String, String> line : approvalLines) {
-				if (callerId.equals(line.get("todoId")) && !"Y".equals(line.get("sanctnSttus"))) {
-					Map<String, String> approveParam = new HashMap<>(line);
-					approveParam.put("todoCfOpn", "");
-					approveParam.put("userId", callerId);
-					approveParam.put("pgmId", paramMap.get("pgmId"));
-					wb20Svc.insertApprovalLine(approveParam);
-					break;
+		// 부서장평가 저장과 동시에, 호출자 본인의 미결 결재선(TODODIV2200) 결재처리(승인완료) 진행
+		// AM 전자결재 연동 문서(PM52)가 존재하는 경우 AM 승인을 우선 호출하면,
+		// AM11SvcImpl.executeLinkedWb20Approval을 통해 WB20 결재선도 함께 자동 승인 연계된다.
+		String tripRptNo = paramMap.get("tripRptNo");
+		Map<String, String> docParam = new HashMap<>();
+		docParam.put("tripReqNo", tripRptNo);
+		Map<String, String> amDoc = pm51Mapper.selectAmDocInfoByTripReqNo(docParam);
+
+		boolean amApproved = false;
+		if (amDoc != null && hasText(amDoc.get("docId"))) {
+			String docId = amDoc.get("docId");
+			String amCoCd = amDoc.get("coCd");
+			Map<String, Object> approvalParam = new HashMap<>();
+			approvalParam.put("docId", docId);
+			approvalParam.put("coCd", amCoCd);
+			approvalParam.put("userId", callerId);
+			String approverNm = paramMap.get("userNm");
+			if (!hasText(approverNm)) {
+				Map<String, String> uParam = new HashMap<>();
+				uParam.put("userId", callerId);
+				Map<String, String> uInfo = cm06Mapper.selectUserInfo(uParam);
+				if (uInfo != null) {
+					approverNm = uInfo.get("name");
+				}
+			}
+			approvalParam.put("userNm", approverNm);
+			approvalParam.put("pgmId", hasText(paramMap.get("pgmId")) ? paramMap.get("pgmId") : "PM5102P01");
+			approvalParam.put("apprOpinion", hasText(paramMap.get("todoCfOpn")) ? paramMap.get("todoCfOpn") : "부서장평가 승인");
+			Map<String, Object> amResult = am11Svc.approveDocument(approvalParam);
+			if (amResult != null && "200".equals(String.valueOf(amResult.get("resultCode")))) {
+				amApproved = true;
+			} else if (amResult != null && !"200".equals(String.valueOf(amResult.get("resultCode")))) {
+				throw new RuntimeException("전자결재 승인 연계 실패: " + amResult.get("resultMessage"));
+			}
+		}
+
+		// AM 연계 승인이 처리되지 않은 경우(레거시 문서 또는 fallback), WB20 결재선 직접 승인 진행
+		if (!amApproved) {
+			Map<String, String> approvalLineParam = new HashMap<>();
+			approvalLineParam.put("todoNo", tripRptNo);
+			approvalLineParam.put("todoDiv2CodeId", "TODODIV2200");
+			List<Map<String, String>> approvalLines = wb20Svc.selectGetApprovalList(approvalLineParam);
+			if (approvalLines != null) {
+				for (Map<String, String> line : approvalLines) {
+					if (callerId.equals(line.get("todoId")) && !"Y".equals(line.get("sanctnSttus"))) {
+						Map<String, String> approveParam = new HashMap<>(line);
+						approveParam.put("todoCfOpn", hasText(paramMap.get("todoCfOpn")) ? paramMap.get("todoCfOpn") : "");
+						approveParam.put("userId", callerId);
+						approveParam.put("pgmId", paramMap.get("pgmId"));
+						wb20Svc.insertApprovalLine(approveParam);
+						break;
+					}
 				}
 			}
 		}
@@ -2114,6 +2209,20 @@ public class PM51SvcImpl implements PM51Svc {
 				applicantNm = paramMap.get("userNm");
 			}
 
+			String deptNm = paramMap.get("deptNm");
+			String levelNm = paramMap.get("levelNm");
+
+			if (hasText(applicantId) && (!hasText(applicantNm) || !hasText(deptNm) || !hasText(levelNm))) {
+				Map<String, String> uParam = new HashMap<>();
+				uParam.put("userId", applicantId);
+				Map<String, String> uInfo = cm06Mapper.selectUserInfo(uParam);
+				if (uInfo != null) {
+					if (!hasText(applicantNm)) applicantNm = uInfo.get("name");
+					if (!hasText(deptNm)) deptNm = uInfo.get("deptNm");
+					if (!hasText(levelNm)) levelNm = uInfo.get("levelNm");
+				}
+			}
+
 			Map<String, String> docIdParam = new HashMap<>();
 			docIdParam.put("tripReqNo", tripReqNo);
 			docIdParam.put("coCd", coCd);
@@ -2126,6 +2235,8 @@ public class PM51SvcImpl implements PM51Svc {
 			amParam.put("coCd", coCd);
 			amParam.put("userId", applicantId);
 			amParam.put("userNm", applicantNm);
+			amParam.put("deptNm", deptNm);
+			amParam.put("levelNm", levelNm);
 			amParam.put("docTitle", buildTripReqApprovalTitle(paramMap));
 			amParam.put("formCd", "PM5101");
 			amParam.put("formVer", 1);
@@ -2355,6 +2466,20 @@ public class PM51SvcImpl implements PM51Svc {
 			String applicantNm = paramMap.get("reqNm");
 			if (!hasText(applicantNm)) applicantNm = paramMap.get("userNm");
 
+			String deptNm = paramMap.get("deptNm");
+			String levelNm = paramMap.get("levelNm");
+
+			if (hasText(applicantId) && (!hasText(applicantNm) || !hasText(deptNm) || !hasText(levelNm))) {
+				Map<String, String> uParam = new HashMap<>();
+				uParam.put("userId", applicantId);
+				Map<String, String> uInfo = cm06Mapper.selectUserInfo(uParam);
+				if (uInfo != null) {
+					if (!hasText(applicantNm)) applicantNm = uInfo.get("name");
+					if (!hasText(deptNm)) deptNm = uInfo.get("deptNm");
+					if (!hasText(levelNm)) levelNm = uInfo.get("levelNm");
+				}
+			}
+
 			Map<String, String> docIdParam = new HashMap<>();
 			docIdParam.put("tripReqNo", tripRptNo);
 			docIdParam.put("coCd", coCd);
@@ -2367,6 +2492,8 @@ public class PM51SvcImpl implements PM51Svc {
 			amParam.put("coCd", coCd);
 			amParam.put("userId", applicantId);
 			amParam.put("userNm", applicantNm);
+			amParam.put("deptNm", deptNm);
+			amParam.put("levelNm", levelNm);
 			amParam.put("docTitle", buildTripRptApprovalTitle(paramMap));
 			amParam.put("formCd", "PM5102");
 			amParam.put("formVer", 1);
@@ -2511,11 +2638,8 @@ public class PM51SvcImpl implements PM51Svc {
 		if (m01 == null) {
 			throw new RuntimeException("출장신청서 정보를 찾을 수 없습니다.");
 		}
-		Map<String, String> chkParam = new HashMap<>();
-		chkParam.put("tripRptNo", tripRptNo);
-		chkParam.put("reqNo", tripRptNo);
-		if (hasCompletedApproval(chkParam, true)) {
-			throw new RuntimeException("최종 결재 완료된 출장복명서는 수정할 수 없습니다.");
+		if (hasText(m02.get("payDt"))) {
+			throw new RuntimeException("이미 지급완료 처리된 출장복명서는 수정할 수 없습니다.");
 		}
 
 		// 회계담당자 권한 검증
@@ -2541,6 +2665,22 @@ public class PM51SvcImpl implements PM51Svc {
 		Map<String, String> delParam = new HashMap<>();
 		delParam.put("tripRptNo", tripRptNo);
 		pm51Mapper.deleteTripRptD01(delParam);
+
+		// 출장자별 일비 및 일정 상세 (TB_PM52D02) 저장 (전송된 경우)
+		if (paramMap.containsKey("rptTravelerArr")) {
+			String rptTravelerArrStr = (String) paramMap.get("rptTravelerArr");
+			if (hasText(rptTravelerArrStr)) {
+				List<Map<String, String>> rptTravelerArr = gsonDtl.fromJson(rptTravelerArrStr, dtlMap);
+				if (rptTravelerArr != null && !rptTravelerArr.isEmpty()) {
+					pm51Mapper.deleteTripRptD02(delParam);
+					for (Map<String, String> travelerMap : rptTravelerArr) {
+						travelerMap.put("tripRptNo", tripRptNo);
+						travelerMap.put("coCd", (String) paramMap.get("coCd"));
+						pm51Mapper.insertTripRptD02(travelerMap);
+					}
+				}
+			}
+		}
 
 		if (paramMap.containsKey("expenseDtlArr")) {
 			String expenseDtlArrStr = (String) paramMap.get("expenseDtlArr");
@@ -2578,80 +2718,167 @@ public class PM51SvcImpl implements PM51Svc {
 			}
 		}
 
-		// 호출자 본인의 미결 결재선(TODODIV2201)이 있으면 결재처리(승인완료) 진행
+		boolean isPayFlow = "Y".equals(paramMap.get("isPayFlow")) || "PAY".equals(paramMap.get("saveMode"));
+		boolean isApproveFlow = "Y".equals(paramMap.get("isApproveFlow")) || "APPROVE".equals(paramMap.get("saveMode"));
 
-		Map<String, String> approvalLineParam = new HashMap<>();
-		approvalLineParam.put("todoNo", tripRptNo);
-		approvalLineParam.put("todoDiv2CodeId", "TODODIV2201");
-		List<Map<String, String>> approvalLines = wb20Svc.selectGetApprovalList(approvalLineParam);
-		if (approvalLines != null) {
-			for (Map<String, String> line : approvalLines) {
-				if (userId.equals(line.get("todoId")) && !"Y".equals(line.get("sanctnSttus"))) {
-					Map<String, String> approveParam = new HashMap<>(line);
-					approveParam.put("todoCfOpn", "");
-					approveParam.put("userId", userId);
-					approveParam.put("pgmId", (String) paramMap.get("pgmId"));
-					wb20Svc.insertApprovalLine(approveParam);
+		// 3. 결재 승인 처리 (isApproveFlow인 경우에만 수행)
+		if (isApproveFlow) {
+			Map<String, String> approveReq = new HashMap<>();
+			approveReq.put("tripRptNo", tripRptNo);
+			approveReq.put("userId", userId);
+			approveReq.put("userNm", paramMap.get("userNm") != null ? String.valueOf(paramMap.get("userNm")) : null);
+			approveReq.put("pgmId", paramMap.get("pgmId") != null ? String.valueOf(paramMap.get("pgmId")) : "PM5102P01");
+			approveReq.put("apprOpinion", "회계정산 결재");
+			approveTripRptApprovalLine(approveReq);
+		}
 
-					// 지급확정 전 점유 충돌 검사: 다른 복명서가 이미 점유한 경비가 있으면 전체 중단
-					List<Map<String, String>> payTargetRows = new ArrayList<>();
-					String payTargetArrStr = (String) paramMap.get("expenseDtlArr");
-					if (hasText(payTargetArrStr)) {
-						List<Map<String, String>> parsedRows = gsonDtl.fromJson(payTargetArrStr, dtlMap);
-						if (parsedRows != null) {
-							payTargetRows.addAll(parsedRows);
-						}
-					}
-					if (!payTargetRows.isEmpty()) {
-						Map<String, Object> occupiedParam = new HashMap<>();
-						occupiedParam.put("tripRptNo", tripRptNo);
-						occupiedParam.put("rows", payTargetRows);
-						List<Map<String, Object>> occupiedList = pm51Mapper.selectTripExpenseOccupiedByOther(occupiedParam);
-						if (occupiedList != null && !occupiedList.isEmpty()) {
-							StringBuilder sb = new StringBuilder();
-							sb.append("다른 복명서가 이미 점유한 출장경비가 ").append(occupiedList.size()).append("건 있어 지급확정을 중단했습니다.\n");
-							int printed = 0;
-							for (Map<String, Object> occupied : occupiedList) {
-								if (printed >= 5) {
-									sb.append("\n... 외 ").append(occupiedList.size() - printed).append("건");
-									break;
-								}
-								sb.append("\n- ").append(occupied.get("workRptDt"))
-									.append(" / 금액 ").append(occupied.get("tripRptAmt"))
-									.append(" / 복명서 ").append(occupied.get("tripRptNo"));
-								printed++;
-							}
-							sb.append("\n\n경비내역을 재조회한 뒤 다시 확인해 주세요.");
-							throw new RuntimeException(sb.toString());
-						}
-					}
+		// 4. 지급완료 처리 (isPayFlow인 경우에만 수행)
+		if (isPayFlow) {
+			// 일반결재 완료 여부 검증 (DB 최신 상태 재조회)
+			m02 = pm51Mapper.selectTripRptM01(m02Param);
+			if (m02 == null) {
+				throw new RuntimeException("출장복명서 정보를 찾을 수 없습니다.");
+			}
 
-					// 자금담당자(SPECRTS15) 본인 결재처리 시점에만 복명서 지급완료 처리
-					Map<String, String> payDoneParam = new HashMap<>();
-					payDoneParam.put("tripRptNo", tripRptNo);
-					payDoneParam.put("userId", userId);
-					payDoneParam.put("pgmId", (String) paramMap.get("pgmId"));
-					pm51Mapper.updateTripRptPayDone(payDoneParam);
+			// 일반결재 완료 여부 검증 (TODODIV2200 신청부서 일반결재선 전원 승인 완료 여부 - PM5101 동일)
+			validateTripRptGeneralApprovalDone(tripRptNo);
+			if (hasText(m02.get("payDt"))) {
+				throw new RuntimeException("이미 지급완료 처리된 출장복명서입니다.");
+			}
 
-					// 지급완료 시점에만 출장경비(TB_PM01D01) 점유
-					Map<String, String> payClearParam = new HashMap<>();
-					payClearParam.put("tripRptNo", tripRptNo);
-					payClearParam.put("userId", userId);
-					payClearParam.put("pgmId", (String) paramMap.get("pgmId"));
-					pm51Mapper.updateTripExpenseStatusClearForPay(payClearParam);
-
-					for (Map<String, String> payRow : payTargetRows) {
-						payRow.put("tripRptNo", tripRptNo);
-						payRow.put("userId", userId);
-						payRow.put("pgmId", (String) paramMap.get("pgmId"));
-						pm51Mapper.updateTripExpenseStatusLinkForPay(payRow);
-					}
-					break;
+			// 지급확정 전 점유 충돌 검사: 다른 복명서가 이미 점유한 경비가 있으면 전체 중단
+			List<Map<String, String>> payTargetRows = new ArrayList<>();
+			String payTargetArrStr = (String) paramMap.get("expenseDtlArr");
+			if (hasText(payTargetArrStr)) {
+				List<Map<String, String>> parsedRows = gsonDtl.fromJson(payTargetArrStr, dtlMap);
+				if (parsedRows != null) {
+					payTargetRows.addAll(parsedRows);
 				}
+			}
+			if (!payTargetRows.isEmpty()) {
+				Map<String, Object> occupiedParam = new HashMap<>();
+				occupiedParam.put("tripRptNo", tripRptNo);
+				occupiedParam.put("rows", payTargetRows);
+				List<Map<String, Object>> occupiedList = pm51Mapper.selectTripExpenseOccupiedByOther(occupiedParam);
+				if (occupiedList != null && !occupiedList.isEmpty()) {
+					StringBuilder sb = new StringBuilder();
+					sb.append("다른 복명서가 이미 점유한 출장경비가 ").append(occupiedList.size()).append("건 있어 지급확정을 중단했습니다.\n");
+					int printed = 0;
+					for (Map<String, Object> occupied : occupiedList) {
+						if (printed >= 5) {
+							sb.append("\n... 외 ").append(occupiedList.size() - printed).append("건");
+							break;
+						}
+						sb.append("\n- ").append(occupied.get("workRptDt"))
+							.append(" / 금액 ").append(occupied.get("tripRptAmt"))
+							.append(" / 복명서 ").append(occupied.get("tripRptNo"));
+						printed++;
+					}
+					sb.append("\n\n경비내역을 재조회한 뒤 다시 확인해 주세요.");
+					throw new RuntimeException(sb.toString());
+				}
+			}
+
+			// 자금담당자(SPECRTS15) 본인 결재처리 시점에만 복명서 지급완료 처리
+			Map<String, String> payDoneParam = new HashMap<>();
+			payDoneParam.put("tripRptNo", tripRptNo);
+			payDoneParam.put("userId", userId);
+			payDoneParam.put("pgmId", (String) paramMap.get("pgmId"));
+			pm51Mapper.updateTripRptPayDone(payDoneParam);
+
+			// 지급완료 시점에만 출장경비(TB_PM01D01) 점유
+			Map<String, String> payClearParam = new HashMap<>();
+			payClearParam.put("tripRptNo", tripRptNo);
+			payClearParam.put("userId", userId);
+			payClearParam.put("pgmId", (String) paramMap.get("pgmId"));
+			pm51Mapper.updateTripExpenseStatusClearForPay(payClearParam);
+
+			for (Map<String, String> payRow : payTargetRows) {
+				payRow.put("tripRptNo", tripRptNo);
+				payRow.put("userId", userId);
+				payRow.put("pgmId", (String) paramMap.get("pgmId"));
+				pm51Mapper.updateTripExpenseStatusLinkForPay(payRow);
 			}
 		}
 
 		return result;
+	}
+
+	@Override
+	@Transactional(rollbackFor = Exception.class)
+	public Map<String, Object> approveTripRptApprovalLine(Map<String, String> paramMap) throws Exception {
+		String tripRptNo = paramMap.get("tripRptNo");
+		String userId = paramMap.get("userId");
+		String pgmId = paramMap.get("pgmId") != null ? paramMap.get("pgmId") : "PM5102P01";
+
+		Map<String, Object> returnMap = new HashMap<>();
+
+		// AM 전자결재 연동 문서(PM52)가 존재하는 경우 AM 승인을 우선 호출하여 WB20 결재선과 함께 자동 승인 연계한다.
+		Map<String, String> settleDocParam = new HashMap<>();
+		settleDocParam.put("tripReqNo", tripRptNo);
+		Map<String, String> settleAmDoc = pm51Mapper.selectAmDocInfoByTripReqNo(settleDocParam);
+
+		boolean settleAmApproved = false;
+		if (settleAmDoc != null && hasText(settleAmDoc.get("docId"))) {
+			Map<String, Object> approvalParam = new HashMap<>();
+			approvalParam.put("docId", settleAmDoc.get("docId"));
+			approvalParam.put("coCd", settleAmDoc.get("coCd"));
+			approvalParam.put("userId", userId);
+			String approverNm = paramMap.get("userNm");
+			if (!hasText(approverNm)) {
+				Map<String, String> uParam = new HashMap<>();
+				uParam.put("userId", userId);
+				Map<String, String> uInfo = cm06Mapper.selectUserInfo(uParam);
+				if (uInfo != null) {
+					approverNm = uInfo.get("name");
+				}
+			}
+			approvalParam.put("userNm", approverNm);
+			approvalParam.put("pgmId", pgmId);
+			approvalParam.put("apprOpinion", paramMap.get("apprOpinion") != null ? paramMap.get("apprOpinion") : "승인");
+			Map<String, Object> amRes = am11Svc.approveDocument(approvalParam);
+			if (amRes != null && "200".equals(String.valueOf(amRes.get("resultCode")))) {
+				settleAmApproved = true;
+				returnMap.put("resultCode", 200);
+				returnMap.put("resultMessage", "결재 승인되었습니다.");
+				returnMap.put("result", amRes);
+				return returnMap;
+			} else {
+				throw new RuntimeException(amRes != null ? String.valueOf(amRes.get("resultMessage")) : "전자결재 승인 처리에 실패했습니다.");
+			}
+		}
+
+		if (!settleAmApproved) {
+			String todoDiv2CodeId = paramMap.get("todoDiv2CodeId");
+			if (!hasText(todoDiv2CodeId)) {
+				todoDiv2CodeId = "TODODIV2201";
+			}
+			Map<String, String> approvalLineParam = new HashMap<>();
+			approvalLineParam.put("todoNo", tripRptNo);
+			approvalLineParam.put("todoDiv2CodeId", todoDiv2CodeId);
+			List<Map<String, String>> approvalLines = wb20Svc.selectGetApprovalList(approvalLineParam);
+			boolean approved = false;
+			if (approvalLines != null) {
+				for (Map<String, String> line : approvalLines) {
+					if (userId.equals(line.get("todoId")) && !"Y".equals(line.get("sanctnSttus"))) {
+						Map<String, String> approveParam = new HashMap<>(line);
+						approveParam.put("todoCfOpn", paramMap.get("apprOpinion") != null ? paramMap.get("apprOpinion") : "");
+						approveParam.put("userId", userId);
+						approveParam.put("pgmId", pgmId);
+						Map<String, String> wb20Res = wb20Svc.insertApprovalLine(approveParam);
+						approved = true;
+						returnMap.put("resultCode", 200);
+						returnMap.put("resultMessage", "결재 승인되었습니다.");
+						returnMap.put("result", wb20Res);
+						break;
+					}
+				}
+			}
+			if (!approved) {
+				throw new RuntimeException("결재할 차례가 아니거나 이미 결재하셨습니다.");
+			}
+		}
+		return returnMap;
 	}
 
 	@Override
