@@ -1190,6 +1190,7 @@ public class PM51SvcImpl implements PM51Svc {
 		List<Map<String, String>> reqProjectList = pm51Mapper.selectTripReqD03(paramMap);
 		List<Map<String, String>> rptProjectList = pm51Mapper.selectTripRptD03(paramMap);
 		List<Map<String, String>> rptCardList = pm51Mapper.selectTripRptD04(paramMap);
+		List<Map<String, String>> rptDailyList = pm51Mapper.selectTripRptD05(paramMap);
 
 		result.put("m02", m02);
 		result.put("d02", d02);
@@ -1200,6 +1201,7 @@ public class PM51SvcImpl implements PM51Svc {
 		result.put("reqProjectList", reqProjectList);
 		result.put("rptProjectList", rptProjectList);
 		result.put("rptCardList", rptCardList);
+		result.put("rptDailyList", rptDailyList);
 
 		if (m02 != null && hasText(m02.get("tripRptNo"))) {
 			try {
@@ -1263,6 +1265,16 @@ public class PM51SvcImpl implements PM51Svc {
 				cardMap.put("userId", paramMap.get("userId"));
 				cardMap.put("pgmId", "PM5102P01");
 				pm51Mapper.insertTripRptD04(cardMap);
+			}
+		}
+
+		List<Map<String, String>> rptDailyArr = gsonDtl.fromJson(paramMap.get("rptDailyArr"), dtlMap);
+		if (rptDailyArr != null && !rptDailyArr.isEmpty()) {
+			for (Map<String, String> dailyMap : rptDailyArr) {
+				dailyMap.put("tripRptNo", paramMap.get("tripRptNo"));
+				dailyMap.put("creatId", paramMap.get("userId"));
+				dailyMap.put("pgmId", "PM5102P01");
+				pm51Mapper.insertTripRptD05(dailyMap);
 			}
 		}
 
@@ -1408,6 +1420,10 @@ public class PM51SvcImpl implements PM51Svc {
 		if (paramMap.get("rptCardArr") != null) {
 			pm51Mapper.deleteTripRptD04(delParam);
 		}
+		// 일비정산 통화별 상세는 요청에 전송된 경우에만 삭제한다
+		if (paramMap.get("rptDailyArr") != null) {
+			pm51Mapper.deleteTripRptD05(delParam);
+		}
 
 		List<Map<String, String>> rptTravelerArr = gsonDtl.fromJson(paramMap.get("rptTravelerArr"), dtlMap);
 		if (rptTravelerArr != null && !rptTravelerArr.isEmpty()) {
@@ -1434,6 +1450,16 @@ public class PM51SvcImpl implements PM51Svc {
 				cardMap.put("userId", paramMap.get("userId"));
 				cardMap.put("pgmId", "PM5102P01");
 				pm51Mapper.insertTripRptD04(cardMap);
+			}
+		}
+
+		List<Map<String, String>> rptDailyArr = gsonDtl.fromJson(paramMap.get("rptDailyArr"), dtlMap);
+		if (rptDailyArr != null && !rptDailyArr.isEmpty()) {
+			for (Map<String, String> dailyMap : rptDailyArr) {
+				dailyMap.put("tripRptNo", paramMap.get("tripRptNo"));
+				dailyMap.put("creatId", paramMap.get("userId"));
+				dailyMap.put("pgmId", "PM5102P01");
+				pm51Mapper.insertTripRptD05(dailyMap);
 			}
 		}
 
@@ -2324,6 +2350,24 @@ public class PM51SvcImpl implements PM51Svc {
 		html.append("<th>영업PM</th><td>").append(escapeHtml(pmNm)).append("</td></tr>");
 		html.append("<tr><th>Sales Code</th><td>").append(escapeHtml(salesCd)).append("</td>");
 		html.append("<th>프로젝트명</th><td>").append(escapeHtml(clntPjtNm)).append("</td></tr>");
+
+		// 참여 프로젝트 목록 조회 및 렌더
+		List<Map<String, String>> projectList = null;
+		try {
+			String tripReqNo = paramMap.get("tripReqNo");
+			if (hasText(tripReqNo)) {
+				Map<String, String> qMap = new HashMap<>();
+				qMap.put("tripReqNo", tripReqNo);
+				projectList = pm51Mapper.selectTripReqD03(qMap);
+			}
+		} catch (Exception e) {
+			logger.warn("출장신청서 참여 프로젝트 조회 실패: tripReqNo={}, error={}", paramMap.get("tripReqNo"), e.getMessage());
+		}
+		String projectTableHtml = buildProjectListTable(projectList);
+		if (!projectTableHtml.isEmpty()) {
+			html.append("<tr><th>참여 프로젝트</th><td colspan=\"3\">").append(projectTableHtml).append("</td></tr>");
+		}
+
 		html.append("<tr><th>출장구분</th><td>").append(escapeHtml(resolveCodeNm(tripDiv)));
 		if (hasText(tripNationNm)) {
 			html.append(" (").append(escapeHtml(tripNationNm)).append(")");
@@ -2336,6 +2380,41 @@ public class PM51SvcImpl implements PM51Svc {
 		html.append("<tr><th>출장지</th><td colspan=\"3\">").append(escapeHtml(tripPlace)).append("</td></tr>");
 		html.append("<tr><th>장비명</th><td colspan=\"3\">").append(escapeHtml(equipNm)).append("</td></tr>");
 		html.append("<tr><th>출장목적</th><td colspan=\"3\" style=\"white-space: pre-wrap;\">").append(escapeHtml(tripPurpose)).append("</td></tr>");
+
+		// 출장자별 기간 조회 및 렌더
+		List<Map<String, String>> travelerList = null;
+		try {
+			String tripReqNo = paramMap.get("tripReqNo");
+			if (hasText(tripReqNo)) {
+				Map<String, String> qMap = new HashMap<>();
+				qMap.put("tripReqNo", tripReqNo);
+				travelerList = pm51Mapper.selectTripReqD01(qMap);
+			}
+		} catch (Exception e) {
+			logger.warn("출장신청서 출장자 조회 실패: tripReqNo={}, error={}", paramMap.get("tripReqNo"), e.getMessage());
+		}
+		if (travelerList != null && !travelerList.isEmpty()) {
+			html.append("<tr><th>출장자</th><td colspan=\"3\"><table class=\"table table-bordered\" style=\"width:100%; border-collapse:collapse; margin-bottom:0;\">");
+			html.append("<colgroup><col style=\"width:25%;\"><col style=\"width:25%;\"><col style=\"width:25%;\"><col style=\"width:25%;\"></colgroup>");
+			html.append("<tr><th>성명</th><th>소속</th><th>직급</th><th>출장기간</th></tr>");
+			for (Map<String, String> traveler : travelerList) {
+				String travelerPeriod = "";
+				String stDtm = traveler.get("tripStDtm");
+				String edDtm = traveler.get("tripEdDtm");
+				if (hasText(stDtm) || hasText(edDtm)) {
+					travelerPeriod = formatDateDisplay(stDtm);
+					if (hasText(edDtm)) {
+						travelerPeriod += " ~ " + formatDateDisplay(edDtm);
+					}
+				}
+				html.append("<tr><td>").append(escapeHtml(traveler.get("userNm"))).append("</td>");
+				html.append("<td>").append(escapeHtml(traveler.get("deptNm"))).append("</td>");
+				html.append("<td>").append(escapeHtml(traveler.get("positionNm"))).append("</td>");
+				html.append("<td>").append(escapeHtml(travelerPeriod)).append("</td></tr>");
+			}
+			html.append("</table></td></tr>");
+		}
+
 		html.append("</table></div>");
 		return html.toString();
 	}
@@ -2550,6 +2629,30 @@ public class PM51SvcImpl implements PM51Svc {
 		String actStDtm = formatDateDisplay(paramMap.get("actStDtm"));
 		String actEdDtm = formatDateDisplay(paramMap.get("actEdDtm"));
 		String rptContent = paramMap.get("rptContent");
+		String tripResult = paramMap.get("tripResult");
+		String specialNote = paramMap.get("specialNote");
+		String extendRsn = paramMap.get("extendRsn");
+
+		// 복명서 M01 백필: tripResult/specialNote/extendRsn/actStDtm/actEdDtm 중 누락분 조회
+		if ((!hasText(tripResult) || !hasText(specialNote) || !hasText(extendRsn) || !hasText(actStDtm) || !hasText(actEdDtm))) {
+			try {
+				String tripRptNo = paramMap.get("tripRptNo");
+				if (hasText(tripRptNo)) {
+					Map<String, String> qMap = new HashMap<>();
+					qMap.put("tripRptNo", tripRptNo);
+					Map<String, String> m01 = pm51Mapper.selectTripRptM01(qMap);
+					if (m01 != null) {
+						if (!hasText(tripResult)) tripResult = m01.get("tripResult");
+						if (!hasText(specialNote)) specialNote = m01.get("specialNote");
+						if (!hasText(extendRsn)) extendRsn = m01.get("extendRsn");
+						if (!hasText(actStDtm)) actStDtm = formatDateDisplay(m01.get("actStDtm"));
+						if (!hasText(actEdDtm)) actEdDtm = formatDateDisplay(m01.get("actEdDtm"));
+					}
+				}
+			} catch (Exception e) {
+				logger.warn("출장복명서 마스터 정보 백필 실패: tripRptNo={}, error={}", paramMap.get("tripRptNo"), e.getMessage());
+			}
+		}
 
 		StringBuilder html = new StringBuilder();
 		html.append("<div class=\"approval-document\" style=\"font-size: 13px; line-height: 1.6;\">");
@@ -2562,13 +2665,34 @@ public class PM51SvcImpl implements PM51Svc {
 		html.append("<th>영업PM</th><td>").append(escapeHtml(pmNm)).append("</td></tr>");
 		html.append("<tr><th>Sales Code</th><td>").append(escapeHtml(salesCd)).append("</td>");
 		html.append("<th>프로젝트명</th><td>").append(escapeHtml(clntPjtNm)).append("</td></tr>");
-		html.append("<tr><th>출장기간</th><td colspan=\"3\">").append(escapeHtml(actStDtm));
+
+		// 참여 프로젝트 목록 조회 및 렌더
+		List<Map<String, String>> projectList = null;
+		try {
+			String tripRptNo = paramMap.get("tripRptNo");
+			if (hasText(tripRptNo)) {
+				Map<String, String> qMap = new HashMap<>();
+				qMap.put("tripRptNo", tripRptNo);
+				projectList = pm51Mapper.selectTripRptD03(qMap);
+			}
+		} catch (Exception e) {
+			logger.warn("출장복명서 참여 프로젝트 조회 실패: tripRptNo={}, error={}", paramMap.get("tripRptNo"), e.getMessage());
+		}
+		String projectTableHtml = buildProjectListTable(projectList);
+		if (!projectTableHtml.isEmpty()) {
+			html.append("<tr><th>참여 프로젝트</th><td colspan=\"3\">").append(projectTableHtml).append("</td></tr>");
+		}
+
+		html.append("<tr><th>실제출장기간</th><td colspan=\"3\">").append(escapeHtml(actStDtm));
 		if (hasText(actStDtm) || hasText(actEdDtm)) {
 			html.append(" ~ ").append(escapeHtml(actEdDtm));
 		}
 		html.append("</td></tr>");
 		html.append("<tr><th>출장지</th><td colspan=\"3\">").append(escapeHtml(tripPlace)).append("</td></tr>");
 		html.append("<tr><th>복명내용</th><td colspan=\"3\" style=\"white-space: pre-wrap;\">").append(escapeHtml(rptContent)).append("</td></tr>");
+		html.append("<tr><th>출장결과</th><td colspan=\"3\" style=\"white-space: pre-wrap;\">").append(escapeHtml(tripResult)).append("</td></tr>");
+		html.append("<tr><th>특기사항</th><td colspan=\"3\" style=\"white-space: pre-wrap;\">").append(escapeHtml(specialNote)).append("</td></tr>");
+		html.append("<tr><th>출장연장사유</th><td colspan=\"3\" style=\"white-space: pre-wrap;\">").append(escapeHtml(extendRsn)).append("</td></tr>");
 		html.append("</table></div>");
 		return html.toString();
 	}
@@ -2595,6 +2719,35 @@ public class PM51SvcImpl implements PM51Svc {
 		} catch (Exception e) {
 			return 0;
 		}
+	}
+
+	private String buildProjectListTable(List<Map<String, String>> projectList) {
+		if (projectList == null || projectList.isEmpty()) {
+			return "";
+		}
+		StringBuilder sb = new StringBuilder();
+		sb.append("<table class=\"table table-bordered\" style=\"width:100%; border-collapse:collapse; margin-bottom:0;\">");
+		sb.append("<colgroup><col style=\"width:15%;\"><col style=\"width:20%;\"><col style=\"width:15%;\"><col style=\"width:15%;\"><col style=\"width:20%;\"><col style=\"width:15%;\"></colgroup>");
+		sb.append("<tr><th>프로젝트명</th><th>고객사</th><th>설비</th><th>PM</th><th>프로젝트기간</th><th>비고</th></tr>");
+		for (Map<String, String> project : projectList) {
+			String projectPeriod = "";
+			String stDt = project.get("stDt");
+			String edDt = project.get("edDt");
+			if (hasText(stDt) || hasText(edDt)) {
+				projectPeriod = formatDateDisplay(stDt);
+				if (hasText(edDt)) {
+					projectPeriod += " ~ " + formatDateDisplay(edDt);
+				}
+			}
+			sb.append("<tr><td>").append(escapeHtml(project.get("clntPjtNm"))).append("</td>");
+			sb.append("<td>").append(escapeHtml(project.get("clntNm"))).append("</td>");
+			sb.append("<td>").append(escapeHtml(project.get("equipNm"))).append("</td>");
+			sb.append("<td>").append(escapeHtml(project.get("pmNm"))).append("</td>");
+			sb.append("<td>").append(escapeHtml(projectPeriod)).append("</td>");
+			sb.append("<td>").append(escapeHtml(project.get("etc"))).append("</td></tr>");
+		}
+		sb.append("</table>");
+		return sb.toString();
 	}
 
 	@Override
@@ -2714,6 +2867,21 @@ public class PM51SvcImpl implements PM51Svc {
 					cardMap.put("userId", userId);
 					cardMap.put("pgmId", "PM5102P01");
 					pm51Mapper.insertTripRptD04(cardMap);
+				}
+			}
+		}
+
+		// 일비정산 통화별 상세 (요청에 전송된 경우에만 처리, "[]"는 전체 삭제)
+		if (paramMap.get("rptDailyArr") != null) {
+			pm51Mapper.deleteTripRptD05(delParam);
+
+			List<Map<String, String>> rptDailyArr = gsonDtl.fromJson((String) paramMap.get("rptDailyArr"), dtlMap);
+			if (rptDailyArr != null && !rptDailyArr.isEmpty()) {
+				for (Map<String, String> dailyMap : rptDailyArr) {
+					dailyMap.put("tripRptNo", tripRptNo);
+					dailyMap.put("creatId", userId);
+					dailyMap.put("pgmId", "PM5102P01");
+					pm51Mapper.insertTripRptD05(dailyMap);
 				}
 			}
 		}

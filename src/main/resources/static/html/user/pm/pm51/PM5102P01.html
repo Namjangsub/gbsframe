@@ -109,6 +109,17 @@
 			margin-right: 3px !important;
 		}
 	</style>
+	<style>
+		/* 긴 팝업에서도 하단 작업 버튼을 화면 하단에 유지 */
+		.pm5102-footer {
+			position: sticky;
+			bottom: 0;
+			z-index: 20;
+			background: #fff;
+			padding: 8px 0;
+			border-top: 1px solid #ddd;
+		}
+	</style>
 	<div class="tit_contents">
 		<h4 class="tit" id="popTitle">출장복명서</h4>
 	</div>
@@ -440,9 +451,11 @@
 					<tr style="height: 30px;">
 						<td style="text-align: LEFT; border-right: 0px; font-size: 13px; font-weight: bold; color: blue;">카드사 명세</td>
 						<td>
-							<div class="add_btn_small pdl10">
-								<a onclick="pasteRptCardGrid();" style="height: 30px; width: 70px; line-height: 28px;" authchk>붙여넣기</a>
-								<a onclick="clearRptCardGrid();" style="height: 30px; width: 70px; line-height: 28px;" authchk>전체삭제</a>
+							<div class="add_btn_small pdl10" style="white-space: nowrap;">
+								<a onclick="pasteRptCardGrid();" style="height: 28px; width: 54px; line-height: 26px; font-size: 11px; padding: 0; margin-left: 2px;" authchk>붙여넣기</a>
+								<a onclick="clearRptCardGrid();" style="height: 28px; width: 54px; line-height: 26px; font-size: 11px; padding: 0; margin-left: 2px;" authchk>전체삭제</a>
+								<a onclick="addRptCardRow();" style="height: 28px; width: 54px; line-height: 26px; font-size: 11px; padding: 0; margin-left: 2px;" authchk>행추가</a>
+								<a onclick="deleteSelectedRptCardRow();" style="height: 28px; width: 54px; line-height: 26px; font-size: 11px; padding: 0; margin-left: 2px;" authchk>행삭제</a>
 							</div>
 						</td>
 					</tr>
@@ -524,7 +537,13 @@
 			<!-- 정산 요약 -->
 			<div style="display: flex; justify-content: space-between; gap: 12px; margin-top: 20px;">
 				<div style="width: 49%;">
-					<div style="font-weight: bold; color: blue; margin-bottom: 5px;">일비정산 <span style="color: black; font-weight: normal; font-size: 12px;">(+반납, -지급)</span></div>
+					<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+						<div style="font-weight: bold; color: blue;">일비정산 <span style="color: black; font-weight: normal; font-size: 12px;">(+반납, -지급)</span></div>
+						<div id="dailySettleBtnArea" class="add_btn_small pdl10" style="margin: 0; padding: 0;">
+							<a onclick="addManualDailyRow();" style="height: 28px; width: 60px; line-height: 26px; font-size: 11px;" authchk>행추가</a>
+							<a onclick="deleteSelectedDailyRow();" style="height: 28px; width: 60px; line-height: 26px; font-size: 11px;" authchk>행삭제</a>
+						</div>
+					</div>
 					<div class="ax5_grid" data-ax5grid="dailySettlementGrid" style="width: 100%;"></div>
 				</div>
 				<div style="width: 49%;">
@@ -677,7 +696,7 @@
 
 	<br>
 	<!-- 하단 버튼 -->
-	<div class="popup_bottom_btn">
+	<div class="popup_bottom_btn pm5102-footer">
 		<button type="button" id="fileUpBtn" form="popForm" onclick="fileUpload($(this.form));" authchk style="display:none; background-color: #f0ad4e; color: white; border-color: #eea236;">첨부파일저장</button>
 		<button type="button" id="saveBtn" onclick="saveTripRpt();" authchk>저장</button>
 		<button type="button" id="lineApproveBtn" onclick="approvePm51Line();" authchk style="display:none; background-color: #337ab7; color: white; border-color: #2e6da4;">결재</button>
@@ -826,6 +845,11 @@
 	var currentReqExpItems = null; // 신청서 예상경비 상세(TB_PM51D02, KRW/USD 분리) - 일비정산 선지급분 산출용
 	var reqApplicantInfo = {}; // 출장신청/복명 신청인 정보 (ID, 성명, 부서명, 직급명 등)
 	var reqApplicantCoCd = '';
+
+	// 일비정산 수동 행 및 저장값 추적
+	var manualDailyRows = [];
+	var suppressedDailyKeys = {};
+	var savedDailyByKey = {};
 
 	// 근태마감년월 (PM30 관리 값)
 	var pm51AttendanceCloseYm = null;
@@ -1169,7 +1193,9 @@
 	function isExpenseStatusSelectionAllowed() {
 		var actionType = $('#actionType').val();
 		if (actionType === 'C') return false;
-		return isAccountingUser() && !isRptPaid() && !hasCompletedMngApproval();
+		// 정책(2026-09): 회계담당자는 지급완료(isRptPaid) 전까지 정산 전면 편집 가능.
+		// 관리결재 부분승인(hasCompletedMngApproval)만으로는 잠그지 않는다.
+		return isAccountingUser() && !isRptPaid();
 	}
 
 	// 출장 경비 신청 현황: 식비/식대/숙박비 항목 여부 판정 (선택 원천 차단 + 자동선택 제외 + 안내 alert에서 공용으로 사용)
@@ -1352,7 +1378,11 @@
 	var CARD_MATCH_DATE_TOLERANCE_DAYS = 0;
 
 	function isRptCardGridEditBlocked() {
-		return !(isAccountingUser() && !isRptPaid() && !hasCompletedMngApproval());
+		return !(isAccountingUser() && !isRptPaid());
+	}
+
+	function isDailyGridEditBlocked() {
+		return !(isAccountingUser() && !isRptPaid());
 	}
 
 	// 카드번호는 숫자만 남겨 뒷 4자리로 비교 (하이픈/공백/마스킹문자 제거)
@@ -1499,6 +1529,11 @@
 			header: { align: "center" },
 			page: { display: false },
 			body: {
+				onClick: function () {
+					if (!isRptCardGridEditBlocked()) {
+						this.self.select(this.dindex);
+					}
+				},
 				onDataChanged: function () {
 					setTimeout(function() { refreshCardReconciliation(); }, 0);
 				}
@@ -1519,7 +1554,7 @@
 			},
 			columns: [
 				{ key: 'cardUseDt', label: '일자', width: 90, align: 'center',
-					editor: { type: 'text', disabled: isRptCardGridEditBlocked } },
+					editor: { type: 'date', config: { content: { config: { mode: 'day', selectMode: 'day' } } }, disabled: isRptCardGridEditBlocked } },
 				{ key: 'cardNo', label: '카드번호', width: 110, align: 'center',
 					editor: { type: 'text', disabled: isRptCardGridEditBlocked } },
 				{ key: 'currCd', label: '통화', width: 60, align: 'center',
@@ -1646,6 +1681,108 @@
 		});
 	}
 
+	function getDailySettleSaveList() {
+		if (!dailySettlementGridView || !dailySettlementGridView.target) return [];
+		return $.map(dailySettlementGridView.target.getList() || [], function(row) {
+			// _mid는 클라이언트 추적용, 저장 payload에는 제외 (백엔드 계약: userId/userNm/currCd/dailyAdvance/dailyFinal/manualYn)
+			return {
+				userId: row.userId || '',
+				userNm: row.userNm || '',
+				currCd: row.currNm || '',
+				firstSchedule: row.firstSchedule || '',
+				actualSchedule: row.actualSchedule || '',
+				dailyAdvance: getSettlementNumber(row.dailyAdvance || 0),
+				dailyFinal: getSettlementNumber(row.dailyFinal || 0),
+				manualYn: row._manualRow ? 'Y' : 'N'
+			};
+		});
+	}
+
+	function hasDuplicateDailySettlementCurrency() {
+		if (isDailyGridEditBlocked()) return false;
+		var dailyKeyMap = {};
+		var duplicated = false;
+		$.each(getDailySettleSaveList(), function(idx, row) {
+			var dailyKey = String(row.userNm || '').replace(/^\s+|\s+$/g, '') + '|' +
+				String(row.currCd || '').replace(/^\s+|\s+$/g, '').toUpperCase();
+			if (dailyKeyMap[dailyKey]) {
+				duplicated = true;
+				return false;
+			}
+			dailyKeyMap[dailyKey] = true;
+		});
+		return duplicated;
+	}
+
+	function addManualDailyRow() {
+		if (isDailyGridEditBlocked()) return;
+		if (!dailySettlementGridView || !dailySettlementGridView.target) return;
+		// 바로 전 행(그리드 마지막 행)의 내용을 복사하고 일비_최종확정만 0으로 초기화
+		var list = dailySettlementGridView.target.getList() || [];
+		var prev = list.length ? list[list.length - 1] : null;
+		var prevAdvance = prev ? getSettlementNumber(prev.dailyAdvance || 0) : 0;
+		manualDailyRows.push({
+			userId: prev ? (prev.userId || '') : '',
+			userNm: prev ? (prev.userNm || '') : '',
+			firstSchedule: prev ? (prev.firstSchedule || '') : '',
+			actualSchedule: prev ? (prev.actualSchedule || '') : '',
+			currNm: prev ? (prev.currNm || 'CURR01') : 'CURR01',
+			dailyAdvance: prevAdvance,
+			dailyFinal: 0,
+			dailyDiff: prevAdvance, // 선지급분 - 0
+			_manualRow: true,
+			_mid: Date.now() + '_' + Math.random().toString(36).slice(2)
+		});
+		refreshSettlementSummaryGrids();
+	}
+
+	function deleteSelectedDailyRow() {
+		if (isDailyGridEditBlocked()) return;
+		if (!dailySettlementGridView || !dailySettlementGridView.target) return;
+		var selected = dailySettlementGridView.target.getList('selected') || [];
+		if (selected.length === 0) {
+			alert('삭제할 행을 선택하세요.');
+			return;
+		}
+		selected.forEach(function(row) {
+			if (row._manualRow) {
+				// 수동행: _mid 기준 제거
+				var mid = row._mid;
+				if (mid) {
+					manualDailyRows = $.grep(manualDailyRows, function(m) { return m._mid !== mid; });
+				}
+			} else {
+				// 자동행: suppressedDailyKeys에 마크
+				var key = (row.userNm || '') + '|' + (row.currNm || '');
+				suppressedDailyKeys[key] = true;
+			}
+		});
+		refreshSettlementSummaryGrids();
+	}
+
+	function addRptCardRow() {
+		if (isRptCardGridEditBlocked()) return;
+		if (!rptCardGridView || !rptCardGridView.target) return;
+		rptCardGridView.target.addRow({ cardUseDt: '', cardNo: '', currCd: '', useAmt: 0, reconState: '' }, 'last');
+		setTimeout(function() { refreshCardReconciliation(); }, 0);
+	}
+
+	function deleteSelectedRptCardRow() {
+		if (isRptCardGridEditBlocked()) return;
+		if (!rptCardGridView || !rptCardGridView.target) return;
+		var selected = rptCardGridView.target.getList('selected') || [];
+		if (selected.length === 0) {
+			alert('삭제할 행을 선택하세요.');
+			return;
+		}
+		// AX5 관례: 선택행은 __index로 removeRow. 다중선택 대비 인덱스 내림차순으로 제거(제거 시 뒤 인덱스가 당겨지므로).
+		selected.map(function(row) { return row.__index; })
+			.filter(function(i) { return i !== undefined && i !== null; })
+			.sort(function(a, b) { return b - a; })
+			.forEach(function(idx) { rptCardGridView.target.removeRow(idx); });
+		setTimeout(function() { refreshCardReconciliation(); resizeRptCardGrid(); }, 0);
+	}
+
 	// 출장 경비 신청 현황 그리드 높이 조정 (데이터 0건이어도 컬럼헤더/합계행은 항상 노출)
 	function initDailySettlementGrid() {
 		dailySettlementGridView = { target: new ax5.ui.grid() };
@@ -1683,10 +1820,10 @@
 			columns: [
 				{ key: 'userNm', label: '성명', width: 90, align: 'center' },
 				{ key: 'firstSchedule', label: '최초일정', width: 80, align: 'center' },
-				{ key: 'actualSchedule', label: '실제일정', width: 80, align: 'center' },
-				{ key: 'currNm', label: '통화종류', width: 80, align: 'center', formatter: function() { return getCurrUnitLabel(this.value); } },
+				{ key: 'actualSchedule', label: '실제일정', width: 80, align: 'center', editor: { type: 'text', disabled: function() { return isDailyGridEditBlocked() || !(this.item && this.item._manualRow); } } },
+				{ key: 'currNm', label: '통화종류', width: 80, align: 'center', editor: { type: 'select', disabled: function() { return isDailyGridEditBlocked() || !(this.item && this.item._manualRow); }, config: { columnKeys: { optionValue: 'CD', optionText: 'NM' }, options: comboCurrCd } }, formatter: function() { return getCurrUnitLabel(this.value); } },
 				{ key: 'dailyAdvance', label: '일비_선지급분', width: 110, align: 'right', formatter: 'money' },
-				{ key: 'dailyFinal', label: '일비_최종확정', width: 110, align: 'right', editor: { type: 'number' }, formatter: 'money' },
+				{ key: 'dailyFinal', label: '일비_최종확정', width: 110, align: 'right', editor: { type: 'number', disabled: isDailyGridEditBlocked }, formatter: 'money' },
 				{ key: 'dailyDiff', label: '차이', width: 90, align: 'right', formatter: 'money' }
 			],
 			footSum: [[
@@ -1777,13 +1914,38 @@
 		// 선택된 경비 현황만 집계
 		var expenses = tripExpenseStatusGridView && tripExpenseStatusGridView.target ? tripExpenseStatusGridView.target.getList("selected") || [] : [];
 
-		// 선지급분(신청서 기준): 숙박비 + 출장일비(식대+잡비) 항목의 KRW/USD 금액 합산 (TB_PM51D02)
-		var reqAdvKrw = 0, reqAdvUsd = 0;
+		// 수동 행 편집 사항 병합 (setData 전에 getList하여 사용자 입력 보존)
+		// _mid 기반 병합: 그리드의 편집분만 흡수, manualDailyRows는 소스오브트루스 유지
+		var oldDailyListFull = (dailySettlementGridView && dailySettlementGridView.target) ? dailySettlementGridView.target.getList() || [] : [];
+		var liveManual = $.grep(oldDailyListFull, function(r) { return r._manualRow; });
+		var liveManualMap = {};
+		$.each(liveManual, function(idx, row) {
+			if (row._mid) liveManualMap[row._mid] = row;
+		});
+		// manualDailyRows의 _mid를 기준으로 그리드 편집분 병합
+		$.each(manualDailyRows, function(idx, row) {
+			var mid = row._mid;
+			if (mid && liveManualMap[mid]) {
+				// 그리드에서 찾으면 편집된 값으로 갱신
+				row.userNm = liveManualMap[mid].userNm;
+				row.currNm = liveManualMap[mid].currNm;
+				row.firstSchedule = liveManualMap[mid].firstSchedule;
+				row.actualSchedule = liveManualMap[mid].actualSchedule;
+				row.dailyAdvance = liveManualMap[mid].dailyAdvance;
+				row.dailyFinal = liveManualMap[mid].dailyFinal;
+				row._userEditedFinal = liveManualMap[mid]._userEditedFinal;
+			}
+			// mid가 없거나 그리드에 없으면 원본 유지 (방금 추가된 행)
+		});
+
+		// 선지급분(신청서 기준): 숙박비 + 출장일비(식대+잡비) 항목의 KRW/USD/USD2 금액 합산 (TB_PM51D02)
+		var reqAdvKrw = 0, reqAdvUsd = 0, reqAdvUsd2 = 0;
 		$.each(currentReqExpItems || [], function(idx, item) {
 			var itemCd = String(item.expItemCd || '').trim();
 			if (itemCd === '숙박비' || itemCd === '식대' || itemCd === '일비') {
 				reqAdvKrw += getSettlementNumber(item.krwAmt || 0);
 				reqAdvUsd += getSettlementNumber(item.usdAmt || 0);
+				reqAdvUsd2 += getSettlementNumber(item.usdAmt2 || 0);
 			}
 		});
 
@@ -1792,7 +1954,17 @@
 		var finalKrw = actual.krw;
 		var finalUsd = actual.usd;
 
-		var oldDailyList = (dailySettlementGridView && dailySettlementGridView.target) ? dailySettlementGridView.target.getList() || [] : [];
+		// D05 복원 및 자동행 저장값 추적: 현재 그리드 편집분을 기존 savedDailyByKey에 병합 (D05 시드 보존)
+		// suppressedDailyKeys는 문서 로드 시에만 초기화, delete가 채우고, refresh는 읽기만 함
+		var oldDailyList = $.grep(oldDailyListFull, function(r) { return !r._manualRow; });
+		$.each(oldDailyList, function(idx, row) {
+			var key = (row.userNm || '') + '|' + (row.currNm || '');
+			// _userEditedFinal=true인 행만 갱신 (사용자 편집분 누적)
+			if (row._userEditedFinal) {
+				savedDailyByKey[key] = { dailyFinal: row.dailyFinal, dailyAdvance: row.dailyAdvance, _userEditedFinal: true };
+			}
+		});
+
 		var dailyRows = [];
 		$.each(travelers, function(idx, row) {
 			var requested = $.grep(requestedTravelers, function(item) { return item.userId === row.userId; })[0] || {};
@@ -1800,18 +1972,34 @@
 			var actualSchedule = formatStayPeriod(row.tripStDt, row.tripEdDt);
 			var userNm = row.userNm || row.userId || '';
 			var savedDailyAmt = (row.dailyAmt !== undefined && row.dailyAmt !== null && row.dailyAmt !== '' && Number(row.dailyAmt) > 0) ? Number(row.dailyAmt) : null;
-			if (reqAdvKrw || finalKrw || (savedDailyAmt !== null && isKrwCurrency('CURR01'))) {
-				var oldRow = $.grep(oldDailyList, function(item) { return item.currNm === 'CURR01'; })[0];
-				var curFinal = (oldRow && oldRow._userEditedFinal) ? oldRow.dailyFinal : (savedDailyAmt !== null ? savedDailyAmt : finalKrw);
+			var krwKey = userNm + '|CURR01';
+			if (!suppressedDailyKeys[krwKey] && (reqAdvKrw || finalKrw || (savedDailyAmt !== null && isKrwCurrency('CURR01')))) {
+				var savedKrw = savedDailyByKey[krwKey];
+				var curFinal = (savedKrw && savedKrw._userEditedFinal) ? savedKrw.dailyFinal : (savedDailyAmt !== null ? savedDailyAmt : finalKrw);
 				var curDiff = reqAdvKrw - curFinal;
-				dailyRows.push({ userNm: userNm, firstSchedule: firstSchedule, actualSchedule: actualSchedule, currNm: 'CURR01', dailyAdvance: reqAdvKrw, dailyFinal: curFinal, dailyDiff: curDiff, _userEditedFinal: !!(oldRow && oldRow._userEditedFinal) || savedDailyAmt !== null });
+				dailyRows.push({ userNm: userNm, firstSchedule: firstSchedule, actualSchedule: actualSchedule, currNm: 'CURR01', dailyAdvance: reqAdvKrw, dailyFinal: curFinal, dailyDiff: curDiff, _userEditedFinal: !!(savedKrw && savedKrw._userEditedFinal) || savedDailyAmt !== null });
 			}
-			if (reqAdvUsd || finalUsd || (savedDailyAmt !== null && !isKrwCurrency($('#tripRptCurr').val()))) {
-				var reqCurr = $('#tripRptCurr').val() || 'CURR02';
-				var oldRowUsd = $.grep(oldDailyList, function(item) { return item.currNm === reqCurr; })[0];
-				var curFinalUsd = (oldRowUsd && oldRowUsd._userEditedFinal) ? oldRowUsd.dailyFinal : (savedDailyAmt !== null ? savedDailyAmt : finalUsd);
-				var curDiffUsd = reqAdvUsd - curFinalUsd;
-				dailyRows.push({ userNm: userNm, firstSchedule: firstSchedule, actualSchedule: actualSchedule, currNm: reqCurr, dailyAdvance: reqAdvUsd, dailyFinal: curFinalUsd, dailyDiff: curDiffUsd, _userEditedFinal: !!(oldRowUsd && oldRowUsd._userEditedFinal) || savedDailyAmt !== null });
+			// 외화1: 신청서에서 실제 외화(원화 아님)를 선택한 경우에만 통화별 행 생성 (통화가 원화면 달러 행을 만들지 않음)
+			var reqCurr = (currentTripReqMaster && currentTripReqMaster.currCd) ? currentTripReqMaster.currCd : ($('#tripRptCurr').val() || '');
+			if (reqCurr && !isKrwCurrency(reqCurr)) {
+				var usdKey = userNm + '|' + reqCurr;
+				if (!suppressedDailyKeys[usdKey] && (reqAdvUsd || finalUsd || savedDailyByKey[usdKey])) {
+					var savedUsd = savedDailyByKey[usdKey];
+					var curFinalUsd = (savedUsd && savedUsd._userEditedFinal) ? savedUsd.dailyFinal : finalUsd;
+					var curDiffUsd = reqAdvUsd - curFinalUsd;
+					dailyRows.push({ userNm: userNm, firstSchedule: firstSchedule, actualSchedule: actualSchedule, currNm: reqCurr, dailyAdvance: reqAdvUsd, dailyFinal: curFinalUsd, dailyDiff: curDiffUsd, _userEditedFinal: !!(savedUsd && savedUsd._userEditedFinal) });
+				}
+			}
+			// 외화2(통화단위2): 신청서에 원화도 아니고 외화1과도 다른 별도 통화가 지정된 경우에만 통화별 행 자동 추가
+			var settleCurr2 = getSettleCurrCd2();
+			if (settleCurr2) {
+				var usd2Key = userNm + '|' + settleCurr2;
+				if (!suppressedDailyKeys[usd2Key]) {
+					var savedUsd2 = savedDailyByKey[usd2Key];
+					var curFinalUsd2 = (savedUsd2 && savedUsd2._userEditedFinal) ? savedUsd2.dailyFinal : reqAdvUsd2;
+					var curDiffUsd2 = reqAdvUsd2 - curFinalUsd2;
+					dailyRows.push({ userNm: userNm, firstSchedule: firstSchedule, actualSchedule: actualSchedule, currNm: settleCurr2, dailyAdvance: reqAdvUsd2, dailyFinal: curFinalUsd2, dailyDiff: curDiffUsd2, _userEditedFinal: !!(savedUsd2 && savedUsd2._userEditedFinal) });
+				}
 			}
 		});
 		// 실비정산 최초전도금은 출장신청서 전체 지급합계가 아니라 예비비/특별비 지급금액만 사용
@@ -1941,6 +2129,12 @@
 			}
 			row.afterSettle = (row.firstAdvance || 0) + (row.currentAdvance || 0) - row.usedAmt;
 			cashBalances[currencyKey] = row.afterSettle;
+		});
+		// 자동행 생성 후 수동행 append
+		dailyRows = dailyRows.concat(manualDailyRows || []);
+		// 초기 조회/재집계 시에도 차이 컬럼을 항상 선지급분 - 최종확정으로 보정
+		$.each(dailyRows, function(idx, row) {
+			row.dailyDiff = getSettlementNumber(row.dailyAdvance || 0) - getSettlementNumber(row.dailyFinal || 0);
 		});
 		dailySettlementGridView.target.setData({ list: dailyRows, page: { totalElements: dailyRows.length } });
 		actualSettlementGridView.target.setData({ list: actualRows, page: { totalElements: actualRows.length } });
@@ -3016,6 +3210,34 @@
 
 			bindRptCardGrid(data.result.rptCardList || []);
 
+			// D05 (일비정산) 시드: 저장된 일비정산 정보 초기화
+			manualDailyRows = [];
+			suppressedDailyKeys = {};
+			savedDailyByKey = {};
+			var rptDailyList = data.result.rptDailyList || [];
+			$.each(rptDailyList, function(idx, item) {
+				var key = (item.userNm || '') + '|' + (item.currCd || '');
+				if (item.manualYn === 'Y') {
+					manualDailyRows.push({
+						userId: item.userId || '',
+						userNm: item.userNm || '',
+						currNm: item.currCd || '',
+						firstSchedule: item.firstSchedule || '',
+						actualSchedule: item.actualSchedule || '',
+						dailyAdvance: getSettlementNumber(item.dailyAdvance || 0),
+						dailyFinal: getSettlementNumber(item.dailyFinal || 0),
+						_manualRow: true,
+						_mid: Date.now() + '_' + Math.random().toString(36).slice(2)
+					});
+				} else {
+					savedDailyByKey[key] = {
+						dailyAdvance: getSettlementNumber(item.dailyAdvance || 0),
+						dailyFinal: getSettlementNumber(item.dailyFinal || 0),
+						_userEditedFinal: true
+					};
+				}
+			});
+
 			var stDtm = (m01.tripStDtm || '').substring(0, 8);
 			var edDtm = (m01.tripEdDtm || '').substring(0, 8);
 			$('#reqTripPeriod').val(formatToDate(stDtm) + ' ~ ' + formatToDate(edDtm));
@@ -3908,6 +4130,13 @@
 			return;
 		}
 
+		// 일비정산은 동일 성명·통화 조합을 하나의 행으로만 저장한다.
+		// 행추가는 직전 행 복사 방식이므로 저장 직전에 중복을 검증한다.
+		if (hasDuplicateDailySettlementCurrency()) {
+			alert('일비정산에 동일 성명·통화종류 행이 중복되었습니다. 통화종류를 확인하세요.');
+			return;
+		}
+
 		var formData = new FormData();
 
 		// 마스터 정보
@@ -3974,6 +4203,12 @@
 		// 파라미터를 생략하면 서버가 기존 데이터를 보존하므로, 그 외 사용자의 저장으로 명세가 지워지지 않는다.
 		if (!isRptCardGridEditBlocked()) {
 			formData.append('rptCardArr', JSON.stringify(getRptCardSaveList()));
+		}
+
+		// 일비정산은 회계담당자(편집 가능 상태)일 때만 전송한다.
+		// 파라미터를 생략하면 서버가 기존 데이터를 보존하므로, 그 외 사용자의 저장으로 정산정보가 지워지지 않는다.
+		if (!isDailyGridEditBlocked()) {
+			formData.append('rptDailyArr', JSON.stringify(getDailySettleSaveList()));
 		}
 
 		// 결재선 배열
@@ -4311,6 +4546,10 @@
 	function saveTripExpenseStatusOnly(isPay) {
 		var tripRptNo = $('#tripRptNo').val();
 		if (!tripRptNo) return;
+		if (hasDuplicateDailySettlementCurrency()) {
+			alert('일비정산에 동일 성명·통화종류 행이 중복되었습니다. 통화종류를 확인하세요.');
+			return;
+		}
 
 		// 경비현황 그리드의 현재 선택된 데이터 수집
 		var statusList = tripExpenseStatusGridView.target.getList("selected") || [];
@@ -4348,8 +4587,8 @@
 			};
 		});
 
-		// 출장자 그리드 데이터 및 일비정산 데이터 수집
-		var dailyList = (dailySettlementGridView && dailySettlementGridView.target) ? dailySettlementGridView.target.getList() || [] : [];
+		// 출장자 그리드 데이터 및 일비정산 데이터 수집 (자동행만 - 수동행은 traveler와 무관)
+		var dailyList = $.grep((dailySettlementGridView && dailySettlementGridView.target) ? dailySettlementGridView.target.getList() || [] : [], function(d) { return !d._manualRow; });
 		var travelerList = (rptTravelerGridView && rptTravelerGridView.target) ? rptTravelerGridView.target.getList() || [] : [];
 		var rptTravelerList = $.map(travelerList, function(row) {
 			var cloned = $.extend({}, row);
@@ -4390,6 +4629,7 @@
 			expenseDtlArr: JSON.stringify(expenseDtlList),
 			rptTravelerArr: JSON.stringify(rptTravelerList),
 			rptCardArr: JSON.stringify(getRptCardSaveList()),
+			rptDailyArr: JSON.stringify(getDailySettleSaveList()),
 			userId: jwt.userId,
 			userNm: jwt.userNm,
 			isPayFlow: isPay ? 'Y' : 'N',
@@ -4855,7 +5095,7 @@
 		var isAccounting = isAccountingUser(); // 회계 담당자 여부
 		var applicant = isRptApplicant(); // 신청인 여부
 		// 회계담당자가 실제로 정산 확정(=지급완료 처리)을 진행할 수 있는 상태인지
-		var isAccountingActive = isAccounting && !isRptPaid() && !hasCompletedMngApproval();
+		var isAccountingActive = isAccounting && !isRptPaid();
 
 		// 결재 진입 상태 시 락 판정 (기본적으로 결재선 승인이 완료되었거나 회계 지급 완료된 경우 하드 락)
 		// 예외: 신청인 본인이고 아직 아무도 승인/지급하지 않았다면, 결재함 등 결재 진입 경로(isApprovalEntryMode)로
@@ -5007,6 +5247,8 @@
 			$('#tripExpenseStatusArea').find('.add_btn_small').show();
 			// locked 분기에서 '.add_btn_small a'가 개별로 숨겨지므로, 카드사 명세 버튼은 a까지 함께 되살린다
 			$('#rptCardArea').find('.add_btn_small, .add_btn_small a').show();
+			// 일비정산 버튼도 함께 되살린다
+			$('#dailySettleBtnArea, #dailySettleBtnArea a').show();
 			// 그리드 편집 가능 여부는 각 컬럼의 editor.disabled(isAccountingUser/isRptPaid 기준)가 실시간으로 반영
 			$('#advRcvAmtKrw, #advRcvAmtUsd, #advRcvAmtUsd2, #acctNightCnt, #acctDayCnt, #acctEatCnt').prop('disabled', false);
 			$('[data-ax5grid="tripExpenseStatusGrid"]').removeClass('readonly-grid-selector');
@@ -5021,6 +5263,8 @@
 		if (disabled) {
 			$('#tripExpenseStatusArea').find('.add_btn_small').hide();
 			$('#rptCardArea').find('.add_btn_small, .add_btn_small a').hide();
+			// 일비정산 버튼도 함께 숨긴다
+			$('#dailySettleBtnArea, #dailySettleBtnArea a').hide();
 			// 그리드 편집 가능 여부는 각 컬럼의 editor.disabled(isAccountingUser/isRptPaid 기준)가 실시간으로 반영
 			$('#advRcvAmtKrw, #advRcvAmtUsd, #advRcvAmtUsd2, #acctNightCnt, #acctDayCnt, #acctEatCnt').prop('disabled', true);
 			$('[data-ax5grid="tripExpenseStatusGrid"]').addClass('readonly-grid-selector');
