@@ -416,6 +416,7 @@ public class PM07SvcImpl implements PM07Svc {
 				amParam.put("userId", paramMap.get("userId"));
 				amParam.put("userNm", paramMap.get("userNm"));
 				amParam.put("docTitle", buildVacationApprovalTitle(paramMap));
+				amParam.put("vacTypeNm", paramMap.get("vacTypeNm"));
 				amParam.put("formCd", "PM0701");
 				amParam.put("formVer", 1);
 				amParam.put("erpBizType", "PM07");

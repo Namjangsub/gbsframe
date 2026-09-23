@@ -253,6 +253,9 @@ public class AM11SvcImpl implements AM11Svc {
         paramMap.put("currApproverId", completedBySource ? null : firstApprover.get("approverId"));
         paramMap.put("currApproverNm", completedBySource ? null : firstApprover.get("approverNm"));
         paramMap.put("docStatus", completedBySource ? "COMPLETED" : "REQUEST");
+        if (!completedBySource && firstApprover.get("wb20Div2CodeId") != null) {
+            paramMap.put("todoDiv2CodeId", firstApprover.get("wb20Div2CodeId"));
+        }
 
         if (isNew) {
             am11Mapper.insertApprovalDoc(paramMap);
@@ -349,6 +352,17 @@ public class AM11SvcImpl implements AM11Svc {
             resultMap.put("resultMessage", "현재 결재자 또는 대결자만 승인할 수 있습니다.");
             return resultMap;
         }
+
+        // docInfo 호이스트 (알림 이벤트에 실제 docTitle/docDataJson 등 필요)
+        Map<String, Object> docInfo = am11Mapper.selectApprovalDocInfo(paramMap);
+        if (docInfo != null) {
+            paramMap.put("docTitle", docInfo.get("docTitle"));
+            paramMap.put("docDataJson", docInfo.get("docDataJson"));
+        }
+        // PM07/PM08 리치 발송용 필드 추가
+        paramMap.put("erpBizType", docLock.get("erpBizType"));
+        paramMap.put("erpBizKey", docLock.get("erpBizKey"));
+        paramMap.put("coCd", docLock.get("coCd"));
 
         // 2. 현재 결재선 목록 확인
         List<Map<String, Object>> lineList = am11Mapper.selectApprovalLineList(paramMap);
@@ -502,7 +516,6 @@ public class AM11SvcImpl implements AM11Svc {
         // 6. ERP 사후처리 및 알림 큐/이벤트 발행
         // 본문 승인 완료 시점(일반 결재 완료 시) 또는 최종 완료 시점에 ERP 사후처리 실행
         if (!"POST_PROGRESS".equals(docStatus) && (nextLine == null)) {
-            Map<String, Object> docInfo = am11Mapper.selectApprovalDocInfo(paramMap);
             String erpBizType = (docInfo != null) ? (String) docInfo.get("erpBizType") : null;
             try {
                 postProcessorRegistry.processCompleted(erpBizType, docInfo, paramMap);
@@ -540,8 +553,8 @@ public class AM11SvcImpl implements AM11Svc {
             }
 
             eventPublisher.publishEvent(new ApprovalEvent(
-                "COMPLETE", docId, (String) docLock.get("docNo"), docInfo != null ? (String) docInfo.get("docTitle") : "",
-                (String) docLock.get("draUserId"), "", "", "", paramMap
+                "COMPLETE", docId, (String) docLock.get("docNo"), (String) paramMap.get("docTitle"),
+                (String) docLock.get("draUserId"), docInfo != null ? (String) docInfo.get("draUserNm") : "", "", "", paramMap
             ));
         } else if (nextLine != null) {
             // 다음 순번 결재자 알림 큐 적재
@@ -559,9 +572,13 @@ public class AM11SvcImpl implements AM11Svc {
                 logger.warn("다음 결재자 알림 큐 적재 경고: docId={}", docId, ne);
             }
 
+            paramMap.put("currLineSeq", nextLine.get("lineSeq"));
+            if (nextLine.get("wb20Div2CodeId") != null) {
+                paramMap.put("todoDiv2CodeId", nextLine.get("wb20Div2CodeId"));
+            }
             eventPublisher.publishEvent(new ApprovalEvent(
-                "APPROVE_NEXT", docId, (String) docLock.get("docNo"), "",
-                (String) docLock.get("draUserId"), "",
+                "APPROVE_NEXT", docId, (String) docLock.get("docNo"), (String) paramMap.get("docTitle"),
+                (String) docLock.get("draUserId"), docInfo != null ? (String) docInfo.get("draUserNm") : (String) paramMap.get("draUserNm"),
                 (String) nextLine.get("approverId"), (String) nextLine.get("approverNm"), paramMap
             ));
         } else if (nextPostLine != null) {
@@ -580,9 +597,13 @@ public class AM11SvcImpl implements AM11Svc {
                 logger.warn("후결 결재자 알림 큐 적재 경고: docId={}", docId, ne);
             }
 
+            paramMap.put("currLineSeq", nextPostLine.get("lineSeq"));
+            if (nextPostLine.get("wb20Div2CodeId") != null) {
+                paramMap.put("todoDiv2CodeId", nextPostLine.get("wb20Div2CodeId"));
+            }
             eventPublisher.publishEvent(new ApprovalEvent(
-                "APPROVE_NEXT", docId, (String) docLock.get("docNo"), "사후결재(후결) 요청",
-                (String) docLock.get("draUserId"), "",
+                "APPROVE_NEXT", docId, (String) docLock.get("docNo"), (String) paramMap.get("docTitle"),
+                (String) docLock.get("draUserId"), docInfo != null ? (String) docInfo.get("draUserNm") : (String) paramMap.get("draUserNm"),
                 (String) nextPostLine.get("approverId"), (String) nextPostLine.get("approverNm"), paramMap
             ));
         }
@@ -716,7 +737,7 @@ public class AM11SvcImpl implements AM11Svc {
 
         eventPublisher.publishEvent(new ApprovalEvent(
             "REJECT", docId, (String) docLock.get("docNo"), docInfo != null ? (String) docInfo.get("docTitle") : "",
-            (String) docLock.get("draUserId"), "", "", "", paramMap
+            (String) docLock.get("draUserId"), docInfo != null ? (String) docInfo.get("draUserNm") : "", "", "", paramMap
         ));
 
         resultMap.put("docId", docId);
@@ -1082,40 +1103,40 @@ public class AM11SvcImpl implements AM11Svc {
             try {
                 Map<String, Object> notifParam = new HashMap<>();
                 notifParam.put("docId", docId);
-                notifParam.put("eventType", "APPROVE_NEXT");
-                notifParam.put("receiverId", nextLine.get("approverId"));
-                notifParam.put("receiverNm", nextLine.get("approverNm"));
+                notifParam.put("eventType", "ARBIT");
+                notifParam.put("receiverId", docLock.get("draUserId"));
+                notifParam.put("receiverNm", docInfo != null ? docInfo.get("draUserNm") : "");
                 notifParam.put("notifChannel", "KAKAO");
-                notifParam.put("notifTitle", "[" + docLock.get("docNo") + "] 결재 대기 문서가 도착했습니다");
-                notifParam.put("notifMsg", "신청부서 전결 완료로 결재 순번이 도래하였습니다. 문서를 확인하십시오.");
+                notifParam.put("notifTitle", "[" + docLock.get("docNo") + "] 전결 처리");
+                notifParam.put("notifMsg", "전결 처리되었습니다. 결재의견: " + (apprOpinion != null ? apprOpinion : "전결 승인"));
                 approvalQueueSvc.enqueueNotification(notifParam);
             } catch (Exception ne) {
                 logger.warn("다음 단계 결재자 알림 큐 적재 경고: docId={}", docId, ne);
             }
 
             eventPublisher.publishEvent(new ApprovalEvent(
-                "APPROVE_NEXT", docId, (String) docLock.get("docNo"), "전결 후 다음 단계 결재 요청",
-                (String) docLock.get("draUserId"), "",
+                "ARBIT", docId, (String) docLock.get("docNo"), "전결 처리",
+                (String) docLock.get("draUserId"), docInfo != null ? (String) docInfo.get("draUserNm") : "",
                 (String) nextLine.get("approverId"), (String) nextLine.get("approverNm"), paramMap
             ));
         } else if (nextPostLine != null) {
             try {
                 Map<String, Object> notifParam = new HashMap<>();
                 notifParam.put("docId", docId);
-                notifParam.put("eventType", "APPROVE_NEXT");
-                notifParam.put("receiverId", nextPostLine.get("approverId"));
-                notifParam.put("receiverNm", nextPostLine.get("approverNm"));
+                notifParam.put("eventType", "ARBIT");
+                notifParam.put("receiverId", docLock.get("draUserId"));
+                notifParam.put("receiverNm", docInfo != null ? docInfo.get("draUserNm") : "");
                 notifParam.put("notifChannel", "KAKAO");
-                notifParam.put("notifTitle", "[" + docLock.get("docNo") + "] 사후결재(후결) 요청 문서가 도착했습니다");
-                notifParam.put("notifMsg", "전결 처리 후 사후결재(후결) 순번이 도래하였습니다.");
+                notifParam.put("notifTitle", "[" + docLock.get("docNo") + "] 전결 처리");
+                notifParam.put("notifMsg", "전결 처리되었습니다. 결재의견: " + (apprOpinion != null ? apprOpinion : "전결 승인"));
                 approvalQueueSvc.enqueueNotification(notifParam);
             } catch (Exception ne) {
                 logger.warn("전결 후 후결 알림 큐 적재 경고: docId={}", docId, ne);
             }
 
             eventPublisher.publishEvent(new ApprovalEvent(
-                "APPROVE_NEXT", docId, (String) docLock.get("docNo"), "전결 후 사후결재(후결) 요청",
-                (String) docLock.get("draUserId"), "",
+                "ARBIT", docId, (String) docLock.get("docNo"), "전결 처리",
+                (String) docLock.get("draUserId"), docInfo != null ? (String) docInfo.get("draUserNm") : "",
                 (String) nextPostLine.get("approverId"), (String) nextPostLine.get("approverNm"), paramMap
             ));
         } else {
@@ -1135,7 +1156,7 @@ public class AM11SvcImpl implements AM11Svc {
 
             eventPublisher.publishEvent(new ApprovalEvent(
                 "COMPLETE", docId, (String) docLock.get("docNo"), docInfo != null ? (String) docInfo.get("docTitle") : "",
-                (String) docLock.get("draUserId"), "", "", "", paramMap
+                (String) docLock.get("draUserId"), docInfo != null ? (String) docInfo.get("draUserNm") : "", "", "", paramMap
             ));
         }
 

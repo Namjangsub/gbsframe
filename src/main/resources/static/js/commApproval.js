@@ -507,7 +507,7 @@ function Approval(htmlParam, param, popParam) {
 								//PM51(출장신청서 TODODIV2190/2191, 출장복명서 TODODIV2200/2201)은 순차결재 문서이므로
 								//차례가 아닌 결재자에게는 결재버튼을 노출하지 않는다(서버 validatePm51SequentialApproval과 동일 기준).
 								//단, 본인이 이미 승인한 건은 결재의견 수정을 위해 버튼을 유지한다.
-								var pm51SeqDivs = ["TODODIV2190", "TODODIV2191", "TODODIV2200", "TODODIV2201"];
+								var pm51SeqDivs = ["TODODIV2190", "TODODIV2191", "TODODIV2200", "TODODIV2201", "TODODIV2300", "TODODIV2410", "TODODIV2420"];
 								var isPm51Seq = ($.inArray(data.todoDiv2CodeId, pm51SeqDivs) > -1);
 								if (isPm51Seq) {
 									if (data.sanctnSttus == "Y") applyBtn = true;	//의견수정
@@ -730,8 +730,11 @@ function Approval(htmlParam, param, popParam) {
 				if(data.resultCode == 200){
 					confirmYn = true;
 					let todoYn = (data.result && data.result.todoYn) ? data.result.todoYn : '';
+					// PM51/PM07/PM08/... 공용: 순차결재 대상 판정
 					var isPm51Seq = paramMap.todoDiv2CodeId === 'TODODIV2190' || paramMap.todoDiv2CodeId === 'TODODIV2191'
-					             || paramMap.todoDiv2CodeId === 'TODODIV2200' || paramMap.todoDiv2CodeId === 'TODODIV2201';
+					             || paramMap.todoDiv2CodeId === 'TODODIV2200' || paramMap.todoDiv2CodeId === 'TODODIV2201'
+					             || paramMap.todoDiv2CodeId === 'TODODIV2300'
+					             || paramMap.todoDiv2CodeId === 'TODODIV2410' || paramMap.todoDiv2CodeId === 'TODODIV2420';
 					if( todoYn == "Y" || todoCfOpn != '') {		//모든 결재요청이 완료되면 카톡 전송
 						paramMap.bigo = "";		//보완요청일경우만 자료가 있음.
 						// PFU 공유 등록 결과는 insertApprovalLine 응답으로 함께 처리
@@ -815,19 +818,23 @@ function Approval(htmlParam, param, popParam) {
 	}
 }
 
-// PM51 순차결재 전용 division 매핑: 신청부서(개인) 결재구분 -> 관리부서 결재구분
+// PM51/PM07/PM08/... 순차결재 전용 division 매핑: 신청부서(개인) 결재구분 -> 관리부서 결재구분
 var PM51_SEQUENTIAL_DIV_MAP = {
 	'TODODIV2190': 'TODODIV2191', // 출장신청서
 	'TODODIV2200': 'TODODIV2201'  // 출장복명서
 };
 var PM51_SEQUENTIAL_TITLE = {
 	'TODODIV2190': '출장신청서', 'TODODIV2191': '출장신청서',
-	'TODODIV2200': '출장복명서', 'TODODIV2201': '출장복명서'
+	'TODODIV2200': '출장복명서', 'TODODIV2201': '출장복명서',
+	'TODODIV2300': '휴가신청서',                          // PM07 추가
+	'TODODIV2410': '휴일대체근무 신청서',                // PM08 신청 추가
+	'TODODIV2420': '휴일대체근무 신청서'                 // PM08 결과 추가
 };
 
 // 지정된 todoNo/todoDiv2CodeId 결재선에서 아직 미완료(sanctnSttus!=='Y')인 최소 순번(sanctnSn) 결재자를 찾아
 // "결재 요청" 알림톡을 발송한다. 대상이 없으면(=해당 구분 결재가 모두 완료) false, 발송했으면 true를 반환한다.
-function notifyPm51NextApprover(todoNo, todoDiv2CodeId, pgmId) {
+// (PM51/PM07/PM08/... 공용) customMessage: 선택 인자. 있으면 해당 본문으로 발송, 없으면 기존 템플릿 사용.
+function notifyPm51NextApprover(todoNo, todoDiv2CodeId, pgmId, customMessage) {
 	if (!todoNo || !todoDiv2CodeId) return false;
 	var rows = [];
 	postAjaxSync("/user/wb/wb20/selectGetApprovalList", { todoNo: todoNo, todoDiv2CodeId: todoDiv2CodeId }, null, function(data) {
@@ -841,13 +848,14 @@ function notifyPm51NextApprover(todoNo, todoDiv2CodeId, pgmId) {
 		if (!nextRow || sn < Number(nextRow.sanctnSn || 0)) nextRow = row;
 	});
 	if (!nextRow) return false;
-	sendPm51ApprovalRequestKakao(todoNo, todoDiv2CodeId, nextRow.sanctnSn, pgmId);
+	sendPm51ApprovalRequestKakao(todoNo, todoDiv2CodeId, nextRow.sanctnSn, pgmId, customMessage);
 	return true;
 }
 
-// PM51 전용 "결재 요청" 알림톡 - PM5101P01.html/PM5102P01.html의 kakaoTodo()와 동일한 방식(복수 대상 조회 + TMPLATDIV02)으로
+// PM51/PM07/PM08/... 공용 "결재 요청" 알림톡 - PM5101P01.html/PM5102P01.html의 kakaoTodo()와 동일한 방식(복수 대상 조회 + TMPLATDIV02)으로
 // 특정 순번(sanctnSn) 한 명에게만 발송한다.
-function sendPm51ApprovalRequestKakao(todoNo, todoDiv2CodeId, sanctnSn, pgmId) {
+// customMessage: 선택 인자. 있으면 해당 본문으로 발송, 없으면 DB 템플릿(messageDesc) 사용.
+function sendPm51ApprovalRequestKakao(todoNo, todoDiv2CodeId, sanctnSn, pgmId, customMessage) {
 	var clntNm = (jwt.coCd == "GUN") ? "(주)건양ITT" : "트루넷";
 	var teleNo = "051-312-2400";
 	postAjaxSync("/user/wb/wb24/selectMemberTelNo", { coCd: jwt.coCd, userId: jwt.userId }, null, function(data) {
@@ -871,7 +879,7 @@ function sendPm51ApprovalRequestKakao(todoNo, todoDiv2CodeId, sanctnSn, pgmId) {
 
 	$.each(sendList, function(idx, sendObj) {
 		var mobile = sendObj.telNo;
-		var talkMessage = sendObj.messageDesc;
+		var talkMessage = customMessage || sendObj.messageDesc;
 		if (!mobile || !talkMessage) return;
 		reqParam.rcvId = sendObj.todoId;
 		reqParam.rcvNm = sendObj.name;
@@ -931,12 +939,13 @@ function sendTodoFinal(param) {
 	}
 	commKaKaoSendTodo(paramSend);
 
-	// PM51(출장신청서 TODODIV2190/2191, 출장복명서 TODODIV2200/2201) 전용: 순차결재 다음 차례 결재자에게 결재요청 알림톡 발송.
-	// 그 외 모듈의 todoDiv2CodeId는 이 조건에 걸리지 않으므로 기존 동작에 전혀 영향이 없다.
+	// PM51/PM07/PM08/... 순차결재 대상: 다음 차례 결재자에게 결재요청 알림톡 발송.
 	// 보완요청(bigo)건은 실제 결재완료가 아니므로(같은 차례가 유지됨) 대상에서 제외한다.
 	var pm51Bigo = (param?.bigo ?? '').trim();
 	var isPm51Target = param.todoDiv2CodeId === 'TODODIV2190' || param.todoDiv2CodeId === 'TODODIV2191'
-	                || param.todoDiv2CodeId === 'TODODIV2200' || param.todoDiv2CodeId === 'TODODIV2201';
+	                || param.todoDiv2CodeId === 'TODODIV2200' || param.todoDiv2CodeId === 'TODODIV2201'
+	                || param.todoDiv2CodeId === 'TODODIV2300'
+	                || param.todoDiv2CodeId === 'TODODIV2410' || param.todoDiv2CodeId === 'TODODIV2420';
 	if (!pm51Bigo && isPm51Target) {
 		var pm51HasNext = notifyPm51NextApprover(param.todoNo, param.todoDiv2CodeId, param.pgmId);
 		if (!pm51HasNext && PM51_SEQUENTIAL_DIV_MAP.hasOwnProperty(param.todoDiv2CodeId)) {
