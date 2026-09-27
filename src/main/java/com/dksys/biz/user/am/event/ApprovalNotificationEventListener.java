@@ -3,6 +3,9 @@ package com.dksys.biz.user.am.event;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+import java.time.temporal.ChronoUnit;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -10,12 +13,14 @@ import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
 
 import com.dksys.biz.user.am.util.ApprovalSecurityUtil;
+import com.dksys.biz.user.am.queue.service.ApprovalQueueSvc;
 import com.dksys.biz.user.bm.bm18.service.BM18Svc;
 import com.dksys.biz.user.wb.wb24.service.WB24Svc;
 import com.google.gson.Gson;
@@ -25,8 +30,20 @@ public class ApprovalNotificationEventListener {
 
     private final Logger logger = LoggerFactory.getLogger(ApprovalNotificationEventListener.class);
 
+    @Value("${kakaoSend:false}")
+    private boolean kakaoSend;
+
+    @Value("${GBS_TALK_API_URL:}") private String talkApiUrl;
+    @Value("${GBS_TALK_AUTH_TOKEN:}") private String talkAuthToken;
+    @Value("${GBS_TALK_SERVER_NAME:}") private String talkServerName;
+    @Value("${GBS_TALK_PAYMENT_TYPE:}") private String talkPaymentType;
+    @Value("${GBS_TALK_SERVICE:}") private String talkService;
+
     @Autowired(required = false)
     private BM18Svc bm18Svc;
+
+    @Autowired(required = false)
+    private ApprovalQueueSvc approvalQueueSvc;
 
     @Autowired(required = false)
     private WB24Svc wb24Svc;
@@ -46,13 +63,15 @@ public class ApprovalNotificationEventListener {
                 case "SUBMIT":
                 case "APPROVE_NEXT":
                     String erpBizType = event.getExtraInfo() != null ? (String) event.getExtraInfo().get("erpBizType") : null;
-                    if ("PM07".equals(erpBizType) || "PM08".equals(erpBizType)) {
+                    if ("PM51".equals(erpBizType)) {
+                        sendPm51Notification(event);
+                    } else if ("PM07".equals(erpBizType) || "PM08".equals(erpBizType)) {
                         sendRichNotification(event);
                     } else {
                         sendNotification(event.getNextApproverId(), event.getNextApproverNm(),
                                 "[" + event.getDocNo() + "] 결재 대기 문서가 도착했습니다",
                                 "[" + event.getDocNo() + "] 결재 대기 문서가 도착했습니다: " + event.getDocTitle(),
-                                event.getDocId(), null, null);
+                                event.getDocId(), approvalTodoNo(event), approvalTodoDiv2CodeId(event));
                     }
                     sendApplicantOpinionNotification(event, "결재 처리", false);
                     break;
@@ -65,7 +84,7 @@ public class ApprovalNotificationEventListener {
                             "[" + event.getDocNo() + "] 결재 승인 완료",
                             "[" + event.getDocNo() + "] 상신하신 문서가 최종 승인 완료되었습니다: " + event.getDocTitle()
                                     + approvalOpinionSuffix(event),
-                            event.getDocId(), null, null);
+                            event.getDocId(), approvalTodoNo(event), approvalTodoDiv2CodeId(event));
                     break;
                 case "REJECT":
                     // 기안자에게 반려 알림 발송
@@ -73,14 +92,14 @@ public class ApprovalNotificationEventListener {
                             "[" + event.getDocNo() + "] 결재 반려",
                             "[" + event.getDocNo() + "] 상신하신 문서가 반려되었습니다: " + event.getDocTitle()
                                     + approvalOpinionSuffix(event),
-                            event.getDocId(), null, null);
+                            event.getDocId(), approvalTodoNo(event), approvalTodoDiv2CodeId(event));
                     break;
                 case "CANCEL":
                     // 취소 알림
                     sendNotification(event.getNextApproverId(), event.getNextApproverNm(),
                             "[" + event.getDocNo() + "] 결재 상신 취소",
                             "[" + event.getDocNo() + "] 기안자가 문서를 회수(상신 취소)하였습니다.",
-                            event.getDocId(), null, null);
+                            event.getDocId(), approvalTodoNo(event), approvalTodoDiv2CodeId(event));
                     break;
                 default:
                     break;
@@ -100,7 +119,7 @@ public class ApprovalNotificationEventListener {
                 "[" + event.getDocNo() + "] " + action + " 의견",
                 "[" + event.getDocNo() + "] " + event.getDocTitle()
                         + "\n결재의견: " + (opinion.isEmpty() ? "(의견 없음)" : opinion),
-                event.getDocId(), null, null);
+                event.getDocId(), approvalTodoNo(event), approvalTodoDiv2CodeId(event));
     }
 
     private String approvalOpinionSuffix(ApprovalEvent event) {
@@ -119,7 +138,49 @@ public class ApprovalNotificationEventListener {
         return opinion == null ? "" : String.valueOf(opinion).trim();
     }
 
+    private String approvalTodoNo(ApprovalEvent event) {
+        if (event.getExtraInfo() != null) {
+            String[] keys = {"todoNo", "wb20TodoNo", "erpBizKey"};
+            for (String key : keys) {
+                Object value = event.getExtraInfo().get(key);
+                if (value != null && !String.valueOf(value).trim().isEmpty()) {
+                    return String.valueOf(value).trim();
+                }
+            }
+        }
+        return null;
+    }
+
+    private String approvalTodoDiv2CodeId(ApprovalEvent event) {
+        if (event.getExtraInfo() != null) {
+            String[] keys = {"todoDiv2CodeId", "wb20Div2CodeId"};
+            for (String key : keys) {
+                Object value = event.getExtraInfo().get(key);
+                if (value != null && !String.valueOf(value).trim().isEmpty()) {
+                    return String.valueOf(value).trim();
+                }
+            }
+        }
+        return null;
+    }
+
+    /** PM51은 WB20에 신청/관리부서 결재선을 일괄 생성하므로 실제 현재 결재선 코드를 사용한다. */
+    private void sendPm51Notification(ApprovalEvent event) {
+        sendRichNotification(event, resolvePm51TodoDiv2CodeId(event));
+    }
+
+    private String resolvePm51TodoDiv2CodeId(ApprovalEvent event) {
+        if (event.getExtraInfo() == null || event.getExtraInfo().get("todoDiv2CodeId") == null) {
+            return null;
+        }
+        return String.valueOf(event.getExtraInfo().get("todoDiv2CodeId"));
+    }
+
     private void sendRichNotification(ApprovalEvent event) {
+        sendRichNotification(event, null);
+    }
+
+    private void sendRichNotification(ApprovalEvent event, String resolvedTodoDiv2CodeId) {
         if (event.getNextApproverId() == null || event.getNextApproverId().trim().isEmpty() || bm18Svc == null) {
             return;
         }
@@ -133,7 +194,7 @@ public class ApprovalNotificationEventListener {
 
             if (erpBizType == null || erpBizType.isEmpty() || erpBizKey == null || erpBizKey.isEmpty()
                     || coCd == null || coCd.isEmpty()) {
-                logger.warn("[ApprovalNotification] PM07/PM08 리치 발송 조건 미충족: erpBizType={}, erpBizKey={}, coCd={}",
+                logger.warn("[ApprovalNotification] PM07/PM08/PM51 리치 발송 조건 미충족: erpBizType={}, erpBizKey={}, coCd={}",
                         erpBizType, erpBizKey, coCd);
                 return;
             }
@@ -146,6 +207,8 @@ public class ApprovalNotificationEventListener {
                 if (todoDiv2CodeId == null || todoDiv2CodeId.isEmpty()) {
                     todoDiv2CodeId = "TODODIV2410";
                 }
+            } else if ("PM51".equals(erpBizType)) {
+                todoDiv2CodeId = resolvedTodoDiv2CodeId;
             }
             if (todoDiv2CodeId == null) {
                 return;
@@ -221,6 +284,20 @@ public class ApprovalNotificationEventListener {
                 finalMessage = finalMessage.replace("#{ordrgMngTelNo}", ordrgMngTelNo);
                 finalMessage = finalMessage.replace("#{nameTo}", msgInfo.get("name") != null ? msgInfo.get("name") : "");
                 finalMessage = finalMessage.replace("#{rcvNm}", msgInfo.get("name") != null ? msgInfo.get("name") : "");
+
+                if ("PM51".equals(erpBizType)) {
+                    String tripPeriod = resolvePm51TripPeriod(paramMap);
+                    finalMessage = finalMessage.replace("#{tripPeriod}", tripPeriod);
+                    if (!tripPeriod.isEmpty() && finalMessage.indexOf("#{tripPeriod}") < 0) {
+                        int requestWorkIndex = finalMessage.indexOf("요청업무 :");
+                        if (requestWorkIndex >= 0) {
+                            int lineEnd = finalMessage.indexOf('\n', requestWorkIndex);
+                            if (lineEnd < 0) lineEnd = finalMessage.length();
+                            finalMessage = finalMessage.substring(0, lineEnd) + " [" + tripPeriod + "]"
+                                    + finalMessage.substring(lineEnd);
+                        }
+                    }
+                }
             }
 
             Map<String, String> logParam = new HashMap<>();
@@ -242,17 +319,17 @@ public class ApprovalNotificationEventListener {
             logParam.put("todoDiv2CodeId", todoDiv2CodeId);
 
             String sendgStatus = "READY";
+            if (!kakaoSend) {
+                logParam.put("sendgStatus", "READY");
+                bm18Svc.insertKakaoMessage(logParam);
+                return;
+            }
             try {
-                String talkApiUrl = System.getenv("GBS_TALK_API_URL");
-                String authToken = System.getenv("GBS_TALK_AUTH_TOKEN");
-                String serverName = System.getenv("GBS_TALK_SERVER_NAME");
-                String paymentType = System.getenv("GBS_TALK_PAYMENT_TYPE");
-                String service = System.getenv("GBS_TALK_SERVICE");
                 if (talkApiUrl == null || talkApiUrl.trim().isEmpty()
-                        || authToken == null || authToken.trim().isEmpty()
-                        || serverName == null || serverName.trim().isEmpty()
-                        || paymentType == null || paymentType.trim().isEmpty()
-                        || service == null || service.trim().isEmpty()) {
+                        || talkAuthToken == null || talkAuthToken.trim().isEmpty()
+                        || talkServerName == null || talkServerName.trim().isEmpty()
+                        || talkPaymentType == null || talkPaymentType.trim().isEmpty()
+                        || talkService == null || talkService.trim().isEmpty()) {
                     logger.warn("[ApprovalNotification] 알림톡 환경변수 미설정으로 실발송을 건너뜁니다: messageId={}", maxMessageId);
                     logParam.put("sendgStatus", "READY");
                     bm18Svc.insertKakaoMessage(logParam);
@@ -262,13 +339,13 @@ public class ApprovalNotificationEventListener {
                 HttpURLConnection conn = (HttpURLConnection) url.openConnection();
                 conn.setRequestMethod("POST");
                 conn.setRequestProperty("Content-Type", "application/json; charset=utf-8");
-                conn.setRequestProperty("authToken", authToken);
-                conn.setRequestProperty("serverName", serverName);
-                conn.setRequestProperty("paymentType", paymentType);
+                conn.setRequestProperty("authToken", talkAuthToken);
+                conn.setRequestProperty("serverName", talkServerName);
+                conn.setRequestProperty("paymentType", talkPaymentType);
                 conn.setDoOutput(true);
 
                 Map<String, String> talkBody = new HashMap<>();
-                talkBody.put("service", service);
+                talkBody.put("service", talkService);
                 talkBody.put("messageId", maxMessageId);
                 talkBody.put("title", logParam.get("title"));
                 talkBody.put("message", finalMessage);
@@ -299,6 +376,36 @@ public class ApprovalNotificationEventListener {
         }
     }
 
+    private String resolvePm51TripPeriod(Map<String, Object> paramMap) {
+        String start = textValue(paramMap.get("tripStDtm"));
+        String end = textValue(paramMap.get("tripEdDtm"));
+        if ((start.isEmpty() || end.isEmpty()) && paramMap.get("docDataJson") != null) {
+            try {
+                Map<String, Object> docData = new Gson().fromJson(String.valueOf(paramMap.get("docDataJson")), Map.class);
+                if (start.isEmpty()) start = textValue(docData.get("tripStDtm"));
+                if (end.isEmpty()) end = textValue(docData.get("tripEdDtm"));
+            } catch (Exception e) {
+                logger.warn("[ApprovalNotification] PM51 출장기간 정보 파싱 실패: docId={}", paramMap.get("docId"));
+            }
+        }
+        if (start.length() < 8 || end.length() < 8) return "";
+        try {
+            LocalDate startDate = LocalDate.parse(start.substring(0, 8), DateTimeFormatter.BASIC_ISO_DATE);
+            LocalDate endDate = LocalDate.parse(end.substring(0, 8), DateTimeFormatter.BASIC_ISO_DATE);
+            long nights = Math.max(0, ChronoUnit.DAYS.between(startDate, endDate));
+            long days = nights + 1;
+            return startDate.format(DateTimeFormatter.ofPattern("yyyy.MM.dd")) + "~"
+                    + endDate.format(DateTimeFormatter.ofPattern("yyyy.MM.dd")) + " "
+                    + nights + "박" + days + "일";
+        } catch (Exception e) {
+            return "";
+        }
+    }
+
+    private String textValue(Object value) {
+        return value == null ? "" : String.valueOf(value).replaceAll("[^0-9]", "");
+    }
+
     private String selectApproverMobile(String approverId, String coCd) {
         if (wb24Svc == null || approverId == null || approverId.trim().isEmpty()) {
             return null;
@@ -323,7 +430,11 @@ public class ApprovalNotificationEventListener {
 
     private void sendNotification(String receiverId, String receiverNm, String title, String message, String docId,
             String todoNo, String todoDiv2CodeId) {
-        if (receiverId == null || receiverId.trim().isEmpty()) {
+        if (receiverId == null || receiverId.trim().isEmpty()
+                || todoNo == null || todoNo.trim().isEmpty()
+                || todoDiv2CodeId == null || todoDiv2CodeId.trim().isEmpty()) {
+            logger.warn("[ApprovalNotification] 필수 알림 식별값 누락으로 발송 생략: receiverId={}, todoNo={}, todoDiv2CodeId={}",
+                    receiverId, todoNo, todoDiv2CodeId);
             return;
         }
 
@@ -332,6 +443,30 @@ public class ApprovalNotificationEventListener {
 
         logger.info("[ApprovalNotification -> Receiver({}): {}] Title: {}, Message: {}",
                 receiverId, receiverNm, maskedTitle, maskedMsg);
+
+        if (approvalQueueSvc != null) {
+            try {
+                String receiverMobile = selectApproverMobile(receiverId, null);
+                Map<String, Object> queueParam = new HashMap<>();
+                queueParam.put("docId", docId);
+                queueParam.put("eventType", "APPROVAL_NOTIFICATION");
+                queueParam.put("receiverId", receiverId);
+                queueParam.put("receiverNm", receiverNm);
+                queueParam.put("receiverMobile", receiverMobile);
+                queueParam.put("notifChannel", "KAKAO");
+                queueParam.put("notifTitle", maskedTitle);
+                queueParam.put("notifMsg", maskedMsg);
+                queueParam.put("messageId", "AM_" + System.currentTimeMillis());
+                queueParam.put("tmplatDiv", "TMPLATDIV02");
+                queueParam.put("todoNo", todoNo);
+                queueParam.put("todoDiv2CodeId", todoDiv2CodeId);
+                queueParam.put("creatPgm", "AM_ALIM");
+                approvalQueueSvc.enqueueNotification(queueParam);
+                return;
+            } catch (Exception e) {
+                logger.warn("[ApprovalNotification] AM 알림 큐 적재 실패: receiverId={}, err={}", receiverId, e.getMessage());
+            }
+        }
 
         if (bm18Svc != null) {
             try {
@@ -344,12 +479,12 @@ public class ApprovalNotificationEventListener {
                 kakaoParam.put("sendgStatus", "READY");
                 kakaoParam.put("title", maskedTitle);
                 kakaoParam.put("mssage", maskedMsg);
-                kakaoParam.put("mobile", "");
+                kakaoParam.put("mobile", selectApproverMobile(receiverId, null));
                 kakaoParam.put("nameTo", receiverNm);
                 kakaoParam.put("creatId", "SYSTEM");
                 kakaoParam.put("creatPgm", "AM_ALIM");
-                kakaoParam.put("todoNo", docId);
-                kakaoParam.put("todoDiv2CodeId", "AM1101P01");
+                kakaoParam.put("todoNo", todoNo);
+                kakaoParam.put("todoDiv2CodeId", todoDiv2CodeId);
                 bm18Svc.insertKakaoMessage(kakaoParam);
                 logger.info("[ApprovalNotification] TB_BM18M01 알림 메시지 발송 테이블 INSERT 성공: receiverId={}", receiverId);
             } catch (Exception e) {

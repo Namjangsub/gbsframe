@@ -937,7 +937,12 @@ function sendTodoFinal(param) {
 			, "todoTitl"	  : param.todoTitl
 			, "bigo"		  : (param?.bigo ?? '').trim()	//list.bigo = "보완요청";  결제 버튼 보완요청 처리시에만 전달됨
 	}
-	commKaKaoSendTodo(paramSend);
+	// PM07/PM08 결재 알림은 AM 서버 큐가 최초상신·다음결재·완료를 담당한다.
+	// 프론트에서 직접 발송하면 KKO/READY 이력이 중복 생성되므로 발송하지 않는다.
+	var serverApprovalNotification = param.pgmId === 'PM0701P01' || param.pgmId === 'PM0801P01';
+	if (!serverApprovalNotification) {
+		commKaKaoSendTodo(paramSend);
+	}
 
 	// PM51/PM07/PM08/... 순차결재 대상: 다음 차례 결재자에게 결재요청 알림톡 발송.
 	// 보완요청(bigo)건은 실제 결재완료가 아니므로(같은 차례가 유지됨) 대상에서 제외한다.
@@ -946,7 +951,7 @@ function sendTodoFinal(param) {
 	                || param.todoDiv2CodeId === 'TODODIV2200' || param.todoDiv2CodeId === 'TODODIV2201'
 	                || param.todoDiv2CodeId === 'TODODIV2300'
 	                || param.todoDiv2CodeId === 'TODODIV2410' || param.todoDiv2CodeId === 'TODODIV2420';
-	if (!pm51Bigo && isPm51Target) {
+	if (!serverApprovalNotification && !pm51Bigo && isPm51Target) {
 		var pm51HasNext = notifyPm51NextApprover(param.todoNo, param.todoDiv2CodeId, param.pgmId);
 		if (!pm51HasNext && PM51_SEQUENTIAL_DIV_MAP.hasOwnProperty(param.todoDiv2CodeId)) {
 			// 방금 신청부서(개인) 결재가 모두 완료됨 -> 관리부서 결재 1번 순번에게 시작 알림

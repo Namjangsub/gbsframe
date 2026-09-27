@@ -1,11 +1,15 @@
 package com.dksys.biz.user.am.queue.service.impl;
 
+import java.io.OutputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
 import java.util.HashMap;
 import java.util.Map;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -14,6 +18,8 @@ import com.dksys.biz.user.am.am11.mapper.AM11Mapper;
 import com.dksys.biz.user.am.postprocessor.ApprovalPostProcessorRegistry;
 import com.dksys.biz.user.am.util.ApprovalSecurityUtil;
 import com.dksys.biz.user.bm.bm18.service.BM18Svc;
+import com.dksys.biz.user.wb.wb24.service.WB24Svc;
+import com.google.gson.Gson;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -26,6 +32,14 @@ public class ApprovalQueueItemExecutor {
     private final Logger logger = LoggerFactory.getLogger(ApprovalQueueItemExecutor.class);
     private final ObjectMapper objectMapper = new ObjectMapper();
 
+    @Value("${kakaoSend:false}")
+    private boolean kakaoSend;
+    @Value("${GBS_TALK_API_URL:}") private String talkApiUrl;
+    @Value("${GBS_TALK_AUTH_TOKEN:}") private String talkAuthToken;
+    @Value("${GBS_TALK_SERVER_NAME:}") private String talkServerName;
+    @Value("${GBS_TALK_PAYMENT_TYPE:}") private String talkPaymentType;
+    @Value("${GBS_TALK_SERVICE:}") private String talkService;
+
     @Autowired
     private AM11Mapper am11Mapper;
 
@@ -34,6 +48,9 @@ public class ApprovalQueueItemExecutor {
 
     @Autowired(required = false)
     private BM18Svc bm18Svc;
+
+    @Autowired(required = false)
+    private WB24Svc wb24Svc;
 
     public enum ExecutionResult {
         SUCCESS, FAIL, SKIPPED
@@ -45,6 +62,10 @@ public class ApprovalQueueItemExecutor {
     @Transactional(propagation = Propagation.REQUIRES_NEW, rollbackFor = Exception.class)
     public ExecutionResult acquireAndExecuteNotification(Map<String, Object> item) {
         String notifId = String.valueOf(item.get("notifId"));
+
+        if (!kakaoSend) {
+            return ExecutionResult.SKIPPED;
+        }
 
         // 1. 원자적 CAS 선점 (PROCESSING 전이)
         int acquired = am11Mapper.updateNotificationProcessing(notifId);
@@ -100,24 +121,75 @@ public class ApprovalQueueItemExecutor {
                 kakaoParam.put("rcvId", String.valueOf(notif.get("receiverId")));
                 kakaoParam.put("rcvNm", String.valueOf(notif.get("receiverNm")));
                 kakaoParam.put("clntCd", "1");
-                kakaoParam.put("tmplatDiv", "TMPLATDIV02");
-                kakaoParam.put("sendgStatus", "READY");
+                kakaoParam.put("tmplatDiv", valueOrDefault(notif.get("tmplatDiv"), "TMPLATDIV02"));
                 kakaoParam.put("title", ApprovalSecurityUtil.maskSensitiveData(String.valueOf(notif.get("notifTitle"))));
                 kakaoParam.put("mssage", ApprovalSecurityUtil.maskSensitiveData(String.valueOf(notif.get("notifMsg"))));
-                kakaoParam.put("mobile", "");
+                String receiverMobile = notif.get("receiverMobile") == null
+                        ? "" : String.valueOf(notif.get("receiverMobile"));
+                if (isBlank(receiverMobile) && wb24Svc != null) {
+                    Map<String, String> userParam = new HashMap<>();
+                    userParam.put("userId", String.valueOf(notif.get("receiverId")));
+                    java.util.List<Map<String, String>> telList = wb24Svc.selectMemberTelNo(userParam);
+                    if (telList != null && !telList.isEmpty()) {
+                        receiverMobile = telList.get(0).get("telNo");
+                    }
+                }
+                kakaoParam.put("mobile", receiverMobile);
                 kakaoParam.put("nameTo", String.valueOf(notif.get("receiverNm")));
                 kakaoParam.put("creatId", "SYSTEM");
                 kakaoParam.put("creatPgm", "AM_QUEUE");
-                kakaoParam.put("todoNo", String.valueOf(notif.get("docId")));
-                kakaoParam.put("todoDiv2CodeId", "AM1101P01");
+                String todoNo = valueOrDefault(notif.get("todoNo"), "");
+                String todoDiv2CodeId = valueOrDefault(notif.get("todoDiv2CodeId"), "");
+                if (isBlank(todoNo) || isBlank(todoDiv2CodeId)) {
+                    logger.warn("[Notification Worker] ERP 원자료 식별값 누락으로 카카오 발송 생략: notifId={}", notif.get("notifId"));
+                    return false;
+                }
+                kakaoParam.put("todoNo", todoNo);
+                kakaoParam.put("todoDiv2CodeId", todoDiv2CodeId);
+
+                if (isBlank(talkApiUrl) || isBlank(talkAuthToken) || isBlank(talkServerName)
+                        || isBlank(talkPaymentType) || isBlank(talkService) || isBlank(kakaoParam.get("mobile"))) {
+                    return false;
+                }
+
+                Map<String, String> talkBody = new HashMap<>();
+                talkBody.put("service", talkService);
+                talkBody.put("messageId", valueOrDefault(notif.get("messageId"), "AM_" + notif.get("notifId")));
+                talkBody.put("title", kakaoParam.get("title"));
+                talkBody.put("message", kakaoParam.get("mssage"));
+                talkBody.put("mobile", kakaoParam.get("mobile"));
+                talkBody.put("template", "10003");
+
+                HttpURLConnection conn = (HttpURLConnection) new URL(talkApiUrl).openConnection();
+                conn.setRequestMethod("POST");
+                // PM0701P01 직접 발송 경로와 동일한 카카오 API 인증 헤더명을 사용한다.
+                conn.setRequestProperty("authToken", talkAuthToken);
+                conn.setRequestProperty("serverName", talkServerName);
+                conn.setRequestProperty("paymentType", talkPaymentType);
+                conn.setRequestProperty("Content-Type", "application/json; charset=UTF-8");
+                conn.setDoOutput(true);
+                byte[] body = new Gson().toJson(talkBody).getBytes("UTF-8");
+                try (OutputStream os = conn.getOutputStream()) {
+                    os.write(body);
+                }
+                int responseCode = conn.getResponseCode();
+                kakaoParam.put("sendgStatus", responseCode == 200 ? "OK" : "FAIL");
                 int result = bm18Svc.insertKakaoMessage(kakaoParam);
-                return result >= 0;
+                return responseCode == 200 && result >= 0;
             } catch (Exception e) {
                 logger.warn("[Notification Worker] 카카오 발송 테이블 연동 실패: notifId={}, err={}", notif.get("notifId"), e.getMessage());
                 return false;
             }
         }
         return true;
+    }
+
+    private String valueOrDefault(Object value, String defaultValue) {
+        return value == null || String.valueOf(value).trim().isEmpty() ? defaultValue : String.valueOf(value);
+    }
+
+    private boolean isBlank(String value) {
+        return value == null || value.trim().isEmpty();
     }
 
     /**
