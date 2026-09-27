@@ -321,7 +321,6 @@
 							<td style="text-align: LEFT; border-right: 0px;; font-size: 13px; font-weight: bold; color: blue;"><span style="color:#ff0000;">*</span> 출장기간</td>
 							<td style="text-align: right; vertical-align: middle;">
 								<div class="add_btn_small pdl10" style="display: inline-flex; align-items: center; justify-content: flex-end; gap: 2px;">
-									<a onclick="addTravelerRow();" style="height: 100%; min-height: 28px; line-height: 1;" title="직원 추가" authchk>+</a>
 									<a onclick="deleteTravelerRow();" style="height: 100%; min-height: 28px; line-height: 1;" title="삭제" authchk>-</a>
 									<a onclick="addOutSrcTravelerRow();" class="btn-txt" style="height: 100%; min-height: 28px; line-height: 28px; width: auto !important; min-width: 42px !important; padding: 0 8px !important; font-size: 12px !important; font-weight: bold !important; white-space: nowrap !important;" title="외주인력 추가" authchk>외주</a>
 								</div>
@@ -1445,7 +1444,6 @@
 				items: [
 					{ type: 1, label: "붙여넣기" },
 					{ divide: true },
-					{ type: 1, label: "줄추가" },
 					{ type: 1, label: "내용 삭제" },
 					{ type: 2, label: "줄삭제" }
 				],
@@ -1455,9 +1453,7 @@
 					const gridInstance = travelerGridView.target;
 					if (item.label === "붙여넣기") {
 						gridContextMenuPaste(gridInstance, param.dindex, param.colIndex, param.column);
-					} else if (item.label === "줄추가") {
-						addTravelerRow();
-					} else if (item.label === "내용 삭제") {
+						} else if (item.label === "내용 삭제") {
 						gridContextMenuClearRow(gridInstance, param.dindex);
 					} else if (item.label === "줄삭제") {
 						deleteTravelerRow(param.dindex);
@@ -1978,9 +1974,22 @@
 		$('#dayCnt').val(Math.max(0, dayCnt));
 	}
 
-	// 출장자 행 추가 (다중 선택 지원)
+	function normalizeTravelerRows(list) {
+		var employeeKept = false;
+		return (list || []).filter(function(row) {
+			var isOutSrc = row.outSrcYn === '외주' || row.outSrcYn === 'Y' || row.deptNm === '외주';
+			if (isOutSrc) return true;
+			if (employeeKept) return false;
+			employeeKept = true;
+			return true;
+		});
+	}
+
+	// 출장자 행 추가: 신청인은 최초 자동 등록된 1명으로 고정
 	function addTravelerRow() {
 		if (blockApprovalEntryEdit()) return;
+		alert("출장자는 1명(신청인)만 등록 가능합니다.");
+		return;
 		if (popParam.actionType === 'PAY') {
 			alert("지급처리 모드에서는 출장자를 추가할 수 없습니다.");
 			return;
@@ -2116,6 +2125,11 @@
 			return;
 		}
 		if (dindex !== undefined && dindex !== null) {
+			var targetRow = travelerGridView.target.getList()[dindex];
+			if (targetRow && targetRow.outSrcYn !== '외주' && targetRow.outSrcYn !== 'Y' && targetRow.deptNm !== '외주') {
+				alert("신청인 출장자는 삭제할 수 없습니다.");
+				return;
+			}
 			travelerGridView.target.removeRow(dindex);
 		} else {
 			var selectedRows = travelerGridView.target.getList("selected");
@@ -2123,7 +2137,13 @@
 				alert("삭제할 행을 선택해주세요.");
 				return;
 			}
-			var rowKeys = selectedRows.map(function(row) { return row.__index; }).sort(function(a, b) { return b - a; });
+			var rowKeys = selectedRows.filter(function(row) {
+				return row.outSrcYn === '외주' || row.outSrcYn === 'Y' || row.deptNm === '외주';
+			}).map(function(row) { return row.__index; }).sort(function(a, b) { return b - a; });
+			if (rowKeys.length === 0) {
+				alert("신청인 출장자는 삭제할 수 없습니다.");
+				return;
+			}
 			rowKeys.forEach(rowKey => {
 				travelerGridView.target.removeRow(rowKey);
 			});
@@ -2612,6 +2632,7 @@
 			mapProjectDateFields(projectList);
 
 			// 출장자 그리드
+			travelerList = normalizeTravelerRows(travelerList);
 			travelerGridView.target.setData({ list: travelerList, page: { totalElements: travelerList.length } }); //출장자
 			gridResize(travelerGridView, travelerList.length);
 
@@ -2822,7 +2843,10 @@
 		// 출장자 정보 및 출장기간 필수 검증
 		if (!isPaymentFlow) {
 			var gridList = travelerGridView.target.getList();
-			if (gridList.length !== 1) {
+			var employeeRows = $.grep(gridList, function(item) {
+				return !(item.outSrcYn === '외주' || item.outSrcYn === 'Y' || item.deptNm === '외주');
+			});
+			if (employeeRows.length !== 1) {
 				var $gridContainer = $('[data-ax5grid="travelerGrid"]');
 				$gridContainer.addClass('error-outline');
 				$gridContainer.one('click', function() {
@@ -2835,8 +2859,9 @@
 			var missingFieldsList = [];
 			$.each(gridList, function(idx, item) {
 				var missing = [];
+				var isOutSrc = item.outSrcYn === '외주' || item.outSrcYn === 'Y' || item.deptNm === '외주';
 				if (!item.userNm) missing.push("이름");
-				if (!item.positionNm) missing.push("직급");
+				if (!isOutSrc && !item.positionNm) missing.push("직급");
 				if (!item.tripStDt) missing.push("출발일자");
 				if (!item.tripStTm) missing.push("출발시간");
 				if (!item.tripEdDt) missing.push("도착일자");
@@ -3798,7 +3823,7 @@
 					var sanctnSn = parseInt(elem.sanctnSn, 10);
 					var userId = String(elem.todoId || elem.usrNm || elem.empNo || '').trim().toLowerCase();
 					// 결재선의 첫 번째 결재자(신청자 본인), 순번 1번, 또는 신청자/작성자 ID 일치 행은 본인 결재이므로 타인 승인 완료 판정에서 제외
-					if (approvalCount === 1 || sanctnSn === 1 || (reqId && userId === reqId) || (creatId && userId === creatId)) {
+					if (sanctnSn === 1 || (reqId && userId === reqId) || (creatId && userId === creatId)) {
 						return true;
 					}
 
@@ -4906,13 +4931,16 @@
 			tagHeight = tagHeight > 260 ? 260 : tagHeight;
 		} else if (gridName === 'projectGrid') {
 			// 프로젝트 그리드는 헤더(약 60px) + 데이터행(약 26px) + 여백(약 5px)
-			tagHeight = (size || 0) * 26 + 65;
-			tagHeight = tagHeight < 65 ? 65 : tagHeight;
+			// 프로젝트 그리드는 헤더 28px과 데이터 행 높이만 확보한다.
+			tagHeight = Math.max(65, (size || 0) * 26 + 28);
 			tagHeight = tagHeight > 300 ? 300 : tagHeight;
 		} else {
 			// 출장자 그리드는 헤더(2줄, 약 60px) + 데이터행 1줄 고정(약 28px) + 테두리/여백(약 5px)
 			// 요청에 따라 항상 1줄만 보이도록 고정
-			tagHeight = (1 * 28) + 65;
+			// 출장자 그리드는 외주 인력 행 수에 따라 높이를 자동 확장한다.
+			var rowCount = Math.max(1, size || 0);
+			// 헤더 28px + 데이터 행 높이만 확보하여 마지막 행 아래 빈 공간을 없앤다.
+			tagHeight = Math.max(65, (rowCount * 28) + 28);
 		}
 		gridObj.target.setHeight(tagHeight);
 	}
@@ -5369,6 +5397,7 @@
 						}
 					}
 				});
+				tList = normalizeTravelerRows(tList);
 				travelerGridView.target.setData({ list: tList, page: { totalElements: tList.length } });
 				window.pm51TravelerExpenseSyncing = false;
 				recalcExpenseFromTravelerGrid();

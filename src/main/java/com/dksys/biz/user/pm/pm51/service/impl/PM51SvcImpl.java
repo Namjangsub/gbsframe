@@ -197,6 +197,7 @@ public class PM51SvcImpl implements PM51Svc {
 
 		// travelers와 expenses 검증/파싱
 		List<Map<String, String>> travelers = gson.fromJson(paramMap.get("travelerArr"), listType);
+		validateTravelerRegistration(paramMap, travelers);
 		validateTravelerDateOverlap(paramMap, travelers);
 		List<Map<String, String>> expenses = gson.fromJson(paramMap.get("expenseArr"), listType);
 
@@ -253,6 +254,7 @@ public class PM51SvcImpl implements PM51Svc {
 		int result = pm51Mapper.insertTripReqM01(paramMap);
 
 		List<Map<String, String>> travelerArr = gsonDtl.fromJson(paramMap.get("travelerArr"), dtlMap);
+		validateTravelerRegistration(paramMap, travelerArr);
 		validateTravelerDateOverlap(paramMap, travelerArr);
 		if (travelerArr != null && !travelerArr.isEmpty()) {
 			for (Map<String, String> travelerMap : travelerArr) {
@@ -446,13 +448,16 @@ public class PM51SvcImpl implements PM51Svc {
 			pm51Mapper.deleteTripReqMngApprovalLines(delParam);
 		}
 
+		List<Map<String, String>> validatedTravelerArr = gsonDtl.fromJson(paramMap.get("travelerArr"), dtlMap);
+		validateTravelerRegistration(paramMap, validatedTravelerArr);
+		validateTravelerDateOverlap(paramMap, validatedTravelerArr);
+
 		pm51Mapper.deleteTripReqD01(delParam);
 		pm51Mapper.deleteTripReqD02(delParam);
 		pm51Mapper.deleteTripReqD03(delParam);
 
 		if (paramMap.get("travelerArr") != null && !paramMap.get("travelerArr").isEmpty()) {
-			List<Map<String, String>> travelerArr = gsonDtl.fromJson(paramMap.get("travelerArr"), dtlMap);
-			validateTravelerDateOverlap(paramMap, travelerArr);
+			List<Map<String, String>> travelerArr = validatedTravelerArr;
 			if (travelerArr != null && !travelerArr.isEmpty()) {
 				for (Map<String, String> travelerMap : travelerArr) {
 					travelerMap.put("tripReqNo", paramMap.get("tripReqNo"));
@@ -974,6 +979,29 @@ public class PM51SvcImpl implements PM51Svc {
 				String travelerNm = hasText(travelerMap.get("userNm")) ? travelerMap.get("userNm") : userId;
 				throw new RuntimeException(travelerNm + "님의 출장기간이 기등록된 " + overlap.get("docType") + "(" + overlap.get("docNo") + ")와 중복됩니다.");
 			}
+		}
+	}
+
+	private void validateTravelerRegistration(Map<String, String> paramMap, List<Map<String, String>> travelerArr) {
+		if (travelerArr == null || travelerArr.isEmpty()) {
+			throw new RuntimeException("출장자는 신청인 1명을 반드시 등록해야 합니다.");
+		}
+
+		int employeeCount = 0;
+		String applicantId = paramMap.get("reqId");
+		for (Map<String, String> traveler : travelerArr) {
+			boolean isOutSrc = "외주".equals(traveler.get("outSrcYn"))
+					|| "Y".equalsIgnoreCase(traveler.get("outSrcYn"))
+					|| "외주".equals(traveler.get("deptNm"));
+			if (!isOutSrc) {
+				employeeCount++;
+				if (hasText(applicantId) && !applicantId.equals(traveler.get("userId"))) {
+					throw new RuntimeException("출장자는 신청인만 등록할 수 있습니다.");
+				}
+			}
+		}
+		if (employeeCount != 1) {
+			throw new RuntimeException("출장자는 신청인 1명만 등록할 수 있습니다. 외주 인력은 추가 등록할 수 있습니다.");
 		}
 	}
 
@@ -2271,6 +2299,7 @@ public class PM51SvcImpl implements PM51Svc {
 			amParam.put("docDataJson", new GsonBuilder().disableHtmlEscaping().create().toJson(paramMap));
 			amParam.put("docRenderHtml", buildTripReqApprovalHtml(paramMap));
 			amParam.put("pgmId", "PM5101P01");
+			amParam.put("todoDiv2CodeId", amLineList.get(0).get("wb20Div2CodeId"));
 			amParam.put("lineList", amLineList);
 			amParam.put("autoApprovedCount", autoApprovedCount);
 
@@ -2394,8 +2423,8 @@ public class PM51SvcImpl implements PM51Svc {
 			logger.warn("출장신청서 출장자 조회 실패: tripReqNo={}, error={}", paramMap.get("tripReqNo"), e.getMessage());
 		}
 		if (travelerList != null && !travelerList.isEmpty()) {
-			html.append("<tr><th>출장자</th><td colspan=\"3\"><table class=\"table table-bordered\" style=\"width:100%; border-collapse:collapse; margin-bottom:0;\">");
-			html.append("<colgroup><col style=\"width:25%;\"><col style=\"width:25%;\"><col style=\"width:25%;\"><col style=\"width:25%;\"></colgroup>");
+			html.append("<tr><th>출장자</th><td colspan=\"3\"><table class=\"table table-bordered\" style=\"width:100%; table-layout:fixed; border-collapse:collapse; margin-bottom:0; word-break:break-word;\">");
+			html.append("<colgroup><col style=\"width:18%;\"><col style=\"width:20%;\"><col style=\"width:14%;\"><col style=\"width:48%;\"></colgroup>");
 			html.append("<tr><th>성명</th><th>소속</th><th>직급</th><th>출장기간</th></tr>");
 			for (Map<String, String> traveler : travelerList) {
 				String travelerPeriod = "";
@@ -2726,8 +2755,8 @@ public class PM51SvcImpl implements PM51Svc {
 			return "";
 		}
 		StringBuilder sb = new StringBuilder();
-		sb.append("<table class=\"table table-bordered\" style=\"width:100%; border-collapse:collapse; margin-bottom:0;\">");
-		sb.append("<colgroup><col style=\"width:15%;\"><col style=\"width:20%;\"><col style=\"width:15%;\"><col style=\"width:15%;\"><col style=\"width:20%;\"><col style=\"width:15%;\"></colgroup>");
+		sb.append("<table class=\"table table-bordered\" style=\"width:100%; table-layout:fixed; border-collapse:collapse; margin-bottom:0; word-break:break-word;\">");
+		sb.append("<colgroup><col style=\"width:16%;\"><col style=\"width:19%;\"><col style=\"width:18%;\"><col style=\"width:12%;\"><col style=\"width:25%;\"><col style=\"width:10%;\"></colgroup>");
 		sb.append("<tr><th>프로젝트명</th><th>고객사</th><th>설비</th><th>PM</th><th>프로젝트기간</th><th>비고</th></tr>");
 		for (Map<String, String> project : projectList) {
 			String projectPeriod = "";
