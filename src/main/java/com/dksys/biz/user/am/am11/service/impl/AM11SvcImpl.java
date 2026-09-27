@@ -284,7 +284,7 @@ public class AM11SvcImpl implements AM11Svc {
             notifParam.put("notifChannel", "KAKAO");
             notifParam.put("notifTitle", "[" + paramMap.get("docNo") + "] 결재 대기 문서가 도착했습니다");
             notifParam.put("notifMsg", paramMap.get("draUserNm") + "님이 결재를 상신하였습니다: " + paramMap.get("docTitle"));
-            approvalQueueSvc.enqueueNotification(notifParam);
+            enqueueApprovalNotification(notifParam, paramMap);
         } catch (Exception ne) {
             logger.warn("상신 알림 큐 적재 경고: docId={}", docId, ne);
         }
@@ -540,6 +540,7 @@ public class AM11SvcImpl implements AM11Svc {
             // 기안자 최종 완료 알림 큐 적재
             try {
                 Map<String, Object> notifParam = new HashMap<>();
+                copyApprovalTodoIdentity(paramMap, docLock);
                 notifParam.put("docId", docId);
                 notifParam.put("eventType", "COMPLETE");
                 notifParam.put("receiverId", docLock.get("draUserId"));
@@ -547,7 +548,7 @@ public class AM11SvcImpl implements AM11Svc {
                 notifParam.put("notifChannel", "KAKAO");
                 notifParam.put("notifTitle", "[" + docLock.get("docNo") + "] 결재가 최종 승인되었습니다");
                 notifParam.put("notifMsg", "상신하신 문서가 최종 승인 완료되었습니다: " + (docInfo != null ? docInfo.get("docTitle") : ""));
-                approvalQueueSvc.enqueueNotification(notifParam);
+                enqueueApprovalNotification(notifParam, paramMap);
             } catch (Exception ne) {
                 logger.warn("최종 승인 알림 큐 적재 경고: docId={}", docId, ne);
             }
@@ -567,7 +568,7 @@ public class AM11SvcImpl implements AM11Svc {
                 notifParam.put("notifChannel", "KAKAO");
                 notifParam.put("notifTitle", "[" + docLock.get("docNo") + "] 결재 대기 문서가 도착했습니다");
                 notifParam.put("notifMsg", "결재 순번이 도래하였습니다. 문서를 확인하십시오.");
-                approvalQueueSvc.enqueueNotification(notifParam);
+                enqueueApprovalNotification(notifParam, paramMap);
             } catch (Exception ne) {
                 logger.warn("다음 결재자 알림 큐 적재 경고: docId={}", docId, ne);
             }
@@ -592,7 +593,7 @@ public class AM11SvcImpl implements AM11Svc {
                 notifParam.put("notifChannel", "KAKAO");
                 notifParam.put("notifTitle", "[" + docLock.get("docNo") + "] 사후결재(후결) 요청 문서가 도착했습니다");
                 notifParam.put("notifMsg", "전결 후 사후결재(후결) 순번이 도래하였습니다.");
-                approvalQueueSvc.enqueueNotification(notifParam);
+                enqueueApprovalNotification(notifParam, paramMap);
             } catch (Exception ne) {
                 logger.warn("후결 결재자 알림 큐 적재 경고: docId={}", docId, ne);
             }
@@ -730,7 +731,7 @@ public class AM11SvcImpl implements AM11Svc {
             notifParam.put("notifChannel", "KAKAO");
             notifParam.put("notifTitle", "[" + docLock.get("docNo") + "] 결재가 반려되었습니다");
             notifParam.put("notifMsg", "상신하신 문서가 반려되었습니다: " + ApprovalSecurityUtil.maskSensitiveData(apprOpinion));
-            approvalQueueSvc.enqueueNotification(notifParam);
+            enqueueApprovalNotification(notifParam, paramMap);
         } catch (Exception ne) {
             logger.warn("반려 알림 큐 적재 경고: docId={}", docId, ne);
         }
@@ -811,7 +812,7 @@ public class AM11SvcImpl implements AM11Svc {
                 notifParam.put("notifChannel", "KAKAO");
                 notifParam.put("notifTitle", "[" + docLock.get("docNo") + "] 결재 문서가 회수되었습니다");
                 notifParam.put("notifMsg", "기안자(" + docLock.get("draUserNm") + ")가 상신 문서를 회수(취소)하였습니다.");
-                approvalQueueSvc.enqueueNotification(notifParam);
+                enqueueApprovalNotification(notifParam, paramMap);
             }
         } catch (Exception ne) {
             logger.warn("취소 알림 큐 적재 경고: docId={}", docId, ne);
@@ -1109,7 +1110,7 @@ public class AM11SvcImpl implements AM11Svc {
                 notifParam.put("notifChannel", "KAKAO");
                 notifParam.put("notifTitle", "[" + docLock.get("docNo") + "] 전결 처리");
                 notifParam.put("notifMsg", "전결 처리되었습니다. 결재의견: " + (apprOpinion != null ? apprOpinion : "전결 승인"));
-                approvalQueueSvc.enqueueNotification(notifParam);
+                enqueueApprovalNotification(notifParam, paramMap);
             } catch (Exception ne) {
                 logger.warn("다음 단계 결재자 알림 큐 적재 경고: docId={}", docId, ne);
             }
@@ -1129,7 +1130,7 @@ public class AM11SvcImpl implements AM11Svc {
                 notifParam.put("notifChannel", "KAKAO");
                 notifParam.put("notifTitle", "[" + docLock.get("docNo") + "] 전결 처리");
                 notifParam.put("notifMsg", "전결 처리되었습니다. 결재의견: " + (apprOpinion != null ? apprOpinion : "전결 승인"));
-                approvalQueueSvc.enqueueNotification(notifParam);
+                enqueueApprovalNotification(notifParam, paramMap);
             } catch (Exception ne) {
                 logger.warn("전결 후 후결 알림 큐 적재 경고: docId={}", docId, ne);
             }
@@ -1149,7 +1150,7 @@ public class AM11SvcImpl implements AM11Svc {
                 notifParam.put("notifChannel", "KAKAO");
                 notifParam.put("notifTitle", "[" + docLock.get("docNo") + "] 전결로 최종 승인 완료되었습니다");
                 notifParam.put("notifMsg", "상신하신 문서가 전결로 최종 승인 완료되었습니다: " + (docInfo != null ? docInfo.get("docTitle") : ""));
-                approvalQueueSvc.enqueueNotification(notifParam);
+                enqueueApprovalNotification(notifParam, paramMap);
             } catch (Exception ne) {
                 logger.warn("전결 완료 알림 큐 적재 경고: docId={}", docId, ne);
             }
@@ -1697,5 +1698,35 @@ public class AM11SvcImpl implements AM11Svc {
             return null;
         }
         return am11Mapper.selectDocIdByBizKey(paramMap);
+    }
+
+    private void enqueueApprovalNotification(Map<String, Object> notifParam, Map<String, Object> source) {
+        if (source == null || approvalQueueSvc == null) {
+            return;
+        }
+        String todoNo = valueOf(source.get("todoNo"));
+        if (todoNo.isEmpty()) todoNo = valueOf(source.get("wb20TodoNo"));
+        if (todoNo.isEmpty()) todoNo = valueOf(source.get("erpBizKey"));
+        String todoDiv2CodeId = valueOf(source.get("todoDiv2CodeId"));
+        if (todoDiv2CodeId.isEmpty()) todoDiv2CodeId = valueOf(source.get("wb20Div2CodeId"));
+        if (todoNo.isEmpty() || todoDiv2CodeId.isEmpty()) {
+            logger.warn("결재 원천 식별값 누락으로 카카오 알림 큐 등록 생략: docId={}", notifParam.get("docId"));
+            return;
+        }
+        notifParam.put("todoNo", todoNo);
+        notifParam.put("todoDiv2CodeId", todoDiv2CodeId);
+        approvalQueueSvc.enqueueNotification(notifParam);
+    }
+
+    private void copyApprovalTodoIdentity(Map<String, Object> target, Map<String, Object> source) {
+        if (target == null || source == null) return;
+        if (!valueOf(target.get("todoNo")).isEmpty()) return;
+        String todoNo = valueOf(source.get("todoNo"));
+        if (todoNo.isEmpty()) todoNo = valueOf(source.get("wb20TodoNo"));
+        if (todoNo.isEmpty()) todoNo = valueOf(source.get("erpBizKey"));
+        String div2 = valueOf(source.get("todoDiv2CodeId"));
+        if (div2.isEmpty()) div2 = valueOf(source.get("wb20Div2CodeId"));
+        if (!todoNo.isEmpty()) target.put("todoNo", todoNo);
+        if (!div2.isEmpty()) target.put("todoDiv2CodeId", div2);
     }
 }
