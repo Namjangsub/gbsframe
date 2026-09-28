@@ -265,6 +265,18 @@
 	</div>
 
 <script type="text/javascript">
+	var subcontractPayOriginal = null;
+	var subcontractPayEditable = false;
+	function subcontractPayValues() {
+		return {payDiv: $('#payDiv').val() || '', payDivDt: ($('#payDivDt').val() || '').replace(/-/g, '')};
+	}
+	function subcontractPayChanged() {
+		var current = subcontractPayValues();
+		return subcontractPayOriginal !== null && (current.payDiv !== subcontractPayOriginal.payDiv || current.payDivDt !== subcontractPayOriginal.payDivDt);
+	}
+	function refreshSubcontractPayButton() {
+		if (subcontractPayOriginal !== null) $('#actionBtn').toggle(subcontractPayEditable && subcontractPayChanged());
+	}
 
 	var turnKeyGridView = {
         initView: function () {
@@ -430,7 +442,9 @@
         		$('#payDivDt').removeAttr('required', 'true');
         	}
 
-		})
+		});
+		$('#payDiv').on('change', refreshSubcontractPayButton);
+		$('#payDivDt').on('input change changeDate', refreshSubcontractPayButton);
 	        
 		actionType = modalStack.last().paramObj.actionType;
 		fileTrgtKey = modalStack.last().paramObj.fileTrgtKey;
@@ -632,6 +646,15 @@
 					$('#popForm input, #popForm textarea, #popForm select').css({'background-color':'#e6e6e6', 'pointer-events':'none'});
 					$('#actionBtn').hide();
 					$('#fileUpBtn').show();
+					// disabled 처리하면 별도 첨부파일 저장 시 회사 등 기존 폼 값이 누락된다.
+					$('#popForm input:not([type="hidden"]), #popForm textarea, #popForm select').prop('readonly', true).attr('tabindex', '-1');
+					subcontractPayOriginal = subcontractPayValues();
+					subcontractPayEditable = actionType === 'U' && data.result.confYm !== 'Y';
+					if (subcontractPayEditable) {
+						$('#payDiv, #payDivDt').prop('disabled', false).prop('readonly', false).removeAttr('tabindex')
+							.css({'background-color':'', 'pointer-events':''});
+					}
+					refreshSubcontractPayButton();
 				}
 				
 				//계산서 발행완료일경우
@@ -663,6 +686,26 @@
 
 	// 수정
 	function updatePchsCost() {
+		if (subcontractPayOriginal !== null) {
+			if (!subcontractPayEditable || !subcontractPayChanged()) return;
+			if (!inputValidation($('#payDiv, #payDivDt').filter('[required]'))) return;
+			if (!monthCloseChk($('#costDt').val(), '', $('#coCd').val())) return;
+			var values = subcontractPayValues();
+			var payFormData = new FormData();
+			payFormData.append('fileTrgtKey', $('#fileTrgtKey').val() || fileTrgtKey);
+			payFormData.append('payDiv', values.payDiv);
+			payFormData.append('payDivDt', values.payDivDt);
+			payFormData.append('userId', jwt.userId);
+			payFormData.append('pgmId', 'SM1001P01');
+			filePostAjax('/user/sm/sm10/updatePchsCost', payFormData, function(data) {
+				alert(data.resultMessage);
+				if (data.resultCode == 200) {
+					modalStack.last().callback('1');
+					modalStack.close();
+				}
+			});
+			return;
+		}
 		if (inputValidation($('.popup_area [required]'))) {						// 필수 필드의 유효성 검사
 			var formData = makeFormData();										// 요청이 통과하면 makeFormData() 함수를 이용해 formData를 생성
 

@@ -22,6 +22,8 @@ public interface SM10Mapper {
 
   int updatePchsCost(Map<String, String> paramMap);
 
+  int updateSubcontractPchsCostPay(Map<String, String> paramMap);
+
   int deletePchsCost(Map<String, String> paramMap);
 
   int selectTurnKeySalesCodeCount(Map<String, String> paramMap);

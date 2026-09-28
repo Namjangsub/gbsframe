@@ -63,6 +63,35 @@ public class SM10SvcImpl implements SM10Svc {
 
   @Override
   public int updatePchsCost(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
+	// 외주 자료의 상세내역/첨부파일은 건드리지 않고 청구/영수 정보만 갱신한다.
+	Map<?, ?> saved = selectPchsCostInfo(paramMap);
+	if (saved == null) throw new IllegalArgumentException("수정할 자료가 없습니다.");
+	if (saved.get("ctrtNo") != null && !saved.get("ctrtNo").toString().isEmpty()) {
+		if ("Y".equals(saved.get("confYm"))) {
+			throw new IllegalArgumentException("매입확정 자료는 수정할 수 없습니다.");
+		}
+		String payDiv = paramMap.get("payDiv");
+		if (!"PAYDIV01".equals(payDiv) && !"PAYDIV02".equals(payDiv)) {
+			throw new IllegalArgumentException("청구/영수구분을 선택해 주세요.");
+		}
+		String payDivDt = "";
+		if ("PAYDIV01".equals(payDiv)) {
+			payDivDt = paramMap.getOrDefault("payDivDt", "").replace("-", "");
+			try {
+				java.time.LocalDate.parse(payDivDt, java.time.format.DateTimeFormatter.BASIC_ISO_DATE);
+			} catch (java.time.format.DateTimeParseException e) {
+				throw new IllegalArgumentException("올바른 영수일자를 입력해 주세요.");
+			}
+		}
+		Map<String, String> payParams = new HashMap<>();
+		payParams.put("fileTrgtKey", String.valueOf(saved.get("fileTrgtKey")));
+		payParams.put("coCd", String.valueOf(saved.get("coCd")));
+		payParams.put("payDiv", payDiv);
+		payParams.put("payDivDt", payDivDt);
+		payParams.put("userId", paramMap.get("userId"));
+		payParams.put("pgmId", paramMap.get("pgmId"));
+		return sm10Mapper.updateSubcontractPchsCostPay(payParams);
+	}
 //	Gson gson = new Gson();
 	Gson gsonDtl = new GsonBuilder().disableHtmlEscaping().create();
 	Type dtlMap = new TypeToken<ArrayList<Map<String, String>>>(){}.getType();
