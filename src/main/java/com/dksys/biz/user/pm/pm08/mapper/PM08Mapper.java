@@ -58,4 +58,8 @@ public interface PM08Mapper {
 
 	int deleteAmM01ByDocId(Map<String, String> paramMap);
 
+	int deleteAmD01ByReqNo(Map<String, String> paramMap);
+
+	int deleteAmM01ByReqNo(Map<String, String> paramMap);
+
 }

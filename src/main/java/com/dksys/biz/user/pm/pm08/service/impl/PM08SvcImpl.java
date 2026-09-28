@@ -150,9 +150,8 @@ public class PM08SvcImpl implements PM08Svc {
 						if (apprItem.get("pgPath") == null || apprItem.get("pgPath").isEmpty()) {
 							apprItem.put("pgPath", "/user/pm/pm08/PM0801P01.html");
 						}
-						if (apprItem.get("todoTitl") == null || apprItem.get("todoTitl").isEmpty()) {
-							apprItem.put("todoTitl", "휴일대체근무 신청서");
-						}
+						// WB20 TODO_TITL을 AM DOC_TITLE과 동일 형식으로 무조건 통일(프론트 하드코딩값 덮어쓰기)
+						apprItem.put("todoTitl", buildSubstituteWorkApprovalTitle(paramMap, apprItem.get("todoDiv2CodeId")));
 						String itemSalesCd = apprItem.get("salesCd");
 						if (itemSalesCd == null || itemSalesCd.trim().isEmpty() || reqNo.equals(itemSalesCd)) {
 							apprItem.put("salesCd", firstSalesCd);
@@ -315,9 +314,8 @@ public class PM08SvcImpl implements PM08Svc {
 						if (apprItem.get("pgPath") == null || apprItem.get("pgPath").isEmpty()) {
 							apprItem.put("pgPath", "/user/pm/pm08/PM0801P01.html");
 						}
-						if (apprItem.get("todoTitl") == null || apprItem.get("todoTitl").isEmpty()) {
-							apprItem.put("todoTitl", isResultStage ? "휴일대체근무 결과보고서" : "휴일대체근무 신청서");
-						}
+						// WB20 TODO_TITL을 AM DOC_TITLE과 동일 형식으로 무조건 통일(프론트 하드코딩값 덮어쓰기)
+						apprItem.put("todoTitl", buildSubstituteWorkApprovalTitle(paramMap, todoDiv2CodeId));
 						String itemSalesCd = apprItem.get("salesCd");
 						if (itemSalesCd == null || itemSalesCd.trim().isEmpty() || reqNoVal.equals(itemSalesCd)) {
 							apprItem.put("salesCd", firstSalesCd);
@@ -538,6 +536,18 @@ public class PM08SvcImpl implements PM08Svc {
 			deleteParam2.put("todoNo", paramMap.get("reqNo"));
 			deleteParam2.put("todoDiv2CodeId", "TODODIV1420");
 			wb20Svc.deleteTodoMasterByTodoNo(deleteParam2);
+
+			// 3. 결과 전자결재(AM) 문서 정리: 결과 결재선(TODODIV2420)을 가진 AM 문서만 삭제(신청 문서는 보존)
+			Map<String, String> amResQuery = new HashMap<>();
+			amResQuery.put("reqNo", paramMap.get("reqNo"));
+			amResQuery.put("todoDiv2CodeId", "TODODIV2420");
+			String resultDocId = pm08Mapper.selectAmDocIdByReqNo(amResQuery);
+			if (resultDocId != null && !resultDocId.trim().isEmpty()) {
+				Map<String, String> amResDel = new HashMap<>();
+				amResDel.put("docId", resultDocId);
+				pm08Mapper.deleteAmD01ByDocId(amResDel);
+				pm08Mapper.deleteAmM01ByDocId(amResDel);
+			}
 
 			result.put("resultCode", "200");
 			result.put("resultMessage", "근무결과가 성공적으로 삭제되었습니다.");
@@ -899,16 +909,12 @@ public class PM08SvcImpl implements PM08Svc {
 			return;
 		}
 		try {
+			// PM08은 신청/결과를 별도 AM 문서로 생성하므로 reqNo 기준 PM08 AM 문서 전체를 삭제한다
+			// (기존 단건 조회는 ROWNUM=1로 최신 1건만 삭제 → 나머지 문서가 고아로 잔존하는 결함).
 			Map<String, String> param = new HashMap<>();
 			param.put("reqNo", reqNo);
-			param.put("coCd", (coCd != null && !coCd.trim().isEmpty()) ? coCd : "GUN");
-			String docId = pm08Mapper.selectAmDocIdByReqNo(param);
-			if (docId != null && !docId.trim().isEmpty()) {
-				Map<String, String> delParam = new HashMap<>();
-				delParam.put("docId", docId);
-				pm08Mapper.deleteAmD01ByDocId(delParam);
-				pm08Mapper.deleteAmM01ByDocId(delParam);
-			}
+			pm08Mapper.deleteAmD01ByReqNo(param);
+			pm08Mapper.deleteAmM01ByReqNo(param);
 		} catch (Exception e) {
 			throw new RuntimeException("전자결재 문서 삭제 처리 중 오류가 발생했습니다: " + e.getMessage(), e);
 		}

@@ -2080,7 +2080,10 @@ public class PM51SvcImpl implements PM51Svc {
 			approvalMap.put("histNo", "");
 			approvalMap.put("sanctnSttus", "N");
 			if (!hasText(approvalMap.get("todoTitle"))) {
-				approvalMap.put("todoTitle", approvalTitle(paramMap));
+				// WB20 TODO_TITL을 AM DOC_TITLE과 동일 형식으로 통일(신청자·출장지 포함, 신청/보고 분기)
+				approvalMap.put("todoTitle", hasText(paramMap.get("tripRptNo"))
+						? buildTripRptApprovalTitle(paramMap)
+						: buildTripReqApprovalTitle(paramMap));
 			}
 			if (!hasText(approvalMap.get("todoTitl"))) {
 				approvalMap.put("todoTitl", approvalMap.get("todoTitle"));
@@ -2143,7 +2146,8 @@ public class PM51SvcImpl implements PM51Svc {
 
 			String coCd = hasText(paramMap.get("coCd")) ? paramMap.get("coCd") : "GUN";
 
-			if (!hasText(paramMap.get("reqDt")) || !hasText(paramMap.get("creatDttm"))) {
+			// reqDt/creatDttm 뿐 아니라 tripPlace가 없을 때도 M01 백필(제목의 '(출장지)' 누락 방지)
+			if (!hasText(paramMap.get("reqDt")) || !hasText(paramMap.get("creatDttm")) || !hasText(paramMap.get("tripPlace"))) {
 				Map<String, String> qMap = new HashMap<>();
 				qMap.put("tripReqNo", tripReqNo);
 				Map<String, String> dbM01 = pm51Mapper.selectTripReqM01(qMap);
