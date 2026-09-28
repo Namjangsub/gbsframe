@@ -64,6 +64,17 @@ public class ApprovalQueueItemExecutor {
         String notifId = String.valueOf(item.get("notifId"));
 
         if (!kakaoSend) {
+            // 발송 비활성(kakaoSend=false) 환경: CAS 선점 후 종결 상태(SKIPPED)로 표시해
+            // 행이 READY로 남아 스케줄러가 30초마다 무한 재선택/반복 로그하는 것을 방지한다.
+            int skipAcquired = am11Mapper.updateNotificationProcessing(notifId);
+            if (skipAcquired == 0) {
+                return ExecutionResult.SKIPPED; // 다른 워커가 이미 선점
+            }
+            Map<String, Object> skipParam = new HashMap<>();
+            skipParam.put("notifId", notifId);
+            skipParam.put("notifStatus", "SKIPPED");
+            skipParam.put("errMsg", "kakaoSend=false: 발송 비활성 환경으로 종결");
+            am11Mapper.updateNotificationQueueStatus(skipParam);
             return ExecutionResult.SKIPPED;
         }
 

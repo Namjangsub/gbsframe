@@ -33,6 +33,10 @@ public class ApprovalNotificationEventListener {
     @Value("${kakaoSend:false}")
     private boolean kakaoSend;
 
+    // 알림 발송 트리거 방식: SCHEDULER(주기적 폴링, 기본) | EVENT(이벤트 발생 시 즉시 일괄 발송)
+    @Value("${approval.notification.dispatch-mode:SCHEDULER}")
+    private String dispatchMode;
+
     @Value("${GBS_TALK_API_URL:}") private String talkApiUrl;
     @Value("${GBS_TALK_AUTH_TOKEN:}") private String talkAuthToken;
     @Value("${GBS_TALK_SERVER_NAME:}") private String talkServerName;
@@ -107,6 +111,17 @@ public class ApprovalNotificationEventListener {
         } catch (Exception e) {
             logger.error("[ApprovalNotification] 알림 발송 이벤트 처리 중 예외 발생: eventType={}, docId={}",
                     event.getEventType(), event.getDocId(), e);
+        }
+
+        // 건별(EVENT) 발송 모드: 이 이벤트로 적재된 알림을 즉시 일괄 드레인한다(스케줄러 대기 없이 발송).
+        // 리스너는 @Async(앰비언트 트랜잭션 없음)이고 enqueue는 각각 커밋되므로, 여기서 드레인하면
+        // REQUIRES_NEW 실행기가 커밋된 큐 행을 정상 조회한다.
+        if ("EVENT".equalsIgnoreCase(dispatchMode) && approvalQueueSvc != null) {
+            try {
+                approvalQueueSvc.retryPendingNotifications();
+            } catch (Exception e) {
+                logger.warn("[ApprovalNotification] EVENT 즉시 발송(드레인) 경고: docId={}", event.getDocId(), e);
+            }
         }
     }
 

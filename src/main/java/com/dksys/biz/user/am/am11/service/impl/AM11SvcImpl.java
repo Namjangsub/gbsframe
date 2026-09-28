@@ -1210,7 +1210,7 @@ public class AM11SvcImpl implements AM11Svc {
         audit.put("userId", paramMap.get("userId"));
         audit.put("userNm", paramMap.get("userNm"));
         audit.put("deptNm", paramMap.get("deptNm"));
-        audit.put("clientIp", ApprovalSecurityUtil.maskIp((String) paramMap.get("clientIp")));
+        audit.put("clientIp", paramMap.get("clientIp"));
         audit.put("eventDetail", ApprovalSecurityUtil.maskSensitiveData(detail));
         am11Mapper.insertAuditLog(audit);
     }
@@ -1708,22 +1708,11 @@ public class AM11SvcImpl implements AM11Svc {
 
         // 10. 변경된 새 결재자에게 알림 큐 적재 및 이벤트 발행
         if (nextFirstApproverId != null) {
-            try {
-                Map<String, Object> notifParam = new HashMap<>();
-                notifParam.put("docId", docId);
-                notifParam.put("eventType", "APPROVE_NEXT");
-                notifParam.put("receiverId", nextFirstApproverId);
-                notifParam.put("receiverNm", nextFirstApproverNm);
-                notifParam.put("notifChannel", "KAKAO");
-                notifParam.put("notifTitle", "[" + docLock.get("docNo") + "] 결재선 변경에 따른 결재 대기 요청");
-                notifParam.put("notifMsg", "결재선이 변경되어 결재 대기 순번이 도래하였습니다: " + docLock.get("docTitle"));
-                approvalQueueSvc.enqueueNotification(notifParam);
-            } catch (Exception ne) {
-                logger.warn("결재선 변경 알림 큐 적재 경고: docId={}", docId, ne);
-            }
-
+            // 결재선 변경으로 순번이 도래한 다음 결재자에게 알림.
+            // 이벤트 경로로 단일화(리스너가 todoNo/결재구분/모바일 해석). 실제 문서제목(DOC_TITLE) 전달.
+            // (기존 직접 enqueue 경로는 todoNo/div2 누락으로 발송 스킵·제목 null·중복 적재라 제거)
             eventPublisher.publishEvent(new ApprovalEvent(
-                "APPROVE_NEXT", docId, (String) docLock.get("docNo"), "결재선 변경에 따른 결재 요청",
+                "APPROVE_NEXT", docId, (String) docLock.get("docNo"), (String) docLock.get("docTitle"),
                 draUserId, "", nextFirstApproverId, nextFirstApproverNm, paramMap
             ));
         }
