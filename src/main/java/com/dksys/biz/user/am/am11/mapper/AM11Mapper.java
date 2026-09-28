@@ -103,4 +103,7 @@ public interface AM11Mapper {
 
     // 7. ERP 연계 비즈니스 키(todoNo, todoKey 등)로 AM 전자결재 docId 조회
     String selectDocIdByBizKey(Map<String, Object> paramMap);
+
+    // 8. P4 역방향 동기화: 신규 WB20 행의 TODO_KEY를 AM11D01에 백필
+    int updateApprovalLineWb20Link(Map<String, Object> paramMap);
 }

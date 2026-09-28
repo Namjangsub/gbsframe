@@ -115,6 +115,9 @@
                D.ARBIT_YN,
                D.WB20_TODO_KEY, D.WB20_CO_CD, D.WB20_TODO_NO, D.WB20_SANCTN_SN,
                D.WB20_DIV1_CODE_ID, D.WB20_DIV2_CODE_ID,
+               D.CREAT_ID,
+               D.CREAT_PGM,
+               TO_CHAR(D.CREAT_DTTM, 'YYYY-MM-DD HH24:MI:SS') AS CREAT_DTTM,
                CASE WHEN R.USER_ID IS NOT NULL
                           OR (D.LINE_STATUS = 'APPROVED' AND D.APPROVER_ID =
                               (SELECT X.DRA_USER_ID FROM TB_AM11M01 X WHERE X.DOC_ID = D.DOC_ID))
@@ -261,10 +264,10 @@
             #{erpBizKey, jdbcType=VARCHAR},
             #{userId},
             #{pgmId},
-            SYSDATE,
+            SYSTIMESTAMP,
             #{userId},
             #{pgmId},
-            SYSDATE
+            SYSTIMESTAMP
         )
     </insert>
 
@@ -287,7 +290,7 @@
                ERP_BIZ_KEY      = #{erpBizKey, jdbcType=VARCHAR},
                UDT_ID           = #{userId},
                UDT_PGM          = #{pgmId},
-               UDT_DTTM         = SYSDATE
+               UDT_DTTM         = SYSTIMESTAMP
          WHERE DOC_ID = #{docId}
     </update>
 
@@ -296,7 +299,11 @@
         UPDATE TB_AM11M01
            SET DOC_DATA_JSON = #{docDataJson, jdbcType=CLOB},
                DOC_RENDER_HTML = #{docRenderHtml, jdbcType=CLOB},
-               UDT_ID = #{userId}, UDT_PGM = #{pgmId}, UDT_DTTM = SYSDATE
+               <!-- 원천 업무 저장 시 제목이 바뀌면 AM 문서제목도 동기화(널이면 미변경: AM-UI 결재선변경 등엔 영향 없음) -->
+               <if test="docTitle != null and docTitle != ''">
+               DOC_TITLE = #{docTitle, jdbcType=VARCHAR},
+               </if>
+               UDT_ID = #{userId}, UDT_PGM = #{pgmId}, UDT_DTTM = SYSTIMESTAMP
          WHERE DOC_ID = #{docId}
     </update>
 
@@ -311,7 +318,7 @@
                </if>
                UDT_ID           = #{userId},
                UDT_PGM          = #{pgmId},
-               UDT_DTTM         = SYSDATE
+               UDT_DTTM         = SYSTIMESTAMP
          WHERE DOC_ID = #{docId}
     </update>
 
@@ -385,12 +392,12 @@
             #{wb20SanctnSn, jdbcType=NUMERIC},
             #{wb20Div1CodeId, jdbcType=VARCHAR},
             #{wb20Div2CodeId, jdbcType=VARCHAR},
+            NVL(#{creatId, jdbcType=VARCHAR}, #{userId}),
+            NVL(#{creatPgm, jdbcType=VARCHAR}, #{pgmId}),
+            NVL(TO_TIMESTAMP(#{creatDttm, jdbcType=VARCHAR}, 'YYYY-MM-DD HH24:MI:SS'), SYSTIMESTAMP),
             #{userId},
             #{pgmId},
-            SYSDATE,
-            #{userId},
-            #{pgmId},
-            SYSDATE
+            SYSTIMESTAMP
         )
     </insert>
 
@@ -409,9 +416,26 @@
                ARBIT_YN        = NVL(#{arbitYn, jdbcType=VARCHAR}, 'N'),
                UDT_ID          = #{userId},
                UDT_PGM         = #{pgmId},
-               UDT_DTTM        = SYSDATE
+               UDT_DTTM        = SYSTIMESTAMP
          WHERE DOC_ID = #{docId}
            AND LINE_SEQ = #{lineSeq}
+    </update>
+
+    <!-- P4 역방향 동기화: 신규 WB20 행의 TODO_KEY를 AM11D01에 백필 -->
+    <update id="updateApprovalLineWb20Link" parameterType="Map">
+        UPDATE TB_AM11D01
+           SET WB20_TODO_KEY     = #{wb20TodoKey, jdbcType=NUMERIC},
+               WB20_CO_CD        = #{wb20CoCd, jdbcType=VARCHAR},
+               WB20_TODO_NO      = #{wb20TodoNo, jdbcType=VARCHAR},
+               WB20_SANCTN_SN    = #{wb20SanctnSn, jdbcType=NUMERIC},
+               WB20_DIV1_CODE_ID = #{wb20Div1CodeId, jdbcType=VARCHAR},
+               WB20_DIV2_CODE_ID = #{wb20Div2CodeId, jdbcType=VARCHAR},
+               UDT_ID            = #{userId, jdbcType=VARCHAR},
+               UDT_PGM           = #{pgmId, jdbcType=VARCHAR},
+               UDT_DTTM          = SYSTIMESTAMP
+         WHERE DOC_ID = #{docId, jdbcType=VARCHAR}
+           AND APPROVER_ID = #{approverId, jdbcType=VARCHAR}
+           AND LINE_TYPE = #{lineType, jdbcType=VARCHAR}
     </update>
 
     <!-- 다음 순번 결재선 상태를 PENDING(진행)으로 변경 -->
@@ -420,7 +444,7 @@
            SET LINE_STATUS = 'PENDING',
                UDT_ID      = #{userId},
                UDT_PGM     = #{pgmId},
-               UDT_DTTM    = SYSDATE
+               UDT_DTTM    = SYSTIMESTAMP
          WHERE DOC_ID = #{docId}
            AND LINE_SEQ = #{nextLineSeq}
     </update>
@@ -428,7 +452,7 @@
     <update id="cancelArbitCurrentLine" parameterType="Map">
         UPDATE TB_AM11D01
            SET LINE_STATUS='PENDING', APPR_DT=NULL, APPR_OPINION=NULL, ARBIT_YN='N',
-               ACTUAL_USER_ID=NULL, ACTUAL_USER_NM=NULL, UDT_ID=#{userId}, UDT_PGM=#{pgmId}, UDT_DTTM=SYSDATE
+               ACTUAL_USER_ID=NULL, ACTUAL_USER_NM=NULL, UDT_ID=#{userId}, UDT_PGM=#{pgmId}, UDT_DTTM=SYSTIMESTAMP
          WHERE DOC_ID=#{docId} AND LINE_SEQ=#{lineSeq} AND (ARBIT_YN='Y' OR LINE_STATUS='ARBIT')
            AND (APPROVER_ID=#{userId} OR ACTUAL_USER_ID=#{userId})
     </update>
@@ -451,7 +475,7 @@
     <update id="resetArbitRemainingLines" parameterType="Map">
         UPDATE TB_AM11D01
            SET LINE_STATUS='READY', APPR_DT=NULL, APPR_OPINION=NULL, ARBIT_YN='N',
-               UDT_ID=#{userId}, UDT_PGM=#{pgmId}, UDT_DTTM=SYSDATE
+               UDT_ID=#{userId}, UDT_PGM=#{pgmId}, UDT_DTTM=SYSTIMESTAMP
          WHERE DOC_ID=#{docId} AND LINE_SEQ &gt; #{lineSeq}
            AND LINE_STATUS IN ('ARBIT', 'PENDING')
     </update>
@@ -473,7 +497,7 @@
                APPR_OPINION = '상위 결재자 전결로 인한 종결',
                UDT_ID       = #{userId},
                UDT_PGM      = #{pgmId},
-               UDT_DTTM     = SYSDATE
+               UDT_DTTM     = SYSTIMESTAMP
          WHERE DOC_ID = #{docId}
            AND LINE_SEQ <![CDATA[ > ]]> #{lineSeq}
            AND NVL(LINE_TYPE, 'APPR') != 'POST'
@@ -488,7 +512,7 @@
                APPR_OPINION = '상위 결재자 전결로 인한 종결',
                UDT_ID       = #{userId},
                UDT_PGM      = #{pgmId},
-               UDT_DTTM     = SYSDATE
+               UDT_DTTM     = SYSTIMESTAMP
          WHERE DOC_ID = #{docId}
            AND LINE_SEQ <![CDATA[ > ]]> #{lineSeq}
            AND WB20_DIV2_CODE_ID = #{wb20Div2CodeId}
@@ -504,7 +528,7 @@
                TODO_CF_OPN  = NVL(#{apprOpinion, jdbcType=VARCHAR}, '상위 결재자 전결로 인한 종결'),
                UDT_ID       = #{userId},
                UDT_PGM      = 'AM11_ARBIT',
-               UDT_DTTM     = SYSDATE
+               UDT_DTTM     = SYSTIMESTAMP
          WHERE TODO_NO      = #{erpBizKey}
            <if test="todoDiv2CodeId != null and todoDiv2CodeId != ''">
            AND TODO_DIV2_CODE_ID = #{todoDiv2CodeId}
@@ -521,7 +545,7 @@
            SET APRV_STS_CD = #{aprvStsCd},
                UDT_ID      = #{userId},
                UDT_PGM     = 'AM11_ARBIT',
-               UDT_DTTM    = SYSDATE
+               UDT_DTTM    = SYSTIMESTAMP
          WHERE TRIP_REQ_NO = #{tripReqNo}
     </update>
 
@@ -558,7 +582,7 @@
             #{prevStatus, jdbcType=VARCHAR},
             #{nextStatus, jdbcType=VARCHAR},
             #{actOpinion, jdbcType=VARCHAR},
-            SYSDATE,
+            SYSTIMESTAMP,
             #{clientIp, jdbcType=VARCHAR},
             #{userAgent, jdbcType=VARCHAR}
         )
@@ -608,7 +632,7 @@
          EVENT_DEPT_NM, EVENT_DTTM, CLIENT_IP, EVENT_DETAIL)
         VALUES
         (TB_AM90M01_SQ01.NEXTVAL, #{docId, jdbcType=VARCHAR}, #{docNo, jdbcType=VARCHAR},
-         #{eventType}, #{userId}, #{userNm}, #{deptNm, jdbcType=VARCHAR}, SYSDATE,
+         #{eventType}, #{userId}, #{userNm}, #{deptNm, jdbcType=VARCHAR}, SYSTIMESTAMP,
          NVL(#{clientIp, jdbcType=VARCHAR}, 'UNKNOWN'), #{eventDetail, jdbcType=VARCHAR})
     </insert>
 
@@ -626,7 +650,7 @@
                 DEPT_NM        = NVL(#{deptNm, jdbcType=VARCHAR}, A.DEPT_NM)
         WHEN NOT MATCHED THEN
             INSERT (DOC_ID, USER_ID, USER_NM, DEPT_NM, FIRST_READ_DTTM, LAST_READ_DTTM, READ_CNT)
-            VALUES (#{docId}, #{userId}, #{userNm}, #{deptNm, jdbcType=VARCHAR}, SYSDATE, SYSDATE, 1)
+            VALUES (#{docId}, #{userId}, #{userNm}, #{deptNm, jdbcType=VARCHAR}, SYSTIMESTAMP, SYSTIMESTAMP, 1)
     </insert>
 
     <select id="selectDocReadList" parameterType="Map" resultType="CamelMap">
@@ -669,7 +693,7 @@
             #{chgRsn},
             #{prevLineJson, jdbcType=CLOB},
             #{nextLineJson, jdbcType=CLOB},
-            SYSDATE
+            SYSTIMESTAMP
         )
     </insert>
 
@@ -732,8 +756,8 @@
             NVL(#{maxRetry, jdbcType=INTEGER}, 3),
             SYSDATE,
             #{errMsg, jdbcType=VARCHAR},
-            SYSDATE,
-            SYSDATE
+            SYSTIMESTAMP,
+            SYSTIMESTAMP
         )
     </insert>
 
@@ -750,7 +774,7 @@
     <update id="updateNotificationProcessing" parameterType="String">
         UPDATE TB_AM91M01
            SET NOTIF_STATUS = 'PROCESSING',
-               UDT_DTTM     = SYSDATE
+               UDT_DTTM     = SYSTIMESTAMP
          WHERE NOTIF_ID     = #{notifId}
            AND NOTIF_STATUS IN ('READY', 'FAIL')
     </update>
@@ -769,7 +793,7 @@
                    NEXT_TRY_DTTM = NVL(#{nextTryDttm, jdbcType=TIMESTAMP}, NEXT_TRY_DTTM),
                    </otherwise>
                </choose>
-               UDT_DTTM      = SYSDATE
+               UDT_DTTM      = SYSTIMESTAMP
          WHERE NOTIF_ID      = #{notifId}
     </update>
 
@@ -835,8 +859,8 @@
             NVL(#{maxRetry, jdbcType=INTEGER}, 3),
             SYSDATE,
             #{errMsg, jdbcType=VARCHAR},
-            SYSDATE,
-            SYSDATE
+            SYSTIMESTAMP,
+            SYSTIMESTAMP
         )
     </insert>
 
@@ -844,7 +868,7 @@
     <update id="updateCompensationProcessing" parameterType="String">
         UPDATE TB_AM92M01
            SET STATUS   = 'PROCESSING',
-               UDT_DTTM = SYSDATE
+               UDT_DTTM = SYSTIMESTAMP
          WHERE COMP_ID  = #{compId}
            AND STATUS IN ('PENDING', 'FAIL')
     </update>
@@ -863,7 +887,7 @@
                    NEXT_TRY_DTTM = NVL(#{nextTryDttm, jdbcType=TIMESTAMP}, NEXT_TRY_DTTM),
                    </otherwise>
                </choose>
-               UDT_DTTM      = SYSDATE
+               UDT_DTTM      = SYSTIMESTAMP
          WHERE COMP_ID       = #{compId}
     </update>
 
@@ -896,7 +920,7 @@
                TODO_CF_OPN  = #{apprOpinion, jdbcType=VARCHAR},
                UDT_ID       = #{userId},
                UDT_PGM      = 'AM_POST_PROCESSOR',
-               UDT_DTTM     = SYSDATE
+               UDT_DTTM     = SYSTIMESTAMP
          WHERE TODO_NO      = #{erpBizKey}
     </update>
 
@@ -907,7 +931,7 @@
                TODO_CF_OPN  = #{rejectOpinion, jdbcType=VARCHAR},
                UDT_ID       = #{userId},
                UDT_PGM      = 'AM_POST_PROCESSOR',
-               UDT_DTTM     = SYSDATE
+               UDT_DTTM     = SYSTIMESTAMP
          WHERE TODO_NO      = #{erpBizKey}
            AND APPR_REJECT_YN = 'Y'
     </update>
@@ -919,7 +943,7 @@
                TODO_CF_OPN  = '상신 취소(회수)',
                UDT_ID       = #{userId},
                UDT_PGM      = 'AM_POST_PROCESSOR',
-               UDT_DTTM     = SYSDATE
+               UDT_DTTM     = SYSTIMESTAMP
          WHERE TODO_NO      = #{erpBizKey}
     </update>
 

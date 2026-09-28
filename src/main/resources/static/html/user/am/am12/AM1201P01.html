@@ -246,7 +246,7 @@
 					<input type="text" id="changeReason" class="form-control input-sm" placeholder="결재선 변경 사유를 입력하세요 (필수)">
 				</div>
 				<div style="text-align:right; margin-top:8px;">
-					<button type="button" class="btn btn-primary btn-xs" onclick="saveApprovalLineChanges();">
+					<button type="button" id="btnSaveChangeLine" class="btn btn-primary btn-xs" onclick="saveApprovalLineChanges();" disabled>
 						<i class="fa fa-save"></i> 변경사항 저장
 					</button>
 					<button type="button" class="btn btn-default btn-xs" onclick="$('#changeLineArea').slideUp();">
@@ -792,6 +792,13 @@
 
 	// 결재선 동적 변경 관리
 	var modifiableLineList = [];
+	var originalChangeLineSnapshot = "";
+
+	// 결재선이 원본과 달라졌을 때만 "변경사항 저장" 버튼 활성화
+	function updateChangeSaveBtnState() {
+		var changed = JSON.stringify(modifiableLineList) !== originalChangeLineSnapshot;
+		$('#btnSaveChangeLine').prop('disabled', !changed);
+	}
 
 	function toggleChangeLineArea() {
 		var $area = $('#changeLineArea');
@@ -819,11 +826,14 @@
 			}
 		});
 
+		// 변경 감지 기준: 영역을 열 때의 잔여 결재선을 원본 스냅샷으로 저장
+		originalChangeLineSnapshot = JSON.stringify(modifiableLineList);
 		renderChangeLineTable();
 		$area.slideDown();
 	}
 
 	function renderChangeLineTable() {
+		updateChangeSaveBtnState();
 		var $body = $('#changeLineTableBody');
 		$body.empty();
 		if (modifiableLineList.length === 0) {
@@ -834,7 +844,7 @@
 			var tr = '<tr>'
 				+ '<td style="text-align:center;"><input type="radio" name="selChangeLineRow" value="' + idx + '"></td>'
 				+ '<td style="text-align:center;">'
-				+ '<select class="form-control input-sm" onchange="modifiableLineList[' + idx + '].lineType = this.value;" style="height:22px; padding:1px 4px; font-size:11px;">'
+				+ '<select class="form-control input-sm" onchange="modifiableLineList[' + idx + '].lineType = this.value; updateChangeSaveBtnState();" style="height:22px; padding:1px 4px; font-size:11px;">'
 				+ '<option value="APPR"' + (item.lineType === 'APPR' ? ' selected' : '') + '>결재</option>'
 				+ '<option value="AGREE"' + (item.lineType === 'AGREE' ? ' selected' : '') + '>합의</option>'
 				+ '<option value="COOP"' + (item.lineType === 'COOP' ? ' selected' : '') + '>협조</option>'
@@ -858,6 +868,23 @@
 			pgmId: "AM1201M01",
 			pm20Flag: "N"
 		};
+		// 결재자 검색 모달이 열려 있는 동안 이 화면(전자결재 상세)의 버튼 클릭을 블라인드 처리한다.
+		// 취소/선택 어느 쪽으로 닫혀도 해제되도록 modalStack.size() 변화를 감지한다.
+		var $blind = $('#am1201ButtonBlind');
+		if ($blind.length === 0) {
+			$('#approvalDetailModalArea').css('position', 'relative')
+				.append('<div id="am1201ButtonBlind" style="position:absolute; top:0; left:0; right:0; bottom:0; z-index:10000; background:rgba(0,0,0,0.03); cursor:not-allowed;"></div>');
+			$blind = $('#am1201ButtonBlind');
+		}
+		$blind.show();
+		var blindBaseLevel = (typeof modalStack !== 'undefined' && modalStack && modalStack.size) ? modalStack.size() : 0;
+		var blindTimer = setInterval(function () {
+			var lvl = (typeof modalStack !== 'undefined' && modalStack && modalStack.size) ? modalStack.size() : 0;
+			if (lvl <= blindBaseLevel) {
+				$('#am1201ButtonBlind').hide();
+				clearInterval(blindTimer);
+			}
+		}, 200);
 		openSecondModal("/static/html/cmn/modal/userSearch.html", 450, 650, "결재자 검색", paramObj, function(tree) {
 			if (!tree || typeof tree.get_checked !== 'function') {
 				alert("사용자 검색 결과를 가져오지 못했습니다.");
@@ -897,6 +924,9 @@
 			}
 			modifiableLineList.push(user);
 			renderChangeLineTable();
+			// 추가한 대상자가 자동 선택되도록 마지막(방금 추가한) 행의 라디오를 선택
+			var addedIdx = modifiableLineList.length - 1;
+			$('input[name="selChangeLineRow"][value="' + addedIdx + '"]').prop('checked', true);
 		});
 	}
 
@@ -933,7 +963,8 @@
 		var reason = $('#changeReason').val();
 		if (!reason || reason.trim().length === 0) {
 			alert("결재선 변경 사유를 입력하십시오.");
-			$('#changeReason').focus();
+			$('#changeReason').css('border', '1px solid #d9534f').focus()
+				.off('input.reqErr').on('input.reqErr', function(){ $(this).css('border', ''); });
 			return;
 		}
 		if (modifiableLineList.length === 0) {
@@ -943,6 +974,9 @@
 		if (!confirm("결재선을 변경하시겠습니까? (이전 결재선 내역은 스냅샷으로 영구 보존됩니다)")) return;
 
 		var docId = $('#detailForm').find('#docId').val();
+		// 동시성 확인용: 화면이 로드한 시점의 진행정보(현재 결재순번/문서상태)를 함께 전송.
+		// 백엔드가 현재 DB값과 비교해 다르면(그 사이 결재/반려로 진행이 바뀜) 변경을 거부한다.
+		var loadedDoc = (currentDocDetail && currentDocDetail.docInfo) ? currentDocDetail.docInfo : {};
 		var param = {
 			docId: docId,
 			coCd: currentCoCd || jwt.coCd || "GUN",
@@ -950,6 +984,8 @@
 			userNm: jwt.userNm,
 			authCd: jwt.authCd,
 			changeReason: reason,
+			expectedCurrLineSeq: (loadedDoc.currLineSeq !== undefined && loadedDoc.currLineSeq !== null) ? String(loadedDoc.currLineSeq) : "",
+			expectedDocStatus: loadedDoc.docStatus || "",
 			lineList: modifiableLineList
 		};
 
@@ -972,13 +1008,15 @@
 				&& currentDocDetail.docInfo.pm08TeamManagerOpinionRequired === 'Y'
 				&& (!opinion || opinion.trim().length === 0)) {
 			alert('담당팀장 결재는 결재의견을 입력해야 합니다.');
-			$('#apprOpinion').focus();
+			$('#apprOpinion').css('border', '1px solid #d9534f').focus()
+				.off('input.reqErr').on('input.reqErr', function(){ $(this).css('border', ''); });
 			return;
 		}
 
 		if (actionType === 'REJECT' && (!opinion || opinion.trim().length === 0)) {
 			alert("반려 시에는 반드시 반려 사유를 입력해야 합니다.");
-			$('#apprOpinion').focus();
+			$('#apprOpinion').css('border', '1px solid #d9534f').focus()
+				.off('input.reqErr').on('input.reqErr', function(){ $(this).css('border', ''); });
 			return;
 		}
 

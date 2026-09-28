@@ -1080,6 +1080,28 @@
 		SELECT TO_CHAR(sysdate, 'YYYY-MM-DD HH24:MI:SS') FROM DUAL
 	</select>
 
+	<select id="selectMaxCreatDttm" parameterType="Map" resultType="String">
+		SELECT TO_CHAR(MAX(CREAT_DTTM), 'YYYY-MM-DD HH24:MI:SS')
+		FROM TB_WB20M03
+		WHERE TODO_NO = #{todoNo,jdbcType=VARCHAR}
+		AND CO_CD = #{coCd,jdbcType=VARCHAR}
+	</select>
+
+	<select id="selectOrigCreatInfo" parameterType="Map" resultType="camelMap">
+		SELECT CREAT_ID, CREAT_PGM, CREATE_DTTM
+		FROM (
+			SELECT CREAT_ID
+				, CREAT_PGM
+				, TO_CHAR(CREAT_DTTM, 'YYYY-MM-DD HH24:MI:SS') AS CREATE_DTTM
+			FROM TB_WB20M03
+			WHERE TODO_NO = #{todoNo,jdbcType=VARCHAR}
+			AND CO_CD = #{coCd,jdbcType=VARCHAR}
+			AND CREAT_DTTM IS NOT NULL
+			ORDER BY CREAT_DTTM DESC
+		)
+		WHERE ROWNUM = 1
+	</select>
+
 	<!-- todo insert -->
 	<insert id="insertTodoMaster" parameterType="Map">
 		MERGE INTO TB_WB20M03
@@ -1168,6 +1190,166 @@
 	</insert>
 	<!-- todo insert -->
 
+	<!-- AM 역방향 동기화용 insertTodoMaster (자동승인 분기 없음, 명시적 SANCTN_STTUS) -->
+	<insert id="insertTodoMasterForAmLink" parameterType="Map">
+		MERGE INTO TB_WB20M03
+			USING DUAL
+			ON (
+				TODO_KEY = #{todoKey}
+				AND SANCTN_SN = #{sanctnSn}
+				AND CO_CD = #{coCd}
+				AND TODO_DIV1_CODE_ID = #{todoDiv1CodeId}
+				AND TODO_DIV2_CODE_ID = #{todoDiv2CodeId}
+				)
+		WHEN MATCHED THEN
+			UPDATE SET
+				TODO_ID = #{todoId,								jdbcType=VARCHAR}
+				, SALES_CD = #{salesCd,							jdbcType=VARCHAR}
+				, PG_PATH = #{pgPath,							jdbcType=VARCHAR}
+				, TODO_FILE_TRGT_KEY = #{todoFileTrgtKey,		jdbcType=VARCHAR}
+				, TODO_CO_CD = #{todoCoCd}
+				, TODO_NO = #{todoNo}
+				, TODO_CODE_KIND = #{todoCodeKind,				jdbcType=VARCHAR}
+				, TODO_CODE_ID = #{todoCodeId,					jdbcType=VARCHAR}
+				, UDT_ID = #{userId}
+				, UDT_PGM = #{pgmId}
+				, UDT_DTTM = SYSDATE
+				, PG_PARAM = #{pgParam,							jdbcType=VARCHAR}
+				, TODO_TITL = #{todoTitl,						jdbcType=VARCHAR}
+				, ETC_FIELD3 = ''
+		WHEN NOT MATCHED THEN
+		INSERT
+		(
+			TODO_KEY
+			, SANCTN_SN
+			, CO_CD
+			, TODO_DIV1_CODE_ID
+			, TODO_DIV2_CODE_ID
+			, TODO_ID
+			, TODO_CF_DT
+			, TODO_CF_OPN
+			, SANCTN_STTUS
+			, SALES_CD
+			, PG_PATH
+			, TODO_FILE_TRGT_KEY
+			, TODO_CO_CD
+			, TODO_NO
+			, TODO_CODE_KIND
+			, TODO_CODE_ID
+			, CREAT_ID
+			, CREAT_PGM
+			, CREAT_DTTM
+			, UDT_ID
+			, UDT_PGM
+			, UDT_DTTM
+			, PG_PARAM
+			, TODO_TITL
+		)
+		VALUES
+		(
+			#{todoKey}
+			, #{sanctnSn}
+			, #{coCd}
+			, #{todoDiv1CodeId}
+			, #{todoDiv2CodeId}
+			, #{todoId}
+			, #{todoCfDt,				jdbcType=VARCHAR}
+			, #{todoCfOpn,				jdbcType=VARCHAR}
+			, #{sanctnSttus,			jdbcType=VARCHAR}
+			, #{salesCd,				jdbcType=VARCHAR}
+			, #{pgPath,					jdbcType=VARCHAR}
+			, #{todoFileTrgtKey,		jdbcType=VARCHAR}
+			, #{todoCoCd,				jdbcType=VARCHAR}
+			, #{todoNo,					jdbcType=VARCHAR}
+			, #{todoCodeKind,			jdbcType=VARCHAR}
+			, #{todoCodeId,				jdbcType=VARCHAR}
+			, #{creatId,				jdbcType=VARCHAR}
+			, #{creatPgm,				jdbcType=VARCHAR}
+			, #{createDttm,				jdbcType=VARCHAR}
+			, #{userId,					jdbcType=VARCHAR}
+			, #{pgmId,					jdbcType=VARCHAR}
+			, SYSDATE
+			, #{pgParam,				jdbcType=VARCHAR}
+			, #{todoTitl,				jdbcType=VARCHAR}
+		)
+	</insert>
+
+	<!-- AM 역방향 동기화용 템플릿 복사 신규 행 생성 (최소 SANCTN_SN 행을 템플릿으로 사용) -->
+	<insert id="insertTodoMasterCopyTemplate" parameterType="Map">
+		INSERT INTO TB_WB20M03 (
+			TODO_KEY
+			, SANCTN_SN
+			, CO_CD
+			, TODO_DIV1_CODE_ID
+			, TODO_DIV2_CODE_ID
+			, TODO_ID
+			, TODO_CF_DT
+			, TODO_CF_OPN
+			, SANCTN_STTUS
+			, SALES_CD
+			, PG_PATH
+			, TODO_FILE_TRGT_KEY
+			, TODO_CO_CD
+			, TODO_NO
+			, TODO_CODE_KIND
+			, TODO_CODE_ID
+			, CREAT_ID
+			, CREAT_PGM
+			, CREAT_DTTM
+			, UDT_ID
+			, UDT_PGM
+			, UDT_DTTM
+			, PG_PARAM
+			, TODO_TITL
+		)
+		SELECT
+			#{todoKey,jdbcType=VARCHAR}
+			, #{sanctnSn,jdbcType=VARCHAR}
+			, #{coCd,jdbcType=VARCHAR}
+			, #{todoDiv1CodeId,jdbcType=VARCHAR}
+			, #{todoDiv2CodeId,jdbcType=VARCHAR}
+			, #{todoId,jdbcType=VARCHAR}
+			, NULL
+			, NULL
+			, 'N'
+			, SALES_CD
+			, PG_PATH
+			, TODO_FILE_TRGT_KEY
+			, TODO_CO_CD
+			, TODO_NO
+			, TODO_CODE_KIND
+			, TODO_CODE_ID
+			, CREAT_ID
+			, CREAT_PGM
+			, CREAT_DTTM
+			, #{userId,jdbcType=VARCHAR}
+			, #{pgmId,jdbcType=VARCHAR}
+			, SYSDATE
+			, PG_PARAM
+			, TODO_TITL
+		FROM (
+			SELECT
+				SALES_CD
+				, PG_PATH
+				, TODO_FILE_TRGT_KEY
+				, TODO_CO_CD
+				, TODO_NO
+				, TODO_CODE_KIND
+				, TODO_CODE_ID
+				, CREAT_ID
+				, CREAT_PGM
+				, CREAT_DTTM
+				, PG_PARAM
+				, TODO_TITL
+			FROM TB_WB20M03
+			WHERE TODO_NO = #{todoNo,jdbcType=VARCHAR}
+				AND CO_CD = #{coCd,jdbcType=VARCHAR}
+			ORDER BY CASE WHEN TODO_DIV1_CODE_ID = #{todoDiv1CodeId,jdbcType=VARCHAR} THEN 0 ELSE 1 END
+					, SANCTN_SN
+		)
+		WHERE ROWNUM = 1
+	</insert>
+
 	<!-- 결재 todo  삭제 -->
 	<delete id="deleteTodoMaster" parameterType="Map">
         DELETE FROM TB_WB20M03
@@ -1194,6 +1376,20 @@
 		WHERE 1=1
 			AND TODO_DIV2_CODE_ID = #{todoDiv2CodeId}
 			AND TODO_NO = #{todoNo}
+	</delete>
+
+	<!-- 역방향 결재선 동기화: 특정 행 삭제(승인행 보존) -->
+	<delete id="deleteRemainingTodoLine" parameterType="Map">
+		DELETE
+			FROM TB_WB20M03
+		WHERE 1=1
+			AND TODO_NO = #{todoNo,jdbcType=VARCHAR}
+			AND CO_CD = #{coCd,jdbcType=VARCHAR}
+			AND TODO_KEY = #{todoKey,jdbcType=NUMERIC}
+			AND SANCTN_SN = #{sanctnSn,jdbcType=NUMERIC}
+			AND TODO_DIV1_CODE_ID = #{todoDiv1CodeId,jdbcType=VARCHAR}
+			AND TODO_DIV2_CODE_ID = #{todoDiv2CodeId,jdbcType=VARCHAR}
+			AND SANCTN_STTUS != 'Y'
 	</delete>
 
 	<!-- TODO 결재완료여부  -->
@@ -1238,6 +1434,37 @@
 		  AND A.TODO_DIV2_CODE_ID = #{todoDiv2CodeId}
 	</update>
 
+	<!-- AM→WB 역방향 동기화: PHASE A 비승인행 offset 이동 -->
+	<update id="offsetNonApprovedSanctnSn" parameterType="Map">
+		UPDATE TB_WB20M03
+		   SET SANCTN_SN = SANCTN_SN + #{offset, jdbcType=NUMERIC}
+		 WHERE TODO_NO = #{todoNo, jdbcType=VARCHAR}
+		   AND CO_CD = #{coCd, jdbcType=VARCHAR}
+		   AND SANCTN_STTUS != 'Y'
+		   AND TODO_DIV1_CODE_ID IN ('TODODIV20','TODODIV10')
+	</update>
+
+	<!-- AM→WB 역방향 동기화: PHASE B 기존 링크행 SANCTN_SN 업데이트 -->
+	<update id="updateTodoLineSanctnSnByKey" parameterType="Map">
+		UPDATE TB_WB20M03
+		   SET SANCTN_SN = #{sanctnSn, jdbcType=NUMERIC}
+		     , UDT_ID = #{userId, jdbcType=VARCHAR}
+		     , UDT_PGM = #{pgmId, jdbcType=VARCHAR}
+		     , UDT_DTTM = SYSDATE
+		 WHERE TODO_NO = #{todoNo, jdbcType=VARCHAR}
+		   AND CO_CD = #{coCd, jdbcType=VARCHAR}
+		   AND TODO_KEY = #{todoKey, jdbcType=NUMERIC}
+		   AND SANCTN_STTUS != 'Y'
+	</update>
+
+	<!-- AM→WB 역방향 동기화: PHASE C offset 잔류행 검증 -->
+	<select id="countOffsetLeftoverSanctnSn" parameterType="Map" resultType="int">
+		SELECT COUNT(*) FROM TB_WB20M03
+		 WHERE TODO_NO = #{todoNo, jdbcType=VARCHAR}
+		   AND CO_CD = #{coCd, jdbcType=VARCHAR}
+		   AND SANCTN_STTUS != 'Y'
+		   AND SANCTN_SN >= #{offset, jdbcType=NUMERIC}
+	</select>
 
 	<!-- TODO 모바일 뷰어 조회  -->
     <select id="selectMobileTodoSelect" parameterType="Map" resultType="camelMap">

@@ -68,18 +68,30 @@ public interface WB20Mapper {
 
 	String selectSystemCreateDttm(Map<String, String> paramMap);
 
+	String selectMaxCreatDttm(Map<String, String> paramMap);
+
+	Map<String, String> selectOrigCreatInfo(Map<String, String> paramMap);
+
 	int insertTodoMaster(Map<String, String> paramMap);
+	int insertTodoMasterForAmLink(Map<String, String> paramMap);
+	int insertTodoMasterCopyTemplate(Map<String, String> paramMap);
 
 	int deleteTodoMaster(Map<String, String> param);
 
 	int deleteAllTodoMaster(Map<String, String> param);
 
 	int deleteTodoMasterByTodoNo(Map<String, String> param);
+	int deleteRemainingTodoLine(Map<String, Object> paramMap);
 	int selectAmDeleteBlockCount(Map<String, String> param);
 	int cancelAmDocumentByErpKey(Map<String, String> param);
 
 	//결재 todo 삭제시 순번
 	int updateTodoMasterSanctnSn(Map<String, String> paramMap);
+
+	// AM→WB 역방향 동기화: PHASE A/B/C 매퍼 (SANCTN_SN 재배정)
+	int offsetNonApprovedSanctnSn(Map<String, Object> paramMap);
+	int updateTodoLineSanctnSnByKey(Map<String, Object> paramMap);
+	int countOffsetLeftoverSanctnSn(Map<String, Object> paramMap);
 
 
 	Map<String, String> selectMobileTodoSelect(Map<String, String> paramMap);

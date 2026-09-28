@@ -1295,6 +1295,9 @@ public class AM11SvcImpl implements AM11Svc {
                 Map<String, Object> approverOrg = am11Mapper.selectUserOrgSnapshot(approverId);
 
                 Map<String, Object> lineParam = new HashMap<>(paramMap);
+                lineParam.remove("creatId");
+                lineParam.remove("creatPgm");
+                lineParam.remove("creatDttm");
                 lineParam.put("docId", docId);
                 lineParam.put("lineSeq", seq);
                 lineParam.put("lineType", line.get("lineType") != null ? line.get("lineType") : "APPR");
@@ -1354,6 +1357,17 @@ public class AM11SvcImpl implements AM11Svc {
             }
         }
         return null;
+    }
+
+    /**
+     * WB20 링크값 보존용 coalesce: 요청값이 있으면 그대로, 없으면(null/공백) 변경 전 결재선(prevLine)의 값을 유지.
+     * 결재선 수정(재삽입) 시 WB20_TODO_KEY/NO/SANCTN_SN/DIV1/DIV2/CO_CD 연계정보가 NULL로 사라지는 것을 방지한다.
+     */
+    private Object coalesceLink(Object requestVal, Map<String, Object> prevLine, String key) {
+        if (requestVal != null && !String.valueOf(requestVal).trim().isEmpty()) {
+            return requestVal;
+        }
+        return prevLine != null ? prevLine.get(key) : null;
     }
 
     @Override
@@ -1456,6 +1470,24 @@ public class AM11SvcImpl implements AM11Svc {
         List<Map<String, Object>> beforeLineList = am11Mapper.selectApprovalLineList(paramMap);
         int currLineSeq = Integer.parseInt(String.valueOf(docLock.get("currLineSeq")));
 
+        // 2-1. 동시성 확인: 화면이 로드한 시점의 진행정보(결재순번/문서상태)와 현재 DB가 다르면
+        // (그 사이 다른 사용자가 결재/반려하여 진행이 바뀐 것) 결재선 변경을 거부한다.
+        String expectedCurrLineSeq = paramMap.get("expectedCurrLineSeq") == null ? null : String.valueOf(paramMap.get("expectedCurrLineSeq")).trim();
+        String expectedDocStatus = paramMap.get("expectedDocStatus") == null ? null : String.valueOf(paramMap.get("expectedDocStatus")).trim();
+        if (expectedCurrLineSeq != null && !expectedCurrLineSeq.isEmpty()) {
+            String curSeqStr = String.valueOf(docLock.get("currLineSeq"));
+            boolean seqMismatch = !expectedCurrLineSeq.equals(curSeqStr);
+            boolean statusMismatch = expectedDocStatus != null && !expectedDocStatus.isEmpty()
+                    && !expectedDocStatus.equals(String.valueOf(docLock.get("docStatus")));
+            if (seqMismatch || statusMismatch) {
+                logger.warn("[결재선변경] 동시성 충돌: 화면 진행정보 불일치. docId={}, expectedSeq={}, curSeq={}, expectedStatus={}, curStatus={}",
+                        docId, expectedCurrLineSeq, curSeqStr, expectedDocStatus, docLock.get("docStatus"));
+                resultMap.put("resultCode", "409");
+                resultMap.put("resultMessage", "결재 진행정보가 변경되었습니다(다른 사용자가 결재/반려). 화면을 새로고침한 후 다시 시도하십시오.");
+                return resultMap;
+            }
+        }
+
         // 신규 잔여 결재선 파싱
         List<Map<String, Object>> rawNewLines = parseLineList(paramMap.get("lineList"));
         if (rawNewLines == null || rawNewLines.isEmpty()) {
@@ -1499,20 +1531,50 @@ public class AM11SvcImpl implements AM11Svc {
         String nextFirstApproverId = null;
         String nextFirstApproverNm = null;
 
+        // 재삽입 시 WB20 링크 보존: 변경 전 결재선(beforeLineList)의 WB20_* 값을 approverId로 찾아
+        // 요청에 없으면 기존 값을 유지한다(수정 시 링크가 NULL로 사라지는 문제 방지).
+        Map<String, Map<String, Object>> beforeByApprover = new HashMap<>();
+        for (Map<String, Object> prevLine : beforeLineList) {
+            Object prevApproverId = prevLine.get("approverId");
+            if (prevApproverId != null) {
+                beforeByApprover.put(String.valueOf(prevApproverId), prevLine);
+            }
+        }
+
         for (Map<String, Object> line : newLines) {
             String approverId = (String) line.get("approverId");
             Map<String, Object> approverOrg = am11Mapper.selectUserOrgSnapshot(approverId);
+            Map<String, Object> prevLine = beforeByApprover.get(approverId);
+
+            // WB20 링크 복원: 요청에 없으면 변경 전 값 유지. 복원값을 line(=newLines 요소)에도 되써서
+            // 뒤의 WB20 역방향 동기화(newLines 전달, 아래 wb20SyncParam)가 기존 결재자를 linked로 인식하게 한다
+            // (P1: 링크 유실로 전 라인이 brandNew 오분류→삭제+재생성 churn 방지).
+            Object lnkTodoKey = coalesceLink(line.get("wb20TodoKey"), prevLine, "wb20TodoKey");
+            Object lnkCoCd = coalesceLink(line.get("wb20CoCd"), prevLine, "wb20CoCd");
+            Object lnkTodoNo = coalesceLink(line.get("wb20TodoNo"), prevLine, "wb20TodoNo");
+            Object lnkSanctnSn = coalesceLink(line.get("wb20SanctnSn"), prevLine, "wb20SanctnSn");
+            Object lnkDiv1 = coalesceLink(line.get("wb20Div1CodeId"), prevLine, "wb20Div1CodeId");
+            Object lnkDiv2 = coalesceLink(line.get("wb20Div2CodeId"), prevLine, "wb20Div2CodeId");
+            line.put("wb20TodoKey", lnkTodoKey);
+            line.put("wb20CoCd", lnkCoCd);
+            line.put("wb20TodoNo", lnkTodoNo);
+            line.put("wb20SanctnSn", lnkSanctnSn);
+            line.put("wb20Div1CodeId", lnkDiv1);
+            line.put("wb20Div2CodeId", lnkDiv2);
 
             Map<String, Object> lineParam = new HashMap<>(paramMap);
+            lineParam.remove("creatId");
+            lineParam.remove("creatPgm");
+            lineParam.remove("creatDttm");
             lineParam.put("docId", docId);
             lineParam.put("lineSeq", nextSeq);
             lineParam.put("lineType", line.get("lineType") != null ? line.get("lineType") : "APPR");
-            lineParam.put("wb20TodoKey", line.get("wb20TodoKey"));
-            lineParam.put("wb20CoCd", line.get("wb20CoCd"));
-            lineParam.put("wb20TodoNo", line.get("wb20TodoNo"));
-            lineParam.put("wb20SanctnSn", line.get("wb20SanctnSn"));
-            lineParam.put("wb20Div1CodeId", line.get("wb20Div1CodeId"));
-            lineParam.put("wb20Div2CodeId", line.get("wb20Div2CodeId"));
+            lineParam.put("wb20TodoKey", lnkTodoKey);
+            lineParam.put("wb20CoCd", lnkCoCd);
+            lineParam.put("wb20TodoNo", lnkTodoNo);
+            lineParam.put("wb20SanctnSn", lnkSanctnSn);
+            lineParam.put("wb20Div1CodeId", lnkDiv1);
+            lineParam.put("wb20Div2CodeId", lnkDiv2);
 
             if (nextSeq == currLineSeq) {
                 lineParam.put("lineStatus", "PENDING");
@@ -1538,19 +1600,72 @@ public class AM11SvcImpl implements AM11Svc {
                 lineParam.put("deptNm", line.get("deptNm"));
             }
 
+            // CREAT 필드 보존: 변경 전 라인이 있으면 원본값, 없으면 문서 기안자 라인의 값 상속
+            String creatId = null;
+            String creatPgm = null;
+            String creatDttm = null;
+            if (prevLine != null) {
+                creatId = (String) prevLine.get("creatId");
+                creatPgm = (String) prevLine.get("creatPgm");
+                creatDttm = (String) prevLine.get("creatDttm");
+            } else if (!beforeLineList.isEmpty()) {
+                Map<String, Object> firstLine = beforeLineList.get(0);
+                creatId = (String) firstLine.get("creatId");
+                creatPgm = (String) firstLine.get("creatPgm");
+                creatDttm = (String) firstLine.get("creatDttm");
+            }
+            lineParam.put("creatId", creatId);
+            lineParam.put("creatPgm", creatPgm);
+            lineParam.put("creatDttm", creatDttm);
+
             am11Mapper.insertApprovalLine(lineParam);
             nextSeq++;
         }
 
         // AM 변경 결재선을 WB20 원본문서에도 동일 트랜잭션으로 반영한다.
         Object erpBizKey = docLock.get("erpBizKey");
+        logger.info("[AM→WB sync] 호출부 도달. docId={}, erpBizType={}, erpBizKey={}, coCd={}, wb20SvcNull={}, newLines.size={}",
+                docId, docLock.get("erpBizType"), erpBizKey, docLock.get("coCd"),
+                (wb20Svc == null), (newLines == null ? "null" : newLines.size()));
+        List<Map<String, Object>> wb20LinkResults = new ArrayList<>();
         if (erpBizKey != null && !String.valueOf(erpBizKey).trim().isEmpty() && wb20Svc != null) {
             Map<String, Object> wb20SyncParam = new HashMap<>();
             wb20SyncParam.put("todoNo", String.valueOf(erpBizKey));
             wb20SyncParam.put("coCd", String.valueOf(docLock.get("coCd")));
             wb20SyncParam.put("userId", paramMap.get("userId"));
             wb20SyncParam.put("lineList", newLines);
-            wb20Svc.syncApprovalLinesFromAm(wb20SyncParam);
+            wb20LinkResults = wb20Svc.syncApprovalLinesFromAm(wb20SyncParam);
+        } else {
+            logger.warn("[AM→WB sync] 호출부 스킵: 가드 미통과(erpBizKey empty 또는 wb20Svc null). erpBizKey={}, wb20SvcNull={}",
+                    erpBizKey, (wb20Svc == null));
+        }
+
+        // P4) 신규 WB20 행의 TODO_KEY를 AM11D01에 백필
+        if (wb20LinkResults != null && !wb20LinkResults.isEmpty()) {
+            logger.info("[AM→WB sync] P4 백필 시작. 대상 건수={}", wb20LinkResults.size());
+            for (Map<String, Object> linkInfo : wb20LinkResults) {
+                try {
+                    Map<String, Object> backfillParam = new HashMap<>(paramMap);
+                    backfillParam.put("docId", docId);
+                    backfillParam.put("approverId", linkInfo.get("approverId"));
+                    backfillParam.put("lineType", linkInfo.get("lineType"));
+                    backfillParam.put("wb20TodoKey", linkInfo.get("wb20TodoKey"));
+                    backfillParam.put("wb20CoCd", linkInfo.get("wb20CoCd"));
+                    backfillParam.put("wb20TodoNo", linkInfo.get("wb20TodoNo"));
+                    backfillParam.put("wb20SanctnSn", linkInfo.get("wb20SanctnSn"));
+                    backfillParam.put("wb20Div1CodeId", linkInfo.get("wb20Div1CodeId"));
+                    backfillParam.put("wb20Div2CodeId", linkInfo.get("wb20Div2CodeId"));
+
+                    int updateCnt = am11Mapper.updateApprovalLineWb20Link(backfillParam);
+                    logger.info("[AM→WB sync] P4 백필 완료. approverId={}, lineType={}, wb20TodoKey={}, updateCnt={}",
+                            linkInfo.get("approverId"), linkInfo.get("lineType"), linkInfo.get("wb20TodoKey"), updateCnt);
+                } catch (Exception e) {
+                    logger.error("[AM→WB sync] P4 백필 오류. approverId={}, lineType={}",
+                            linkInfo.get("approverId"), linkInfo.get("lineType"), e);
+                    throw new RuntimeException("P4 백필 처리 중 오류 발생: " + e.getMessage(), e);
+                }
+            }
+            logger.info("[AM→WB sync] P4 백필 완료. 처리 건수={}", wb20LinkResults.size());
         }
 
         // 7. 문서 마스터 현재 결재자 정보 동기화

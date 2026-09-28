@@ -354,7 +354,7 @@ public class PM07SvcImpl implements PM07Svc {
 					// NULL=NULL 비교가 항상 거짓이 되므로, 서버가 발급한 reqNo로 여기서 강제로 채워야 한다.
 					approval.put("salesCd", reqNo);
 					approval.put("etcField1", reqNo);
-					approval.put("todoTitl", paramMap.get("reqTitl"));
+					approval.put("todoTitl", buildVacationTodoTitl(paramMap));
 					if (!approval.containsKey("coCd") || approval.get("coCd") == null || approval.get("coCd").isEmpty()) approval.put("coCd", paramMap.get("coCd"));
 					if (!approval.containsKey("todoCoCd") || approval.get("todoCoCd") == null || approval.get("todoCoCd").isEmpty()) approval.put("todoCoCd", paramMap.get("coCd"));
 					boolean isShare = "공유".equals(approval.get("gb"));
@@ -410,58 +410,7 @@ public class PM07SvcImpl implements PM07Svc {
 					}
 				}
 
-				// 기존 WB20 결재는 유지하고, 동일 업무를 AM 결재함에도 등록한다.
-				Map<String, Object> amParam = new HashMap<>();
-				amParam.put("coCd", paramMap.get("coCd"));
-				amParam.put("userId", paramMap.get("userId"));
-				amParam.put("userNm", paramMap.get("userNm"));
-				amParam.put("docTitle", buildVacationApprovalTitle(paramMap));
-				amParam.put("vacTypeNm", paramMap.get("vacTypeNm"));
-				amParam.put("formCd", "PM0701");
-				amParam.put("formVer", 1);
-				amParam.put("erpBizType", "PM07");
-				amParam.put("erpBizKey", reqNo);
-				amParam.put("docDataJson", new GsonBuilder().disableHtmlEscaping().create().toJson(paramMap));
-				amParam.put("docRenderHtml", buildVacationApprovalHtml(paramMap));
-				amParam.put("pgmId", "PM0701P01");
-				List<Map<String, Object>> amLineList = new ArrayList<>();
-				for (Map<String, String> approval : approvalList) {
-					Map<String, Object> amLine = new HashMap<>();
-					amLine.put("approverId", approval.get("todoId"));
-					amLine.put("approverNm", approval.get("name"));
-						amLine.put("deptId", approval.get("deptId"));
-						amLine.put("lineSeq", approval.get("sanctnSn"));
-						amLine.put("wb20TodoKey", approval.get("todoKey"));
-						amLine.put("wb20CoCd", approval.get("coCd"));
-						amLine.put("wb20TodoNo", approval.get("todoNo"));
-						amLine.put("wb20SanctnSn", approval.get("sanctnSn"));
-						amLine.put("wb20Div1CodeId", approval.get("todoDiv1CodeId"));
-						amLine.put("wb20Div2CodeId", approval.get("todoDiv2CodeId"));
-					// WB20 TODODIV10(공유)는 AM에서 참조선으로만 매핑한다.
-					amLine.put("lineType", "TODODIV10".equals(approval.get("todoDiv1CodeId")) ? "REF" : "APPR");
-					amLine.put("sourceApproved", "Y".equalsIgnoreCase(approval.get("sanctnSttus")) ? "Y" : "N");
-					amLineList.add(amLine);
-				}
-				amParam.put("lineList", amLineList);
-				int autoApprovedCount = 0;
-				for (Map<String, Object> line : amLineList) {
-					if (!"Y".equals(line.get("sourceApproved"))) break;
-					autoApprovedCount++;
-				}
-				amParam.put("autoApprovedCount", autoApprovedCount);
-				// PM07 화면에서 전달한 신청자명을 AM 기안자명으로 명시 전달한다.
-				if (amParam.get("userNm") == null || String.valueOf(amParam.get("userNm")).trim().isEmpty()) {
-					amParam.put("userNm", paramMap.get("reqTitl"));
-				}
-				Map<String, Object> amResult = am11Svc.submitApproval(amParam);
-				if (!"200".equals(String.valueOf(amResult.get("resultCode")))) {
-					if (amParam.get("docId") != null) {
-						amParam.put("changeReason", "PM07 신청서 수정 동기화");
-						am11Svc.changeApprovalLines(amParam);
-					} else {
-						throw new IllegalStateException("AM 결재문서 자동등록 실패: " + amResult.get("resultMessage"));
-					}
-				}
+				syncVacationToAm(paramMap);
 			}
 
 			String vacDtArr = paramMap.get("vacDtArr");
@@ -620,7 +569,7 @@ public class PM07SvcImpl implements PM07Svc {
 					// (프론트가 정상적으로 채워 보내는 값이지만, 서버에서도 방어적으로 보정한다).
 					approval.put("salesCd", paramMap.get("reqNo"));
 					approval.put("etcField1", paramMap.get("reqNo"));
-					approval.put("todoTitl", paramMap.get("reqTitl"));
+					approval.put("todoTitl", buildVacationTodoTitl(paramMap));
 					if (!approval.containsKey("coCd") || approval.get("coCd") == null || approval.get("coCd").isEmpty()) approval.put("coCd", paramMap.get("coCd"));
 					if (!approval.containsKey("todoCoCd") || approval.get("todoCoCd") == null || approval.get("todoCoCd").isEmpty()) approval.put("todoCoCd", paramMap.get("coCd"));
 					boolean isShare = "공유".equals(approval.get("gb"));
@@ -657,6 +606,7 @@ public class PM07SvcImpl implements PM07Svc {
 				if (!paramMap.containsKey("todoNo") || paramMap.get("todoNo") == null) paramMap.put("todoNo", paramMap.get("reqNo"));
 				if (!paramMap.containsKey("todoDiv2CodeId") || paramMap.get("todoDiv2CodeId") == null) paramMap.put("todoDiv2CodeId", "TODODIV2300");
 				wb20Svc.insertTodoMaster(paramMap);
+				syncVacationToAm(paramMap);
 			}
 
 			// 수정 시 기존 작업일지 삭제
@@ -807,6 +757,168 @@ public class PM07SvcImpl implements PM07Svc {
 			}
 		} catch (Exception e) {
 			throw new RuntimeException("전자결재 문서 삭제 처리 중 오류가 발생했습니다: " + e.getMessage(), e);
+		}
+	}
+
+	private void syncVacationToAm(Map<String, String> paramMap) {
+		try {
+			String reqNo = paramMap.get("reqNo");
+			if (reqNo == null || reqNo.trim().isEmpty()) {
+				return;
+			}
+
+			String coCd = paramMap.get("coCd");
+			if (coCd == null || coCd.trim().isEmpty()) {
+				coCd = "GUN";
+			}
+
+			Map<String, String> wb20Query = new HashMap<>();
+			wb20Query.put("todoNo", reqNo);
+			wb20Query.put("coCd", coCd);
+			List<Map<String, String>> wb20Lines = wb20Svc.selectGetApprovalList(wb20Query);
+			if (wb20Lines == null || wb20Lines.isEmpty()) {
+				return;
+			}
+
+			List<Map<String, String>> apprList = new ArrayList<>();
+			List<Map<String, String>> refList = new ArrayList<>();
+			for (Map<String, String> row : wb20Lines) {
+				String div1 = row.get("todoDiv1CodeId");
+				if ("TODODIV10".equals(div1) || "공유".equals(row.get("gb"))) {
+					refList.add(row);
+				} else {
+					apprList.add(row);
+				}
+			}
+
+			java.util.Collections.sort(apprList, new java.util.Comparator<Map<String, String>>() {
+				@Override
+				public int compare(Map<String, String> o1, Map<String, String> o2) {
+					int s1 = parseIntSafe(o1.get("sanctnSn"));
+					int s2 = parseIntSafe(o2.get("sanctnSn"));
+					return Integer.compare(s1, s2);
+				}
+			});
+
+			java.util.Collections.sort(refList, new java.util.Comparator<Map<String, String>>() {
+				@Override
+				public int compare(Map<String, String> o1, Map<String, String> o2) {
+					int s1 = parseIntSafe(o1.get("sanctnSn"));
+					int s2 = parseIntSafe(o2.get("sanctnSn"));
+					return Integer.compare(s1, s2);
+				}
+			});
+
+			List<Map<String, Object>> amLineList = new ArrayList<>();
+			for (Map<String, String> row : apprList) {
+				Map<String, Object> amLine = new HashMap<>();
+				amLine.put("approverId", row.get("todoId"));
+				String approverNm = row.get("todoNm");
+				if (approverNm == null || approverNm.trim().isEmpty()) {
+					approverNm = row.get("name");
+				}
+				amLine.put("approverNm", approverNm);
+				amLine.put("deptId", row.get("deptId"));
+				amLine.put("lineSeq", row.get("sanctnSn"));
+				amLine.put("wb20TodoKey", row.get("todoKey"));
+				amLine.put("wb20CoCd", row.get("coCd"));
+				amLine.put("wb20TodoNo", row.get("todoNo"));
+				amLine.put("wb20SanctnSn", row.get("sanctnSn"));
+				amLine.put("wb20Div1CodeId", row.get("todoDiv1CodeId"));
+				amLine.put("wb20Div2CodeId", row.get("todoDiv2CodeId"));
+				amLine.put("lineType", "APPR");
+				amLine.put("sourceApproved", "Y".equalsIgnoreCase(row.get("sanctnSttus")) ? "Y" : "N");
+				amLineList.add(amLine);
+			}
+
+			for (Map<String, String> row : refList) {
+				Map<String, Object> amLine = new HashMap<>();
+				amLine.put("approverId", row.get("todoId"));
+				String approverNm = row.get("todoNm");
+				if (approverNm == null || approverNm.trim().isEmpty()) {
+					approverNm = row.get("name");
+				}
+				amLine.put("approverNm", approverNm);
+				amLine.put("deptId", row.get("deptId"));
+				amLine.put("lineSeq", row.get("sanctnSn"));
+				amLine.put("wb20TodoKey", row.get("todoKey"));
+				amLine.put("wb20CoCd", row.get("coCd"));
+				amLine.put("wb20TodoNo", row.get("todoNo"));
+				amLine.put("wb20SanctnSn", row.get("sanctnSn"));
+				amLine.put("wb20Div1CodeId", row.get("todoDiv1CodeId"));
+				amLine.put("wb20Div2CodeId", row.get("todoDiv2CodeId"));
+				amLine.put("lineType", "REF");
+				amLine.put("sourceApproved", "N");
+				amLineList.add(amLine);
+			}
+
+			if (amLineList.isEmpty()) {
+				return;
+			}
+
+			int autoApprovedCount = 0;
+			for (Map<String, Object> line : amLineList) {
+				if (!"Y".equals(line.get("sourceApproved"))) break;
+				autoApprovedCount++;
+			}
+
+			String applicantId = paramMap.get("reqId");
+			if (applicantId == null || applicantId.trim().isEmpty()) {
+				applicantId = paramMap.get("userId");
+			}
+			String applicantNm = paramMap.get("reqNm");
+			if (applicantNm == null || applicantNm.trim().isEmpty()) {
+				applicantNm = paramMap.get("userNm");
+			}
+			if (applicantNm == null || applicantNm.trim().isEmpty()) {
+				applicantNm = paramMap.get("reqTitl");
+			}
+
+			Map<String, String> docIdParam = new HashMap<>();
+			docIdParam.put("reqNo", reqNo);
+			docIdParam.put("coCd", coCd);
+			String existingDocId = pm07Mapper.selectAmDocIdByReqNo(docIdParam);
+
+			Map<String, Object> amParam = new HashMap<>();
+			if (existingDocId != null && !existingDocId.trim().isEmpty()) {
+				amParam.put("docId", existingDocId);
+			}
+			amParam.put("coCd", coCd);
+			amParam.put("userId", applicantId);
+			amParam.put("userNm", applicantNm);
+			// AM 문서 제목도 WB20 TODO_TITL과 동일 형식으로 통일("[휴가] 신청자 유형 (일자)")
+			amParam.put("docTitle", buildVacationTodoTitl(paramMap));
+			amParam.put("vacTypeNm", paramMap.get("vacTypeNm"));
+			amParam.put("formCd", "PM0701");
+			amParam.put("formVer", 1);
+			amParam.put("erpBizType", "PM07");
+			amParam.put("erpBizKey", reqNo);
+			amParam.put("docDataJson", new GsonBuilder().disableHtmlEscaping().create().toJson(paramMap));
+			amParam.put("docRenderHtml", buildVacationApprovalHtml(paramMap));
+			amParam.put("pgmId", "PM0701P01");
+			amParam.put("lineList", amLineList);
+			amParam.put("autoApprovedCount", autoApprovedCount);
+
+			Map<String, Object> amResult = am11Svc.submitApproval(amParam);
+			// 기존 AM 문서가 진행 중인 상태라 재상신이 거절된 경우에는
+			// PM07에서 변경한 WB20 결재선을 AM 잔여 결재선으로 동기화한다.
+			if (existingDocId != null && !existingDocId.trim().isEmpty()
+					&& amResult != null && !"200".equals(String.valueOf(amResult.get("resultCode")))) {
+				Map<String, Object> lineChangeParam = new HashMap<>(amParam);
+				lineChangeParam.put("changeReason", "PM07 휴가신청 수정 동기화");
+				lineChangeParam.put("lineList", amLineList);
+				am11Svc.changeApprovalLines(lineChangeParam);
+			}
+		} catch (Exception e) {
+			throw new RuntimeException("전자결재(AM) 연동 중 오류가 발생했습니다: " + e.getMessage(), e);
+		}
+	}
+
+	private int parseIntSafe(String value) {
+		try {
+			return value != null && !value.trim().isEmpty() ? Integer.parseInt(value) : 0;
+		} catch (NumberFormatException e) {
+			return 0;
 		}
 	}
 
@@ -1698,6 +1810,44 @@ public class PM07SvcImpl implements PM07Svc {
 		boolean outing = "PM07TYPE04".equals(vacTypeCd)
 				|| (vacTypeNm != null && vacTypeNm.contains("외출"));
 		return applicant.trim() + " " + (outing ? "외출신청서" : "휴가신청서");
+	}
+
+	/**
+	 * WB20 결재선 TODO_TITL 생성: "[휴가] {신청자} {휴가유형} ({시작일자})" 형식.
+	 * 예) "[휴가] 최지상 외출 (2026-09-28)". 신청자=reqTitl, 유형=vacTypeNm(괄호 이후 제거), 일자=stDt.
+	 * AM→WB 역방향은 이 값을 템플릿에서 복사하므로 여기서 일관 생성하면 양쪽 동일하게 유지된다.
+	 */
+	private String buildVacationTodoTitl(Map<String, String> paramMap) {
+		String applicant = paramMap.get("reqTitl");
+		if (applicant == null || applicant.trim().isEmpty()) applicant = paramMap.get("userNm");
+		if (applicant == null || applicant.trim().isEmpty()) applicant = paramMap.get("reqId");
+		if (applicant == null) applicant = "";
+		applicant = applicant.trim();
+
+		// 휴가유형 표기: 반차류는 "반차 (오전)"처럼 오전/오후 포함(공용 formatVacationTypeDisplay 재사용)
+		String typeBase = formatVacationTypeDisplay(paramMap);
+		typeBase = (typeBase == null) ? "" : typeBase.trim();
+
+		String stDt = paramMap.get("stDt");
+		stDt = (stDt == null) ? "" : stDt.trim();
+		String edDt = paramMap.get("edDt");
+		edDt = (edDt == null) ? "" : edDt.trim();
+		// 시작=종료(또는 종료 없음)면 시작일만, 다르면 "시작 ~ 종료" 표시
+		String dateStr;
+		if (stDt.isEmpty()) {
+			dateStr = edDt;
+		} else if (edDt.isEmpty() || stDt.equals(edDt)) {
+			dateStr = stDt;
+		} else {
+			dateStr = stDt + " ~ " + edDt;
+		}
+
+		StringBuilder sb = new StringBuilder();
+		sb.append("[휴가]");
+		if (!applicant.isEmpty()) sb.append(" ").append(applicant);
+		if (!typeBase.isEmpty()) sb.append(" ").append(typeBase);
+		if (!dateStr.isEmpty()) sb.append(" (").append(dateStr).append(")");
+		return sb.toString();
 	}
 
 	private String escapeHtml(String value) {

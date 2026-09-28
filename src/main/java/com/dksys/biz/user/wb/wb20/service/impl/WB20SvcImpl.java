@@ -3,9 +3,13 @@ package com.dksys.biz.user.wb.wb20.service.impl;
 import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -28,6 +32,8 @@ import com.google.gson.reflect.TypeToken;
 @Service
 @Transactional(rollbackFor = Exception.class)
 public class WB20SvcImpl implements WB20Svc {
+
+	private final Logger logger = LoggerFactory.getLogger(getClass());
 
 	@Autowired
 	WB20Mapper wb20Mapper;
@@ -1016,10 +1022,597 @@ public class WB20SvcImpl implements WB20Svc {
 
 	@Override
 	@Transactional(rollbackFor = Exception.class)
-	public void syncApprovalLinesFromAm(Map<String, Object> paramMap) {
+	public List<Map<String, Object>> syncApprovalLinesFromAm(Map<String, Object> paramMap) {
+		List<Map<String, Object>> results = new ArrayList<>();
+
 		if (paramMap == null || paramMap.get("todoNo") == null) {
-			return;
+			return results;
 		}
+
+		String todoNo = String.valueOf(paramMap.get("todoNo"));
+		String coCd = String.valueOf(paramMap.get("coCd"));
+		String userId = String.valueOf(paramMap.get("userId"));
+		@SuppressWarnings("unchecked")
+		List<Map<String, Object>> lineList = (List<Map<String, Object>>) paramMap.get("lineList");
+
+		logger.info("[AM→WB sync] 진입. todoNo={}, coCd={}, lineList.size={}",
+				todoNo, coCd, (lineList == null ? "null" : lineList.size()));
+
+		if (lineList == null || lineList.isEmpty()) {
+			logger.warn("[AM→WB sync] 조기종료: lineList 비어있음. todoNo={}", todoNo);
+			return results;
+		}
+
+		// 0) 현재 WB20 결재체인 스냅샷 로드
+		Map<String, String> snapParam = new HashMap<>();
+		snapParam.put("todoNo", todoNo);
+		snapParam.put("coCd", coCd);
+		List<Map<String, String>> wb20Rows = wb20Mapper.selectGetApprovalList(snapParam);
+
+		if (wb20Rows == null || wb20Rows.isEmpty()) {
+			logger.warn("[AM→WB sync] 조기종료: selectGetApprovalList 0건(todoNo/coCd 불일치 의심). todoNo={}, coCd={}",
+					todoNo, coCd);
+			return results;
+		}
+		logger.info("[AM→WB sync] 스냅샷 로드. wb20Rows.size={}, todoNo={}, coCd={}", wb20Rows.size(), todoNo, coCd);
+
+		// A) CREAT_* 상속: 문서 최초 생성정보(CREAT_ID/PGM/DTTM)를 원본값에서 상속
+		Map<String, String> origCreatParam = new HashMap<>();
+		origCreatParam.put("todoNo", todoNo);
+		origCreatParam.put("coCd", coCd);
+		Map<String, String> origCreatInfo = wb20Mapper.selectOrigCreatInfo(origCreatParam);
+
+		if (origCreatInfo == null || origCreatInfo.isEmpty()) {
+			logger.warn(
+					"syncApprovalLinesFromAm 스킵: 기존 결재행이 없거나 NULL CREAT_DTTM 상태. todoNo={}, coCd={}. 먼저 DELETE FROM TB_WB20M03 WHERE TODO_NO=? AND CREAT_PGM='AM1201M01' 실행 필요.",
+					todoNo, coCd);
+			return results;
+		}
+
+		String creatId = origCreatInfo.get("creatId");
+		String creatPgm = origCreatInfo.get("creatPgm");
+		String createDttm = origCreatInfo.get("createDttm");
+
+		if (creatId == null || creatPgm == null || createDttm == null) {
+			logger.warn(
+					"syncApprovalLinesFromAm 스킵: 원본 생성정보 불완전. todoNo={}, coCd={}, creatId={}, creatPgm={}, createDttm={}",
+					todoNo, coCd, creatId, creatPgm, createDttm);
+			return results;
+		}
+
+		// 1) 링크보유 / 신규 분류: wb20TodoKey를 단일 판정 기준으로 사용
+		// (linked: 값 있음 → WB20 기존 행 매칭 가능 / brandNew: null 또는 빈 문자열 → 신규 생성)
+		List<Map<String, Object>> linked = new ArrayList<>();
+		List<Map<String, Object>> brandNew = new ArrayList<>();
+
+		for (Map<String, Object> line : lineList) {
+			Object wb20TodoKey = line.get("wb20TodoKey");
+			Object wb20SanctnSn = line.get("wb20SanctnSn");
+			Object wb20Div1CodeId = line.get("wb20Div1CodeId");
+			Object wb20Div2CodeId = line.get("wb20Div2CodeId");
+
+			// wb20TodoKey 단일 기준: null 또는 trim 후 empty인지 판정
+			String todoKeyStr = wb20TodoKey == null ? null : String.valueOf(wb20TodoKey).trim();
+			boolean hasLinkedKey = todoKeyStr != null && !todoKeyStr.isEmpty();
+
+			if (hasLinkedKey) {
+				// linked: wb20TodoKey 값 있음
+				linked.add(line);
+				logger.info(
+						"[AM→WB sync] 분류: linked. approverId={}, lineType={}, wb20TodoKey=[{}], wb20SanctnSn=[{}], wb20Div1=[{}], wb20Div2=[{}]",
+						line.get("approverId"), line.get("lineType"), todoKeyStr,
+						wb20SanctnSn, wb20Div1CodeId, wb20Div2CodeId);
+			} else {
+				// brandNew: wb20TodoKey 없음 (기존 필드 부분유무는 무시)
+				brandNew.add(line);
+				logger.info(
+						"[AM→WB sync] 분류: brandNew. approverId={}, lineType={}, wb20TodoKey=[{}], wb20SanctnSn=[{}], wb20Div1=[{}], wb20Div2=[{}]",
+						line.get("approverId"), line.get("lineType"), todoKeyStr,
+						wb20SanctnSn, wb20Div1CodeId, wb20Div2CodeId);
+			}
+		}
+
+		// 2) 링크보유 라인 upsert (승인행은 손대지 않음, insertTodoMasterForAmLink로 자동승인 회피)
+		for (Map<String, Object> line : linked) {
+			// String.valueOf(null) 방어: wb20 필드 null 체크
+			String wb20TodoKey = line.get("wb20TodoKey") != null ? String.valueOf(line.get("wb20TodoKey")) : null;
+			String wb20SanctnSn = line.get("wb20SanctnSn") != null ? String.valueOf(line.get("wb20SanctnSn")) : null;
+			String wb20CoCd = line.get("wb20CoCd") != null ? String.valueOf(line.get("wb20CoCd")) : null;
+			String wb20TodoNo = line.get("wb20TodoNo") != null ? String.valueOf(line.get("wb20TodoNo")) : null;
+			String wb20Div1CodeId = line.get("wb20Div1CodeId") != null ? String.valueOf(line.get("wb20Div1CodeId")) : null;
+			String wb20Div2CodeId = line.get("wb20Div2CodeId") != null ? String.valueOf(line.get("wb20Div2CodeId")) : null;
+
+			// 필수 필드 검증
+			if (wb20TodoKey == null || wb20TodoKey.isEmpty()) {
+				logger.warn("[AM→WB sync] linked 라인 스킵: wb20TodoKey null/empty. approverId={}, lineType={}", line.get("approverId"), line.get("lineType"));
+				continue;
+			}
+
+			// 기존 WB20 행이 존재하는지 확인
+			boolean matchedRowExists = false;
+			for (Map<String, String> row : wb20Rows) {
+				if (String.valueOf(row.get("todoKey")).equals(wb20TodoKey)) {
+					matchedRowExists = true;
+					break;
+				}
+			}
+
+			// 기존 행이 존재하면 그대로 보존하고 upsert하지 않는다.
+			// (keepKeys로 step3 삭제 대상에서도 제외됨. upsert하면 selectGetApprovalList가
+			//  반환하지 않는 컬럼 - TODO_TITL, PG_PARAM 등 - 이 NULL로 덮여 값이 사라진다.)
+			if (matchedRowExists) {
+				continue;
+			}
+
+			// MERGE upsert via insertTodoMasterForAmLink (자동승인 회피)
+			String linkedApproverId = line.get("approverId") != null ? String.valueOf(line.get("approverId")).trim() : null;
+			if (linkedApproverId == null || linkedApproverId.isEmpty()) {
+				logger.warn("[AM→WB sync] linked 라인 upsert 스킵: approverId null/empty. wb20TodoKey={}, lineType={}", wb20TodoKey, line.get("lineType"));
+				continue;
+			}
+
+			Map<String, String> upsertParam = new HashMap<>();
+			upsertParam.put("todoKey", wb20TodoKey);
+			upsertParam.put("sanctnSn", wb20SanctnSn);
+			upsertParam.put("coCd", wb20CoCd);
+			upsertParam.put("todoDiv1CodeId", wb20Div1CodeId);
+			upsertParam.put("todoDiv2CodeId", wb20Div2CodeId);
+			upsertParam.put("todoId", linkedApproverId);
+			upsertParam.put("todoNo", wb20TodoNo);
+			upsertParam.put("sanctnSttus", "N");
+			upsertParam.put("pgmId", "AM1201M01");
+			upsertParam.put("userId", userId);
+			upsertParam.put("creatId", creatId);
+			upsertParam.put("creatPgm", creatPgm);
+			upsertParam.put("createDttm", createDttm);
+
+			// 부가 컬럼: snapshot에서 상속
+			for (Map<String, String> row : wb20Rows) {
+				if (String.valueOf(row.get("todoKey")).equals(wb20TodoKey)) {
+					// selectGetApprovalList 반환 컬럼
+					if (row.get("salesCd") != null) {
+						upsertParam.put("salesCd", row.get("salesCd"));
+					}
+					if (row.get("pgPath") != null) {
+						upsertParam.put("pgPath", row.get("pgPath"));
+					}
+					if (row.get("pgParam") != null) {
+						upsertParam.put("pgParam", row.get("pgParam"));
+					}
+					if (row.get("todoCoCd") != null) {
+						upsertParam.put("todoCoCd", row.get("todoCoCd"));
+					}
+					if (row.get("todoCodeKind") != null) {
+						upsertParam.put("todoCodeKind", row.get("todoCodeKind"));
+					}
+					if (row.get("todoCodeId") != null) {
+						upsertParam.put("todoCodeId", row.get("todoCodeId"));
+					}
+					if (row.get("todoFileTrgtKey") != null) {
+						upsertParam.put("todoFileTrgtKey", row.get("todoFileTrgtKey"));
+					}
+					break;
+				}
+			}
+
+			logger.info(
+					"[AM→WB sync] linked 라인 upsert. wb20TodoKey={}, approverId={}, div1={}, div2={}, sanctnSn={}",
+					wb20TodoKey, linkedApproverId, wb20Div1CodeId, wb20Div2CodeId, wb20SanctnSn);
+
+			wb20Mapper.insertTodoMasterForAmLink(upsertParam);
+		}
+
+		// 3) 삭제: WB20 잔여 미승인 행 중 AM 목록에 없는 것 제거 (APPR/REF 모두)
+		// keepKeys: linked 라인들의 TODO_KEY 세트
+		Map<String, Object> keepKeys = new HashMap<>();
+		for (Map<String, Object> line : linked) {
+			keepKeys.put(String.valueOf(line.get("wb20TodoKey")), true);
+		}
+
+		// P2) 삭제 이후 문서가 비었는지 판정 & 스냅샷 템플릿 확보
+		// 판정 조건: 생존 행의 존재 여부 (승인 'Y' 또는 linked 유지행 또는 non-APPR/REF)
+		Map<String, String> snapshotTemplate = null;
+		Integer minSanctnSn = null;
+		String minSanctnSnDiv1 = null;
+		String minSanctnSnDiv2 = null;
+
+		for (Map<String, String> row : wb20Rows) {
+			String rowTodoKey = String.valueOf(row.get("todoKey"));
+			String rowSanctnSttus = row.get("sanctnSttus");
+			String rowDiv1CodeId = row.get("todoDiv1CodeId");
+			String rowDiv2CodeId = row.get("todoDiv2CodeId");
+			int rowSn = Integer.parseInt(String.valueOf(row.get("sanctnSn")));
+
+			// Survival 조건: 승인 'Y' 또는 non-APPR/REF 또는 linked 유지행
+			boolean survives = "Y".equals(rowSanctnSttus)
+					|| (!("TODODIV20".equals(rowDiv1CodeId) || "TODODIV10".equals(rowDiv1CodeId)))
+					|| keepKeys.containsKey(rowTodoKey);
+
+			if (survives && minSanctnSn == null) {
+				// 최소 SANCTN_SN 행 기록: 생존 행 중 첫 번째
+				minSanctnSn = rowSn;
+				minSanctnSnDiv1 = rowDiv1CodeId;
+				minSanctnSnDiv2 = rowDiv2CodeId;
+			}
+		}
+
+		// 생존 행이 없으면 스냅샷 템플릿 확보: APPR 그룹의 최소 SN 행 선택
+		if (minSanctnSn == null && !brandNew.isEmpty()) {
+			for (Map<String, String> row : wb20Rows) {
+				String rowDiv1CodeId = row.get("todoDiv1CodeId");
+				if ("TODODIV20".equals(rowDiv1CodeId)) {
+					int rowSn = Integer.parseInt(String.valueOf(row.get("sanctnSn")));
+					if (minSanctnSn == null || rowSn < minSanctnSn) {
+						minSanctnSn = rowSn;
+						minSanctnSnDiv1 = "TODODIV20";
+					}
+				}
+			}
+
+			// 스냅샷 템플릿 확보
+			if (minSanctnSn != null) {
+				for (Map<String, String> row : wb20Rows) {
+					String rowDiv1 = row.get("todoDiv1CodeId");
+					int rowSn = Integer.parseInt(String.valueOf(row.get("sanctnSn")));
+					if ("TODODIV20".equals(rowDiv1) && rowSn == minSanctnSn) {
+						snapshotTemplate = new HashMap<>(row);
+						logger.info("[AM→WB sync] P2 방어: 스냅샷 템플릿 확보. min_SN={}, div1={}, salesCd={}, pgPath={}, todoNo={}",
+								minSanctnSn, "TODODIV20", row.get("salesCd"), row.get("pgPath"), todoNo);
+						break;
+					}
+				}
+			}
+		}
+
+		for (Map<String, String> row : wb20Rows) {
+			String rowTodoKey = String.valueOf(row.get("todoKey"));
+			String rowSanctnSttus = row.get("sanctnSttus");
+			String rowDiv1CodeId = row.get("todoDiv1CodeId");
+
+			// 조건: 미승인 AND (APPR(TODODIV20) OR REF(TODODIV10)) AND AM 목록에 없음
+			if (!"Y".equals(rowSanctnSttus) && ("TODODIV20".equals(rowDiv1CodeId) || "TODODIV10".equals(rowDiv1CodeId))
+					&& !keepKeys.containsKey(rowTodoKey)) {
+
+				Map<String, Object> deleteParam = new HashMap<>();
+				deleteParam.put("todoNo", todoNo);
+				deleteParam.put("coCd", coCd);
+				deleteParam.put("todoKey", rowTodoKey);
+				deleteParam.put("sanctnSn", String.valueOf(row.get("sanctnSn")));
+				deleteParam.put("todoDiv1CodeId", rowDiv1CodeId);
+				deleteParam.put("todoDiv2CodeId", row.get("todoDiv2CodeId"));
+
+				wb20Mapper.deleteRemainingTodoLine(deleteParam);
+			}
+		}
+
+		// 4) 신규 라인 생성 (brandNew lines, APPR/REF 모두)
+		// C) REF 라인의 DIV2 도출 규칙: linked lines가 있으면 그들의 DIV2에서 페어링, 없으면 검증
+		String linkedDiv2 = null;
+		if (!linked.isEmpty()) {
+			Object firstLinkedDiv2 = linked.get(0).get("wb20Div2CodeId");
+			if (firstLinkedDiv2 != null) {
+				linkedDiv2 = String.valueOf(firstLinkedDiv2);
+			}
+		}
+
+		// D) approvalDiv2Set 사전 계산: APPR 그룹의 DIV2 목록 (brandNew 루프에서 공유)
+		Set<String> approvalDiv2Set = new HashSet<>();
+		for (Map<String, String> row : wb20Rows) {
+			if ("TODODIV20".equals(row.get("todoDiv1CodeId"))) {
+				approvalDiv2Set.add(row.get("todoDiv2CodeId"));
+			}
+		}
+
+		// E) 그룹별 SANCTN_SN 러닝 카운터: 루프 전에 각 그룹의 MAX SN 초기화
+		// step3에서 삭제되는 행(미승인 & keepKeys 미포함)은 제외하고, 생존 행(승인 'Y' 또는 linked 유지행)만 기준으로
+		// 초기화해야 신규 순번이 AM 순번과 촘촘히 일치한다(삭제될 순번을 건너뛰지 않도록).
+		Map<String, Integer> groupSeqMap = new HashMap<>();
+		for (Map<String, String> row : wb20Rows) {
+			String rowTodoKey = String.valueOf(row.get("todoKey"));
+			boolean survives = "Y".equals(row.get("sanctnSttus")) || keepKeys.containsKey(rowTodoKey);
+			if (!survives) {
+				continue; // step3에서 삭제될 행은 순번 계산에서 제외
+			}
+			String groupKey = row.get("todoDiv1CodeId") + "|" + row.get("todoDiv2CodeId");
+			int sn = Integer.parseInt(String.valueOf(row.get("sanctnSn")));
+			if (!groupSeqMap.containsKey(groupKey) || groupSeqMap.get(groupKey) < sn) {
+				groupSeqMap.put(groupKey, sn);
+			}
+		}
+
+		for (Map<String, Object> line : brandNew) {
+			String lineType = (String) line.get("lineType");
+			if (lineType == null) {
+				lineType = "APPR";
+			}
+
+			String div1CodeId = "APPR".equals(lineType) ? "TODODIV20" : "TODODIV10";
+			String div2CodeId = null;
+
+			if ("APPR".equals(lineType)) {
+				// APPR: DIV2는 linked 라인에서 도출, 또는 문서의 유일한 APPR 그룹
+				if (linkedDiv2 != null) {
+					div2CodeId = linkedDiv2;
+				} else {
+					// brandNew만 있는 경우: DIV2 다중 그룹 검증 (approvalDiv2Set은 루프 전에 사전 계산됨)
+					if (approvalDiv2Set.isEmpty()) {
+						logger.warn(
+								"[AM→WB sync] 신규 결재자 생성 실패: 같은 문서에 APPR(TODODIV20) 그룹이 없음. approverId={}",
+								line.get("approverId"));
+						continue;
+					} else if (approvalDiv2Set.size() > 1) {
+						logger.error(
+								"[AM→WB sync] 신규 결재자 생성 중단: 같은 문서에 여러 APPR DIV2 그룹 존재하는데 linked line이 없음(DIV2 판정 불가). "
+									+ "이는 AM→WB 동기화 페이로드 구조의 어긋남. todoNo={}, groups={}, approverId={}",
+								todoNo, approvalDiv2Set, line.get("approverId"));
+						return results;
+					} else {
+						div2CodeId = approvalDiv2Set.iterator().next();
+					}
+				}
+			} else {
+				// REF: DIV2는 linked의 APPR DIV2를 페어링으로 변환
+				if (linkedDiv2 == null) {
+					// REF만 있고 APPR linked가 없는 경우: 기존 공유 라인에서 상속
+					for (Map<String, String> row : wb20Rows) {
+						if ("TODODIV10".equals(row.get("todoDiv1CodeId"))) {
+							div2CodeId = row.get("todoDiv2CodeId");
+							break;
+						}
+					}
+
+					if (div2CodeId == null) {
+						// 폴백: 문서의 APPR 그룹 DIV2를 사용해서 페어링으로 도출
+						if (approvalDiv2Set.isEmpty()) {
+							logger.warn(
+									"[AM→WB sync] 신규 공유자 생성 실패: 같은 문서에 기존 REF 라인도 APPR도 없음. approverId={}",
+									line.get("approverId"));
+							continue;
+						} else if (approvalDiv2Set.size() > 1) {
+							logger.warn(
+									"[AM→WB sync] 신규 공유자 생성 실패: 같은 문서에 여러 APPR DIV2 그룹 존재(REF DIV2 판정 불가). "
+										+ "approvalDiv2Set={}, approverId={}",
+									approvalDiv2Set, line.get("approverId"));
+							continue;
+						} else {
+							// 문서의 유일한 APPR DIV2를 페어링으로 변환
+							String approvalDiv2 = approvalDiv2Set.iterator().next();
+							if (approvalDiv2.startsWith("TODODIV2")) {
+								div2CodeId = "TODODIV1" + approvalDiv2.substring(8);
+								logger.info(
+										"[AM→WB sync] REF DIV2 폴백: APPR DIV2 페어링. approvalDiv2={} → refDiv2={}, approverId={}",
+										approvalDiv2, div2CodeId, line.get("approverId"));
+							} else {
+								logger.warn(
+										"[AM→WB sync] 신규 공유자 생성 실패: APPR DIV2의 페어링 규칙 미적용(startsWith TODODIV2 아님). "
+											+ "approvalDiv2={}, approverId={}",
+										approvalDiv2, line.get("approverId"));
+								continue;
+							}
+						}
+					}
+				} else {
+					// linkedDiv2를 TODODIV2xxx → TODODIV1xxx로 페어링
+					if (linkedDiv2.startsWith("TODODIV2")) {
+						div2CodeId = "TODODIV1" + linkedDiv2.substring(8);
+					} else {
+						logger.warn(
+								"[AM→WB sync] 신규 공유자 생성 실패: linked DIV2의 페어링 규칙 미적용(startsWith TODODIV2 아님). "
+									+ "linkedDiv2={}, approverId={}",
+								linkedDiv2, line.get("approverId"));
+						continue;
+					}
+				}
+			}
+
+			// approverId null 검증
+			String approverId = line.get("approverId") != null ? String.valueOf(line.get("approverId")).trim() : null;
+			if (approverId == null || approverId.isEmpty()) {
+				logger.warn("[AM→WB sync] 신규 행 스킵: approverId null/empty. lineType={}, div1={}, div2={}", lineType, div1CodeId, div2CodeId);
+				continue;
+			}
+
+			// TODO_KEY 채번
+			Map<String, String> keyParam = new HashMap<>();
+			Integer nextTodoKey = wb20Mapper.selectNextTodoKey(keyParam);
+
+			// SANCTN_SN: 그룹별 러닝 카운터 ++
+			String groupKey = div1CodeId + "|" + div2CodeId;
+			Integer currentSeq = groupSeqMap.getOrDefault(groupKey, 0);
+			int newSn = currentSeq + 1;
+			groupSeqMap.put(groupKey, newSn);
+
+			// P2) 신규 행 INSERT: empty 판정에 따라 라우팅
+			if (snapshotTemplate != null) {
+				// 스냅샷 템플릿 기반 insertTodoMasterForAmLink 사용
+				Map<String, String> forAmParam = new HashMap<>();
+				forAmParam.put("todoKey", String.valueOf(nextTodoKey));
+				forAmParam.put("sanctnSn", String.valueOf(newSn));
+				forAmParam.put("coCd", coCd);
+				forAmParam.put("todoDiv1CodeId", div1CodeId);
+				forAmParam.put("todoDiv2CodeId", div2CodeId);
+				forAmParam.put("todoId", approverId);
+				forAmParam.put("todoNo", todoNo);
+				forAmParam.put("sanctnSttus", "N");
+				forAmParam.put("pgmId", "AM1201M01");
+				forAmParam.put("userId", userId);
+				forAmParam.put("creatId", creatId);
+				forAmParam.put("creatPgm", creatPgm);
+				forAmParam.put("createDttm", createDttm);
+
+				// 스냅샷에서 부가컬럼 추출
+				if (snapshotTemplate.get("salesCd") != null) {
+					forAmParam.put("salesCd", snapshotTemplate.get("salesCd"));
+				}
+				if (snapshotTemplate.get("pgPath") != null) {
+					forAmParam.put("pgPath", snapshotTemplate.get("pgPath"));
+				}
+				if (snapshotTemplate.get("pgParam") != null) {
+					forAmParam.put("pgParam", snapshotTemplate.get("pgParam"));
+				}
+				if (snapshotTemplate.get("todoCoCd") != null) {
+					forAmParam.put("todoCoCd", snapshotTemplate.get("todoCoCd"));
+				}
+				if (snapshotTemplate.get("todoCodeKind") != null) {
+					forAmParam.put("todoCodeKind", snapshotTemplate.get("todoCodeKind"));
+				}
+				if (snapshotTemplate.get("todoCodeId") != null) {
+					forAmParam.put("todoCodeId", snapshotTemplate.get("todoCodeId"));
+				}
+				if (snapshotTemplate.get("todoFileTrgtKey") != null) {
+					forAmParam.put("todoFileTrgtKey", snapshotTemplate.get("todoFileTrgtKey"));
+				}
+				if (snapshotTemplate.get("todoTitl") != null) {
+					forAmParam.put("todoTitl", snapshotTemplate.get("todoTitl"));
+				}
+
+				logger.info(
+						"[AM→WB sync] 신규 행 insert (스냅샷 기반). todoKey={}, approverId={}, div1={}, div2={}, sanctnSn={}",
+						nextTodoKey, approverId, div1CodeId, div2CodeId, newSn);
+
+				wb20Mapper.insertTodoMasterForAmLink(forAmParam);
+			} else {
+				// 라이브 템플릿 기반 insertTodoMasterCopyTemplate 사용
+				Map<String, String> insertParam = new HashMap<>();
+				insertParam.put("todoKey", String.valueOf(nextTodoKey));
+				insertParam.put("sanctnSn", String.valueOf(newSn));
+				insertParam.put("coCd", coCd);
+				insertParam.put("todoDiv1CodeId", div1CodeId);
+				insertParam.put("todoDiv2CodeId", div2CodeId);
+				insertParam.put("todoId", approverId);
+				insertParam.put("todoNo", todoNo);
+				insertParam.put("pgmId", "AM1201M01");
+				insertParam.put("userId", userId);
+
+				logger.info(
+						"[AM→WB sync] 신규 행 insert (라이브 템플릿 복사). todoKey={}, approverId={}, div1={}, div2={}, sanctnSn={}",
+						nextTodoKey, approverId, div1CodeId, div2CodeId, newSn);
+
+				wb20Mapper.insertTodoMasterCopyTemplate(insertParam);
+			}
+
+			// P4) 신규 행 링크정보 수집 (백필용)
+			Map<String, Object> linkInfo = new HashMap<>();
+			linkInfo.put("approverId", approverId);
+			linkInfo.put("lineType", lineType);
+			linkInfo.put("wb20TodoKey", nextTodoKey);
+			linkInfo.put("wb20CoCd", coCd);
+			linkInfo.put("wb20TodoNo", todoNo);
+			linkInfo.put("wb20SanctnSn", newSn);
+			linkInfo.put("wb20Div1CodeId", div1CodeId);
+			linkInfo.put("wb20Div2CodeId", div2CodeId);
+			results.add(linkInfo);
+
+			logger.info("[AM→WB sync] 신규 행 링크정보 수집 (P4 백필용). approverId={}, lineType={}, wb20TodoKey={}, wb20SanctnSn={}",
+					approverId, lineType, nextTodoKey, newSn);
+		}
+
+		// ===== PHASE A/B/C: WB20 SANCTN_SN을 AM(lineList) 순서와 일치시키는 재번호 =====
+		// selectApprovalYn(wb20.xml)이 SUM('Y')=MAX(SANCTN_SN)로 완료판정하므로,
+		// 비승인 포함 SANCTN_SN이 gap없이 1..n 연속이어야 한다. PHASE C 검증 필수(잔류 시 롤백).
+		final int SANCTN_OFFSET = 1000; // SANCTN_SN 자릿수 미확인이나 결재선 규모상 충분
+
+		// 그룹별 승인행('Y') 최대 SANCTN_SN = base
+		Map<String, Integer> groupApprovedMax = new HashMap<>();
+		for (Map<String, String> row : wb20Rows) {
+			if (!"Y".equals(row.get("sanctnSttus"))) continue;
+			String gk = row.get("todoDiv1CodeId") + "|" + row.get("todoDiv2CodeId");
+			int sn = Integer.parseInt(String.valueOf(row.get("sanctnSn")));
+			groupApprovedMax.merge(gk, sn, Math::max);
+		}
+
+		// brandNew 라인의 todoKey/div 조회용(results = step4에서 생성된 신규행 링크정보)
+		Map<String, Map<String, Object>> brandNewByKey = new HashMap<>();
+		for (Map<String, Object> r : results) {
+			brandNewByKey.put(String.valueOf(r.get("approverId")) + "|" + String.valueOf(r.get("lineType")), r);
+		}
+
+		// PHASE A: 비승인 APPR/REF 행을 임시 오프셋으로 이동(목표 구간 비우기)
+		Map<String, Object> offParam = new HashMap<>();
+		offParam.put("todoNo", todoNo);
+		offParam.put("coCd", coCd);
+		offParam.put("offset", SANCTN_OFFSET);
+		wb20Mapper.offsetNonApprovedSanctnSn(offParam);
+
+		// PHASE B: lineList(AM 순서) 순회하며 목표 SANCTN_SN 배정. P4 백필용 results 재구성.
+		List<Map<String, Object>> reorderResults = new ArrayList<>();
+		Map<String, Integer> groupCounter = new HashMap<>();
+		for (Map<String, Object> line : lineList) {
+			Object wb20TodoKeyObj = line.get("wb20TodoKey");
+			String todoKeyStr = (wb20TodoKeyObj == null) ? null : String.valueOf(wb20TodoKeyObj).trim();
+			boolean isLinked = todoKeyStr != null && !todoKeyStr.isEmpty();
+
+			String lineType = (String) line.get("lineType");
+			if (lineType == null) lineType = "APPR";
+			String approverId = line.get("approverId") != null ? String.valueOf(line.get("approverId")).trim() : null;
+
+			String todoKey;
+			String div1;
+			String div2;
+			if (isLinked) {
+				todoKey = todoKeyStr;
+				div1 = String.valueOf(line.get("wb20Div1CodeId"));
+				div2 = String.valueOf(line.get("wb20Div2CodeId"));
+			} else {
+				Map<String, Object> r = brandNewByKey.get(approverId + "|" + lineType);
+				if (r == null) {
+					// step4에서 생성 스킵된 라인(div2 미도출/approverId 없음 등) → 재번호 대상 없음
+					continue;
+				}
+				todoKey = String.valueOf(r.get("wb20TodoKey"));
+				div1 = String.valueOf(r.get("wb20Div1CodeId"));
+				div2 = String.valueOf(r.get("wb20Div2CodeId"));
+			}
+
+			String gk = div1 + "|" + div2;
+			int base = groupApprovedMax.getOrDefault(gk, 0);
+			int target = groupCounter.getOrDefault(gk, base) + 1;
+
+			Map<String, Object> p = new HashMap<>();
+			p.put("todoNo", todoNo);
+			p.put("coCd", coCd);
+			p.put("todoKey", todoKey);
+			p.put("sanctnSn", target);
+			p.put("userId", userId);
+			p.put("pgmId", "AM1201M01");
+			int upd = wb20Mapper.updateTodoLineSanctnSnByKey(p);
+			if (upd == 0) {
+				// 대상 행이 없으면(희귀) 목표 번호를 소비하지 않아 순번 gap을 방지
+				logger.warn("[AM→WB sync] SANCTN_SN 재배정 대상행 없음(스킵). approverId={}, lineType={}, todoKey={}",
+						approverId, lineType, todoKey);
+				continue;
+			}
+			groupCounter.put(gk, target);
+
+			// P4 백필용 정보: 목표 SANCTN_SN으로(AM11D01.WB20_SANCTN_SN까지 동기화)
+			Map<String, Object> info = new HashMap<>();
+			info.put("approverId", approverId);
+			info.put("lineType", lineType);
+			info.put("wb20TodoKey", todoKey);
+			info.put("wb20CoCd", coCd);
+			info.put("wb20TodoNo", todoNo);
+			info.put("wb20SanctnSn", target);
+			info.put("wb20Div1CodeId", div1);
+			info.put("wb20Div2CodeId", div2);
+			reorderResults.add(info);
+
+			logger.info("[AM→WB sync] SANCTN_SN 재배정. approverId={}, lineType={}, todoKey={}, target={}",
+					approverId, lineType, todoKey, target);
+		}
+
+		// PHASE C: offset 잔류행(재배정 누락) 검증 — 있으면 순번 gap 손상 → 롤백
+		Map<String, Object> chkParam = new HashMap<>();
+		chkParam.put("todoNo", todoNo);
+		chkParam.put("coCd", coCd);
+		chkParam.put("offset", SANCTN_OFFSET);
+		int leftover = wb20Mapper.countOffsetLeftoverSanctnSn(chkParam);
+		if (leftover > 0) {
+			logger.error("[AM→WB sync] PHASE C 실패: offset 잔류 {}건 → 롤백. todoNo={}", leftover, todoNo);
+			throw new IllegalStateException("SANCTN_SN 재번호 불완전(offset 잔류 " + leftover + "건): todoNo=" + todoNo);
+		}
+
+		logger.info("[AM→WB sync] 완료. 재배정/생성 {}건(신규행 {}개)", reorderResults.size(), brandNew.size());
+		return reorderResults;
 	}
 
 }
