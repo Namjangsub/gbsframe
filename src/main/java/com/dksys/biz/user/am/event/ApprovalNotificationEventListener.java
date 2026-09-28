@@ -299,6 +299,8 @@ public class ApprovalNotificationEventListener {
                 finalMessage = finalMessage.replace("#{ordrgMngTelNo}", ordrgMngTelNo);
                 finalMessage = finalMessage.replace("#{nameTo}", msgInfo.get("name") != null ? msgInfo.get("name") : "");
                 finalMessage = finalMessage.replace("#{rcvNm}", msgInfo.get("name") != null ? msgInfo.get("name") : "");
+                // #{formNm}: 업무별 양식명(제목 표기용). 공통 템플릿 1개로도 업무마다 올바른 양식명이 채워진다.
+                finalMessage = finalMessage.replace("#{formNm}", resolveFormNm(erpBizType, todoDiv2CodeId));
 
                 if ("PM51".equals(erpBizType)) {
                     String tripPeriod = resolvePm51TripPeriod(paramMap);
@@ -441,6 +443,20 @@ public class ApprovalNotificationEventListener {
                 "[" + event.getDocNo() + "] 결재 대기 문서가 도착했습니다",
                 "[" + event.getDocNo() + "] 결재 대기 문서가 도착했습니다: " + event.getDocTitle(),
                 event.getDocId(), null, null);
+    }
+
+    /** 알림 메시지 제목 표기용 업무 양식명. 공통 템플릿의 #{formNm} 치환값. */
+    private String resolveFormNm(String erpBizType, String todoDiv2CodeId) {
+        if ("PM08".equals(erpBizType)) {
+            return "TODODIV2420".equals(todoDiv2CodeId) ? "[휴일대체근무 결과보고]" : "[휴일대체근무 신청서]";
+        }
+        if ("PM51".equals(erpBizType)) {
+            return "[출장신청서]";
+        }
+        if ("PM07".equals(erpBizType)) {
+            return "[휴가신청서]";
+        }
+        return "";
     }
 
     private void sendNotification(String receiverId, String receiverNm, String title, String message, String docId,

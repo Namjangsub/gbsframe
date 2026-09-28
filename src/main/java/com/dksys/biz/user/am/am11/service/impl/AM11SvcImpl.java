@@ -1699,12 +1699,12 @@ public class AM11SvcImpl implements AM11Svc {
         }
 
         // 9. 결재 행위 이력 및 감사로그 기록 (민감정보 마스킹 적용)
-        paramMap.put("actType", "LINE_CHG");
+        paramMap.put("actType", "LINE_CHANGE");
         paramMap.put("prevStatus", docStatus);
         paramMap.put("nextStatus", docStatus);
         paramMap.put("actOpinion", "결재선 변경: " + ApprovalSecurityUtil.maskSensitiveData(changeReason));
         am11Mapper.insertApprovalHist(paramMap);
-        writeAudit(paramMap, docLock, "LINE_CHG", "결재선 변경: " + ApprovalSecurityUtil.maskSensitiveData(changeReason));
+        writeAudit(paramMap, docLock, "LINE_CHANGE", "결재선 변경: " + ApprovalSecurityUtil.maskSensitiveData(changeReason));
 
         // 10. 변경된 새 결재자에게 알림 큐 적재 및 이벤트 발행
         if (nextFirstApproverId != null) {
