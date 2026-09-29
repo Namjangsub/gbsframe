@@ -1,3 +1,20 @@
+// GNB 메뉴 접힘 상태 사전 적용 (화면 전환 시 좌측 메뉴 및 상단 영역 번쩍임/FOUC 완전 방지)
+(function() {
+	try {
+		if (typeof localStorage !== 'undefined' && localStorage.getItem('GBS:menuCollapsed') === 'Y') {
+			var style = document.createElement('style');
+			style.id = 'gbs-menu-collapse-prestyle';
+			style.textContent = 
+				'#head_area { display: none !important; } ' +
+				'.menu_off { left: 0 !important; } ' +
+				'.menu_off .off_btn::before { transform: rotate(270deg) !important; } ' +
+				'#top_area { margin-left: 15px !important; width: calc(100% - 15px) !important; } ' +
+				'#main_area { margin-left: 15px !important; width: calc(100% - 15px) !important; }';
+			(document.head || document.documentElement).appendChild(style);
+		}
+	} catch (e) {}
+})();
+
 var setCookie = function(name, value, exp) {
 	var date = new Date();
 	date.setTime(date.getTime() + exp * 24 * 60 * 60 * 1000);
@@ -1777,7 +1794,246 @@ function checkMenuAuth(accessList) {
 		} catch (e) {
 			console.warn("메뉴 자동 추출 실패:", e);
 		}
+
+		// 전 화면 공통: 상단 contents no_bg에 즐겨찾기 바로가기 툴바 자동 렌더링
+		try {
+			initGlobalQuickFavoriteMenu(accessList);
+		} catch (e) {
+			console.warn("상단 즐겨찾기 바로가기 렌더링 실패:", e);
+		}
 	}
+
+/**
+ * 전 화면 공통: 상단 contents no_bg 영역에 즐겨찾기 바로가기 툴바 자동 렌더링
+ * - 기존 도움말, 초기화, 검색 등 우측 버튼들은 우측에 고정 유지
+ * - 앞에서부터 즐겨찾기 버튼들이 순서대로 생성
+ * - 버튼이 넘치면 좌우 꺽세(< >) 버튼이 노출되어 스크롤 네비게이션 제공
+ */
+function initGlobalQuickFavoriteMenu(accessList) {
+	// 모달 팝업 내부 또는 contents no_bg가 없는 화면은 제외
+	if ($('#main_area .contents.no_bg').length === 0) return;
+	if (location.pathname.indexOf('P0') !== -1 || $('body').hasClass('popup-window')) return;
+
+	var favList = [];
+	if (Array.isArray(accessList)) {
+		for (var i = 0; i < accessList.length; i++) {
+			var m = accessList[i];
+			if (m.upMenuId === 'U99' && m.menuType === 'HTML' && m.useYn === 'Y' && m.menuUrl && m.menuUrl !== '-') {
+				favList.push(m);
+			} else if (m.upMenuId === 'U99' || (m.menuUrl && m.menuUrl !== '-' && !m.upMenuId)) {
+				favList.push(m);
+			}
+		}
+	}
+
+	// 즐겨찾기 목록이 있으면 sessionStorage에 캐싱 (화면 전환 시 지연 없는 즉시 렌더링용)
+	if (favList.length > 0) {
+		try {
+			sessionStorage.setItem('GBS:favListCache', JSON.stringify(favList));
+		} catch (e) {}
+	}
+
+	var $contentsNoBg = $('#main_area .contents.no_bg').first();
+	var $wrapper = $('#globalQuickMenuWrapper');
+
+	// 즐겨찾기 메뉴가 없으면 기존 래퍼 제거 및 flex 클래스 해제
+	if (favList.length === 0) {
+		if ($wrapper.length > 0) $wrapper.remove();
+		$contentsNoBg.removeClass('has-quick-menu');
+		return;
+	}
+
+	$contentsNoBg.addClass('has-quick-menu');
+
+	if ($wrapper.length === 0) {
+		var wrapperHtml = '<div id="globalQuickMenuWrapper" class="global-quick-menu-wrapper">'
+		                + '  <button type="button" id="globalQuickScrollLeft" class="global-quick-scroll-btn" onclick="scrollGlobalQuickMenu(-200);" title="이전 즐겨찾기">'
+		                + '    <i class="fas fa-chevron-left"></i>'
+		                + '  </button>'
+		                + '  <div id="globalQuickScrollContainer" class="global-quick-scroll-container"></div>'
+		                + '  <button type="button" id="globalQuickScrollRight" class="global-quick-scroll-btn" onclick="scrollGlobalQuickMenu(200);" title="다음 즐겨찾기">'
+		                + '    <i class="fas fa-chevron-right"></i>'
+		                + '  </button>'
+		                + '</div>';
+		$contentsNoBg.prepend(wrapperHtml);
+	}
+
+	var $container = $('#globalQuickScrollContainer');
+	$container.empty();
+
+	// 사용자가 드래그하여 저장해 둔 순서대로 정렬 적용
+	favList = sortFavListBySavedOrder(favList);
+
+	var curPath = location.pathname;
+	$.each(favList, function(idx, item) {
+		var menuKey = item.originId || item.menuId;
+		var isActive = false;
+		if (curPath && item.menuUrl) {
+			var pureUrl = item.menuUrl.split('?')[0].split('#')[0].trim();
+			if (pureUrl && (curPath === pureUrl || curPath.endsWith(pureUrl) || pureUrl.endsWith(curPath))) {
+				isActive = true;
+			}
+		}
+		var activeCls = isActive ? " active-menu" : "";
+
+		var btnHtml = '<a href="' + item.menuUrl + '" class="global-quick-item' + activeCls + '" id="gquick_' + menuKey + '" '
+		            + 'draggable="true" data-menu-key="' + menuKey + '" '
+		            + 'onclick="setCookie(\'menuSaveYn\', \'' + (item.saveYn || 'Y') + '\', 1); if (typeof insertPgmHistory === \'function\') insertPgmHistory(\'' + item.menuUrl + '\');" '
+		            + 'title="' + item.menuNm + ' (드래그하여 순서 변경)">'
+		            + '<button type="button" class="bg_gray">'
+		            + '<i class="far fa-star" style="color: #f59f00; margin-right: 4px;"></i>' + item.menuNm
+		            + '</button>'
+		            + '</a>';
+		$container.append(btnHtml);
+	});
+
+	// 마우스 드래그 앤 드롭 순서 변경 이벤트 바인딩
+	bindQuickMenuDragAndDrop($container);
+
+	// 스크롤 및 리사이즈 이벤트 바인딩
+	$container.off('scroll.quick wheel.quick').on('scroll.quick', updateGlobalQuickScrollButtons);
+	$container.on('wheel.quick', function(e) {
+		if (this.scrollWidth > this.clientWidth) {
+			e.preventDefault();
+			this.scrollLeft += e.originalEvent.deltaY;
+			updateGlobalQuickScrollButtons();
+		}
+	});
+
+	$(window).off('resize.globalQuick').on('resize.globalQuick', updateGlobalQuickScrollButtons);
+
+	setTimeout(updateGlobalQuickScrollButtons, 60);
+}
+
+/**
+ * 저장된 드래그 순서에 따라 즐겨찾기 목록 정렬
+ */
+function sortFavListBySavedOrder(favList) {
+	try {
+		var storageKey = 'GBS:favMenuOrder:' + (typeof jwt !== "undefined" && jwt.userId ? jwt.userId : 'common');
+		var savedOrderStr = localStorage.getItem(storageKey);
+		if (!savedOrderStr) return favList;
+		var savedOrder = JSON.parse(savedOrderStr);
+		if (!Array.isArray(savedOrder) || savedOrder.length === 0) return favList;
+
+		favList.sort(function(a, b) {
+			var keyA = a.originId || a.menuId;
+			var keyB = b.originId || b.menuId;
+			var idxA = savedOrder.indexOf(keyA);
+			var idxB = savedOrder.indexOf(keyB);
+			if (idxA === -1 && idxB === -1) return 0;
+			if (idxA === -1) return 1;
+			if (idxB === -1) return -1;
+			return idxA - idxB;
+		});
+	} catch (e) {}
+	return favList;
+}
+
+/**
+ * 즐겨찾기 버튼 드래그 앤 드롭 순서 변경 바인딩
+ */
+function bindQuickMenuDragAndDrop($container) {
+	var draggedElem = null;
+	var isDraggingState = false;
+
+	$container.find('.global-quick-item').off('dragstart dragend click').on('dragstart', function(e) {
+		draggedElem = this;
+		isDraggingState = true;
+		$(this).addClass('is-dragging');
+		if (e.originalEvent && e.originalEvent.dataTransfer) {
+			e.originalEvent.dataTransfer.effectAllowed = 'move';
+			e.originalEvent.dataTransfer.setData('text/plain', $(this).attr('data-menu-key') || '');
+		}
+	}).on('dragend', function() {
+		$(this).removeClass('is-dragging');
+		draggedElem = null;
+		saveGlobalQuickMenuOrder();
+		updateGlobalQuickScrollButtons();
+		setTimeout(function() {
+			isDraggingState = false;
+		}, 100);
+	}).on('click', function(e) {
+		// 드래그 직후 실수로 페이지 이동이 발생하는 현상 방지
+		if (isDraggingState) {
+			e.preventDefault();
+			e.stopImmediatePropagation();
+			return false;
+		}
+	});
+
+	$container.off('dragover.quick drop.quick').on('dragover.quick', function(e) {
+		e.preventDefault();
+		if (!draggedElem) return;
+		if (e.originalEvent && e.originalEvent.dataTransfer) {
+			e.originalEvent.dataTransfer.dropEffect = 'move';
+		}
+
+		var target = e.target.closest('.global-quick-item');
+		if (target && target !== draggedElem && target.parentNode === this) {
+			var rect = target.getBoundingClientRect();
+			var isAfter = (e.clientX - rect.left) / (rect.right - rect.left) > 0.5;
+			if (isAfter) {
+				target.after(draggedElem);
+			} else {
+				target.before(draggedElem);
+			}
+		}
+	});
+}
+
+/**
+ * 드래그로 변경된 즐겨찾기 버튼 순서를 localStorage에 저장
+ */
+function saveGlobalQuickMenuOrder() {
+	var order = [];
+	$('#globalQuickScrollContainer .global-quick-item').each(function() {
+		var key = $(this).attr('data-menu-key');
+		if (key) order.push(key);
+	});
+	try {
+		var storageKey = 'GBS:favMenuOrder:' + (typeof jwt !== "undefined" && jwt.userId ? jwt.userId : 'common');
+		localStorage.setItem(storageKey, JSON.stringify(order));
+	} catch (e) {}
+}
+
+/**
+ * 바로가기 컨테이너 스크롤 이동 함수
+ */
+function scrollGlobalQuickMenu(offset) {
+	var container = document.getElementById('globalQuickScrollContainer');
+	if (!container) return;
+	container.scrollBy({ left: offset, behavior: 'smooth' });
+	setTimeout(updateGlobalQuickScrollButtons, 250);
+}
+
+/**
+ * 좌우 꺽세(<>) 버튼 노출 및 활성/비활성 상태 갱신
+ */
+function updateGlobalQuickScrollButtons() {
+	var container = document.getElementById('globalQuickScrollContainer');
+	if (!container) return;
+
+	var $btnLeft = $('#globalQuickScrollLeft');
+	var $btnRight = $('#globalQuickScrollRight');
+
+	// 자식 버튼들이 컨테이너 너비를 초과하는지 여부
+	var hasOverflow = container.scrollWidth > (container.clientWidth + 2);
+
+	if (hasOverflow) {
+		$btnLeft.show();
+		$btnRight.show();
+
+		var atLeft = container.scrollLeft <= 2;
+		var atRight = container.scrollLeft + container.clientWidth >= container.scrollWidth - 2;
+
+		$btnLeft.prop('disabled', atLeft);
+		$btnRight.prop('disabled', atRight);
+	} else {
+		$btnLeft.hide();
+		$btnRight.hide();
+	}
+}
 
 
 function favoritesMenuControl(obj){
@@ -1786,7 +2042,7 @@ function favoritesMenuControl(obj){
     const menuText = $nextA.length ? $nextA.text().trim() : '';
     const menuId = $nextA.length ? $nextA.attr('id') : '';
 
-    if (!menuId.startsWith("U")) return false;
+    if (!menuId) return false;
 
 	var param = {
 		"jobType" 	: jobType,
@@ -1868,17 +2124,96 @@ function setCommonSelect(selectArr){
 	})
 }
 
+/**
+ * 좌측 GNB 메뉴 접기/펼치기 상태 제어 및 영구 유지
+ */
+function setMenuCollapseState(isCollapsed, triggerResize) {
+	var preStyle = document.getElementById('gbs-menu-collapse-prestyle');
+	if (isCollapsed) {
+		$('#head_area').addClass('off');
+		$('#top_area').addClass('on');
+		$('#main_area').addClass('on');
+		if (!preStyle) {
+			try {
+				var style = document.createElement('style');
+				style.id = 'gbs-menu-collapse-prestyle';
+				style.textContent = 
+					'#head_area { display: none !important; } ' +
+					'.menu_off { left: 0 !important; } ' +
+					'.menu_off .off_btn::before { transform: rotate(270deg) !important; } ' +
+					'#top_area { margin-left: 15px !important; width: calc(100% - 15px) !important; } ' +
+					'#main_area { margin-left: 15px !important; width: calc(100% - 15px) !important; }';
+				(document.head || document.documentElement).appendChild(style);
+			} catch (e) {}
+		}
+	} else {
+		$('#head_area').removeClass('off');
+		$('#top_area').removeClass('on');
+		$('#main_area').removeClass('on');
+		if (preStyle) {
+			preStyle.remove();
+		}
+	}
+
+	if (triggerResize) {
+		setTimeout(function() {
+			$(window).trigger('resize');
+			try {
+				if (typeof gridView !== 'undefined' && gridView && gridView.target && typeof gridView.target.align === 'function') {
+					gridView.target.align();
+				}
+			} catch (e) {}
+		}, 80);
+	}
+}
+
+function getMenuCollapseState() {
+	try {
+		return localStorage.getItem('GBS:menuCollapsed') === 'Y';
+	} catch (e) {
+		return false;
+	}
+}
+
 function mainDefaultLoad(menuNm, subMenuNm) {
+	// 1. 이전 저장된 메뉴 접힘/펼침 상태 즉시 복원
+	var isMenuCollapsed = getMenuCollapseState();
+	setMenuCollapseState(isMenuCollapsed, false);
+
+	// 2. 캐시된 즐겨찾기 목록이 있으면 AJAX 대기 없이 즉시 상단 툴바 렌더링 (화면 이동 시 번쩍임/들썩임 완전 제거)
+	try {
+		var cachedFav = sessionStorage.getItem('GBS:favListCache');
+		if (cachedFav) {
+			var cachedList = JSON.parse(cachedFav);
+			if (Array.isArray(cachedList) && cachedList.length > 0) {
+				initGlobalQuickFavoriteMenu(cachedList);
+			}
+		}
+	} catch (e) {}
+
 	// left
 	$("#head_area").load("/static/html/header.html", function(){
 		if (subMenuNm) $("#head_area #title").html(subMenuNm);
 	});
-	$("#head_area").after('<div class="menu_off"><a class="off_btn"></a></div>');
-	$('.off_btn').click(function () {
-	    $('#head_area').toggleClass('off');
-	    $('#top_area').toggleClass('on');
-	    $('#main_area').toggleClass('on');
-    });
+	if ($('.menu_off').length === 0) {
+		$("#head_area").after('<div class="menu_off"><a class="off_btn" href="javascript:void(0);" title="메뉴 접기/펼치기"></a></div>');
+	}
+
+	// off_btn 클릭 시 토글 및 localStorage 영구 저장
+	$('.off_btn').off('click.menuToggle').on('click.menuToggle', function (e) {
+		// 사용자의 직접적인 마우스 클릭(e.originalEvent 존재)인 경우에만 토글 및 저장
+		// 개별 화면 스크립트에서 임의로 호출하는 $('.off_btn').click()에 의해 이전 상태가 풀리거나 뒤집히는 것을 방지
+		if (!e.originalEvent) {
+			return;
+		}
+		var currentCollapsed = $('#head_area').hasClass('off');
+		var nextCollapsed = !currentCollapsed;
+		setMenuCollapseState(nextCollapsed, true);
+		try {
+			localStorage.setItem('GBS:menuCollapsed', nextCollapsed ? 'Y' : 'N');
+		} catch (err) {}
+	});
+
 	// top
 	$("#top_area").load("/static/html/top.html", function(){
 		if (menuNm) $('#topMenu').text(menuNm);
@@ -1888,7 +2223,7 @@ function mainDefaultLoad(menuNm, subMenuNm) {
 	});
 
 	//메뉴 off 시 메인그리드 리플레쉬 그리드 이름 gridView 사용시 적용
-	$(".menu_off").on("click",function(){
+	$(".menu_off").off("click.refreshGrid").on("click.refreshGrid", function(){
 		if($(".menu_off").css("left") == "0px") {
 			try {
 				gridView.initView().setData(0);
