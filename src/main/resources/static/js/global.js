@@ -1880,7 +1880,7 @@ function initGlobalQuickFavoriteMenu(accessList) {
 		            + 'draggable="true" data-menu-key="' + menuKey + '" '
 		            + 'onclick="setCookie(\'menuSaveYn\', \'' + (item.saveYn || 'Y') + '\', 1); if (typeof insertPgmHistory === \'function\') insertPgmHistory(\'' + item.menuUrl + '\');" '
 		            + 'title="' + item.menuNm + ' (드래그하여 순서 변경)">'
-		            + '<button type="button" class="bg_gray">'
+		            + '<button type="button">'
 		            + '<i class="far fa-star" style="color: #f59f00; margin-right: 4px;"></i>' + item.menuNm
 		            + '</button>'
 		            + '</a>';
