@@ -1586,14 +1586,14 @@
 					        , (SELECT FN_CM05M01_CD_TO_NM(decode(QP.MC_PART_CD	, '', decode(QM.MC_PART_CD	, '', ISU.MC_PART_CD	, QM.MC_PART_CD)	, QP.MC_PART_CD)	) FROM DUAL) AS MC_PART_CD_NM
 					        , (SELECT FN_CM05M01_CD_TO_NM(decode(QP.IMPORTANT_CD, '', decode(QM.IMPORTANT_CD, '', ISU.IMPORTANT_CD	, QM.IMPORTANT_CD)	, QP.IMPORTANT_CD)	) FROM DUAL) AS IMPORTANT_CD_NM
 					        , (SELECT FN_CM05M01_CD_TO_NM(decode(QP.IMPACT_CD	, '', decode(QM.IMPACT_CD	, '', ISU.IMPACT_CD		, QM.IMPACT_CD)		, QP.IMPACT_CD)		) FROM DUAL) AS IMPACT_CD_NM
-					        , W1.SANCTN_STTUS AS LAB_STS		--연구소 결재
-					        , W2.SANCTN_STTUS AS PUR_STS		--구매 결재
-					        , W3.SANCTN_STTUS AS PRD_STS		--생산 결재
-					        , W4.SANCTN_STTUS AS OUT_STS		--직접매출 결재
-					        , to_char(W1.TODO_CF_DT,'MM/DD')  AS LAB_APPROVAL_DT		--연구소 결재
-					        , to_char(W2.TODO_CF_DT,'MM/DD')  AS PUR_APPROVAL_DT		--구매 결재
-					        , to_char(W3.TODO_CF_DT,'MM/DD')  AS PRD_APPROVAL_DT		--생산 결재
-					        , to_char(W4.TODO_CF_DT,'MM/DD')  AS OUT_APPROVAL_DT		--직접매출 결재
+					        , W.LAB_STS
+					        , W.PUR_STS
+					        , W.PRD_STS
+					        , W.OUT_STS
+					        , W.LAB_APPROVAL_DT
+					        , W.PUR_APPROVAL_DT
+					        , W.PRD_APPROVAL_DT
+					        , W.OUT_APPROVAL_DT
                             , TO_CHAR(NVL(QM.CUST_REQ_DT, ISU.CUST_REQ_DT), 'YYYY-MM-DD') AS CUST_REQ_DT		--과제 출고일 = 고객요구일
 					        , TO_CHAR(CR.DUDT_INTEND_DT,'YYYY-MM-DD') AS DUDT_INTEND_DT	--수주 납기예정일 ->고객요구일
 					        , CASE WHEN QM.REQ_ST = 'REQST03' THEN 3 
@@ -1624,10 +1624,21 @@
 								LEFT OUTER JOIN TB_QM01P01 AS QP ON QP.REQ_NO = ISU.REQ_NO
 			           			LEFT OUTER JOIN TB_CM06M01 AS B4 ON QM.ORDRG_ID = B4.ID
 				                LEFT OUTER JOIN TB_CM04M01 AS B5 ON B5.DEPT_ID = SUBSTRING(B4.DEPT_ID,0,5)
-				                LEFT OUTER JOIN TB_WB20M03 AS W1 ON W1.TODO_NO = ISU.REQ_NO AND W1.TODO_DIV2_CODE_ID='TODODIV2020' AND W1.TODO_ID='kimjhv' 		--김재현상무
-				                LEFT OUTER JOIN TB_WB20M03 AS W2 ON W2.TODO_NO = ISU.REQ_NO AND W2.TODO_DIV2_CODE_ID='TODODIV2020' AND W2.TODO_ID='h4ng10'		--허상렬팀장
-				                LEFT OUTER JOIN TB_WB20M03 AS W3 ON W3.TODO_NO = ISU.REQ_NO AND W3.TODO_DIV2_CODE_ID='TODODIV2020' AND W3.TODO_ID IN ('K98452000', 'kucho')	-- 김동현상무 퇴사로인한 조규언이사 추가
-				                LEFT OUTER JOIN TB_WB20M03 AS W4 ON W4.TODO_NO = ISU.REQ_NO AND W4.TODO_DIV2_CODE_ID='TODODIV2020' AND W4.TODO_ID IN ('choigss', 'h4ng10')	-- 최경식이사 퇴사로인한 허상렬부장 추가
+				                LEFT OUTER JOIN (
+				                    SELECT TODO_NO,
+				                           MAX(CASE WHEN TODO_ID IN ('kimjhv', 'shjung') THEN SANCTN_STTUS END)                AS LAB_STS,
+				                           MAX(CASE WHEN TODO_ID = 'h4ng10' THEN SANCTN_STTUS END)                             AS PUR_STS,
+				                           MAX(CASE WHEN TODO_ID IN ('K98452000', 'kucho', 'sms') THEN SANCTN_STTUS END)        AS PRD_STS,
+				                           MAX(CASE WHEN TODO_ID = 'choigss' THEN SANCTN_STTUS END)                             AS OUT_STS,
+				                           TO_CHAR(MAX(CASE WHEN TODO_ID IN ('kimjhv', 'shjung') THEN TODO_CF_DT END),'MM/DD') AS LAB_APPROVAL_DT,
+				                           TO_CHAR(MAX(CASE WHEN TODO_ID = 'h4ng10' THEN TODO_CF_DT END),'MM/DD')              AS PUR_APPROVAL_DT,
+				                           TO_CHAR(MAX(CASE WHEN TODO_ID IN ('K98452000', 'kucho', 'sms') THEN TODO_CF_DT END),'MM/DD') AS PRD_APPROVAL_DT,
+				                           TO_CHAR(MAX(CASE WHEN TODO_ID = 'choigss' THEN TODO_CF_DT END),'MM/DD')              AS OUT_APPROVAL_DT
+				                      FROM TB_WB20M03
+				                     WHERE TODO_DIV2_CODE_ID = 'TODODIV2020'
+				                       AND TODO_ID IN ('kimjhv', 'shjung', 'h4ng10', 'K98452000', 'kucho', 'sms', 'choigss')
+				                     GROUP BY TODO_NO
+				                ) AS W ON W.TODO_NO = ISU.REQ_NO
                                 LEFT OUTER JOIN (
 											    SELECT W9.*, ROW_NUMBER() OVER (PARTITION BY SALES_CD ORDER BY VER_NO DESC) AS rn
 											    FROM TB_WB21M01 W9
@@ -2522,14 +2533,14 @@
 								, (SELECT FN_CM05M01_CD_TO_NM(decode(QP.MC_PART_CD	, '', decode(QM.MC_PART_CD	, '', ISU.MC_PART_CD	, QM.MC_PART_CD)	, QP.MC_PART_CD)	) FROM DUAL) AS MC_PART_CD_NM
 								, (SELECT FN_CM05M01_CD_TO_NM(decode(QP.IMPORTANT_CD, '', decode(QM.IMPORTANT_CD, '', ISU.IMPORTANT_CD	, QM.IMPORTANT_CD)	, QP.IMPORTANT_CD)	) FROM DUAL) AS IMPORTANT_CD_NM
 								, (SELECT FN_CM05M01_CD_TO_NM(decode(QP.IMPACT_CD	, '', decode(QM.IMPACT_CD	, '', ISU.IMPACT_CD		, QM.IMPACT_CD)		, QP.IMPACT_CD)		) FROM DUAL) AS IMPACT_CD_NM
-								, W1.SANCTN_STTUS AS LAB_STS		--연구소 결재
-								, W2.SANCTN_STTUS AS PUR_STS		--구매 결재
-								, W3.SANCTN_STTUS AS PRD_STS		--생산 결재
-								, W4.SANCTN_STTUS AS OUT_STS		--직접매출 결재
-								, to_char(W1.TODO_CF_DT,'MM/DD')  AS LAB_APPROVAL_DT		--연구소 결재
-								, to_char(W2.TODO_CF_DT,'MM/DD')  AS PUR_APPROVAL_DT		--구매 결재
-								, to_char(W3.TODO_CF_DT,'MM/DD')  AS PRD_APPROVAL_DT		--생산 결재
-								, to_char(W4.TODO_CF_DT,'MM/DD')  AS OUT_APPROVAL_DT		--직접매출 결재
+								, W.LAB_STS
+								, W.PUR_STS
+								, W.PRD_STS
+								, W.OUT_STS
+								, W.LAB_APPROVAL_DT
+								, W.PUR_APPROVAL_DT
+								, W.PRD_APPROVAL_DT
+								, W.OUT_APPROVAL_DT
 								, TO_CHAR(W9.DE_DT, 'YYYY-MM-DD') AS CUST_REQ_DT			--과제 출고일 = 고객요구일
 								, TO_CHAR(CR.DUDT_INTEND_DT,'YYYY-MM-DD') AS DUDT_INTEND_DT	--수주 납기예정일 ->고객요구일
 								, CASE WHEN QM.REQ_ST = 'REQST03' THEN 3 
@@ -2555,10 +2566,21 @@
 									LEFT OUTER JOIN TB_QM01P01 AS QP ON QP.REQ_NO = ISU.REQ_NO
 									LEFT OUTER JOIN TB_CM06M01 AS B4 ON QM.ORDRG_ID = B4.ID
 									LEFT OUTER JOIN TB_CM04M01 AS B5 ON B5.DEPT_ID = SUBSTRING(B4.DEPT_ID,0,5)
-									LEFT OUTER JOIN TB_WB20M03 AS W1 ON W1.TODO_NO = ISU.REQ_NO AND W1.TODO_DIV2_CODE_ID='TODODIV2020' AND W1.TODO_ID='kimjhv' 		--김재현상무
-									LEFT OUTER JOIN TB_WB20M03 AS W2 ON W2.TODO_NO = ISU.REQ_NO AND W2.TODO_DIV2_CODE_ID='TODODIV2020' AND W2.TODO_ID='h4ng10'		--허상렬팀장
-									LEFT OUTER JOIN TB_WB20M03 AS W3 ON W3.TODO_NO = ISU.REQ_NO AND W3.TODO_DIV2_CODE_ID='TODODIV2020' AND W3.TODO_ID IN ('K98452000', 'kucho')	--김동현상무 퇴사로인한 조규언이사 추가
-									LEFT OUTER JOIN TB_WB20M03 AS W4 ON W4.TODO_NO = ISU.REQ_NO AND W4.TODO_DIV2_CODE_ID='TODODIV2020' AND W4.TODO_ID IN ('choigss', 'h4ng10')	--최경식이사 퇴사로인한 허상렬부장 추가
+									LEFT OUTER JOIN (
+									    SELECT TODO_NO,
+									           MAX(CASE WHEN TODO_ID IN ('kimjhv', 'shjung') THEN SANCTN_STTUS END)                AS LAB_STS,
+									           MAX(CASE WHEN TODO_ID = 'h4ng10' THEN SANCTN_STTUS END)                             AS PUR_STS,
+									           MAX(CASE WHEN TODO_ID IN ('K98452000', 'kucho', 'sms') THEN SANCTN_STTUS END)        AS PRD_STS,
+									           MAX(CASE WHEN TODO_ID = 'choigss' THEN SANCTN_STTUS END)                             AS OUT_STS,
+									           TO_CHAR(MAX(CASE WHEN TODO_ID IN ('kimjhv', 'shjung') THEN TODO_CF_DT END),'MM/DD') AS LAB_APPROVAL_DT,
+									           TO_CHAR(MAX(CASE WHEN TODO_ID = 'h4ng10' THEN TODO_CF_DT END),'MM/DD')              AS PUR_APPROVAL_DT,
+									           TO_CHAR(MAX(CASE WHEN TODO_ID IN ('K98452000', 'kucho', 'sms') THEN TODO_CF_DT END),'MM/DD') AS PRD_APPROVAL_DT,
+									           TO_CHAR(MAX(CASE WHEN TODO_ID = 'choigss' THEN TODO_CF_DT END),'MM/DD')              AS OUT_APPROVAL_DT
+									      FROM TB_WB20M03
+									     WHERE TODO_DIV2_CODE_ID = 'TODODIV2020'
+									       AND TODO_ID IN ('kimjhv', 'shjung', 'h4ng10', 'K98452000', 'kucho', 'sms', 'choigss')
+									     GROUP BY TODO_NO
+									) AS W ON W.TODO_NO = ISU.REQ_NO
 									LEFT OUTER JOIN (
 													SELECT W9.*, ROW_NUMBER() OVER (PARTITION BY SALES_CD ORDER BY VER_NO DESC) AS rn
 													FROM TB_WB21M01 W9
