@@ -431,12 +431,24 @@ public class WB20SvcImpl implements WB20Svc {
 			return;
 		}
 
+		if (!checked(tripReq.get("salesCnfrmYn"))) {
+			throw new RuntimeException("영업팀 확인을 체크해주세요.");
+		}
+		if (!hasText(tripReq.get("tripCondCd"))) {
+			throw new RuntimeException("출장조건을 선택해주세요.");
+		}
+		if ("TRIPCOND99".equals(tripReq.get("tripCondCd")) && !hasText(tripReq.get("etc")) && !hasText(tripReq.get("tripCondEtc"))) {
+			throw new RuntimeException("출장조건 기타 내용을 입력해주세요.");
+		}
 		boolean supportChecked = checked(tripReq.get("sprtTrfcYn"))
 				|| checked(tripReq.get("sprtLdgYn"))
 				|| checked(tripReq.get("sprtMealYn"))
 				|| checked(tripReq.get("sprtEtcYn"));
-		if (!checked(tripReq.get("salesCnfrmYn")) || !hasText(tripReq.get("tripCondCd")) || !supportChecked) {
-			throw new RuntimeException("영업팀 확인, 출장조건, 고객사지원범위를 입력해야 결재처리할 수 있습니다.");
+		if (!supportChecked) {
+			throw new RuntimeException("고객사지원범위를 선택해주세요.");
+		}
+		if (checked(tripReq.get("sprtEtcYn")) && !hasText(tripReq.get("sprtEtcTxt"))) {
+			throw new RuntimeException("고객사지원범위 기타 내용을 입력해주세요.");
 		}
 	}
 
@@ -1032,6 +1044,8 @@ public class WB20SvcImpl implements WB20Svc {
 		String todoNo = String.valueOf(paramMap.get("todoNo"));
 		String coCd = String.valueOf(paramMap.get("coCd"));
 		String userId = String.valueOf(paramMap.get("userId"));
+		Object histNoObj = paramMap.get("histNo");
+		String histNo = (histNoObj != null) ? String.valueOf(histNoObj) : null;
 		@SuppressWarnings("unchecked")
 		List<Map<String, Object>> lineList = (List<Map<String, Object>>) paramMap.get("lineList");
 
@@ -1165,6 +1179,7 @@ public class WB20SvcImpl implements WB20Svc {
 			upsertParam.put("creatId", creatId);
 			upsertParam.put("creatPgm", creatPgm);
 			upsertParam.put("createDttm", createDttm);
+			upsertParam.put("etcField2", histNo);
 
 			// 부가 컬럼: snapshot에서 상속
 			for (Map<String, String> row : wb20Rows) {
@@ -1439,6 +1454,7 @@ public class WB20SvcImpl implements WB20Svc {
 				forAmParam.put("creatId", creatId);
 				forAmParam.put("creatPgm", creatPgm);
 				forAmParam.put("createDttm", createDttm);
+				forAmParam.put("etcField2", histNo);
 
 				// 스냅샷에서 부가컬럼 추출
 				if (snapshotTemplate.get("salesCd") != null) {
@@ -1483,6 +1499,7 @@ public class WB20SvcImpl implements WB20Svc {
 				insertParam.put("todoNo", todoNo);
 				insertParam.put("pgmId", "AM1201M01");
 				insertParam.put("userId", userId);
+				insertParam.put("etcField2", histNo);
 
 				logger.info(
 						"[AM→WB sync] 신규 행 insert (라이브 템플릿 복사). todoKey={}, approverId={}, div1={}, div2={}, sanctnSn={}",
@@ -1532,6 +1549,9 @@ public class WB20SvcImpl implements WB20Svc {
 		offParam.put("todoNo", todoNo);
 		offParam.put("coCd", coCd);
 		offParam.put("offset", SANCTN_OFFSET);
+		if (histNo != null && !histNo.isEmpty()) {
+			offParam.put("histNo", histNo);
+		}
 		wb20Mapper.offsetNonApprovedSanctnSn(offParam);
 
 		// PHASE B: lineList(AM 순서) 순회하며 목표 SANCTN_SN 배정. P4 백필용 results 재구성.
@@ -1605,6 +1625,9 @@ public class WB20SvcImpl implements WB20Svc {
 		chkParam.put("todoNo", todoNo);
 		chkParam.put("coCd", coCd);
 		chkParam.put("offset", SANCTN_OFFSET);
+		if (histNo != null && !histNo.isEmpty()) {
+			chkParam.put("histNo", histNo);
+		}
 		int leftover = wb20Mapper.countOffsetLeftoverSanctnSn(chkParam);
 		if (leftover > 0) {
 			logger.error("[AM→WB sync] PHASE C 실패: offset 잔류 {}건 → 롤백. todoNo={}", leftover, todoNo);

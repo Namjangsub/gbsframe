@@ -29,4 +29,12 @@ public interface AM11Svc {
 
     // 3. ERP 연계 비즈니스 키로 AM 전자결재 docId 조회
     String selectDocIdByBizKey(Map<String, Object> paramMap);
+
+    // 4. 무알림 결재선 재동기화 (진행 전 전용, CR02 수주 삭제 시)
+    Map<String, Object> resyncApprovalLinesPreApproval(Map<String, Object> paramMap);
+
+    // 마이그레이션: CR02 문서 조회 및 업데이트
+    java.util.List<Map<String, Object>> selectCr02DocsForRerender();
+
+    int updateDocRenderHtmlById(Map<String, Object> paramMap);
 }

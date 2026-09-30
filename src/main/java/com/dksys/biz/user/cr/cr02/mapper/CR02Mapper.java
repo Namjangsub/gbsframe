@@ -115,6 +115,10 @@ public interface CR02Mapper {
 
     Map<String, String> ordrsDivChangeChk(Map<String, String> paramMap);
 
+	// CR02 AM 전자결재 삭제
+	int deleteAmD01ByOrdrsNo(Map<String, String> param);
+	int deleteAmM01ByOrdrsNo(Map<String, String> param);
+
 	List<Map<String, Object>> selectUnsettledAmtSalesCodeList(Map<String, String> paramMap);
 
 	List<Map<String, Object>> unsettledAmtCreditChk(Map<String, String> paramMap);

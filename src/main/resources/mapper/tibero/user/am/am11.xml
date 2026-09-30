@@ -31,7 +31,8 @@
                CURR_APPROVER_ID,
                DRA_USER_ID,
                ERP_BIZ_TYPE,
-               ERP_BIZ_KEY
+               ERP_BIZ_KEY,
+               ERP_HIST_NO AS HIST_NO
           FROM TB_AM11M01
          WHERE DOC_ID = #{docId}
     </select>
@@ -225,6 +226,7 @@
             DOC_RENDER_HTML,
             ERP_BIZ_TYPE,
             ERP_BIZ_KEY,
+            ERP_HIST_NO,
             CREAT_ID,
             CREAT_PGM,
             CREAT_DTTM,
@@ -263,6 +265,7 @@
             #{docRenderHtml, jdbcType=CLOB},
             #{erpBizType, jdbcType=VARCHAR},
             #{erpBizKey, jdbcType=VARCHAR},
+            #{histNo, jdbcType=VARCHAR},
             #{userId},
             #{pgmId},
             SYSTIMESTAMP,
@@ -289,6 +292,7 @@
                DOC_RENDER_HTML  = #{docRenderHtml, jdbcType=CLOB},
                ERP_BIZ_TYPE     = #{erpBizType, jdbcType=VARCHAR},
                ERP_BIZ_KEY      = #{erpBizKey, jdbcType=VARCHAR},
+               ERP_HIST_NO      = NVL(#{histNo, jdbcType=VARCHAR}, ERP_HIST_NO),
                UDT_ID           = #{userId},
                UDT_PGM          = #{pgmId},
                UDT_DTTM         = SYSTIMESTAMP
@@ -972,9 +976,32 @@
                        OR M.ERP_BIZ_TYPE IN ('PM51', 'PM07', 'PM08')
                    )
                    </if>
+                   <if test="histNo != null and histNo != ''">
+                   AND M.ERP_HIST_NO = #{histNo, jdbcType=VARCHAR}
+                   </if>
                  ORDER BY TO_NUMBER(DOC_ID) DESC
                )
          WHERE ROWNUM = 1
     </select>
+
+    <!-- CR02 수주목표원가 결재문서 일괄 재생성을 위한 마이그레이션 쿼리 -->
+    <!-- 8. CR02 문서 조회 (DOC_DATA_JSON 전체) -->
+    <select id="selectCr02DocsForRerender" parameterType="Map" resultType="CamelMap">
+        SELECT DOC_ID,
+               DOC_DATA_JSON
+          FROM TB_AM11M01
+         WHERE ERP_BIZ_TYPE = 'CR02'
+           AND DOC_DATA_JSON IS NOT NULL
+    </select>
+
+    <!-- 8-1. 렌더 HTML 업데이트 -->
+    <update id="updateDocRenderHtmlById" parameterType="Map">
+        UPDATE TB_AM11M01
+           SET DOC_RENDER_HTML = #{docRenderHtml, jdbcType=CLOB},
+               UDT_ID          = #{userId, jdbcType=VARCHAR},
+               UDT_PGM         = #{pgmId, jdbcType=VARCHAR},
+               UDT_DTTM        = SYSTIMESTAMP
+         WHERE DOC_ID = #{docId, jdbcType=VARCHAR}
+    </update>
 
 </mapper>

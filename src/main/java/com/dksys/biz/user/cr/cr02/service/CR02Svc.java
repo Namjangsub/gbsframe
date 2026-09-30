@@ -81,4 +81,10 @@ public interface CR02Svc {
 
 	Map<String, Object> settledAmtCreditTotalAmt(Map<String, String> paramMap);
 
+	// 일회성 마이그레이션: CR02 결재문서 렌더 HTML 재생성
+	Map<String, Object> rerenderOrdrsApprovalHtml(Map<String, String> paramMap);
+
+	// 무알림 결재선 재동기화 (결재 진행 전, WB20 삭제 후 AM11D01 동기화용)
+	Map<String, Object> resyncOrdrsApprovalLines(Map<String, String> paramMap);
+
 }

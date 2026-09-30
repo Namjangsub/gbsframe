@@ -2030,17 +2030,17 @@
     }
     
     function deleteShareUser1(){
-        
+
         if( approvalYn() ) {
           alert("결재가 이미 진행중입니다.");
           return;
        }
-        
-        var selRow = parseInt(gridViewPop7.target.selectedDataIndexs);    
+
+        var selRow = parseInt(gridViewPop7.target.selectedDataIndexs);
         if( isNaN(selRow) ) {
            alert("선택된 행이 없습니다.");
            return;
-        } else {         
+        } else {
               if( selRow > -1 ) {
                  var todoKey = gridViewPop7.target.getList()[selRow].todoKey;
                  var gridList = gridViewPop7.target.getList("selected")[0];
@@ -2060,17 +2060,59 @@
                            if (data.resultCode == 200) {
                               alert(data.resultMessage);
                               gridViewPop7.setData(0);
+                              resyncAmApprovalLinesAfterDelete();
                            } else {
-                              alert("삭제중 오류가 발생했습니다");                                
+                              alert("삭제중 오류가 발생했습니다");
                            }
-                        });                   
-                     }                                                
+                        });
+                     }
 //                    } else {
 //                       alert("삭제중 오류가 발생했습니다.")
-//                    }      
+//                    }
              }
            }
         }
+     }
+
+     function resyncAmApprovalLinesAfterDelete(){
+         var ordrsNo = $("#popForm #ordrsNo").val();
+         var coCd = $("#popForm #coCd").val();
+         var histNo = $("#popForm #histNo").val();
+         var userId = jwt.userId;
+         var userNm = jwt.userNm;
+
+         if (!ordrsNo || ordrsNo.trim() === "") {
+            console.warn("resyncAmApprovalLines: ordrsNo 없음");
+            return;
+         }
+
+         var syncParam = {
+            ordrsNo: ordrsNo,
+            coCd: coCd,
+            histNo: histNo,
+            userId: userId,
+            userNm: userNm
+         };
+
+         $.ajax({
+            type: "POST",
+            url: "/user/cr/cr02/resyncOrdrsApprovalLines",
+            data: JSON.stringify(syncParam),
+            contentType: "application/json",
+            dataType: "json",
+            success: function(response) {
+               if (response.rebuilt) {
+                  console.log("AM11D01 재동기화 완료: " + response.lineCount + "개 라인 재구성");
+               } else if (response.skipped) {
+                  console.log("AM11D01 재동기화 스킵: " + (response.reason || ""));
+               } else if (response.resultCode && response.resultCode !== "200") {
+                  console.warn("AM11D01 재동기화 오류: " + (response.resultMessage || response.resultCode));
+               }
+            },
+            error: function(xhr, status, error) {
+               console.error("AM11D01 재동기화 요청 실패: " + error);
+            }
+         });
      }
 
 

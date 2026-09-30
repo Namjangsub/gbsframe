@@ -14,10 +14,12 @@ import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartHttpServletRequest;
 
 import com.dksys.biz.admin.bm.bm16.mapper.BM16Mapper;
+import com.dksys.biz.admin.cm.cm05.service.CM05Svc;
 import com.dksys.biz.admin.cm.cm08.mapper.CM08Mapper;
 import com.dksys.biz.admin.cm.cm08.service.CM08Svc;
 import com.dksys.biz.admin.cm.cm15.service.CM15Svc;
@@ -52,10 +54,19 @@ public class CR02Svcmpl implements CR02Svc {
     CM15Svc cm15Svc;
 
     @Autowired
+    CM05Svc cm05Svc;
+
+    @Autowired
     BM16Mapper bm16Mapper;
 
     @Autowired
     ExceptionThrower thrower;
+
+    @Autowired
+    com.dksys.biz.user.am.am11.service.AM11Svc am11Svc;
+
+    @Autowired
+    com.dksys.biz.user.wb.wb20.service.WB20Svc wb20Svc;
 
     @Override
     public int selectOrdrsCount(Map<String, String> param) {
@@ -332,6 +343,13 @@ public class CR02Svcmpl implements CR02Svc {
                 }
             }
             cr02Mapper.callCopyOrdrs(param); //이력생성
+
+            // AM 전자결재 연동 (정방향)
+            try {
+                syncOrdrsToAm(param);
+            } catch (Exception e) {
+                throw new RuntimeException("전자결재(AM) 연동 중 오류가 발생했습니다: " + e.getMessage(), e);
+            }
 
 //      if("".equals(param.get("newOrdrsNo")) || param.get("newOrdrsNo") == null) {
 //          // 수주일자의 년도가 변경되었을 경우 수주번호를 갱신
@@ -766,6 +784,13 @@ public class CR02Svcmpl implements CR02Svc {
             }
         }
 
+        // AM 전자결재 연동 (정방향/재저장 폴백)
+        try {
+            syncOrdrsToAm(param);
+        } catch (Exception e) {
+            throw new RuntimeException("전자결재(AM) 연동 중 오류가 발생했습니다: " + e.getMessage(), e);
+        }
+
 //      if("".equals(param.get("newOrdrsNo")) || param.get("newOrdrsNo") == null) {
 //          // 수주일자의 년도가 변경되었을 경우 수주번호를 갱신
 //          cr02Mapper.callUpdateOrdrsNo(param);
@@ -1157,6 +1182,11 @@ public class CR02Svcmpl implements CR02Svc {
         if (sharngChk.size() > 0) {
             QM01Mapper.deleteWbsSharngList(paramMap);
         }
+
+        // CR02 AM 전자결재 문서 삭제 (D01 먼저, M01 나중)
+        cr02Mapper.deleteAmD01ByOrdrsNo(paramMap);
+        cr02Mapper.deleteAmM01ByOrdrsNo(paramMap);
+
         //---------------------------------------------------------------
         //첨부 화일 처리 시작  (처음 등록시에는 화일 삭제할게 없음)
         //---------------------------------------------------------------
@@ -1351,5 +1381,537 @@ public class CR02Svcmpl implements CR02Svc {
     @Override
     public List<Map<String, Object>> selectUnsettledAmtSalesCodeList(Map<String, String> paramMap) {
     	return cr02Mapper.selectUnsettledAmtSalesCodeList(paramMap);
+    }
+
+    private List<Map<String, Object>> buildAmLineListFromWb20(String ordrsNo, String coCd, String histNo) {
+        if (ordrsNo == null || ordrsNo.trim().isEmpty()) {
+            return new ArrayList<>();
+        }
+
+        if (coCd == null || coCd.trim().isEmpty()) {
+            coCd = "GUN";
+        }
+
+        if (histNo == null || histNo.trim().isEmpty()) {
+            histNo = "1";
+        }
+
+        // 결재 재조회 (차수+구분별)
+        Map<String, String> apprQuery = new HashMap<>();
+        apprQuery.put("todoNo", ordrsNo);
+        apprQuery.put("coCd", coCd);
+        apprQuery.put("histNo", histNo);
+        apprQuery.put("todoDiv2CodeId", "TODODIV2100");
+        List<Map<String, String>> apprList = wb20Svc.selectGetApprovalList(apprQuery);
+        if (apprList == null) apprList = new ArrayList<>();
+
+        // 공유 재조회 (차수+구분별)
+        Map<String, String> refQuery = new HashMap<>();
+        refQuery.put("todoNo", ordrsNo);
+        refQuery.put("coCd", coCd);
+        refQuery.put("histNo", histNo);
+        refQuery.put("todoDiv2CodeId", "TODODIV1100");
+        List<Map<String, String>> refList = wb20Svc.selectGetApprovalList(refQuery);
+        if (refList == null) refList = new ArrayList<>();
+
+        if (apprList.isEmpty() && refList.isEmpty()) {
+            return new ArrayList<>();
+        }
+
+        // Sort by sanctnSn
+        java.util.Collections.sort(apprList, (o1, o2) -> {
+            int s1 = parseIntSafe(o1.get("sanctnSn"));
+            int s2 = parseIntSafe(o2.get("sanctnSn"));
+            return Integer.compare(s1, s2);
+        });
+
+        java.util.Collections.sort(refList, (o1, o2) -> {
+            int s1 = parseIntSafe(o1.get("sanctnSn"));
+            int s2 = parseIntSafe(o2.get("sanctnSn"));
+            return Integer.compare(s1, s2);
+        });
+
+        // AM lineList 구성: APPR 먼저, REF 나중, 1..N 재채번
+        List<Map<String, Object>> amLineList = new ArrayList<>();
+        int lineSeq = 1;
+        for (Map<String, String> row : apprList) {
+            Map<String, Object> amLine = new HashMap<>();
+            amLine.put("approverId", row.get("todoId"));
+            String approverNm = row.get("todoNm");
+            if (approverNm == null || approverNm.trim().isEmpty()) {
+                approverNm = row.get("name");
+            }
+            amLine.put("approverNm", approverNm);
+            amLine.put("deptId", row.get("deptId"));
+            amLine.put("lineSeq", lineSeq++);
+            amLine.put("wb20TodoKey", row.get("todoKey"));
+            amLine.put("wb20CoCd", row.get("coCd"));
+            amLine.put("wb20TodoNo", row.get("todoNo"));
+            amLine.put("wb20SanctnSn", row.get("sanctnSn"));
+            amLine.put("wb20Div1CodeId", row.get("todoDiv1CodeId"));
+            amLine.put("wb20Div2CodeId", row.get("todoDiv2CodeId"));
+            amLine.put("lineType", "APPR");
+            amLine.put("sourceApproved", "Y".equalsIgnoreCase(row.get("sanctnSttus")) ? "Y" : "N");
+            amLineList.add(amLine);
+        }
+
+        for (Map<String, String> row : refList) {
+            Map<String, Object> amLine = new HashMap<>();
+            amLine.put("approverId", row.get("todoId"));
+            String approverNm = row.get("todoNm");
+            if (approverNm == null || approverNm.trim().isEmpty()) {
+                approverNm = row.get("name");
+            }
+            amLine.put("approverNm", approverNm);
+            amLine.put("deptId", row.get("deptId"));
+            amLine.put("lineSeq", lineSeq++);
+            amLine.put("wb20TodoKey", row.get("todoKey"));
+            amLine.put("wb20CoCd", row.get("coCd"));
+            amLine.put("wb20TodoNo", row.get("todoNo"));
+            amLine.put("wb20SanctnSn", row.get("sanctnSn"));
+            amLine.put("wb20Div1CodeId", row.get("todoDiv1CodeId"));
+            amLine.put("wb20Div2CodeId", row.get("todoDiv2CodeId"));
+            amLine.put("lineType", "REF");
+            amLine.put("sourceApproved", "N");
+            amLineList.add(amLine);
+        }
+
+        return amLineList;
+    }
+
+    private void syncOrdrsToAm(Map<String, String> paramMap) {
+        try {
+            String ordrsNo = paramMap.get("ordrsNo");
+            if (ordrsNo == null || ordrsNo.trim().isEmpty()) {
+                return;
+            }
+
+            String coCd = paramMap.get("coCd");
+            if (coCd == null || coCd.trim().isEmpty()) {
+                coCd = "GUN";
+            }
+
+            String histNo = paramMap.get("histNo");
+            if (histNo == null || histNo.trim().isEmpty()) {
+                histNo = "1";
+            }
+
+            List<Map<String, Object>> amLineList = buildAmLineListFromWb20(ordrsNo, coCd, histNo);
+            if (amLineList.isEmpty()) {
+                return;
+            }
+
+            // autoApprovedCount 계산
+            int autoApprovedCount = 0;
+            for (Map<String, Object> line : amLineList) {
+                if (!"Y".equals(line.get("sourceApproved"))) break;
+                autoApprovedCount++;
+            }
+
+            // 기안자 정보
+            String userId = paramMap.get("userId");
+            String userNm = paramMap.get("userNm");
+            if (userId == null || userId.trim().isEmpty()) {
+                userId = "";
+            }
+            if (userNm == null || userNm.trim().isEmpty()) {
+                userNm = userId;
+            }
+
+            // 기존 docId 조회
+            Map<String, Object> docIdParam = new HashMap<>();
+            docIdParam.put("erpBizKey", ordrsNo);
+            docIdParam.put("coCd", coCd);
+            docIdParam.put("todoDiv2CodeId", "TODODIV2100");
+            docIdParam.put("histNo", histNo);
+            String existingDocId = am11Svc.selectDocIdByBizKey(docIdParam);
+
+            // AM 파라미터 구성
+            Map<String, Object> amParam = new HashMap<>();
+            if (existingDocId != null && !existingDocId.trim().isEmpty()) {
+                amParam.put("docId", existingDocId);
+            }
+            amParam.put("coCd", coCd);
+            amParam.put("userId", userId);
+            amParam.put("userNm", userNm);
+            amParam.put("docTitle", buildOrdrsDocTitle(paramMap, histNo));
+            amParam.put("formCd", "CR0202");
+            amParam.put("formVer", 1);
+            amParam.put("erpBizType", "CR02");
+            amParam.put("erpBizKey", ordrsNo);
+            amParam.put("docDataJson", new GsonBuilder().disableHtmlEscaping().create().toJson(paramMap));
+            amParam.put("docRenderHtml", buildOrdrsApprovalHtml(paramMap));
+            amParam.put("pgmId", "CR0202P01");
+            amParam.put("lineList", amLineList);
+            amParam.put("autoApprovedCount", autoApprovedCount);
+            amParam.put("histNo", histNo);
+
+            // AM submitApproval 호출
+            Map<String, Object> amResult = am11Svc.submitApproval(amParam);
+
+            // 재저장 폴백
+            if (existingDocId != null && !existingDocId.trim().isEmpty()
+                    && amResult != null && !"200".equals(String.valueOf(amResult.get("resultCode")))) {
+                Map<String, Object> lineChangeParam = new HashMap<>(amParam);
+                lineChangeParam.put("changeReason", "CR02 수주목표원가 수정 동기화");
+                lineChangeParam.put("lineList", amLineList);
+                am11Svc.changeApprovalLines(lineChangeParam);
+            }
+        } catch (Exception e) {
+            throw new RuntimeException("전자결재(AM) 연동 중 오류가 발생했습니다: " + e.getMessage(), e);
+        }
+    }
+
+    @Override
+    public Map<String, Object> resyncOrdrsApprovalLines(Map<String, String> paramMap) {
+        Map<String, Object> resultMap = new HashMap<>();
+        resultMap.put("resultCode", "200");
+
+        try {
+            String ordrsNo = paramMap.get("ordrsNo");
+            String coCd = paramMap.get("coCd");
+            String histNo = paramMap.get("histNo");
+
+            if (ordrsNo == null || ordrsNo.trim().isEmpty()) {
+                resultMap.put("skipped", true);
+                resultMap.put("reason", "ordrsNo 없음");
+                return resultMap;
+            }
+
+            if (coCd == null || coCd.trim().isEmpty()) {
+                coCd = "GUN";
+            }
+            if (histNo == null || histNo.trim().isEmpty()) {
+                histNo = "1";
+            }
+
+            List<Map<String, Object>> amLineList = buildAmLineListFromWb20(ordrsNo, coCd, histNo);
+            if (amLineList.isEmpty()) {
+                resultMap.put("skipped", true);
+                resultMap.put("reason", "WB20 결재선 없음");
+                return resultMap;
+            }
+
+            String userId = paramMap.get("userId");
+            String userNm = paramMap.get("userNm");
+            if (userId == null || userId.trim().isEmpty()) {
+                userId = "";
+            }
+            if (userNm == null || userNm.trim().isEmpty()) {
+                userNm = userId;
+            }
+
+            Map<String, Object> docIdParam = new HashMap<>();
+            docIdParam.put("erpBizKey", ordrsNo);
+            docIdParam.put("coCd", coCd);
+            docIdParam.put("todoDiv2CodeId", "TODODIV2100");
+            docIdParam.put("histNo", histNo);
+            String docId = am11Svc.selectDocIdByBizKey(docIdParam);
+
+            if (docId == null || docId.trim().isEmpty()) {
+                resultMap.put("skipped", true);
+                resultMap.put("reason", "AM 문서 미존재");
+                return resultMap;
+            }
+
+            Map<String, Object> amParam = new HashMap<>();
+            amParam.put("docId", docId);
+            amParam.put("coCd", coCd);
+            amParam.put("userId", userId);
+            amParam.put("userNm", userNm);
+            amParam.put("pgmId", "CR0202P01");
+            amParam.put("erpBizType", "CR02");
+            amParam.put("erpBizKey", ordrsNo);
+            amParam.put("histNo", histNo);
+            amParam.put("lineList", amLineList);
+
+            Map<String, Object> resyncResult = am11Svc.resyncApprovalLinesPreApproval(amParam);
+            resultMap.putAll(resyncResult);
+
+        } catch (Exception e) {
+            System.out.println("CR02 결재선 재동기화 중 오류: " + e.getMessage());
+            resultMap.put("resultCode", "500");
+            resultMap.put("resultMessage", "결재선 재동기화 중 오류가 발생했습니다: " + e.getMessage());
+        }
+
+        return resultMap;
+    }
+
+    private String buildOrdrsDocTitle(Map<String, String> paramMap, String histNo) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("[수주목표원가]");
+
+        String ordrsClntNm = paramMap.get("ordrsClntNm");
+        if (ordrsClntNm != null && !ordrsClntNm.trim().isEmpty()) {
+            sb.append(" ").append(ordrsClntNm);
+        }
+
+        String clntPjt = paramMap.get("clntPjt");
+        if (clntPjt != null && !clntPjt.trim().isEmpty()) {
+            sb.append(" ").append(clntPjt);
+        }
+
+        if (histNo != null && !histNo.trim().isEmpty()) {
+            sb.append(" (차수:").append(histNo).append(")");
+        }
+
+        return sb.toString();
+    }
+
+    private String buildOrdrsApprovalHtml(Map<String, String> paramMap) {
+        StringBuilder html = new StringBuilder();
+        html.append("<div class=\"approval-document\"><h3>수주목표원가</h3><table class=\"table table-bordered\">");
+
+        // 필드(라벨, 값) 수집 후 2열(1행당 필드쌍 2개)로 배치하여 가독성 향상
+        java.util.List<String[]> rows = new java.util.ArrayList<String[]>();
+
+        String coCd = paramMap.get("coCd");
+        String coNm = resolveCodeNm(coCd != null ? coCd : "");
+        rows.add(new String[]{"회사", escapeHtml(coNm != null && !coNm.isEmpty() ? coNm : (coCd != null ? coCd : ""))});
+
+        String estNoOrdrs = paramMap.get("estNoOrdrs");
+        rows.add(new String[]{"견적서번호", escapeHtml(estNoOrdrs != null ? estNoOrdrs : "")});
+
+        String estDeg = paramMap.get("estDeg");
+        rows.add(new String[]{"견적차수", escapeHtml(estDeg != null ? estDeg : "")});
+
+        String ordrsNo = paramMap.get("ordrsNo");
+        rows.add(new String[]{"수주번호", escapeHtml(ordrsNo != null ? ordrsNo : "")});
+
+        String newOrdrsNo = paramMap.get("newOrdrsNo");
+        if (newOrdrsNo == null || newOrdrsNo.isEmpty()) {
+            newOrdrsNo = paramMap.get("oldOrdrsNo");
+        }
+        rows.add(new String[]{"건양수주번호", escapeHtml(newOrdrsNo != null ? newOrdrsNo : "")});
+
+        String ordrsDt = paramMap.get("ordrsDt");
+        rows.add(new String[]{"수주일자", escapeHtml(formatDateDisplay(ordrsDt))});
+
+        String ordrsDiv = paramMap.get("ordrsDiv");
+        String ordrsDivNm = resolveCodeNm(ordrsDiv != null ? ordrsDiv : "");
+        rows.add(new String[]{"수주구분", escapeHtml(ordrsDivNm != null && !ordrsDivNm.isEmpty() ? ordrsDivNm : (ordrsDiv != null ? ordrsDiv : ""))});
+
+        String ordrsClntNm = paramMap.get("ordrsClntNm");
+        rows.add(new String[]{"고객사", escapeHtml(ordrsClntNm != null ? ordrsClntNm : "")});
+
+        String ctrtNm = paramMap.get("ctrtNm");
+        rows.add(new String[]{"계약명", escapeHtml(ctrtNm != null ? ctrtNm : "")});
+
+        String mngIdNm = paramMap.get("mngIdNm");
+        rows.add(new String[]{"담당자", escapeHtml(mngIdNm != null ? mngIdNm : "")});
+
+        String histNo = paramMap.get("histNo");
+        rows.add(new String[]{"차수", escapeHtml(histNo != null ? histNo : "")});
+
+        String pmntMtd = paramMap.get("pmntMtd");
+        String pmntMtdNm = resolveCodeNm(pmntMtd != null ? pmntMtd : "");
+        rows.add(new String[]{"결재방법", escapeHtml(pmntMtdNm != null && !pmntMtdNm.isEmpty() ? pmntMtdNm : (pmntMtd != null ? pmntMtd : ""))});
+
+        String vatCd = paramMap.get("vatCd");
+        String vatCdNm = resolveCodeNm(vatCd != null ? vatCd : "");
+        rows.add(new String[]{"부가세", escapeHtml(vatCdNm != null && !vatCdNm.isEmpty() ? vatCdNm : (vatCd != null ? vatCd : ""))});
+
+        String ordrsAmt = paramMap.get("ordrsAmt");
+        rows.add(new String[]{"수주금액", escapeHtml(formatAmount(ordrsAmt))});
+
+        String currCd = paramMap.get("currCd");
+        String currCdNm = resolveCodeNm(currCd != null ? currCd : "");
+        rows.add(new String[]{"통화단위", escapeHtml(currCdNm != null && !currCdNm.isEmpty() ? currCdNm : (currCd != null ? currCd : ""))});
+
+        String ordrger = paramMap.get("ordrger");
+        rows.add(new String[]{"발주자", escapeHtml(ordrger != null ? ordrger : "")});
+
+        String etcField3 = paramMap.get("etcField3");
+        rows.add(new String[]{"발주자.TEL", escapeHtml(etcField3 != null ? etcField3 : "")});
+
+        String fwdExchChkList = paramMap.get("fwdExchChkList");
+        String fwdExchChkListNm = resolveCodeNm(fwdExchChkList != null ? fwdExchChkList : "");
+        rows.add(new String[]{"선물환CheckList", escapeHtml(fwdExchChkListNm != null && !fwdExchChkListNm.isEmpty() ? fwdExchChkListNm : (fwdExchChkList != null ? fwdExchChkList : ""))});
+
+        String fwdExchJoinDt = paramMap.get("fwdExchJoinDt");
+        rows.add(new String[]{"선물환가입일", escapeHtml(formatDateDisplay(fwdExchJoinDt))});
+
+        String exchangeAmt = paramMap.get("exchangeAmt");
+        rows.add(new String[]{"원화금액", escapeHtml(formatAmount(exchangeAmt))});
+
+        String exrate = paramMap.get("exrate");
+        rows.add(new String[]{"환율", escapeHtml(exrate != null ? exrate : "")});
+
+        String ctrtDoc = paramMap.get("ctrtDoc");
+        String ctrtDocNm = resolveCodeNm(ctrtDoc != null ? ctrtDoc : "");
+        rows.add(new String[]{"계약문서", escapeHtml(ctrtDocNm != null && !ctrtDocNm.isEmpty() ? ctrtDocNm : (ctrtDoc != null ? ctrtDoc : ""))});
+
+        String inpexpCd = paramMap.get("inpexpCd");
+        String inpexpCdNm = resolveCodeNm(inpexpCd != null ? inpexpCd : "");
+        rows.add(new String[]{"국내/해외", escapeHtml(inpexpCdNm != null && !inpexpCdNm.isEmpty() ? inpexpCdNm : (inpexpCd != null ? inpexpCd : ""))});
+
+        String prjctSeqNm = paramMap.get("prjctSeqNm");
+        rows.add(new String[]{"프로젝트명", escapeHtml(prjctSeqNm != null ? prjctSeqNm : "")});
+
+        String clntPjt = paramMap.get("clntPjt");
+        String clntPjtNm = resolveCodeNm(clntPjt != null ? clntPjt : "");
+        rows.add(new String[]{"고객사PJT", escapeHtml(clntPjtNm != null && !clntPjtNm.isEmpty() ? clntPjtNm : (clntPjt != null ? clntPjt : ""))});
+
+        // 2열(1행당 필드쌍 2개) 배치
+        int pairsPerRow = 2;
+        for (int i = 0; i < rows.size(); i += pairsPerRow) {
+            html.append("<tr>");
+            for (int j = 0; j < pairsPerRow; j++) {
+                if (i + j < rows.size()) {
+                    String[] r = rows.get(i + j);
+                    html.append("<th>").append(r[0]).append("</th><td>").append(r[1]).append("</td>");
+                } else {
+                    html.append("<th></th><td></td>");
+                }
+            }
+            html.append("</tr>");
+        }
+
+        // 비고 (전체 폭)
+        String ordrsRmk = paramMap.get("ordrsRmk");
+        html.append("<tr><th>비고</th><td colspan=\"3\" style=\"white-space: pre-wrap;\">").append(escapeHtml(ordrsRmk != null ? ordrsRmk : "")).append("</td></tr>");
+
+        html.append("</table></div>");
+        return html.toString();
+    }
+
+    private String formatDateDisplay(String dtm) {
+        if (dtm == null || dtm.trim().isEmpty()) return "";
+        String clean = dtm.trim().replace("-", "");
+        if (clean.length() >= 8) {
+            return clean.substring(0, 4) + "-" + clean.substring(4, 6) + "-" + clean.substring(6, 8);
+        }
+        return dtm;
+    }
+
+    private String formatAmount(String amount) {
+        if (amount == null || amount.trim().isEmpty()) return "";
+        try {
+            double num = Double.parseDouble(amount.trim());
+            return new java.text.DecimalFormat("#,##0.##").format(num);
+        } catch (Exception e) {
+            return amount;
+        }
+    }
+
+    private String resolveCodeNm(String codeId) {
+        if (codeId == null || codeId.trim().isEmpty()) return "";
+        try {
+            Map<String, String> codeMap = new HashMap<>();
+            codeMap.put("codeId", codeId);
+            Map<String, String> codeDetail = cm05Svc.selectCodeInfo(codeMap);
+            if (codeDetail != null && codeDetail.get("codeNm") != null && !codeDetail.get("codeNm").isEmpty()) {
+                return codeDetail.get("codeNm");
+            }
+        } catch (Exception e) {
+            System.out.println("공통코드 코드명 조회 실패: codeId=" + codeId + ", error=" + e.getMessage());
+        }
+        return codeId;
+    }
+
+    private String escapeHtml(String input) {
+        if (input == null) return "";
+        return input.replaceAll("&", "&amp;")
+                .replaceAll("<", "&lt;")
+                .replaceAll(">", "&gt;")
+                .replaceAll("\"", "&quot;")
+                .replaceAll("'", "&#39;");
+    }
+
+    private int parseIntSafe(String value) {
+        try {
+            return value != null && !value.trim().isEmpty() ? Integer.parseInt(value) : 0;
+        } catch (NumberFormatException e) {
+            return 0;
+        }
+    }
+
+    @Override
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    public Map<String, Object> rerenderOrdrsApprovalHtml(Map<String, String> paramMap) {
+        Map<String, Object> result = new HashMap<>();
+        java.util.List<Map<String, Object>> docs = am11Svc.selectCr02DocsForRerender();
+
+        Gson gson = new com.google.gson.Gson();
+        java.lang.reflect.Type mapType = new com.google.gson.reflect.TypeToken<Map<String, String>>(){}.getType();
+
+        int updated = 0;
+        int skipped = 0;
+        int failed = 0;
+        String firstFailDocId = null;
+        String firstFailMessage = null;
+
+        String userId = paramMap.get("userId");
+        if (userId == null || userId.trim().isEmpty()) {
+            userId = "SYSTEM";
+        }
+
+        for (Map<String, Object> doc : docs) {
+            String docId = doc.get("docId") == null ? null : String.valueOf(doc.get("docId"));
+            Object jsonObj = doc.get("docDataJson");
+
+            if (docId == null || docId.trim().isEmpty()) {
+                skipped++;
+                continue;
+            }
+
+            String json = null;
+            if (jsonObj instanceof java.sql.Clob) {
+                try {
+                    java.sql.Clob clob = (java.sql.Clob) jsonObj;
+                    json = clob.getSubString(1, (int) clob.length());
+                } catch (Exception e) {
+                    if (firstFailDocId == null) {
+                        firstFailDocId = docId;
+                        firstFailMessage = "Clob 읽기 실패: " + e.getMessage();
+                    }
+                    failed++;
+                    continue;
+                }
+            } else if (jsonObj != null) {
+                json = String.valueOf(jsonObj);
+            }
+
+            if (json == null || json.trim().isEmpty()) {
+                skipped++;
+                continue;
+            }
+
+            try {
+                Map<String, String> dataMap = gson.fromJson(json, mapType);
+                if (dataMap == null) {
+                    skipped++;
+                    continue;
+                }
+
+                String html = buildOrdrsApprovalHtml(dataMap);
+                Map<String, Object> updateParam = new HashMap<>();
+                updateParam.put("docId", docId);
+                updateParam.put("docRenderHtml", html);
+                updateParam.put("userId", userId);
+                updateParam.put("pgmId", "CR02_RERENDER");
+
+                am11Svc.updateDocRenderHtmlById(updateParam);
+                updated++;
+            } catch (Exception e) {
+                if (firstFailDocId == null) {
+                    firstFailDocId = docId;
+                    firstFailMessage = "렌더링 오류: " + e.getMessage();
+                }
+                failed++;
+            }
+        }
+
+        result.put("resultCode", "200");
+        result.put("total", docs.size());
+        result.put("updated", updated);
+        result.put("skipped", skipped);
+        result.put("failed", failed);
+        if (firstFailDocId != null) {
+            result.put("firstFailDocId", firstFailDocId);
+            result.put("firstFailMessage", firstFailMessage);
+        }
+
+        return result;
     }
 }

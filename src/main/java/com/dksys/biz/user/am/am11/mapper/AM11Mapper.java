@@ -106,4 +106,9 @@ public interface AM11Mapper {
 
     // 8. P4 역방향 동기화: 신규 WB20 행의 TODO_KEY를 AM11D01에 백필
     int updateApprovalLineWb20Link(Map<String, Object> paramMap);
+
+    // 일회성 마이그레이션: CR02 문서의 렌더 HTML 재생성
+    List<Map<String, Object>> selectCr02DocsForRerender();
+
+    int updateDocRenderHtmlById(Map<String, Object> paramMap);
 }

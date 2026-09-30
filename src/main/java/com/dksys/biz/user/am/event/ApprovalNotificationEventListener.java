@@ -71,6 +71,13 @@ public class ApprovalNotificationEventListener {
                         sendPm51Notification(event);
                     } else if ("PM07".equals(erpBizType) || "PM08".equals(erpBizType)) {
                         sendRichNotification(event);
+                    } else if ("CR02".equals(erpBizType)) {
+                        if (!sendRichNotification(event)) {
+                            sendNotification(event.getNextApproverId(), event.getNextApproverNm(),
+                                    "[" + event.getDocNo() + "] 결재 대기 문서가 도착했습니다",
+                                    "[" + event.getDocNo() + "] 결재 대기 문서가 도착했습니다: " + event.getDocTitle(),
+                                    event.getDocId(), approvalTodoNo(event), approvalTodoDiv2CodeId(event));
+                        }
                     } else {
                         sendNotification(event.getNextApproverId(), event.getNextApproverNm(),
                                 "[" + event.getDocNo() + "] 결재 대기 문서가 도착했습니다",
@@ -191,13 +198,13 @@ public class ApprovalNotificationEventListener {
         return String.valueOf(event.getExtraInfo().get("todoDiv2CodeId"));
     }
 
-    private void sendRichNotification(ApprovalEvent event) {
-        sendRichNotification(event, null);
+    private boolean sendRichNotification(ApprovalEvent event) {
+        return sendRichNotification(event, null);
     }
 
-    private void sendRichNotification(ApprovalEvent event, String resolvedTodoDiv2CodeId) {
+    private boolean sendRichNotification(ApprovalEvent event, String resolvedTodoDiv2CodeId) {
         if (event.getNextApproverId() == null || event.getNextApproverId().trim().isEmpty() || bm18Svc == null) {
-            return;
+            return false;
         }
 
         try {
@@ -211,7 +218,7 @@ public class ApprovalNotificationEventListener {
                     || coCd == null || coCd.isEmpty()) {
                 logger.warn("[ApprovalNotification] PM07/PM08/PM51 리치 발송 조건 미충족: erpBizType={}, erpBizKey={}, coCd={}",
                         erpBizType, erpBizKey, coCd);
-                return;
+                return false;
             }
 
             String todoDiv2CodeId = null;
@@ -224,9 +231,11 @@ public class ApprovalNotificationEventListener {
                 }
             } else if ("PM51".equals(erpBizType)) {
                 todoDiv2CodeId = resolvedTodoDiv2CodeId;
+            } else if ("CR02".equals(erpBizType)) {
+                todoDiv2CodeId = "TODODIV2100";
             }
             if (todoDiv2CodeId == null) {
-                return;
+                return false;
             }
 
             Map<String, String> selectParam = new HashMap<>();
@@ -241,7 +250,7 @@ public class ApprovalNotificationEventListener {
             List<Map<String, String>> messageList = bm18Svc.selectMaxMessageIdTodo(selectParam);
             if (messageList == null || messageList.isEmpty()) {
                 logger.warn("[ApprovalNotification] selectMaxMessageIdTodo 결과 없음: todoNo={}", erpBizKey);
-                return;
+                return false;
             }
 
             Map<String, String> msgInfo = messageList.get(0);
@@ -256,7 +265,7 @@ public class ApprovalNotificationEventListener {
 
             if (mobile == null || mobile.isEmpty() || messageDesc == null || messageDesc.isEmpty()) {
                 logger.warn("[ApprovalNotification] 필수 정보 부족: mobile={}, messageDesc 있음={}", mobile, messageDesc != null);
-                return;
+                return false;
             }
 
             String finalMessage = messageDesc;
@@ -331,7 +340,7 @@ public class ApprovalNotificationEventListener {
             logParam.put("mobile", mobile);
             logParam.put("nameTo", event.getNextApproverNm());
             logParam.put("creatId", event.getDraUserId());
-            logParam.put("creatPgm", "PM0701P01");
+            logParam.put("creatPgm", "CR02".equals(erpBizType) ? "CR0202P01" : "PM0701P01");
             logParam.put("todoNo", erpBizKey);
             logParam.put("todoDiv2CodeId", todoDiv2CodeId);
 
@@ -339,7 +348,7 @@ public class ApprovalNotificationEventListener {
             if (!kakaoSend) {
                 logParam.put("sendgStatus", "READY");
                 bm18Svc.insertKakaoMessage(logParam);
-                return;
+                return true;
             }
             try {
                 if (talkApiUrl == null || talkApiUrl.trim().isEmpty()
@@ -350,7 +359,7 @@ public class ApprovalNotificationEventListener {
                     logger.warn("[ApprovalNotification] 알림톡 환경변수 미설정으로 실발송을 건너뜁니다: messageId={}", maxMessageId);
                     logParam.put("sendgStatus", "READY");
                     bm18Svc.insertKakaoMessage(logParam);
-                    return;
+                    return true;
                 }
                 URL url = new URL(talkApiUrl);
                 HttpURLConnection conn = (HttpURLConnection) url.openConnection();
@@ -377,7 +386,7 @@ public class ApprovalNotificationEventListener {
                 int responseCode = conn.getResponseCode();
                 if (responseCode == 200) {
                     sendgStatus = "OK";
-                    logger.info("[ApprovalNotification] PM07/PM08 리치 실발송 성공: messageId={}, receiver={}", maxMessageId, event.getNextApproverId());
+                    logger.info("[ApprovalNotification] PM07/PM08/CR02 리치 실발송 성공: messageId={}, receiver={}", maxMessageId, event.getNextApproverId());
                 } else {
                     logger.warn("[ApprovalNotification] talkapi 발송 실패 (responseCode={}): messageId={}", responseCode, maxMessageId);
                 }
@@ -387,9 +396,11 @@ public class ApprovalNotificationEventListener {
 
             logParam.put("sendgStatus", sendgStatus);
             bm18Svc.insertKakaoMessage(logParam);
+            return true;
 
         } catch (Exception e) {
-            logger.warn("[ApprovalNotification] PM07/PM08 리치 발송 중 예외로 발송하지 않습니다: {}", e.getMessage());
+            logger.warn("[ApprovalNotification] PM07/PM08/CR02 리치 발송 중 예외로 발송하지 않습니다: {}", e.getMessage());
+            return false;
         }
     }
 
@@ -455,6 +466,9 @@ public class ApprovalNotificationEventListener {
         }
         if ("PM07".equals(erpBizType)) {
             return "[휴가신청서]";
+        }
+        if ("CR02".equals(erpBizType)) {
+            return "[수주목표원가]";
         }
         return "";
     }

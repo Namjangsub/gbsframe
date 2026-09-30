@@ -231,7 +231,7 @@ public class AM11SvcImpl implements AM11Svc {
         String erpBizType = String.valueOf(paramMap.get("erpBizType"));
         boolean wb20Linked = "WB20".equals(erpBizType) || "PM07".equals(erpBizType)
                 || "PM08".equals(erpBizType) || "PM51".equals(erpBizType)
-                || "PM52".equals(erpBizType);
+                || "PM52".equals(erpBizType) || "CR02".equals(erpBizType);
         if (wb20Linked) {
             for (Map<String, Object> line : lineList) {
                 if (line.get("wb20TodoNo") == null || String.valueOf(line.get("wb20TodoNo")).trim().isEmpty()
@@ -1286,7 +1286,11 @@ public class AM11SvcImpl implements AM11Svc {
     // 헬퍼 메소드: 결재선 Snapshot 일괄 등록
     private void saveApprovalLines(String docId, Map<String, Object> paramMap, String firstStatus) {
         am11Mapper.deleteApprovalLines(paramMap);
+        insertApprovalLinesSnapshot(docId, paramMap, firstStatus);
+    }
 
+    // 헬퍼 메소드: 결재선 Snapshot 재삽입 (무알림 재빌드용)
+    private void insertApprovalLinesSnapshot(String docId, Map<String, Object> paramMap, String firstStatus) {
         List<Map<String, Object>> lineList = parseLineList(paramMap.get("lineList"));
         if (lineList != null && !lineList.isEmpty()) {
             int seq = 1;
@@ -1416,6 +1420,128 @@ public class AM11SvcImpl implements AM11Svc {
             throw new RuntimeException("해당 결재문서의 열람 이력을 조회할 권한이 없습니다.");
         }
         return am11Mapper.selectDocReadList(paramMap);
+    }
+
+    @Override
+    public Map<String, Object> resyncApprovalLinesPreApproval(Map<String, Object> paramMap) {
+        Map<String, Object> resultMap = new HashMap<>();
+        resultMap.put("resultCode", "200");
+
+        try {
+            String docId = (String) paramMap.get("docId");
+
+            if (docId == null || docId.trim().isEmpty()) {
+                String erpBizKey = (String) paramMap.get("erpBizKey");
+                String coCd = (String) paramMap.get("coCd");
+                String histNo = (String) paramMap.get("histNo");
+
+                if (erpBizKey == null || erpBizKey.trim().isEmpty()) {
+                    resultMap.put("skipped", true);
+                    resultMap.put("reason", "docId 또는 erpBizKey 없음");
+                    return resultMap;
+                }
+
+                if (coCd == null || coCd.trim().isEmpty()) {
+                    coCd = "GUN";
+                }
+                if (histNo == null || histNo.trim().isEmpty()) {
+                    histNo = "1";
+                }
+
+                Map<String, Object> docIdParam = new HashMap<>();
+                docIdParam.put("erpBizKey", erpBizKey);
+                docIdParam.put("coCd", coCd);
+                docIdParam.put("todoDiv2CodeId", "TODODIV2100");
+                docIdParam.put("histNo", histNo);
+                docId = am11Mapper.selectDocIdByBizKey(docIdParam);
+
+                if (docId == null || docId.trim().isEmpty()) {
+                    resultMap.put("skipped", true);
+                    resultMap.put("reason", "AM 문서 미존재");
+                    return resultMap;
+                }
+
+                paramMap.put("docId", docId);
+            }
+
+            Map<String, Object> docInfo = am11Mapper.selectApprovalDocForUpdate(paramMap);
+            if (docInfo == null) {
+                resultMap.put("skipped", true);
+                resultMap.put("reason", "결재 문서 조회 실패");
+                return resultMap;
+            }
+
+            List<Map<String, Object>> lineList = am11Mapper.selectApprovalLineList(paramMap);
+
+            for (Map<String, Object> line : lineList) {
+                if ("APPROVED".equals(line.get("lineStatus"))) {
+                    resultMap.put("skipped", true);
+                    resultMap.put("reason", "이미 승인된 결재선 있음 (진행 중 상태)");
+                    return resultMap;
+                }
+            }
+
+            int currLineSeq = Integer.parseInt(String.valueOf(docInfo.get("currLineSeq") != null ? docInfo.get("currLineSeq") : 1));
+            if (currLineSeq > 1) {
+                resultMap.put("skipped", true);
+                resultMap.put("reason", "결재 진행 중 상태 (currLineSeq=" + currLineSeq + ")");
+                return resultMap;
+            }
+
+            List<Map<String, Object>> incomingLineList = parseLineList(paramMap.get("lineList"));
+            if (incomingLineList == null || incomingLineList.isEmpty()) {
+                resultMap.put("skipped", true);
+                resultMap.put("reason", "재동기화할 결재선 없음");
+                return resultMap;
+            }
+
+            for (Map<String, Object> line : incomingLineList) {
+                if ("Y".equals(line.get("sourceApproved"))) {
+                    resultMap.put("skipped", true);
+                    resultMap.put("reason", "들어오는 결재선에 승인 상태 있음 (WB20 sourceApproved=Y)");
+                    return resultMap;
+                }
+            }
+
+            String firstLineStatus = "READY";
+            if (!lineList.isEmpty()) {
+                Map<String, Object> firstLine = lineList.get(0);
+                firstLineStatus = (String) firstLine.get("lineStatus");
+            }
+
+            Map<String, Object> rebuildParam = new HashMap<>(paramMap);
+            rebuildParam.put("docId", docId);
+            rebuildParam.put("lineList", incomingLineList);
+            rebuildParam.put("autoApprovedCount", 0);
+
+            am11Mapper.deleteApprovalLines(rebuildParam);
+            insertApprovalLinesSnapshot(docId, rebuildParam, firstLineStatus);
+
+            if (!incomingLineList.isEmpty()) {
+                Map<String, Object> firstApprover = incomingLineList.get(0);
+                Map<String, Object> docUpdateParam = new HashMap<>();
+                docUpdateParam.put("docId", docId);
+                // 진행 전 재빌드는 문서 상태를 변경하지 않는다: 기존 DOC_STATUS를 그대로 보존
+                // (updateApprovalDocStatus는 DOC_STATUS=#{nextStatus}를 무조건 세팅하므로 null이면 상태가 유실됨)
+                docUpdateParam.put("nextStatus", docInfo.get("docStatus"));
+                docUpdateParam.put("currLineSeq", 1);
+                docUpdateParam.put("currApproverId", firstApprover.get("approverId"));
+                docUpdateParam.put("currApproverNm", firstApprover.get("approverNm"));
+                docUpdateParam.put("userId", paramMap.get("userId"));
+                docUpdateParam.put("pgmId", paramMap.get("pgmId"));
+                am11Mapper.updateApprovalDocStatus(docUpdateParam);
+            }
+
+            resultMap.put("rebuilt", true);
+            resultMap.put("lineCount", incomingLineList.size());
+
+        } catch (Exception e) {
+            logger.error("무알림 결재선 재동기화 중 오류: ", e);
+            resultMap.put("resultCode", "500");
+            resultMap.put("resultMessage", "결재선 재동기화 중 오류가 발생했습니다: " + e.getMessage());
+        }
+
+        return resultMap;
     }
 
     @Override
@@ -1633,6 +1759,7 @@ public class AM11SvcImpl implements AM11Svc {
             wb20SyncParam.put("todoNo", String.valueOf(erpBizKey));
             wb20SyncParam.put("coCd", String.valueOf(docLock.get("coCd")));
             wb20SyncParam.put("userId", paramMap.get("userId"));
+            wb20SyncParam.put("histNo", docLock.get("histNo"));
             wb20SyncParam.put("lineList", newLines);
             wb20LinkResults = wb20Svc.syncApprovalLinesFromAm(wb20SyncParam);
         } else {
@@ -1802,6 +1929,19 @@ public class AM11SvcImpl implements AM11Svc {
             return null;
         }
         return am11Mapper.selectDocIdByBizKey(paramMap);
+    }
+
+    @Override
+    public java.util.List<Map<String, Object>> selectCr02DocsForRerender() {
+        return am11Mapper.selectCr02DocsForRerender();
+    }
+
+    @Override
+    public int updateDocRenderHtmlById(Map<String, Object> paramMap) {
+        if (paramMap == null || paramMap.isEmpty()) {
+            return 0;
+        }
+        return am11Mapper.updateDocRenderHtmlById(paramMap);
     }
 
     private void enqueueApprovalNotification(Map<String, Object> notifParam, Map<String, Object> source) {
