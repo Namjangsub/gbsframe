@@ -787,8 +787,8 @@
 
 	// 이 신청서에 등록된 영업PM 본인인지 확인 (부서 단위가 아니라 이 건에 지정된 개인 식별)
 	function isSalesPmUser() {
-		var pmId = $('#pmId').val() || '';
-		return !!pmId && pmId === jwt.userId;
+		var pmId = $('#pmId').val() || (currentTripReqMaster && (currentTripReqMaster.pmId || currentTripReqMaster.PM_ID)) || '';
+		return !!pmId && String(pmId).trim().toLowerCase() === String(jwt.userId || '').trim().toLowerCase();
 	}
 
 	// 근태마감년월을 "YYYY/MM" 형식으로 포매팅
@@ -937,9 +937,10 @@
 		if (!gridViewApproval || !gridViewApproval.target || !gridViewApproval.target.getList) return false;
 		var list = gridViewApproval.target.getList();
 		var pending = false;
+		var loginUserId = String(jwt.userId || '').trim().toLowerCase();
 		$.each(list, function(idx, elem) {
-			var userId = elem.usrNm || elem.todoId || '';
-			if (userId === jwt.userId && elem.gb === '결재') {
+			var userId = String(elem.usrNm || elem.todoId || elem.empNo || '').trim().toLowerCase();
+			if (userId === loginUserId && (elem.gb === '결재' || elem.todoDiv1CodeId === 'TODODIV20')) {
 				pending = !($.trim(elem.todoCfDt || '') || elem.sanctnSttus === 'Y');
 				return false;
 			}
@@ -3307,6 +3308,14 @@
 			alert("결재할 차례가 아니거나 이미 결재하셨습니다.");
 			return;
 		}
+
+		// 영업PM 결재 차례인 경우: 영업확인/출장조건/고객사지원범위 검증 및 저장 + 결재처리(updateTripReqSalesInfo) 일괄 수행
+		if (isSalesPmApprovalPending()) {
+			if (!confirm("결재 처리하시겠습니까?")) return;
+			saveTripReqSalesInfo();
+			return;
+		}
+
 		if (!confirm("결재 처리하시겠습니까?")) return;
 
 		// 본인의 미결 결재행 찾기 (일반 또는 관리 그리드)
@@ -3927,7 +3936,7 @@
 		$('input[name="sprtMealSub"]:checked').each(function() { mealSubVals.push(this.value); });
 
 		var param = {
-			tripReqNo: $('#tripReqNo').val(),
+			tripReqNo: $('#tripReqNo').val() || (currentTripReqMaster && (currentTripReqMaster.tripReqNo || currentTripReqMaster.TRIP_REQ_NO)) || (popParam && popParam.tripReqNo) || '',
 			salesCnfrmYn: $('#salesCnfrmYn').is(':checked') ? 'Y' : 'N',
 			salesCnfrmDt: $('#salesCnfrmYn').is(':checked') ? moment().format('YYYYMMDD') : '',
 			tripCondCd: $('input[name="tripCondCd"]:checked').val() || '',
@@ -3991,13 +4000,17 @@
 			$('#tripCondEtc').focus();
 			return false;
 		}
-		if ($('input[name="sprtChk"]:checked').length === 0) {
-			setErrorStyle($('input[name="sprtChk"]'));
+		var hasTrfc = $('input[name="sprtTrfcSub"]:checked').length > 0;
+		var hasLdg = $('input[data-col="sprtLdgYn"]').is(':checked');
+		var hasMeal = $('input[name="sprtMealSub"]:checked').length > 0;
+		var hasEtc = $('input[data-col="sprtEtcYn"]').is(':checked');
+		if (!hasTrfc && !hasLdg && !hasMeal && !hasEtc) {
+			setErrorStyle($('input[name="sprtChk"], input[name="sprtTrfcSub"], input[name="sprtMealSub"]'));
 			alert("고객사지원범위를 선택해주세요.");
-			$('input[name="sprtChk"]').eq(0).focus();
+			$('input[name="sprtTrfcSub"]').eq(0).focus();
 			return false;
 		}
-		if ($('input[name="sprtChk"][value="ETC"]').is(':checked') && !$.trim($('#sprtEtcTxt').val() || '')) {
+		if (hasEtc && !$.trim($('#sprtEtcTxt').val() || '')) {
 			setErrorStyle($('#sprtEtcTxt'));
 			alert("고객사지원범위 기타 내용을 입력해주세요.");
 			$('#sprtEtcTxt').focus();
