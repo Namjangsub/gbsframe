@@ -11,10 +11,12 @@ import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.dksys.biz.admin.cm.cm16.mapper.CM16Mapper;
+import com.dksys.biz.user.am.am11.service.AM11Svc;
 import com.dksys.biz.admin.cm.cm25.mapper.CM25Mapper;
 import com.dksys.biz.user.im.im01.mapper.IM01Mapper;
 import com.dksys.biz.user.pm.pm07.service.PM07Svc;
@@ -61,6 +63,10 @@ public class WB20SvcImpl implements WB20Svc {
 
 	@Autowired
 	PM08Svc pm08Svc;
+
+	@Autowired
+	@Lazy
+	private AM11Svc am11Svc;
 
 	@Autowired
 	ExceptionThrower thrower;
@@ -192,10 +198,74 @@ public class WB20SvcImpl implements WB20Svc {
 		String todoCfOpn = paramMap.get("todoCfOpn");
 		validatePm51SalesApproval(paramMap);
 		validatePm51SequentialApproval(paramMap);
+
+		// AM 연동 판별 및 위임 (1차진입일 때만)
+		boolean isReentry = "Y".equals(paramMap.get("amLinkedApproval"));
+		if (!isReentry && am11Svc != null) {
+			String todoKey = paramMap.get("todoKey");
+			String erpBizKey = paramMap.get("todoNo");
+			String coCd = paramMap.get("coCd");
+
+			// 1차: todoKey 단독 조회
+			Map<String, Object> amCheckParam = new HashMap<>();
+			amCheckParam.put("todoKey", todoKey);
+			String docId = am11Svc.selectDocIdByBizKey(amCheckParam);
+
+			// 1차 실패 시 2차: erpBizKey + coCd + todoDiv2CodeId + histNo
+			if (docId == null || docId.isEmpty()) {
+				amCheckParam.clear();
+				amCheckParam.put("erpBizKey", erpBizKey);
+				amCheckParam.put("coCd", coCd);
+				amCheckParam.put("todoDiv2CodeId", todoDiv2CodeId);
+				Object histNoObj = paramMap.get("histNo");
+				if (histNoObj != null && !String.valueOf(histNoObj).isEmpty()) {
+					amCheckParam.put("histNo", histNoObj);
+				}
+				docId = am11Svc.selectDocIdByBizKey(amCheckParam);
+			}
+
+			// AM 연동 문서 존재 시 위임
+			if (docId != null && !docId.isEmpty()) {
+				Map<String, Object> amParam = new HashMap<>();
+				amParam.put("docId", docId);
+				amParam.put("userId", paramMap.get("userId"));
+				String userNm = paramMap.get("userNm");
+				if (userNm != null && !userNm.isEmpty()) {
+					amParam.put("userNm", userNm);
+				}
+				amParam.put("apprOpinion", todoCfOpn != null ? todoCfOpn : "");
+
+				Map<String, Object> amResult = am11Svc.approveDocument(amParam);
+
+				// AM 엔진 결과 판정: 200 아니면 실패 반환
+				if (amResult == null || !"200".equals(amResult.get("resultCode"))) {
+					Map<String, String> response = new HashMap<>();
+					response.put("resultCount", "0");
+					response.put("RESULT_COUNT", "0");
+					if (amResult != null && amResult.get("resultMessage") != null) {
+						response.put("resultMessage", String.valueOf(amResult.get("resultMessage")));
+					}
+					return response;
+				}
+
+				// 위임 경로: WB20 재조회 후 응답계약 구성
+				Map<String, String> queryParam = new HashMap<>();
+				queryParam.put("todoNo", tempReqNo);
+				queryParam.put("coCd", coCd);
+				Map<String, String> todoYnResult = wb20Mapper.selectTodoFinalYn(queryParam);
+				String todoYn = (todoYnResult != null) ? todoYnResult.get("todoYn") : "N";
+
+				Map<String, String> response = new HashMap<>();
+				response.put("resultCount", "1");
+				response.put("RESULT_COUNT", "1");
+				response.put("todoYn", todoYn);
+				response.put("notifyHandledByAm", "Y");
+				return response;
+			}
+		}
+
+		// 비연동 또는 재진입: 기존 WB20 결재 흐름 실행
 		result += wb20Mapper.updateApprovalLine(paramMap);
-		// WB20 결재 승인 결과를 동일 업무의 AM 전자결재 문서/결재선에 반영(AM 연동 건만 대상, 미연동 건은 SQL이 0건 처리)
-		wb20Mapper.syncAmApprovalLine(paramMap);
-		wb20Mapper.syncAmApprovalDocument(paramMap);
 
 		// 출장신청 관리부서 회계 승인(TODODIV2191) 시 신청서 자동 지급완료 처리 연동
 		if ("TODODIV2191".equals(todoDiv2CodeId) && "Y".equals(paramMap.get("sanctnSttus"))) {
@@ -1096,11 +1166,97 @@ public class WB20SvcImpl implements WB20Svc {
 	@Transactional(rollbackFor = Exception.class)
 	public Map<String, String> rejectApprovalLine(Map<String, String> paramMap) {
 		Map<String, String> result = new HashMap<>();
+
+		// AM 연동 판별 및 위임 (1차진입일 때만)
+		boolean isReentry = "Y".equals(paramMap.get("amLinkedApproval"));
+		if (!isReentry && am11Svc != null) {
+			String todoKey = paramMap.get("todoKey");
+			String erpBizKey = paramMap.get("todoNo");
+			String coCd = paramMap.get("coCd");
+
+			// 1차: todoKey 단독 조회
+			Map<String, Object> amCheckParam = new HashMap<>();
+			amCheckParam.put("todoKey", todoKey);
+			String docId = am11Svc.selectDocIdByBizKey(amCheckParam);
+
+			// 1차 실패 시 2차: erpBizKey + coCd + todoDiv2CodeId + histNo
+			if (docId == null || docId.isEmpty()) {
+				String todoDiv2CodeId = paramMap.get("todoDiv2CodeId");
+				amCheckParam.clear();
+				amCheckParam.put("erpBizKey", erpBizKey);
+				amCheckParam.put("coCd", coCd);
+				if (todoDiv2CodeId != null && !todoDiv2CodeId.isEmpty()) {
+					amCheckParam.put("todoDiv2CodeId", todoDiv2CodeId);
+				}
+				Object histNoObj = paramMap.get("histNo");
+				if (histNoObj != null && !String.valueOf(histNoObj).isEmpty()) {
+					amCheckParam.put("histNo", histNoObj);
+				}
+				docId = am11Svc.selectDocIdByBizKey(amCheckParam);
+			}
+
+			// AM 연동 문서 존재 시 위임
+			if (docId != null && !docId.isEmpty()) {
+				Map<String, Object> amParam = new HashMap<>();
+				amParam.put("docId", docId);
+				amParam.put("userId", paramMap.get("userId"));
+				String rejectOpinion = paramMap.get("rejectOpinion");
+				if (rejectOpinion == null || rejectOpinion.trim().isEmpty()) {
+					rejectOpinion = paramMap.get("todoCfOpn");
+				}
+				if (rejectOpinion == null || rejectOpinion.trim().isEmpty()) {
+					rejectOpinion = "";
+				}
+				amParam.put("apprOpinion", rejectOpinion);
+
+				Map<String, Object> amResult = am11Svc.rejectDocument(amParam);
+
+				// AM 엔진 결과 판정: 200 아니면 실패 반환
+				if (amResult == null || !"200".equals(amResult.get("resultCode"))) {
+					result.put("resultCount", "0");
+					result.put("RESULT_COUNT", "0");
+					if (amResult != null && amResult.get("resultMessage") != null) {
+						result.put("resultMessage", String.valueOf(amResult.get("resultMessage")));
+					}
+					return result;
+				}
+
+				// 엔진 rejectDocument는 AGREE 반려 시에만 WB20 전파를 스킵한다(AM11SvcImpl L955).
+				// 따라서 반려한 라인의 LINE_TYPE이 AGREE일 때만 WB20 원본행을 직접 반려한다.
+				// (APPR은 엔진 콜백이 이미 반려 처리하므로 직접 반려하면 이중 처리가 된다.
+				//  COOP/REF는 엔진이 반려 자체를 차단하므로 이 지점에 도달하지 않는다.)
+				Map<String, String> queryParam = new HashMap<>();
+				queryParam.put("todoNo", erpBizKey);
+				queryParam.put("coCd", coCd);
+				List<Map<String, String>> wb20Lines = selectGetApprovalList(queryParam);
+
+				String targetTodoKey = paramMap.get("todoKey");
+				String actingLineType = "APPR";
+				if (targetTodoKey != null && !targetTodoKey.isEmpty()) {
+					for (Map<String, String> line : wb20Lines) {
+						if (targetTodoKey.equals(line.get("todoKey"))) {
+							String lt = line.get("lineType");
+							actingLineType = (lt != null && !lt.isEmpty()) ? lt : "APPR";
+							break;
+						}
+					}
+				}
+				boolean needsWb20Reject = "AGREE".equals(actingLineType);
+
+				if (needsWb20Reject) {
+					int wbCount = wb20Mapper.rejectApprovalLine(paramMap);
+					result.put("resultCount", String.valueOf(wbCount));
+					result.put("RESULT_COUNT", String.valueOf(wbCount));
+				} else {
+					result.put("resultCount", "1");
+					result.put("RESULT_COUNT", "1");
+				}
+				return result;
+			}
+		}
+
+		// 비연동 또는 재진입: 기존 WB20 반려 흐름 실행
 		int count = wb20Mapper.rejectApprovalLine(paramMap);
-		// WB20 결재 반려 결과를 동일 업무의 AM 전자결재 문서/결재선/이력에 반영(AM 연동 건만 대상)
-		wb20Mapper.syncAmApprovalRejectLine(paramMap);
-		wb20Mapper.syncAmApprovalRejectDocument(paramMap);
-		wb20Mapper.syncAmApprovalRejectHist(paramMap);
 		result.put("resultCount", String.valueOf(count));
 		result.put("RESULT_COUNT", String.valueOf(count));
 		return result;

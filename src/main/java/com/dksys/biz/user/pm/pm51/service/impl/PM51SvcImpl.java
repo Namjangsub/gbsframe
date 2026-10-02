@@ -636,6 +636,12 @@ public class PM51SvcImpl implements PM51Svc {
 				iSharng++;
 			} else {
 				approvalMap.put("sanCtnSn", Integer.toString(iApproval));
+				// 관리부서 결재선 1·2번은 병렬(합의) 결재다. 2번을 AGREE로 생성하면
+				// AM 엔진이 1번(APPR 헤드)+2번(AGREE)을 한 병렬 단계로 열어 순서 무관하게
+				// 두 명 모두 승인(AND)해야 다음(3번)으로 전진한다. 1번/3번은 APPR 순차 유지.
+				if ("mngApprovalArr".equals(arrKey) && iApproval == 2) {
+					approvalMap.put("lineType", "AGREE");
+				}
 				approvalMap.put("pgParam", pgParam2);
 				insertWbsApprovalListSync(approvalMap);
 				iApproval++;

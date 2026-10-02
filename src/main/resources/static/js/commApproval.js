@@ -730,6 +730,7 @@ function Approval(htmlParam, param, popParam) {
 				if(data.resultCode == 200){
 					confirmYn = true;
 					let todoYn = (data.result && data.result.todoYn) ? data.result.todoYn : '';
+					let notifyHandledByAm = (data.result && data.result.notifyHandledByAm) ? data.result.notifyHandledByAm : '';
 					// PM51/PM07/PM08/... 공용: 순차결재 대상 판정
 					var isPm51Seq = paramMap.todoDiv2CodeId === 'TODODIV2190' || paramMap.todoDiv2CodeId === 'TODODIV2191'
 					             || paramMap.todoDiv2CodeId === 'TODODIV2200' || paramMap.todoDiv2CodeId === 'TODODIV2201'
@@ -742,8 +743,10 @@ function Approval(htmlParam, param, popParam) {
 							sendTodoPfuShare(paramMap);
 
 						}
-						sendTodoFinal(paramMap);
-					} else if (typeof notifyPm51NextApprover === 'function' && isPm51Seq) {
+						if (notifyHandledByAm !== 'Y') {
+							sendTodoFinal(paramMap);
+						}
+					} else if (notifyHandledByAm !== 'Y' && typeof notifyPm51NextApprover === 'function' && isPm51Seq) {
 						// PM51 순차결재: 중간 결재자가 결재의견 없이 승인하면 sendTodoFinal()이 호출되지 않아
 						// 다음 차례 결재자에게 결재요청 알림톡이 발송되지 않던 문제 보완.
 						var pm51HasNext = notifyPm51NextApprover(paramMap.todoNo, paramMap.todoDiv2CodeId, paramMap.pgmId);

@@ -786,6 +786,13 @@ public class AM11SvcImpl implements AM11Svc {
                 logger.warn("최종 승인 알림 큐 적재 경고: docId={}", docId, ne);
             }
 
+            // Fix B: 완료 통지 식별자 보강 (enqueue 스킵된 경우 이벤트만 수신되도록)
+            if (paramMap.get("todoDiv2CodeId") == null || valueOf(paramMap.get("todoDiv2CodeId")).isEmpty()) {
+                if (actingLine != null && actingLine.get("wb20Div2CodeId") != null) {
+                    paramMap.put("todoDiv2CodeId", valueOf(actingLine.get("wb20Div2CodeId")));
+                }
+            }
+
             eventPublisher.publishEvent(new ApprovalEvent(
                 "COMPLETE", docId, (String) docLock.get("docNo"), (String) paramMap.get("docTitle"),
                 (String) docLock.get("draUserId"), docInfo != null ? (String) docInfo.get("draUserNm") : "", "", "", paramMap
@@ -827,6 +834,14 @@ public class AM11SvcImpl implements AM11Svc {
                 paramMap.put("currLineSeq", firstLine.get("lineSeq"));
                 if (firstLine.get("wb20Div2CodeId") != null) {
                     paramMap.put("todoDiv2CodeId", firstLine.get("wb20Div2CodeId"));
+                }
+                // Fix A: 리치알림 sanctnSn/div2 불일치 버그 수정
+                // 다음 결재자의 실제 WB20 순번과 div2를 listener에 전달하여 bm18 조회 정확성 보장
+                if (firstLine.get("wb20SanctnSn") != null) {
+                    paramMap.put("rcvSanctnSn", firstLine.get("wb20SanctnSn"));
+                }
+                if (firstLine.get("wb20Div2CodeId") != null) {
+                    paramMap.put("rcvTodoDiv2CodeId", firstLine.get("wb20Div2CodeId"));
                 }
                 eventPublisher.publishEvent(new ApprovalEvent(
                     "APPROVE_NEXT", docId, (String) docLock.get("docNo"), (String) paramMap.get("docTitle"),
@@ -930,6 +945,13 @@ public class AM11SvcImpl implements AM11Svc {
         int actingSeq = Integer.parseInt(String.valueOf(actingLine.get("lineSeq")));
         String actingType = lineTypeOf(actingLine);
 
+        // 협조(COOP)/참조(REF)는 결재권한이 없어 반려 권한도 없다. 확인/승인만 가능.
+        if ("COOP".equals(actingType) || "REF".equals(actingType) || "REFERENCE".equals(actingType)) {
+            resultMap.put("resultCode", "500");
+            resultMap.put("resultMessage", "협조/참조자는 반려 권한이 없습니다. (확인/승인만 가능)");
+            return resultMap;
+        }
+
         // 결재선 반려 업데이트
         Map<String, Object> updateLineParam = new HashMap<>(paramMap);
         updateLineParam.put("lineSeq", actingSeq);
@@ -978,6 +1000,7 @@ public class AM11SvcImpl implements AM11Svc {
                     wbReject.put("rejectOpinion", apprOpinion);
                     wbReject.put("userId", userId);
                     wbReject.put("pgmId", "AM1201P01");
+                    wbReject.put("amLinkedApproval", "Y");
                     Map<String, String> wbResult = wb20Svc.rejectApprovalLine(wbReject);
                     String rejectCnt = wbResult != null
                             ? (wbResult.get("resultCount") != null ? wbResult.get("resultCount") : wbResult.get("RESULT_COUNT"))
@@ -1020,6 +1043,16 @@ public class AM11SvcImpl implements AM11Svc {
                 enqueueApprovalNotification(notifParam, paramMap);
             } catch (Exception ne) {
                 logger.warn("반려 알림 큐 적재 경고: docId={}", docId, ne);
+            }
+
+            // Fix C: 반려 통지 식별자 보강 (enqueue 스킵된 경우 이벤트만 수신되도록)
+            if (paramMap.get("todoNo") == null || valueOf(paramMap.get("todoNo")).isEmpty()) {
+                paramMap.put("todoNo", valueOf(docLock.get("erpBizKey")));
+            }
+            if (paramMap.get("todoDiv2CodeId") == null || valueOf(paramMap.get("todoDiv2CodeId")).isEmpty()) {
+                if (actingLine != null && actingLine.get("wb20Div2CodeId") != null) {
+                    paramMap.put("todoDiv2CodeId", valueOf(actingLine.get("wb20Div2CodeId")));
+                }
             }
 
             eventPublisher.publishEvent(new ApprovalEvent(

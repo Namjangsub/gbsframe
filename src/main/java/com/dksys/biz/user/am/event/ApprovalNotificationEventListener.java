@@ -238,14 +238,32 @@ public class ApprovalNotificationEventListener {
                 return false;
             }
 
+            // Fix A: bm18 조회 sanctnSn/div2 쌍을 부서별 순번과 맞추기 위해 rcv* 값 우선
+            String lookupSanctnSn = "1";
+            if (event.getExtraInfo().get("rcvSanctnSn") != null) {
+                String rcvSn = String.valueOf(event.getExtraInfo().get("rcvSanctnSn")).trim();
+                if (!rcvSn.isEmpty()) {
+                    lookupSanctnSn = rcvSn;
+                }
+            } else if (event.getExtraInfo().get("currLineSeq") != null) {
+                lookupSanctnSn = String.valueOf(event.getExtraInfo().get("currLineSeq"));
+            }
+
+            String lookupDiv2CodeId = todoDiv2CodeId;
+            if (event.getExtraInfo().get("rcvTodoDiv2CodeId") != null) {
+                String rcvDiv2 = String.valueOf(event.getExtraInfo().get("rcvTodoDiv2CodeId")).trim();
+                if (!rcvDiv2.isEmpty()) {
+                    lookupDiv2CodeId = rcvDiv2;
+                }
+            }
+
             Map<String, String> selectParam = new HashMap<>();
             selectParam.put("coCd", coCd);
             selectParam.put("todoDiv1CodeId", "TODODIV20");
-            selectParam.put("todoDiv2CodeId", todoDiv2CodeId);
+            selectParam.put("todoDiv2CodeId", lookupDiv2CodeId);
             selectParam.put("todoNo", erpBizKey);
             selectParam.put("tmplatDiv", "TMPLATDIV02");
-            selectParam.put("sanctnSn", event.getExtraInfo().get("currLineSeq") != null
-                    ? String.valueOf(event.getExtraInfo().get("currLineSeq")) : "1");
+            selectParam.put("sanctnSn", lookupSanctnSn);
 
             List<Map<String, String>> messageList = bm18Svc.selectMaxMessageIdTodo(selectParam);
             if (messageList == null || messageList.isEmpty()) {

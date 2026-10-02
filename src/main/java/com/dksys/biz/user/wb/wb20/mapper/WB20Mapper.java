@@ -51,9 +51,6 @@ public interface WB20Mapper {
 	int syncAmApprovalCancelLine(Map<String, String> paramMap);
 	int syncAmApprovalCancelHist(Map<String, String> paramMap);
 	int syncAmApprovalCancelDocument(Map<String, String> paramMap);
-	int syncAmApprovalRejectLine(Map<String, String> paramMap);
-	int syncAmApprovalRejectDocument(Map<String, String> paramMap);
-	int syncAmApprovalRejectHist(Map<String, String> paramMap);
 	List<Map<String, String>> selectApprovalLinesForAmSync(Map<String, String> paramMap);
 	int deletePendingApprovalLinesForAmSync(Map<String, Object> paramMap);
 	int updatePendingApprovalLineOrder(Map<String, Object> paramMap);
