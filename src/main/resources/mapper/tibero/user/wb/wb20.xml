@@ -495,6 +495,7 @@
 			, E.DEPT_NM AS DT_NM
 			, F.LEVEL_NM AS JIK
 			, TO_CHAR(A.CREAT_DTTM, 'YYYY-MM-DD') AS REQ_DATE
+			, NVL(A.LINE_TYPE, 'APPR') AS LINE_TYPE
 			/* 결재요청자와 결재자가 같은 팀이면 팀장구분을 리턴하고 그외는 공백으로 처리함(이슈 결재처리시 위험도평가에서 사용함 */
 			, CASE
 				    WHEN (A.TODO_DIV2_CODE_ID = 'TODODIV2090'                              	AND C.MNG_ID = B.ID AND B.TEAM_MANAGER = 'TEAM01') THEN '평가'
@@ -520,6 +521,7 @@
 						AND A.CO_CD = B.CO_CD
 						AND A.TODO_DIV1_CODE_ID = B.TODO_DIV1_CODE_ID
 						AND A.TODO_DIV2_CODE_ID = B.TODO_DIV2_CODE_ID
+						AND NVL(B.LINE_TYPE, 'APPR') &lt;&gt; 'COOP'
 <!-- 						AND A.SALES_CD = B.SALES_CD -->
 						AND A.TODO_NO = B.TODO_NO
 					ORDER BY B.SANCTN_SN DESC
@@ -762,7 +764,8 @@
 		    A.SANCTN_SN,
 		    A.SANCTN_STTUS,
 		    B.NAME AS TODO_NM,
-		    C.LEVEL_NM AS JIK		/* 결재 안내문구에 이름+직급으로 표기하기 위함 */
+		    C.LEVEL_NM AS JIK,		/* 결재 안내문구에 이름+직급으로 표기하기 위함 */
+		    NVL(A.LINE_TYPE, 'APPR') AS LINE_TYPE
 		FROM TB_WB20M03 A
 		LEFT OUTER JOIN TB_CM06M01 B ON A.TODO_ID = B.ID
 		LEFT OUTER JOIN TB_CM07M01 C ON B.LEVEL_CD = C.LEVEL_CD
@@ -925,6 +928,75 @@
 		   </if>
 	</update>
 
+	<!-- WB20 결재반려 연동: 반려 결재선 상태 처리 -->
+	<update id="syncAmApprovalRejectLine" parameterType="Map">
+		UPDATE TB_AM11D01
+		   SET LINE_STATUS    = 'REJECTED',
+		       APPR_DT        = SYSDATE,
+		       APPR_OPINION   = #{rejectOpinion, jdbcType=VARCHAR},
+		       ACTUAL_USER_ID = #{userId},
+		       ACTUAL_USER_NM = (SELECT NAME FROM TB_CM06M01 WHERE ID = #{userId} AND ROWNUM = 1),
+		       UDT_ID         = #{userId},
+		       UDT_PGM        = 'WB20_REJECT',
+		       UDT_DTTM       = SYSDATE
+		 WHERE DOC_ID IN (
+		       SELECT DOC_ID FROM TB_AM11M01 WHERE ERP_BIZ_KEY = #{todoNo}
+		       <if test="coCd != null and coCd != ''">
+		         AND CO_CD = #{coCd}
+		       </if>
+		 )
+		   AND (APPROVER_ID = #{userId} AND WB20_SANCTN_SN = TO_NUMBER(#{sanctnSn}))
+	</update>
+
+	<!-- WB20 결재반려 연동: 전자결재 문서 마스터 상태 반려 처리 -->
+	<update id="syncAmApprovalRejectDocument" parameterType="Map">
+		UPDATE TB_AM11M01 M
+		   SET DOC_STATUS = 'REJECTED',
+		       COMPLETE_DT = SYSDATE,
+		       UDT_ID = #{userId},
+		       UDT_PGM = 'WB20_REJECT',
+		       UDT_DTTM = SYSDATE
+		 WHERE M.ERP_BIZ_KEY = #{todoNo}
+		   <if test="coCd != null and coCd != ''">
+		   AND M.CO_CD = #{coCd}
+		   </if>
+	</update>
+
+	<!-- WB20 결재반려 연동: 전자결재 이력 등록 -->
+	<insert id="syncAmApprovalRejectHist" parameterType="Map">
+		INSERT INTO TB_AM11D02 (
+		    HIST_SEQ,
+		    DOC_ID,
+		    ACT_TYPE,
+		    ACT_USER_ID,
+		    ACT_USER_NM,
+		    ACT_DEPT_NM,
+		    ACT_LEVEL_NM,
+		    PREV_STATUS,
+		    NEXT_STATUS,
+		    ACT_OPINION,
+		    ACT_DTTM
+		)
+		SELECT
+		    TO_CHAR(TB_AM11D02_SQ01.NEXTVAL),
+		    M.DOC_ID,
+		    'REJECT',
+		    #{userId, jdbcType=VARCHAR},
+		    (SELECT NAME FROM TB_CM06M01 WHERE ID = #{userId, jdbcType=VARCHAR} AND ROWNUM = 1),
+		    (SELECT DEPT_NM FROM TB_CM04M01 D JOIN TB_CM06M01 U ON D.DEPT_ID = U.DEPT_ID WHERE U.ID = #{userId, jdbcType=VARCHAR} AND ROWNUM = 1),
+		    (SELECT LEVEL_NM FROM TB_CM07M01 L JOIN TB_CM06M01 U ON L.LEVEL_CD = U.LEVEL_CD WHERE U.ID = #{userId, jdbcType=VARCHAR} AND ROWNUM = 1),
+		    M.DOC_STATUS,
+		    'REJECTED',
+		    #{rejectOpinion, jdbcType=VARCHAR},
+		    SYSDATE
+		  FROM TB_AM11M01 M
+		 WHERE M.ERP_BIZ_KEY = #{todoNo}
+		   <if test="coCd != null and coCd != ''">
+		   AND M.CO_CD = #{coCd}
+		   </if>
+		   AND ROWNUM = 1
+	</insert>
+
 	<!-- 결재 반려 처리 (TB_WB20M03) -->
 	<update id="rejectApprovalLine" parameterType="Map">
 		UPDATE TB_WB20M03
@@ -977,6 +1049,14 @@
 							A.DEPT_ID,
 							B.DEPT_NM AS DT_NM,
 							D.LEVEL_NM AS JIK,
+							C.LINE_TYPE,
+							CASE 
+								WHEN C.LINE_TYPE = 'AGREE' THEN '합의' 
+								WHEN C.LINE_TYPE = 'COOP' THEN '협조' 
+								WHEN C.LINE_TYPE = 'POST' THEN '후결' 
+								WHEN C.LINE_TYPE = 'REF' OR C.TODO_DIV1_CODE_ID = 'TODODIV10' THEN '참조' 
+								ELSE '결재' 
+							END AS LINE_TYPE_NM,
 							C.TODO_DIV1_CODE_ID  AS TODO_DIV1_CODE_ID,
 							DECODE(C.TODO_DIV1_CODE_ID, 'TODODIV10', '공유', 'TODODIV20', '결재', '') AS GB,
 							C.SANCTN_STTUS,
@@ -1128,6 +1208,9 @@
 				/* , UDT_DTTM = SYSDATE */
 				, PG_PARAM = #{pgParam,							jdbcType=VARCHAR}
 				, TODO_TITL = #{todoTitl,						jdbcType=VARCHAR}
+				<if test="lineType != null and !lineType.equals('')">
+				, LINE_TYPE = #{lineType,						jdbcType=VARCHAR}
+				</if>
 				, ETC_FIELD3 = ''
 		WHEN NOT MATCHED THEN
 		INSERT
@@ -1153,6 +1236,7 @@
 			, CREAT_DTTM
 			, PG_PARAM
 			, TODO_TITL
+			, LINE_TYPE
 		)
 		VALUES
 		(
@@ -1186,6 +1270,7 @@
 			, #{createDttm,				jdbcType=VARCHAR}
 			, #{pgParam,				jdbcType=VARCHAR}
 			, #{todoTitl,				jdbcType=VARCHAR}
+			, #{lineType,				jdbcType=VARCHAR}
 		)
 	</insert>
 	<!-- todo insert -->
@@ -1245,6 +1330,7 @@
 			, PG_PARAM
 			, TODO_TITL
 			, ETC_FIELD2
+			, LINE_TYPE
 		)
 		VALUES
 		(
@@ -1273,6 +1359,7 @@
 			, #{pgParam,				jdbcType=VARCHAR}
 			, #{todoTitl,				jdbcType=VARCHAR}
 			, #{etcField2, jdbcType=VARCHAR}
+			, #{lineType,				jdbcType=VARCHAR}
 		)
 	</insert>
 
@@ -1304,6 +1391,7 @@
 			, PG_PARAM
 			, TODO_TITL
 			, ETC_FIELD2
+			, LINE_TYPE
 		)
 		SELECT
 			#{todoKey,jdbcType=VARCHAR}
@@ -1331,6 +1419,7 @@
 			, PG_PARAM
 			, TODO_TITL
 			, #{etcField2, jdbcType=VARCHAR}
+			, #{lineType,jdbcType=VARCHAR}
 		FROM (
 			SELECT
 				SALES_CD
@@ -1464,6 +1553,19 @@
 		   AND SANCTN_STTUS != 'Y'
 	</update>
 
+	<!-- AM→WB 역방향 동기화: LINE_TYPE 갱신 (기존행의 구분값만 변경, 다른 컬럼 보존) -->
+	<update id="updateTodoLineTypeByKey" parameterType="Map">
+		UPDATE TB_WB20M03
+		   SET LINE_TYPE = #{lineType, jdbcType=VARCHAR}
+		     , UDT_ID = #{userId, jdbcType=VARCHAR}
+		     , UDT_PGM = #{pgmId, jdbcType=VARCHAR}
+		     , UDT_DTTM = SYSDATE
+		 WHERE TODO_NO = #{todoNo, jdbcType=VARCHAR}
+		   AND CO_CD = #{coCd, jdbcType=VARCHAR}
+		   AND TODO_KEY = #{todoKey, jdbcType=NUMERIC}
+		   AND SANCTN_STTUS != 'Y'
+	</update>
+
 	<!-- AM→WB 역방향 동기화: PHASE C offset 잔류행 검증 -->
 	<select id="countOffsetLeftoverSanctnSn" parameterType="Map" resultType="int">
 		SELECT COUNT(*) FROM TB_WB20M03
@@ -1524,6 +1626,7 @@
 		WHERE 1=1
 				AND TODO_DIV2_CODE_ID = #{todoDiv2CodeId}
 				AND TODO_NO = #{todoNo}
+				AND NVL(A.LINE_TYPE, 'APPR') NOT IN ('COOP', 'POST')
 				GROUP BY A.TODO_NO
 	</select>
 

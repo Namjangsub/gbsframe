@@ -824,7 +824,11 @@ public class PM08SvcImpl implements PM08Svc {
 					amLine.put("wb20SanctnSn", row.get("sanctnSn"));
 					amLine.put("wb20Div1CodeId", row.get("todoDiv1CodeId"));
 					amLine.put("wb20Div2CodeId", row.get("todoDiv2CodeId"));
-				amLine.put("lineType", "APPR");
+				String lineType = row.get("lineType");
+				if (lineType == null || lineType.trim().isEmpty()) {
+					lineType = "APPR";
+				}
+				amLine.put("lineType", lineType);
 				amLine.put("sourceApproved", "Y".equalsIgnoreCase(row.get("sanctnSttus")) ? "Y" : "N");
 				amLineList.add(amLine);
 			}
@@ -841,7 +845,11 @@ public class PM08SvcImpl implements PM08Svc {
 					amLine.put("wb20SanctnSn", row.get("sanctnSn"));
 					amLine.put("wb20Div1CodeId", row.get("todoDiv1CodeId"));
 					amLine.put("wb20Div2CodeId", row.get("todoDiv2CodeId"));
-				amLine.put("lineType", "REF");
+				String lineType = row.get("lineType");
+				if (lineType == null || lineType.trim().isEmpty()) {
+					lineType = "REF";
+				}
+				amLine.put("lineType", lineType);
 				amLine.put("sourceApproved", "N");
 				amLineList.add(amLine);
 			}

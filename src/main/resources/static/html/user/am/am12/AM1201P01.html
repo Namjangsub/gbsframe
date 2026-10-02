@@ -70,6 +70,11 @@
 			border-color: #d9534f;
 			background: #fdf5f5;
 		}
+		#approvalDetailModalArea .flow-node.coop-line {
+			border-style: dashed;
+			background: #fafafa;
+			border-color: #999;
+		}
 		#approvalDetailModalArea .flow-node .node-type {
 			font-size: 10px;
 			color: #777;
@@ -606,13 +611,30 @@
 
 		var lineTypeNmMap = {
 			"DRAFT": "기안",
+			"APPR": "결재",
 			"APPROVE": "결재",
 			"AGREE": "합의",
+			"COOP": "협조",
 			"POST": "후결",
 			"REF": "참조",
 			"REFERENCE": "참조",
 			"NOTIFY": "통보"
 		};
+
+		// AGREE 연속 라인 감지 (병렬 배지용)
+		var agreeRunMap = {};
+		for (var i = 0; i < lineList.length; i++) {
+			if ((lineList[i].lineType || 'APPR') === 'AGREE') {
+				var runLen = 1;
+				for (var j = i + 1; j < lineList.length && (lineList[j].lineType || 'APPR') === 'AGREE'; j++) {
+					runLen++;
+				}
+				for (var k = 0; k < runLen; k++) {
+					agreeRunMap[i + k] = (runLen > 1);
+				}
+				i += runLen - 1;
+			}
+		}
 
 		$.each(lineList, function(idx, line) {
 			var stCls = line.lineStatus || "READY";
@@ -632,16 +654,20 @@
 			if (line.lineType === 'POST') {
 				lTypeBadge += ' <span class="label label-info" style="font-size:9px; padding:1px 3px;">후결</span>';
 			}
+			if ((line.lineType || 'APPR') === 'AGREE' && agreeRunMap[idx]) {
+				lTypeBadge += ' <span class="label label-default" style="font-size:9px; padding:1px 3px; color:#999; background:#f5f5f5; border:1px solid #ddd;">(병렬)</span>';
+			}
 
-			// 결재(APPR 등)는 승인/미승인, 공유·참조(REF)는 확인/미확인으로 표기(반려는 그대로).
+			// 반려는 그대로, 참조(REF/REFERENCE)는 확인/미확인, 협조(COOP)는 의견/미의견, 나머지는 승인/미승인
 			var isRefLine = (line.lineType === 'REF' || line.lineType === 'REFERENCE');
+			var isCoopLine = (line.lineType === 'COOP');
 			var stNm;
 			if (stCls === 'REJECTED') {
 				stNm = '반려';
 			} else if (stCls === 'APPROVED') {
-				stNm = isRefLine ? '확인' : '승인';
+				stNm = isRefLine ? '확인' : (isCoopLine ? '의견' : '승인');
 			} else {
-				stNm = isRefLine ? '미확인' : '미승인';
+				stNm = isRefLine ? '미확인' : (isCoopLine ? '미의견' : '미승인');
 			}
 
 			var readBadge = '';
@@ -651,7 +677,12 @@
 				readBadge = '<div style="font-size:9px; color:#aaa; margin-top:2px;"><i class="fa fa-eye-slash"></i> 미열람</div>';
 			}
 
-			var nodeHtml = '<div class="flow-node ' + stCls + '">'
+			var nodeClasses = 'flow-node ' + stCls;
+			if (isCoopLine) {
+				nodeClasses += ' coop-line';
+			}
+
+			var nodeHtml = '<div class="' + nodeClasses + '">'
 				+ '<div class="node-type">(' + line.lineSeq + ') ' + lTypeBadge + '</div>'
 				+ '<div class="node-name">' + nameDisp + '</div>'
 				+ '<div class="node-dept">' + (line.deptNm || '') + ' ' + (line.levelNm || '') + '</div>'
@@ -750,6 +781,7 @@
 	// 결재자 권한 및 버튼 노출 판정 (후결 단계 포함)
 	function checkUserApprovalAuthority(doc, lineList) {
 		var isMyTurn = false;
+		var isMyApprTurn = false;
 		var isMyArbit = false;
 		$('#btnCancelArbit').hide();
 		$('#btnCancelDraft').hide();
@@ -757,6 +789,8 @@
 		$('.appr-action-btn').hide();
 		var docId = doc.docId;
 		var currLineSeq = Number(doc.currLineSeq || 0);
+
+		// 전결 권한자 확인
 		$.each(lineList || [], function(idx, line) {
 			if (line.arbitYn === 'Y' && (line.actualUserId === jwt.userId || line.approverId === jwt.userId)) {
 				isMyArbit = true;
@@ -767,23 +801,67 @@
 
 		// 1. 진행 중인 문서인지 확인 (REQUEST, PROGRESS, POST_PROGRESS)
 		if (doc.docStatus === 'REQUEST' || doc.docStatus === 'PROGRESS' || doc.docStatus === 'POST_PROGRESS') {
-			$.each(lineList, function(idx, line) {
-				if (Number(line.lineSeq) === currLineSeq) {
-					// 현재 결재자이거나 대결 권한인지
-					if (line.approverId === jwt.userId) {
-						isMyTurn = true;
-					}
-					return false;
+			// 병렬 PENDING 멤버십 판정: 내 PENDING 라인이 있는지 확인 (REF/REFERENCE/NOTIFY/DRAFT 제외)
+			var NON_ACTION_TYPES = { 'REF': 1, 'REFERENCE': 1, 'NOTIFY': 1, 'DRAFT': 1 };
+			$.each(lineList || [], function(idx, line) {
+				var lt = line.lineType || 'APPR';
+				if (NON_ACTION_TYPES[lt]) return;
+				if (line.lineStatus !== 'PENDING') return;
+				if (line.approverId !== jwt.userId && line.actualUserId !== jwt.userId) return;
+
+				isMyTurn = true;
+				if (lt === 'APPR' || lt === 'APPROVE') {
+					isMyApprTurn = true;
 				}
 			});
 
 			// 기안자 본인이면 1차 결재 승인 전까지 상신취소 버튼 노출
+			// CR02: ERP 결재선의 READY 현재 차례도 AM 결재자로 노출한다.
+			// COOP/참조는 차례 계산에서 제외하고, APPR/AGREE 완료 뒤 POST를 연다.
+			if (!isMyTurn && doc.erpBizType === 'CR02') {
+				var actionable = [];
+				$.each(lineList || [], function(idx, line) {
+					var lt = line.lineType || 'APPR';
+					if (lt !== 'APPR' && lt !== 'APPROVE' && lt !== 'AGREE' && lt !== 'POST') return;
+					if (line.lineStatus !== 'APPROVED' && line.lineStatus !== 'REJECTED') actionable.push(line);
+				});
+				var currentStage = [];
+				for (var si = 0; si < actionable.length; si++) {
+					var stageLine = actionable[si];
+					var stageType = stageLine.lineType || 'APPR';
+					if (stageType === 'POST') {
+						var unresolvedApproval = false;
+						for (var ai = 0; ai < actionable.length; ai++) {
+							var approvalType = actionable[ai].lineType || 'APPR';
+							if ((approvalType === 'APPR' || approvalType === 'APPROVE' || approvalType === 'AGREE')
+									&& Number(actionable[ai].lineSeq) < Number(stageLine.lineSeq)) unresolvedApproval = true;
+						}
+						if (!unresolvedApproval) currentStage = [stageLine];
+						break;
+					}
+					if (currentStage.length === 0) {
+						currentStage.push(stageLine);
+						if (stageType !== 'AGREE') break;
+					} else if ((currentStage[0].lineType || 'APPR') === 'AGREE' && stageType === 'AGREE') {
+						currentStage.push(stageLine);
+					} else {
+					break;
+					}
+				}
+				$.each(currentStage, function(idx, line) {
+					if (line.approverId === jwt.userId || line.actualUserId === jwt.userId) {
+						isMyTurn = true;
+						if ((line.lineType || 'APPR') === 'APPR' || line.lineType === 'APPROVE') isMyApprTurn = true;
+					}
+				});
+			}
+
 			if (doc.draUserId === jwt.userId && currLineSeq === 1) {
 				$('#btnCancelDraft').show();
 			}
 
-			// 기안자 본인이거나 현재 결재자이면 결재선 변경 버튼 노출
-			if (doc.draUserId === jwt.userId || isMyTurn || jwt.authCd === 'AUTH001') {
+			// 기안자 본인이거나 APPR 결재자이면 결재선 변경 버튼 노출 (합의/협조자는 제외)
+			if (doc.draUserId === jwt.userId || isMyApprTurn || jwt.authCd === 'AUTH001') {
 				$('#btnChangeLine').show();
 			}
 		}

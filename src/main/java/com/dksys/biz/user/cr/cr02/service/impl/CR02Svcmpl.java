@@ -297,6 +297,21 @@ public class CR02Svcmpl implements CR02Svc {
                 int i = 0;
                 for (Map<String, String> sharngMap : sharngArr) {
                     try {
+                            String targetUsrNm = sharngMap.get("usrNm");
+                            if (targetUsrNm == null || targetUsrNm.trim().isEmpty()) {
+                                targetUsrNm = sharngMap.get("todoId");
+                            }
+                            if (targetUsrNm == null || targetUsrNm.trim().isEmpty()) {
+                                targetUsrNm = sharngMap.get("id");
+                            }
+                            sharngMap.put("usrNm", targetUsrNm);
+                            sharngMap.put("todoId", targetUsrNm);
+                            if (sharngMap.get("todoCoCd") == null || sharngMap.get("todoCoCd").isEmpty()) {
+                                sharngMap.put("todoCoCd", param.get("coCd"));
+                            }
+                            if (sharngMap.get("coCd") == null || sharngMap.get("coCd").isEmpty()) {
+                                sharngMap.put("coCd", param.get("coCd"));
+                            }
                             sharngMap.put("reqNo", param.get("ordrsNo"));
                             sharngMap.put("salesCd", param.get("ordrsNo"));
                             sharngMap.put("fileTrgtKey", param.get("fileTrgtKey"));
@@ -305,11 +320,15 @@ public class CR02Svcmpl implements CR02Svc {
                             sharngMap.put("histNo", "1");
                             sharngMap.put("sanCtnSn",Integer.toString(i+1));
                             sharngMap.put("pgParam", pgParam1);
-                            sharngMap.put("todoTitle", param.get("ordrsNo") +" , " + sharngMap.get("todoTitle"));
+                            String shTitle = sharngMap.get("todoTitle");
+                            if (shTitle != null && !shTitle.startsWith(param.get("ordrsNo"))) {
+                                sharngMap.put("todoTitle", param.get("ordrsNo") +" , " + shTitle);
+                            }
                             QM01Mapper.insertWbsSharngList(sharngMap);
                         i++;
                     } catch (Exception e) {
-                        System.out.println("error2"+e.getMessage());
+                        System.err.println("insertOrdrs insertWbsSharngList error: " + e.getMessage());
+                        e.printStackTrace();
                     }
                 }
             }
@@ -326,6 +345,21 @@ public class CR02Svcmpl implements CR02Svc {
                 int i = 0;
                 for (Map<String, String> approvalMap : approvalArr) {
                     try {
+                            String targetUsrNm = approvalMap.get("usrNm");
+                            if (targetUsrNm == null || targetUsrNm.trim().isEmpty()) {
+                                targetUsrNm = approvalMap.get("todoId");
+                            }
+                            if (targetUsrNm == null || targetUsrNm.trim().isEmpty()) {
+                                targetUsrNm = approvalMap.get("id");
+                            }
+                            approvalMap.put("usrNm", targetUsrNm);
+                            approvalMap.put("todoId", targetUsrNm);
+                            if (approvalMap.get("todoCoCd") == null || approvalMap.get("todoCoCd").isEmpty()) {
+                                approvalMap.put("todoCoCd", param.get("coCd"));
+                            }
+                            if (approvalMap.get("coCd") == null || approvalMap.get("coCd").isEmpty()) {
+                                approvalMap.put("coCd", param.get("coCd"));
+                            }
                             approvalMap.put("reqNo", param.get("ordrsNo"));
                             approvalMap.put("salesCd", param.get("ordrsNo"));
                             approvalMap.put("fileTrgtKey", param.get("fileTrgtKey"));
@@ -334,11 +368,15 @@ public class CR02Svcmpl implements CR02Svc {
                             approvalMap.put("histNo", "1");
                             approvalMap.put("sanCtnSn",Integer.toString(i+1));
                             approvalMap.put("pgParam", pgParam2);
-                            approvalMap.put("todoTitle", param.get("ordrsNo") +" , " + approvalMap.get("todoTitle"));
+                            String apTitle = approvalMap.get("todoTitle");
+                            if (apTitle != null && !apTitle.startsWith(param.get("ordrsNo"))) {
+                                approvalMap.put("todoTitle", param.get("ordrsNo") +" , " + apTitle);
+                            }
                             QM01Mapper.insertWbsApprovalList(approvalMap);
                             i++;
                     } catch (Exception e) {
-                        System.out.println("error2"+e.getMessage());
+                        System.err.println("insertOrdrs insertWbsApprovalList error: " + e.getMessage());
+                        e.printStackTrace();
                     }
                 }
             }
@@ -718,9 +756,17 @@ public class CR02Svcmpl implements CR02Svc {
         param.put("reqNo", param.get("ordrsNo"));
         param.put("salesCd", param.get("ordrsNo"));
 
-        List<Map<String, String>> sharngChk = QM01Mapper.deleteWbsSharngListChk(param);
-        if (sharngChk.size() > 0) {
-            QM01Mapper.deleteWbsSharngList(param);
+        List<Map<String, String>> approvalChk = QM01Mapper.deleteWbsApprovalListChk(param);
+        boolean canUpdateApproval = (approvalChk == null || approvalChk.isEmpty());
+
+        // 기존 결재선/공유선 삭제는 등록(INSERT) 이전에 완료 (공유자 INSERT 후 deleteWbsApprovalList 실행으로 인한 공유자 삭제 방지)
+        if (canUpdateApproval) {
+            QM01Mapper.deleteWbsApprovalList(param);
+        } else {
+            List<Map<String, String>> sharngChk = QM01Mapper.deleteWbsSharngListChk(param);
+            if (sharngChk != null && sharngChk.size() > 0) {
+                QM01Mapper.deleteWbsSharngList(param);
+            }
         }
 
         String pgParam1 = "{\"actionType\":\""+ "T" +"\",";
@@ -736,6 +782,21 @@ public class CR02Svcmpl implements CR02Svc {
             int i = 0;
             for (Map<String, String> sharngMap : sharngArr) {
                 try {
+                        String targetUsrNm = sharngMap.get("usrNm");
+                        if (targetUsrNm == null || targetUsrNm.trim().isEmpty()) {
+                            targetUsrNm = sharngMap.get("todoId");
+                        }
+                        if (targetUsrNm == null || targetUsrNm.trim().isEmpty()) {
+                            targetUsrNm = sharngMap.get("id");
+                        }
+                        sharngMap.put("usrNm", targetUsrNm);
+                        sharngMap.put("todoId", targetUsrNm);
+                        if (sharngMap.get("todoCoCd") == null || sharngMap.get("todoCoCd").isEmpty()) {
+                            sharngMap.put("todoCoCd", param.get("coCd"));
+                        }
+                        if (sharngMap.get("coCd") == null || sharngMap.get("coCd").isEmpty()) {
+                            sharngMap.put("coCd", param.get("coCd"));
+                        }
                         sharngMap.put("reqNo", param.get("ordrsNo"));
                         sharngMap.put("salesCd", param.get("ordrsNo"));
                         sharngMap.put("fileTrgtKey", param.get("fileTrgtKey"));
@@ -744,11 +805,15 @@ public class CR02Svcmpl implements CR02Svc {
                         sharngMap.put("histNo", param.get("histNo"));
                         sharngMap.put("sanCtnSn",Integer.toString(i+1));
                         sharngMap.put("pgParam", pgParam1);
-                        sharngMap.put("todoTitle", param.get("ordrsNo") +" , " + sharngMap.get("todoTitle"));
+                        String shTitle = sharngMap.get("todoTitle");
+                        if (shTitle != null && !shTitle.startsWith(param.get("ordrsNo"))) {
+                            sharngMap.put("todoTitle", param.get("ordrsNo") +" , " + shTitle);
+                        }
                         QM01Mapper.insertWbsSharngList(sharngMap);
                     i++;
                 } catch (Exception e) {
-                    System.out.println("error2"+e.getMessage());
+                    System.err.println("updateOrdrs insertWbsSharngList error: " + e.getMessage());
+                    e.printStackTrace();
                 }
             }
         }
@@ -760,26 +825,46 @@ public class CR02Svcmpl implements CR02Svc {
         //pgParam2 += "\"salesCd\":\""+ param.get("salesCd") +"\",";
         pgParam2 += "\"ordrsNo\":\""+ param.get("ordrsNo") +"\"}";
         //결재
-        Type stringList3 = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
-        List<Map<String, String>> approvalArr = gson.fromJson(param.get("rowApprovalListArr"), stringList3);
-        if (approvalArr != null && approvalArr.size() > 0 ) {
-            int i = 0;
-            for (Map<String, String> approvalMap : approvalArr) {
-                try {
-                        approvalMap.put("reqNo", param.get("ordrsNo"));
-                        approvalMap.put("salesCd", param.get("ordrsNo"));
-                        approvalMap.put("fileTrgtKey", param.get("fileTrgtKey"));
-                        approvalMap.put("pgmId", param.get("pgmId"));
-                        approvalMap.put("userId", param.get("userId"));
-                        approvalMap.put("histNo", param.get("histNo"));
-                        approvalMap.put("sanCtnSn",Integer.toString(i+1));
-                        approvalMap.put("pgParam", pgParam2);
-                        approvalMap.put("todoTitle", param.get("ordrsNo") +" , " + approvalMap.get("todoTitle"));
-                        QM01Mapper.insertWbsApprovalList(approvalMap);
-                        i++;
-                } catch (Exception e) {
-                    System.out.println("error2"+e.getMessage());
-//                  thrower.throwCommonException("공유정보발송!");
+        if (canUpdateApproval) {
+            Type stringList3 = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
+            List<Map<String, String>> approvalArr = gson.fromJson(param.get("rowApprovalListArr"), stringList3);
+            if (approvalArr != null && approvalArr.size() > 0 ) {
+                int i = 0;
+                for (Map<String, String> approvalMap : approvalArr) {
+                    try {
+                            String targetUsrNm = approvalMap.get("usrNm");
+                            if (targetUsrNm == null || targetUsrNm.trim().isEmpty()) {
+                                targetUsrNm = approvalMap.get("todoId");
+                            }
+                            if (targetUsrNm == null || targetUsrNm.trim().isEmpty()) {
+                                targetUsrNm = approvalMap.get("id");
+                            }
+                            approvalMap.put("usrNm", targetUsrNm);
+                            approvalMap.put("todoId", targetUsrNm);
+                            if (approvalMap.get("todoCoCd") == null || approvalMap.get("todoCoCd").isEmpty()) {
+                                approvalMap.put("todoCoCd", param.get("coCd"));
+                            }
+                            if (approvalMap.get("coCd") == null || approvalMap.get("coCd").isEmpty()) {
+                                approvalMap.put("coCd", param.get("coCd"));
+                            }
+                            approvalMap.put("reqNo", param.get("ordrsNo"));
+                            approvalMap.put("salesCd", param.get("ordrsNo"));
+                            approvalMap.put("fileTrgtKey", param.get("fileTrgtKey"));
+                            approvalMap.put("pgmId", param.get("pgmId"));
+                            approvalMap.put("userId", param.get("userId"));
+                            approvalMap.put("histNo", param.get("histNo"));
+                            approvalMap.put("sanCtnSn",Integer.toString(i+1));
+                            approvalMap.put("pgParam", pgParam2);
+                            String apTitle = approvalMap.get("todoTitle");
+                            if (apTitle != null && !apTitle.startsWith(param.get("ordrsNo"))) {
+                                approvalMap.put("todoTitle", param.get("ordrsNo") +" , " + apTitle);
+                            }
+                            QM01Mapper.insertWbsApprovalList(approvalMap);
+                            i++;
+                    } catch (Exception e) {
+                        System.err.println("updateOrdrs insertWbsApprovalList error: " + e.getMessage());
+                        e.printStackTrace();
+                    }
                 }
             }
         }
@@ -1113,6 +1198,9 @@ public class CR02Svcmpl implements CR02Svc {
 
 		Map<String, Object> selectOrdrsInfo = cr02Mapper.selectOrdrsInfo(paramMap); // 선택한 수주 정보 조회
         if (selectOrdrsInfo != null) {
+            if ((paramMap.get("histNo") == null || paramMap.get("histNo").trim().isEmpty()) && selectOrdrsInfo.get("histNo") != null) {
+                paramMap.put("histNo", selectOrdrsInfo.get("histNo").toString());
+            }
             if ("ORDRSDIV2".equals(selectOrdrsInfo.get("ordrsDiv")) || "ORDRSDIV3".equals(selectOrdrsInfo.get("ordrsDiv"))) {
                 HashMap<String, String> param2 = new HashMap<>();
                 param2.putAll(paramMap);
@@ -1184,8 +1272,7 @@ public class CR02Svcmpl implements CR02Svc {
         }
 
         // CR02 AM 전자결재 문서 삭제 (D01 먼저, M01 나중)
-        cr02Mapper.deleteAmD01ByOrdrsNo(paramMap);
-        cr02Mapper.deleteAmM01ByOrdrsNo(paramMap);
+        deleteUnprocessedCr02AmDocs(paramMap);
 
         //---------------------------------------------------------------
         //첨부 화일 처리 시작  (처음 등록시에는 화일 삭제할게 없음)
@@ -1450,7 +1537,11 @@ public class CR02Svcmpl implements CR02Svc {
             amLine.put("wb20SanctnSn", row.get("sanctnSn"));
             amLine.put("wb20Div1CodeId", row.get("todoDiv1CodeId"));
             amLine.put("wb20Div2CodeId", row.get("todoDiv2CodeId"));
-            amLine.put("lineType", "APPR");
+            String lineType = row.get("lineType");
+            if (lineType == null || lineType.trim().isEmpty()) {
+                lineType = "APPR";
+            }
+            amLine.put("lineType", lineType);
             amLine.put("sourceApproved", "Y".equalsIgnoreCase(row.get("sanctnSttus")) ? "Y" : "N");
             amLineList.add(amLine);
         }
@@ -1471,7 +1562,11 @@ public class CR02Svcmpl implements CR02Svc {
             amLine.put("wb20SanctnSn", row.get("sanctnSn"));
             amLine.put("wb20Div1CodeId", row.get("todoDiv1CodeId"));
             amLine.put("wb20Div2CodeId", row.get("todoDiv2CodeId"));
-            amLine.put("lineType", "REF");
+            String lineType = row.get("lineType");
+            if (lineType == null || lineType.trim().isEmpty()) {
+                lineType = "REF";
+            }
+            amLine.put("lineType", lineType);
             amLine.put("sourceApproved", "N");
             amLineList.add(amLine);
         }
@@ -1496,16 +1591,74 @@ public class CR02Svcmpl implements CR02Svc {
                 histNo = "1";
             }
 
+            Map<String, String> rejectedLineParam = new HashMap<>();
+            rejectedLineParam.put("ordrsNo", ordrsNo);
+            rejectedLineParam.put("coCd", coCd);
+            rejectedLineParam.put("histNo", histNo);
+            rejectedLineParam.put("userId", paramMap.get("userId"));
+            rejectedLineParam.put("pgmId", paramMap.get("pgmId") == null ? "CR0202P01" : paramMap.get("pgmId"));
+            cr02Mapper.resetRejectedApprovalLineByOrdrsNo(rejectedLineParam);
+
             List<Map<String, Object>> amLineList = buildAmLineListFromWb20(ordrsNo, coCd, histNo);
-            if (amLineList.isEmpty()) {
+            Map<String, Object> docIdParam = new HashMap<>();
+            docIdParam.put("erpBizKey", ordrsNo);
+            docIdParam.put("coCd", coCd);
+            docIdParam.put("todoDiv2CodeId", "TODODIV2100");
+            docIdParam.put("histNo", histNo);
+            String existingDocId = am11Svc.selectDocIdByBizKey(docIdParam);
+
+            if (existingDocId != null && !existingDocId.trim().isEmpty()) {
+                Map<String, String> statusParam = new HashMap<>();
+                statusParam.put("docId", existingDocId);
+                String existingDocStatus = cr02Mapper.selectAmDocStatusByDocId(statusParam);
+                if ("REJECTED".equals(existingDocStatus)) {
+                    // 반려 문서는 이력 보존을 위해 유지하고, 수정 저장은 새 AM 문서로 상신한다.
+                    existingDocId = null;
+                }
+            }
+
+            boolean hasApprover = false;
+            for (Map<String, Object> line : amLineList) {
+                String lineType = String.valueOf(line.get("lineType"));
+                if ("APPR".equals(lineType) || "AGREE".equals(lineType) || "POST".equals(lineType)) {
+                    hasApprover = true;
+                    break;
+                }
+            }
+            if (!hasApprover) {
+                if (existingDocId != null && !existingDocId.trim().isEmpty()) {
+                    Map<String, String> docParam = new HashMap<>();
+                    docParam.put("docId", existingDocId);
+                    if (cr02Mapper.selectAmApprovalProgressCountByDocId(docParam) == 0) {
+                        cr02Mapper.deleteAmD01ByDocId(docParam);
+                        cr02Mapper.deleteAmM01ByDocId(docParam);
+                    }
+                }
                 return;
             }
 
-            // autoApprovedCount 계산
-            int autoApprovedCount = 0;
-            for (Map<String, Object> line : amLineList) {
-                if (!"Y".equals(line.get("sourceApproved"))) break;
-                autoApprovedCount++;
+            // AM submitApproval은 autoApprovedCount를 현재 차례의 0-based 위치로 사용한다.
+            // 협조/참조는 결재 차례를 막지 않으므로 미완료 APPR/AGREE를 먼저 찾고,
+            // 결재가 모두 끝난 경우에만 미완료 POST를 후결 차례로 선택한다.
+            int autoApprovedCount = amLineList.size();
+            for (int i = 0; i < amLineList.size(); i++) {
+                Map<String, Object> line = amLineList.get(i);
+                String lineType = String.valueOf(line.get("lineType"));
+                boolean isApprovalLine = "APPR".equals(lineType) || "AGREE".equals(lineType);
+                if (isApprovalLine && !"Y".equals(line.get("sourceApproved"))) {
+                    autoApprovedCount = i;
+                    break;
+                }
+            }
+            if (autoApprovedCount == amLineList.size()) {
+                for (int i = 0; i < amLineList.size(); i++) {
+                    Map<String, Object> line = amLineList.get(i);
+                    if ("POST".equals(String.valueOf(line.get("lineType")))
+                            && !"Y".equals(line.get("sourceApproved"))) {
+                        autoApprovedCount = i;
+                        break;
+                    }
+                }
             }
 
             // 기안자 정보
@@ -1517,14 +1670,6 @@ public class CR02Svcmpl implements CR02Svc {
             if (userNm == null || userNm.trim().isEmpty()) {
                 userNm = userId;
             }
-
-            // 기존 docId 조회
-            Map<String, Object> docIdParam = new HashMap<>();
-            docIdParam.put("erpBizKey", ordrsNo);
-            docIdParam.put("coCd", coCd);
-            docIdParam.put("todoDiv2CodeId", "TODODIV2100");
-            docIdParam.put("histNo", histNo);
-            String existingDocId = am11Svc.selectDocIdByBizKey(docIdParam);
 
             // AM 파라미터 구성
             Map<String, Object> amParam = new HashMap<>();
@@ -1646,9 +1791,16 @@ public class CR02Svcmpl implements CR02Svc {
             sb.append(" ").append(ordrsClntNm);
         }
 
+        String clntPjtNm = paramMap.get("clntPjtNm");
         String clntPjt = paramMap.get("clntPjt");
-        if (clntPjt != null && !clntPjt.trim().isEmpty()) {
-            sb.append(" ").append(clntPjt);
+        if (clntPjtNm == null || clntPjtNm.trim().isEmpty() || clntPjtNm.equals(clntPjt)) {
+            if (clntPjt != null && !clntPjt.trim().isEmpty()) {
+                clntPjtNm = resolveCodeNm(clntPjt);
+            }
+        }
+        String pjtDisplay = (clntPjtNm != null && !clntPjtNm.trim().isEmpty()) ? clntPjtNm : clntPjt;
+        if (pjtDisplay != null && !pjtDisplay.trim().isEmpty()) {
+            sb.append(" ").append(pjtDisplay);
         }
 
         if (histNo != null && !histNo.trim().isEmpty()) {
@@ -1816,6 +1968,34 @@ public class CR02Svcmpl implements CR02Svc {
                 .replaceAll(">", "&gt;")
                 .replaceAll("\"", "&quot;")
                 .replaceAll("'", "&#39;");
+    }
+
+    private void deleteUnprocessedCr02AmDocs(Map<String, String> paramMap) {
+        String ordrsNo = paramMap.get("ordrsNo");
+        String coCd = paramMap.get("coCd");
+        if (ordrsNo == null || ordrsNo.trim().isEmpty()) {
+            return;
+        }
+
+        Map<String, String> queryParam = new HashMap<>();
+        queryParam.put("ordrsNo", ordrsNo);
+        queryParam.put("coCd", coCd != null && !coCd.trim().isEmpty() ? coCd : "GUN");
+        List<String> docIds = cr02Mapper.selectCr02AmDocIdsByOrdrsNo(queryParam);
+        if (docIds == null || docIds.isEmpty()) {
+            return;
+        }
+
+        for (String docId : docIds) {
+            if (docId == null || docId.trim().isEmpty()) {
+                continue;
+            }
+            Map<String, String> docParam = new HashMap<>();
+            docParam.put("docId", docId);
+            if (cr02Mapper.selectAmApprovalProgressCountByDocId(docParam) == 0) {
+                cr02Mapper.deleteAmD01ByDocId(docParam);
+                cr02Mapper.deleteAmM01ByDocId(docParam);
+            }
+        }
     }
 
     private int parseIntSafe(String value) {

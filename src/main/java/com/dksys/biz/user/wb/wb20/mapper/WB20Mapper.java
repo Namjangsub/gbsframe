@@ -51,6 +51,9 @@ public interface WB20Mapper {
 	int syncAmApprovalCancelLine(Map<String, String> paramMap);
 	int syncAmApprovalCancelHist(Map<String, String> paramMap);
 	int syncAmApprovalCancelDocument(Map<String, String> paramMap);
+	int syncAmApprovalRejectLine(Map<String, String> paramMap);
+	int syncAmApprovalRejectDocument(Map<String, String> paramMap);
+	int syncAmApprovalRejectHist(Map<String, String> paramMap);
 	List<Map<String, String>> selectApprovalLinesForAmSync(Map<String, String> paramMap);
 	int deletePendingApprovalLinesForAmSync(Map<String, Object> paramMap);
 	int updatePendingApprovalLineOrder(Map<String, Object> paramMap);
@@ -91,6 +94,7 @@ public interface WB20Mapper {
 	// AM→WB 역방향 동기화: PHASE A/B/C 매퍼 (SANCTN_SN 재배정)
 	int offsetNonApprovedSanctnSn(Map<String, Object> paramMap);
 	int updateTodoLineSanctnSnByKey(Map<String, Object> paramMap);
+	int updateTodoLineTypeByKey(Map<String, Object> paramMap);
 	int countOffsetLeftoverSanctnSn(Map<String, Object> paramMap);
 
 

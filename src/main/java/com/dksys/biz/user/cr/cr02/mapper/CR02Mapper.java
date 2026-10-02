@@ -118,6 +118,12 @@ public interface CR02Mapper {
 	// CR02 AM 전자결재 삭제
 	int deleteAmD01ByOrdrsNo(Map<String, String> param);
 	int deleteAmM01ByOrdrsNo(Map<String, String> param);
+	int selectAmApprovalProgressCountByDocId(Map<String, String> param);
+	String selectAmDocStatusByDocId(Map<String, String> param);
+	int deleteAmD01ByDocId(Map<String, String> param);
+	int deleteAmM01ByDocId(Map<String, String> param);
+	int resetRejectedApprovalLineByOrdrsNo(Map<String, String> param);
+	List<String> selectCr02AmDocIdsByOrdrsNo(Map<String, String> param);
 
 	List<Map<String, Object>> selectUnsettledAmtSalesCodeList(Map<String, String> paramMap);
 

@@ -20,6 +20,8 @@ public interface AM11Mapper {
 
     List<Map<String, Object>> selectApprovalLineList(Map<String, Object> paramMap);
 
+    int selectPendingBindingLineCount(Map<String, Object> paramMap);
+
     List<Map<String, Object>> selectApprovalHistList(Map<String, Object> paramMap);
 
     int insertApprovalDoc(Map<String, Object> paramMap);

@@ -193,11 +193,9 @@ public class WB20SvcImpl implements WB20Svc {
 		validatePm51SalesApproval(paramMap);
 		validatePm51SequentialApproval(paramMap);
 		result += wb20Mapper.updateApprovalLine(paramMap);
-		// 영업 PM 결재는 동일 출장신청서의 AM 결재선도 함께 진행시킨다.
-		if (isPm51SalesApproval(paramMap)) {
-			wb20Mapper.syncAmApprovalLine(paramMap);
-			wb20Mapper.syncAmApprovalDocument(paramMap);
-		}
+		// WB20 결재 승인 결과를 동일 업무의 AM 전자결재 문서/결재선에 반영(AM 연동 건만 대상, 미연동 건은 SQL이 0건 처리)
+		wb20Mapper.syncAmApprovalLine(paramMap);
+		wb20Mapper.syncAmApprovalDocument(paramMap);
 
 		// 출장신청 관리부서 회계 승인(TODODIV2191) 시 신청서 자동 지급완료 처리 연동
 		if ("TODODIV2191".equals(todoDiv2CodeId) && "Y".equals(paramMap.get("sanctnSttus"))) {
@@ -467,6 +465,51 @@ public class WB20SvcImpl implements WB20Svc {
 	}
 
 	// 순차결재 취소 검증: 다음 차례 결재자가 이미 승인한 상태에서는 이전 결재자가 결재를 취소할 수 없다 (역순 취소 원칙)
+	/**
+	 * 두 라인이 같은 병렬 AGREE 런에 속하는지 판정
+	 * - 둘 다 AGREE이고
+	 * - 두 라인 사이에 비-AGREE 구속라인(APPR,POST)이 없으면 true
+	 */
+	private boolean isSameStep(Map<String, String> currentLine, Map<String, String> prevLine, List<Map<String, String>> allLines) {
+		if (currentLine == null || prevLine == null) return false;
+		String currType = nvlLineType(currentLine.get("lineType"));
+		String prevType = nvlLineType(prevLine.get("lineType"));
+		// currentLine은 AGREE여야 함, prevLine은 AGREE 또는 APPR 헤드
+		if (!"AGREE".equals(currType) || (!("AGREE".equals(prevType) || "APPR".equals(prevType)))) return false;
+
+		// 두 라인 사이에 비-AGREE 구속 라인(APPR/POST)이 없는지 확인
+		int currSn = Integer.parseInt(String.valueOf(currentLine.get("sanctnSn")));
+		int prevSn = Integer.parseInt(String.valueOf(prevLine.get("sanctnSn")));
+		int minSn = Math.min(currSn, prevSn);
+		int maxSn = Math.max(currSn, prevSn);
+
+		for (Map<String, String> line : allLines) {
+			try {
+				int sn = Integer.parseInt(String.valueOf(line.get("sanctnSn")));
+				if (sn > minSn && sn < maxSn) {
+					String type = nvlLineType(line.get("lineType"));
+					if ("APPR".equals(type) || "POST".equals(type)) {
+						return false;  // 구속 라인 발견
+					}
+				}
+			} catch (Exception e) {
+				continue;
+			}
+		}
+		return true;
+	}
+
+	private boolean isSameAgreeRun(Map<String, String> currentLine, Map<String, String> prevLine, List<Map<String, String>> allLines) {
+		return isSameStep(currentLine, prevLine, allLines);
+	}
+
+	/**
+	 * lineType 정규화: null → 'APPR'
+	 */
+	private String nvlLineType(String lineType) {
+		return (lineType == null || "".equals(lineType.trim())) ? "APPR" : lineType.trim();
+	}
+
 	private void validatePm51SequentialCancel(Map<String, String> paramMap) {
 		String todoDiv1CodeId = paramMap.get("todoDiv1CodeId");
 		String todoDiv2CodeId = paramMap.get("todoDiv2CodeId");
@@ -497,6 +540,7 @@ public class WB20SvcImpl implements WB20Svc {
 		selfParam.put("todoDiv1CodeId", "TODODIV20");
 		selfParam.put("todoDiv2CodeId", todoDiv2CodeId);
 		List<Map<String, String>> lines = wb20Mapper.selectApprovalLineOrder(selfParam);
+		Map<String, String> prevLine = null;
 		for (Map<String, String> line : lines) {
 			int sn;
 			try {
@@ -504,10 +548,25 @@ public class WB20SvcImpl implements WB20Svc {
 			} catch (Exception e) {
 				continue;
 			}
+			String lineType = nvlLineType(line.get("lineType"));
+
+			// COOP/POST면 선행차단 하지 않음
+			if ("COOP".equals(lineType) || "POST".equals(lineType)) {
+				prevLine = line;
+				continue;
+			}
+
+			// 같은 AGREE 런이면 상호 비차단
+			if (prevLine != null && isSameAgreeRun(line, prevLine, lines)) {
+				prevLine = line;
+				continue;
+			}
+
 			if (sn > currentSn && "Y".equals(line.get("sanctnSttus"))) {
 				String nextName = pm51ApproverNameWithJik(line);
 				throw new RuntimeException("다음 결재자 " + (hasText(nextName) ? nextName + "님이 " : "") + "이미 결재를 완료하여 결재 취소할 수 없습니다.\n다음 결재자의 결재를 먼저 취소해야 합니다.");
 			}
+			prevLine = line;
 		}
 
 		// 2. 신청부서 결재선 취소 시, 관리부서 결재선에서 이미 결재가 진행된 건이 있는지 검사
@@ -574,6 +633,7 @@ public class WB20SvcImpl implements WB20Svc {
 		selfParam.put("todoDiv1CodeId", "TODODIV20");
 		selfParam.put("todoDiv2CodeId", todoDiv2CodeId);
 		List<Map<String, String>> lines = wb20Mapper.selectApprovalLineOrder(selfParam);
+		Map<String, String> prevLine = null;
 		for (Map<String, String> line : lines) {
 			int sn;
 			try {
@@ -581,15 +641,31 @@ public class WB20SvcImpl implements WB20Svc {
 			} catch (Exception e) {
 				continue;
 			}
+			String lineType = nvlLineType(line.get("lineType"));
+
+			// COOP/POST면 선행차단 하지 않음
+			if ("COOP".equals(lineType) || "POST".equals(lineType)) {
+				prevLine = line;
+				continue;
+			}
+
+			// 같은 AGREE 런이면 상호 비차단
+			if (prevLine != null && isSameAgreeRun(line, prevLine, lines)) {
+				prevLine = line;
+				continue;
+			}
+
 			// 관리부서(1번 최정민, 2번 이영만)는 상호 병행 결재가 가능해야 하므로,
 			// 2번 결재자(이영만)가 결재할 때 1번(최정민)의 미승인은 차단 사유가 되지 않는다.
 			// 단, 3번 이상(부사장 등)은 1번과 2번이 모두 승인되어야만 결재 가능하다.
 			if (isMngLine && currentSn == 2 && sn == 1) {
+				prevLine = line;
 				continue;
 			}
 			if (sn < currentSn && !"Y".equals(line.get("sanctnSttus"))) {
 				throw new RuntimeException(pm51PendingApproverMessage("이전결재자", line));
 			}
+			prevLine = line;
 		}
 	}
 
@@ -1021,6 +1097,10 @@ public class WB20SvcImpl implements WB20Svc {
 	public Map<String, String> rejectApprovalLine(Map<String, String> paramMap) {
 		Map<String, String> result = new HashMap<>();
 		int count = wb20Mapper.rejectApprovalLine(paramMap);
+		// WB20 결재 반려 결과를 동일 업무의 AM 전자결재 문서/결재선/이력에 반영(AM 연동 건만 대상)
+		wb20Mapper.syncAmApprovalRejectLine(paramMap);
+		wb20Mapper.syncAmApprovalRejectDocument(paramMap);
+		wb20Mapper.syncAmApprovalRejectHist(paramMap);
 		result.put("resultCount", String.valueOf(count));
 		result.put("RESULT_COUNT", String.valueOf(count));
 		return result;
@@ -1151,10 +1231,28 @@ public class WB20SvcImpl implements WB20Svc {
 				}
 			}
 
-			// 기존 행이 존재하면 그대로 보존하고 upsert하지 않는다.
+			// 기존 행이 존재하면 그대로 보존하고 upsert하지 않지만, LINE_TYPE만 갱신한다.
 			// (keepKeys로 step3 삭제 대상에서도 제외됨. upsert하면 selectGetApprovalList가
 			//  반환하지 않는 컬럼 - TODO_TITL, PG_PARAM 등 - 이 NULL로 덮여 값이 사라진다.)
 			if (matchedRowExists) {
+				// LINE_TYPE 갱신: AM에서 변경된 구분이 기존 WB행에도 반영되게
+				String lineType = line.get("lineType") != null ? String.valueOf(line.get("lineType")) : "APPR";
+				// AGREE/COOP/POST는 값을 그대로 보존, REF/REFERENCE는 'REF', 그 외(APPR/null)는 'APPR'
+				// (기존 isApprGroup?"APPR":"REF" 는 AGREE/COOP/POST를 APPR로 뭉개는 버그였음)
+				String wbLineType = ("AGREE".equals(lineType) || "COOP".equals(lineType) || "POST".equals(lineType)) ? lineType
+						: (("REF".equals(lineType) || "REFERENCE".equals(lineType)) ? "REF" : "APPR");
+
+				Map<String, Object> lineTypeParam = new HashMap<>();
+				lineTypeParam.put("todoNo", todoNo);
+				lineTypeParam.put("coCd", coCd);
+				lineTypeParam.put("todoKey", wb20TodoKey);
+				lineTypeParam.put("lineType", wbLineType);
+				lineTypeParam.put("userId", userId);
+				lineTypeParam.put("pgmId", "AM1201M01");
+
+				int updCnt = wb20Mapper.updateTodoLineTypeByKey(lineTypeParam);
+				logger.info("[AM→WB sync] linked 라인 LINE_TYPE 갱신. wb20TodoKey={}, lineType={}, wbLineType={}, updCnt={}",
+						wb20TodoKey, lineType, wbLineType, updCnt);
 				continue;
 			}
 
@@ -1341,8 +1439,18 @@ public class WB20SvcImpl implements WB20Svc {
 				lineType = "APPR";
 			}
 
-			String div1CodeId = "APPR".equals(lineType) ? "TODODIV20" : "TODODIV10";
+			// div1CodeId: isApprGroup (APPR/AGREE/COOP/POST) → TODODIV20, REF → TODODIV10
+			boolean isApprGroup = "APPR".equals(lineType) || "AGREE".equals(lineType) || "COOP".equals(lineType) || "POST".equals(lineType);
+			String div1CodeId = isApprGroup ? "TODODIV20" : "TODODIV10";
 			String div2CodeId = null;
+
+			// wbLineType: AGREE/COOP/POST면 lineType, 아니면 "APPR"
+			String wbLineType;
+			if ("AGREE".equals(lineType) || "COOP".equals(lineType) || "POST".equals(lineType)) {
+				wbLineType = lineType;
+			} else {
+				wbLineType = "APPR";
+			}
 
 			if ("APPR".equals(lineType)) {
 				// APPR: DIV2는 linked 라인에서 도출, 또는 문서의 유일한 APPR 그룹
@@ -1455,6 +1563,7 @@ public class WB20SvcImpl implements WB20Svc {
 				forAmParam.put("creatPgm", creatPgm);
 				forAmParam.put("createDttm", createDttm);
 				forAmParam.put("etcField2", histNo);
+				forAmParam.put("lineType", wbLineType);
 
 				// 스냅샷에서 부가컬럼 추출
 				if (snapshotTemplate.get("salesCd") != null) {
@@ -1500,6 +1609,7 @@ public class WB20SvcImpl implements WB20Svc {
 				insertParam.put("pgmId", "AM1201M01");
 				insertParam.put("userId", userId);
 				insertParam.put("etcField2", histNo);
+				insertParam.put("lineType", wbLineType);
 
 				logger.info(
 						"[AM→WB sync] 신규 행 insert (라이브 템플릿 복사). todoKey={}, approverId={}, div1={}, div2={}, sanctnSn={}",

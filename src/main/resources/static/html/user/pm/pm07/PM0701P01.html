@@ -631,6 +631,21 @@
 					{key: "empNo",            label: "사원번호",    align: "center",   width: 130, hidden: true},
 					{key: "name",             label: "성명",        align: "center",   width: 80},
 					{key: "jik",              label: "직위",        align: "center",   width: 60},
+					{key: "lineTypeNm",       label: "결재구분",    align: "center",   width: 70,
+						formatter: function() {
+							var item = this.item || {};
+							if (item.gb === "공유") {
+								return "참조";
+							}
+							var val = item.lineTypeNm || item.lineType || this.value || "";
+							if (!val || val === "APPR" || val === "결재") return "결재";
+							if (val === "AGREE" || val === "합의") return "합의";
+							if (val === "COOP" || val === "협조") return "협조";
+							if (val === "POST" || val === "후결") return "후결";
+							if (val === "REF" || val === "참조") return "참조";
+							return val;
+						}
+					},
 					{key: "sanctnSttusNm",    label: "결재상태",    align: "center",   width: 70,
 						formatter: function() {
 							var val = this.value || "";
@@ -670,6 +685,7 @@
 			"useYn"  : "Y",
 			"userId" : jwt.userId,
 			"userNm" : jwt.userNm,
+			"pgmId"  : "PM0701P01",
 			"approvalGrid" : currentList.filter(function(item) { return item.gb === "결재"; }).map(function(item) {
 				return {
 					gb: "결재",
@@ -677,6 +693,8 @@
 					text: item.name,
 					parent: item.jik,
 					deptNm: item.dtNm,
+					lineType: item.lineType || "APPR",
+					lineTypeNm: item.lineTypeNm || "결재",
 					telNo: item.telNo,
 					offTelNo: item.offTelNo,
 					email: item.email
@@ -695,8 +713,9 @@
 				};
 			})
 		};
-		openThirdModal("/static/html/cmn/modal/userLstSearch.html", 900, 500, "결재 및 공유자 선택", paramObj, function (approvalGrid, shareGrid) {
+		openThirdModal("/static/html/cmn/modal/userLstSearch.html", 1020, 650, "결재 및 공유자 선택", paramObj, function (approvalGrid, shareGrid) {
 			var appArray = approvalGrid.target.list.map(function(item, idx) {
+				var lType = item.lineType || "APPR";
 				return {
 					gb: "결재",
 					sanctnSn: idx + 1,
@@ -706,6 +725,8 @@
 					empNo: item.id,
 					name: item.text,
 					jik: item.parent,
+					lineType: lType,
+					lineTypeNm: (lType === "AGREE" ? "합의" : lType === "COOP" ? "협조" : lType === "POST" ? "후결" : "결재"),
 					dtNm: item.deptNm,
 					telNo: item.telNo,
 					offTelNo: item.offTelNo,
@@ -723,6 +744,8 @@
 					empNo: item.id,
 					name: item.text,
 					jik: item.parent,
+					lineType: "REF",
+					lineTypeNm: "참조",
 					dtNm: item.deptNm,
 					telNo: item.telNo,
 					offTelNo: item.offTelNo,
@@ -819,17 +842,21 @@
 		var autoList = [];
 		var addedIds = {};
 
-		function pushApprover(u) {
+		function pushApprover(u, lineType, lineTypeNm) {
 			if (!u || !u.id) return;
 			var key = String(u.id).toLowerCase();
 			if (addedIds[key]) return;		// 동일인 중복 결재행 방지
 			addedIds[key] = true;
+			var lType = lineType || "APPR";
+			var lTypeNm = lineTypeNm || (lType === "COOP" ? "협조" : lType === "AGREE" ? "합의" : lType === "POST" ? "후결" : "결재");
 			autoList.push({
 				gb    : "결재",
 				usrNm : u.id,
 				todoId: u.id,
 				name  : u.name || u.id,
 				jik   : u.levelNm || '',
+				lineType   : lType,
+				lineTypeNm : lTypeNm,
 				dtNm  : u.deptNm || '',
 				telNo : u.telNo || '',
 				email : u.email || '',
@@ -858,6 +885,8 @@
 						todoId        : uObj.id,
 						name          : uObj.name || uObj.id,
 						jik           : uObj.levelNm || '',
+						lineType      : "APPR",
+						lineTypeNm    : "결재",
 						dtNm          : uObj.deptNm || '',
 						telNo         : uObj.telNo || '',
 						email         : uObj.email || '',
@@ -914,7 +943,9 @@
 				if (!uId) return true;
 				postAjaxSync("/admin/cm/cm06/selectUserInfo", { "userId": uId }, null, function(userData) {
 					if (userData && userData.userInfo) {
-						pushApprover(userData.userInfo);
+						var lType = (String(uId).toLowerCase() === 'cyh') ? "COOP" : "APPR";
+						var lTypeNm = (lType === "COOP") ? "협조" : "결재";
+						pushApprover(userData.userInfo, lType, lTypeNm);
 					}
 				});
 			});
@@ -968,13 +999,17 @@
 			return found;
 		}
 
-		function buildRow(uObj) {
+		function buildRow(uObj, lineType, lineTypeNm) {
+			var lType = lineType || "APPR";
+			var lTypeNm = lineTypeNm || (lType === "COOP" ? "협조" : lType === "AGREE" ? "합의" : lType === "POST" ? "후결" : "결재");
 			return {
 				gb    : "결재",
 				usrNm : uObj.id,
 				todoId: uObj.id,
 				name  : uObj.name || uObj.id,
 				jik   : uObj.levelNm || '',
+				lineType   : lType,
+				lineTypeNm : lTypeNm,
 				dtNm  : uObj.deptNm || '',
 				telNo : uObj.telNo || '',
 				email : uObj.email || '',
@@ -1007,7 +1042,11 @@
 		$.each(missingIds, function(idx, uid) {
 			postAjaxSync("/admin/cm/cm06/selectUserInfo", { "userId": uid }, null, function(data) {
 				if (data && data.userInfo) {
-					newRows.push(buildRow(data.userInfo));
+					// SPECRTS17 결재자 자동 보충 시에만 cyh이면 협조(COOP)
+					var isSpecrtsCyh = (specrtsIdList.indexOf(uid) > -1 && String(uid).toLowerCase() === 'cyh');
+					var lType = isSpecrtsCyh ? "COOP" : "APPR";
+					var lTypeNm = isSpecrtsCyh ? "협조" : "결재";
+					newRows.push(buildRow(data.userInfo, lType, lTypeNm));
 				}
 			});
 		});
@@ -1056,6 +1095,15 @@
 			postAjaxSync("/user/wb/wb20/selectGetApprovalList",
 				{ "todoNo": reqNo, "todoDiv2CodeId": div.cd }, null, function(data) {
 					$.each(data.resultList || [], function(idx, r) {
+						var lType = r.lineType || (div.gb === "공유" ? "REF" : "APPR");
+						var lTypeNm = r.lineTypeNm;
+						if (!lTypeNm) {
+							if (lType === "AGREE") lTypeNm = "합의";
+							else if (lType === "COOP") lTypeNm = "협조";
+							else if (lType === "POST") lTypeNm = "후결";
+							else if (lType === "REF" || div.gb === "공유") lTypeNm = "참조";
+							else lTypeNm = "결재";
+						}
 						rows.push({
 							gb            : div.gb,
 							sanctnSn      : Number(r.sanctnSn || 0),
@@ -1064,6 +1112,8 @@
 							empNo         : r.empNo || r.todoId,
 							name          : r.todoNm || r.name,
 							jik           : r.jik,
+							lineType      : lType,
+							lineTypeNm    : lTypeNm,
 							reqDate       : r.reqDate || r.creatDttm || "",
 							todoCfDt      : r.todoCfDt || "",
 							todoCfOpn     : r.todoCfOpn || "",
@@ -1321,6 +1371,7 @@
 				todoCoCd       : $('#coCd').val() || "GUN",
 				todoDiv1CodeId : todoDiv1CodeId,
 				todoDiv2CodeId : todoDiv2CodeId,
+				lineType       : item.lineType || (item.gb === "공유" ? "REF" : "APPR"),
 				// WB20 결재선은 (TODO_DIV2_CODE_ID, SALES_CD, TODO_NO) 로 문서를 식별한다.
 				// deleteAllTodoMaster 의 SALES_CD 조건에 jdbcType 이 없어 null 이면 Tibero 가 거부하고,
 				// 결재선 삭제/재등록이 통째로 실패한다. Sales Code 가 없는 모듈은 문서키를 넣는 것이 관례.
@@ -1885,8 +1936,9 @@
 
 	function checkFileOnlyChangePM07() {
 		var reqNo = $('#popForm #reqNo').val() || $('#popForm #fileTrgtKey').val();
-		if (!reqNo && typeof modalStack !== 'undefined' && modalStack.last && modalStack.last().paramObj) {
-			reqNo = modalStack.last().paramObj.reqNo || modalStack.last().paramObj.todoNo || "";
+		var lastModal = (typeof modalStack !== 'undefined' && typeof modalStack.last === 'function') ? modalStack.last() : null;
+		if (!reqNo && lastModal && lastModal.paramObj) {
+			reqNo = lastModal.paramObj.reqNo || lastModal.paramObj.todoNo || "";
 		}
 
 		// 신청서 번호가 없는 신규 등록(C) 상태에서는 상신 시 파일이 함께 저장되므로 첨부파일저장 버튼은 숨김

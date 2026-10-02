@@ -1282,9 +1282,45 @@
                     {key: "empNo",      		label: "사원번호", 	align: "center",   width: 130, hidden: true},
                     {key: "name",       		label: "성명",      	align: "center",   width: 80},
                     {key: "jik",       			label: "직위",      	align: "center",   width: 60},
+					{key: "lineTypeNm",       	label: "결재구분",   	align: "center",   width: 70,
+						formatter: function() {
+							var item = this.item || {};
+							if (item.gb === "공유") {
+								return "참조";
+							}
+							var val = item.lineTypeNm || item.lineType || this.value || "";
+							if (!val || val === "APPR" || val === "결재") return "결재";
+							if (val === "AGREE" || val === "합의") return "합의";
+							if (val === "COOP" || val === "협조") return "협조";
+							if (val === "POST" || val === "후결") return "후결";
+							if (val === "REF" || val === "참조") return "참조";
+							return val;
+						}
+					},
+					{key: "sanctnSttusNm",      label: "결재상태",   align: "center",   width: 70,
+						formatter: function() {
+							var item = this.item || {};
+							var isApproved = (item.sanctnSttus === 'Y' || this.value === '승인' || this.value === '확인' || (item.todoCfDt && $.trim(item.todoCfDt).length > 0));
+							if (item.gb === '공유') {
+								if (isApproved) {
+									return '<span style="color: #2e6da4; font-weight: bold;">확인</span>';
+								} else {
+									return '<span style="color: #d9534f; font-weight: bold;">미확인</span>';
+								}
+							} else {
+								if (item.sanctnSttusNm === '반려' || item.apprRejectYn === 'Y') {
+									return '<span style="color: #d9534f; font-weight: bold;">반려</span>';
+								} else if (isApproved) {
+									return '<span style="color: #2e6da4; font-weight: bold;">승인</span>';
+								} else {
+									return '<span style="color: #d9534f; font-weight: bold;">미승인</span>';
+								}
+							}
+						}
+					},
                     {key: "creatDttm",      	label: "요청일자", 	align: "center",   width: 90},
                     {key: "todoCfDt",      		label: "확인일자",		align: "center",   width: 130},
-                    {key: "todoCfOpn",      	label: "확인의견", 	align: "left",     width: 200},
+                    {key: "todoCfOpn",      	label: "확인의견", 	align: "left",     width: "*"},
                     {key: "telNo",      		label: "H.P",		align: "center",   width: 130},
                     {key: "todoKey",      		label: "todoKey",		align: "center",   width: 130, hidden: true},
                     {key: "sanctnSttus",      	label: "sanctnSttus",		align: "center",   width: 130, hidden: true},                   
@@ -1321,26 +1357,56 @@
    			            	$('#createHistory').hide();
    			            	$('#actionOrdrsBtn').hide();
    			            }
-                            updateGridGrouping();
+    						list.forEach(elem => {
+							if (!elem.lineType) {
+								elem.lineType = (elem.gb === "공유") ? "REF" : "APPR";
+							}
+							if (!elem.lineTypeNm) {
+								elem.lineTypeNm = (elem.lineType === 'AGREE') ? '합의' : (elem.lineType === 'COOP') ? '협조' : (elem.lineType === 'POST') ? '후결' : (elem.gb === '공유' ? '참조' : '결재');
+							}
+						});
+                        updateGridGrouping();
    			       }
    						targetObj.setData({
    	  						list : list,
 	   	  					page : {
-				                    	totalElements : list.length
+				                    	totalElements : list ? list.length : 0
 						    } 
    	  					});
+						resizeThirdGrid(list ? list.length : 0);
    	  				});
           		},
 
         		setData2 : function(_list) {
+					if (_list && _list.length > 0) {
+						_list.forEach(elem => {
+							if (!elem.lineType) {
+								elem.lineType = (elem.gb === "공유") ? "REF" : "APPR";
+							}
+							if (!elem.lineTypeNm) {
+								elem.lineTypeNm = (elem.lineType === 'AGREE') ? '합의' : (elem.lineType === 'COOP') ? '협조' : (elem.lineType === 'POST') ? '후결' : (elem.gb === '공유' ? '참조' : '결재');
+							}
+						});
+					}
         			this.target.setData({
    	  						list : _list,
 	   	  					page : {
-				                    	totalElements :  _list.length,
+				                    	totalElements :  _list ? _list.length : 0,
 						    } 
    	  					});
+					resizeThirdGrid(_list ? _list.length : 0);
           		}
   	}
+
+	// 결재 및 공유 그리드 높이 자동 조절 함수
+	function resizeThirdGrid(size) {
+		var rowCount = (typeof size === 'number') ? size : (gridViewPop7 && gridViewPop7.target && gridViewPop7.target.list ? gridViewPop7.target.list.length : 0);
+		var tagHeight = Math.max(90, (rowCount * 26) + 65);
+		tagHeight = Math.min(320, tagHeight);
+		if (gridViewPop7 && gridViewPop7.target) {
+			gridViewPop7.target.setHeight(tagHeight);
+		}
+	}
 
     var actionType = modalStack.last().paramObj.actionType;
     var paramObj = modalStack.last().paramObj;
@@ -1926,6 +1992,7 @@
         paramObj["useYn"] =  "Y";
         paramObj["userId"] =  $('#ordrgId').val();
         paramObj["userNm"] =  $('#ordrgNm').val();
+        paramObj["pgmId"] = "CR0202P02";
         paramObj["approvalGrid"] = $.grep(appshaList, function(item) {return item.gb === "결재";   
         		}).map(function(item) {
 	        		  	return {
@@ -1933,7 +2000,10 @@
 	        			    id: item.usrNm,
 	        			    text: item.name,
 	        			    parent: item.jik,
-	        			    deptNm: item.dtNm,
+	        			    deptNm: item.dtNm || item.deptNm,
+	        			    dtNm: item.dtNm || item.deptNm,
+	        			    lineType: item.lineType || "APPR",
+	        			    lineTypeNm: item.lineTypeNm || "결재",
 	        			    telNo: item.telNo,
 	        			    offTelNo: item.offTelNo,
 	        			    email: item.email,
@@ -1953,7 +2023,10 @@
 						    id: item.usrNm,
 						    text: item.name,
 						    parent: item.jik,
-						    deptNm: item.dtNm,
+						    deptNm: item.dtNm || item.deptNm,
+						    dtNm: item.dtNm || item.deptNm,
+						    lineType: "REF",
+						    lineTypeNm: "참조",
 						    telNo: item.telNo,
 						    offTelNo: item.offTelNo,
 						    email: item.email,
@@ -1967,43 +2040,54 @@
 						};
 				});
         
-        openSecondModal("/static/html/cmn/modal/userLstSearch.html", 900, 500, "작성자 검색", paramObj, function (approvalGrid, shareGrid){
+        openSecondModal("/static/html/cmn/modal/userLstSearch.html", 1040, 640, "작성자 검색", paramObj, function (approvalGrid, shareGrid){
 //     		console.log('결재라인 : ', approvalGrid.target.list);
 //     		console.log('공유라인 : ', shareGrid.target.list);
     		
-    		var appArray = approvalGrid.target.list.map(function(item) {
-    			  return {
+    		var appArray = approvalGrid.target.list.map(function(item, idx) {
+    			var lType = item.lineType || (item.lineTypeNm === "합의" ? "AGREE" : item.lineTypeNm === "협조" ? "COOP" : item.lineTypeNm === "후결" ? "POST" : item.lineTypeNm === "참조" ? "REF" : "APPR");
+    			return {
     				  	gb: "결재",
     				  	usrNm: item.id,
     				  	name: item.text,
 						jik: item.parent,
-						dtNm: item.deptNm,
+						deptNm: item.deptNm || item.dtNm,
+						dtNm: item.deptNm || item.dtNm,
+						coCd: $('#coCd').val(),
+						lineType: lType,
+						lineTypeNm: (lType === "AGREE" ? "합의" : lType === "COOP" ? "협조" : lType === "POST" ? "후결" : "결재"),
 						telNo: item.telNo,
 						offTelNo: item.offTelNo,
 						email: item.email,
 						todoId: item.id
         			    , todoKey: item.todoKey        			    
-        			    , sanctnSn: item.sanctnSn
+        			    , sanctnSn: idx + 1
         			    , sanctnSttus: item.sanctnSttus
+        			    , sanctnSttusNm: item.sanctnSttusNm || (item.sanctnSttus == 'Y' ? '승인' : '미승인')
         		        , todoCfDt: item.todoCfDt
         		        , todoCfOpn: item.todoCfOpn        			    
         			    , flag: item.flag
 					};
 			});
-    		var shaArray = shareGrid.target.list.map(function(item) {
+    		var shaArray = shareGrid.target.list.map(function(item, idx) {
   			  return {
 	  				  	gb: "공유",
 						usrNm: item.id,
 						name: item.text,
 						jik: item.parent,
-						dtNm: item.deptNm,
+						deptNm: item.deptNm || item.dtNm,
+						dtNm: item.deptNm || item.dtNm,
+						coCd: $('#coCd').val(),
+						lineType: "REF",
+						lineTypeNm: "참조",
 						telNo: item.telNo,
 						offTelNo: item.offTelNo,
 						email: item.email,
 						todoId: item.id
         			    , todoKey: item.todoKey        			    
-        			    , sanctnSn: item.sanctnSn
+        			    , sanctnSn: idx + 1
         			    , sanctnSttus: item.sanctnSttus
+        			    , sanctnSttusNm: item.sanctnSttusNm || (item.sanctnSttus == 'Y' ? '확인' : '미확인')
         		        , todoCfDt: item.todoCfDt
         		        , todoCfOpn: item.todoCfOpn        			    
         			    , flag: item.flag

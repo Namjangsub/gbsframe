@@ -769,7 +769,10 @@
 			if (colKey === "workSubstDays" || colKey === "sw" || colKey === "sw_all") {
 				var reqParam = {
 					"coCd": coCd,
+					"reqId": userId,
 					"userId": userId,
+					"holidayDtFrom": curYy + "0101",
+					"holidayDtTo": curYy + "1231",
 					"reqDtFrom": curYy + "0101",
 					"reqDtTo": curYy + "1231"
 				};
