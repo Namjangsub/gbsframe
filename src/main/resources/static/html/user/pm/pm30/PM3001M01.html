@@ -258,28 +258,20 @@
 
 		<!-- ─ 등록된 자료 조회 영역 (아코디언) ─ -->
 		<div class="section-title" id="searchAreaHeader" style="display: flex; justify-content: space-between; align-items: center; cursor: pointer; user-select: none;">
-			<span>등록된 근태자료 조회 <small style="font-weight: normal; color: #666; margin-left: 8px;">(클릭하여 부서 등 상세조건 접기/펼치기)</small></span>
+			<span>등록된 근태자료 조회 <small style="font-weight: normal; color: #666; margin-left: 8px;">(클릭하여 접기/펼치기)</small></span>
 			<i id="searchAreaToggleIcon" class="fa fa-chevron-up" style="transition: transform 0.3s ease; color: #0099cc; font-size: 13px;"></i>
 		</div>
 		<div class="contents search" id="searchAreaContent">
 			<div class="">
-				<table class="table_input type04">
-					<colgroup>
-						<col width="9%"><col width="23%"><col width="9%"><col width="14%">
-						<col width="8%"><col width="12%"><col width="9%"><col width="16%">
-					</colgroup>
-					<!-- 첫 번째 줄: 회사구분을 검색 조건의 첫 항목으로 배치 -->
+				<table class="table_input type05">
+					<!-- 검색조건 1행 (한 줄에 5개 배치) -->
 					<tr>
-						<th>회사구분</th>
+						<th class="hit">회사</th>
 						<td>
-							<select id="hrCoCd" name="hrCoCd" class="form-control input-sm" style="width: 150px; height: 30px;" data-kind="CO" onchange="searchAttendanceData();">
+							<select id="coCd_S" name="coCd_S" data-kind="CO" data-search="coCd" required msg="회사" onchange="searchAttendanceData();">
 								<option value="">전체</option>
 							</select>
 						</td>
-						<td colspan="6"></td>
-					</tr>
-					<!-- 두 번째 줄: 근무일, 구분, 근무자, 부서 -->
-					<tr>
 						<th class="hit">근무일</th>
 						<td>
 							<div class="date_input" style="display:flex;align-items:center;gap:0px;">
@@ -434,6 +426,8 @@
 		$(document).ready(function() {
 			// mainDefaultLoad(대메뉴명, 화면명) — 다른 PM 모듈 화면(PM6001M01 등)과 동일한 구조로 통일
 			mainDefaultLoad("생산관리", "근태데이터변환");
+			setCommonSelect($("select[data-kind]"));
+			$("#coCd_S").val(jwt.coCd);
 
 			// 붙여넣기 텍스트 입력 시 실시간 유효 라인 수 카운팅
 			$('#pasteTextarea').on('input change keyup', function() {
@@ -455,8 +449,8 @@
 			});
 
 			// 임시 테스트용
-			$('#searchStDt').val('2026-07-01');
-			$('#workRptIdNm_S').val('남장섭');
+			// $('#searchStDt').val('2026-07-01');
+			// $('#workRptIdNm_S').val('남장섭');
 
 			// 근무일 검색조건에 기간(From~Till) 데이터피커 적용 (PM5101M01.html의 신청기간과 동일한 패턴)
 			$('#searchStDt, #searchEdDt').on('click', function() {
@@ -1394,17 +1388,17 @@
 
 			bindDetailGroupDblClick();
 
-			// 등록된 근태자료 조회 아코디언 토글 (최소 접기 시 첫줄 근무일/구분/근무자 유지, 2번째줄 부서 상세 조건 토글)
+			// 등록된 근태자료 조회 아코디언 토글
 			$('#searchAreaHeader').on('click', function() {
-				var $moreRow = $('#searchRowMore');
-				if ($moreRow.is(':visible')) {
-					$moreRow.hide();
-					$('#searchAreaToggleIcon').removeClass('fa-chevron-up').addClass('fa-chevron-down');
-				} else {
-					$moreRow.show();
-					$('#searchAreaToggleIcon').removeClass('fa-chevron-down').addClass('fa-chevron-up');
-				}
-				resizeAttendanceGrid((attendanceData && attendanceData.length) || 1);
+				$('#searchAreaContent').slideToggle(200, function() {
+					var isVisible = $(this).is(':visible');
+					if (isVisible) {
+						$('#searchAreaToggleIcon').removeClass('fa-chevron-down').addClass('fa-chevron-up');
+					} else {
+						$('#searchAreaToggleIcon').removeClass('fa-chevron-up').addClass('fa-chevron-down');
+					}
+					resizeAttendanceGrid((attendanceData && attendanceData.length) || 1);
+				});
 			});
 
 			// 데이터 입력 아코디언 토글 이벤트
@@ -1970,9 +1964,13 @@
 			$('#searchStDt').val(today.clone().startOf('month').format('YYYY-MM-DD'));
 			$('#searchEdDt').val(today.clone().endOf('month').format('YYYY-MM-DD'));
 			$('#applyType_S').val('');
-			$('#workerKeyword_S').val('');
+			$('#workRptId_S').val('');
+			$('#workRptIdNm_S').val('');
 			$('#deptId_S').val('');
 			$('#deptNm_S').val('');
+			if (typeof jwt !== 'undefined' && jwt.coCd) {
+				$('#coCd_S').val(jwt.coCd);
+			}
 			attendanceData = [];
 			rawDataList = [];
 			attendanceGrid.setData({
@@ -1987,7 +1985,7 @@
 		function openWorkDeptTree(gbn) {
 			var sfx = (gbn == 'S') ? '_S' : '';
 			var paramObj = {
-				 "coCd"   : ''
+				 "coCd"   : $('#coCd_S').val() || (typeof jwt !== 'undefined' ? jwt.coCd : '')
 				,"deptId" : $('#deptId' + sfx).val()
 				,"deptNm" : $('#deptNm' + sfx).val()
 				,"useYn"  : "Y"
@@ -2639,6 +2637,7 @@
 		// ─ 현재 검색 조건 값을 하나의 문자열로 반환 (변경 비교용) ─
 		function getSearchStateString() {
 			return [
+				$('#coCd_S').val() || '',
 				$('#searchStDt').val() || '',
 				$('#searchEdDt').val() || '',
 				$('#deptId_S').val() || '',
@@ -2651,7 +2650,7 @@
 		// ─ 사용자 (작성자/근무자) 검색 팝업 ─
 		function openUserSearch() {
 			var paramObj = {
-				"coCd" : jwt.coCd,
+				"coCd" : $('#coCd_S').val() || jwt.coCd,
 				"userId" : $('#workRptId_S').val(),
 				"userNm" : $('#workRptIdNm_S').val()
 			};
@@ -2834,7 +2833,7 @@
 			lastSearchStateStr = currentStateStr;
 
 			var searchParams = {
-				coCd: jwt.coCd,
+				coCd: $('#coCd_S').val() || jwt.coCd,
 				stDt: stDt,
 				edDt: edDt,
 				deptId: $('#deptId_S').val() || '',
@@ -2842,7 +2841,7 @@
 				workRptIdNm: $('#workRptIdNm_S').val() || '',
 				workerKeyword: $('#workRptIdNm_S').val() || $('#workRptId_S').val() || '',
 				applyType: $('#applyType_S').val() || '',
-				hrCoCd: $('#hrCoCd').val() || ''
+				hrCoCd: $('#coCd_S').val() || jwt.coCd
 			};
 
 			postAjax('/user/pm/pm30/selectAttendanceList', searchParams, null, function(data) {
