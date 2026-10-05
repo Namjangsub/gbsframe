@@ -973,8 +973,10 @@ public class AM11SvcImpl implements AM11Svc {
             am11Mapper.updateApprovalDocStatus(docStatusParam);
 
             // AM 반려도 원본 WB20의 동일 결재행과 업무 후처리를 반드시 같은 트랜잭션으로 처리한다.
-            // (AGREE 반려: WB20 반려 전파 스킵, currApproverId 주키 실패로 인한 보호)
-            if (!"AGREE".equals(actingType)) {
+            // APPR·AGREE 공통 전파: 반려자 본인(approverId/userId) 기준으로 WB20 원본행을 찾아 반려한다.
+            // (과거 AGREE 스킵 사유였던 "currApproverId 주키 실패"는 find-line을 본인 기준으로 바꿔 해소됨.
+            //  관리부서 2번(AGREE) 반려 시 WB20 라인·업무마스터 미반영 desync를 막기 위해 AGREE도 전파)
+            {
                 String erpBizKey = valueOf(docLock.get("erpBizKey"));
                 String coCd = valueOf(docLock.get("coCd"));
                 if (!erpBizKey.isEmpty() && !coCd.isEmpty()) {
