@@ -527,9 +527,30 @@
 			return (allOrg.indexOf('기술연구') !== -1 || allOrg.indexOf('연구소') !== -1 || deptId.indexOf('GUN40') === 0);
 		}
 
+		// ─ 생산팀 소속 또는 생산직(=시급직) 여부 판정 ─
+		// 1. orgDivNm === '시급직'
+		// 2. salesArea === 'SALESAREA60' (시급직(생산)) 또는 '시급직' 포함
+		// 3. 조직명(org1~org4, deptNm)에 '생산' 포함 또는 deptId가 'GUN60'으로 시작 또는 salesArea에 '생산' 포함
+		function isProdTeamOrWorkerRow(item) {
+			if (!item) return false;
+			var allOrg = (String(item.org1Nm || '') + ' ' + String(item.org2Nm || '') + ' ' + String(item.org3Nm || '') + ' ' + String(item.org4Nm || '') + ' ' + String(item.deptNm || '')).trim();
+			var deptId = String(item.deptId || '').trim();
+			var salesArea = String(item.salesArea || item.salesAreaCd || '').trim();
+			var orgDiv = String(item.orgDivNm || '').trim();
+
+			var isHourly = (orgDiv === '시급직' || salesArea === 'SALESAREA60' || salesArea === '시급직(생산)' || salesArea === '시급직(현장)' || salesArea.indexOf('시급직') !== -1);
+			var isProdTeam = (allOrg.indexOf('생산') !== -1 || deptId.indexOf('GUN60') === 0 || salesArea.indexOf('생산') !== -1);
+
+			return isHourly || isProdTeam;
+		}
+
 		// ─ 실제근무시간(netWorkTm) 시간미달 판정 ─
 		// 1. 실제근무시간이 0보다 크고 8 미만인 경우 대상
-		// 2. 단, 휴일인 경우 기술연구소를 제외한 모든 팀은 (시간미달) 대상에서 제외
+		// 2. 평일인 경우: 전 부서 대상
+		// 3. 휴일인 경우:
+		//    - 기술연구소(GUN40 / 조직명 '기술연구' 또는 '연구소')
+		//    - 생산팀/생산직(salesArea === 'SALESAREA60' 등) 중 타각/근무시간이 있는 경우
+		//    - 그 외 팀은 휴일 시간미달 표기 대상에서 제외
 		function isNetWorkTmShortfall(item, netWorkTmVal) {
 			if (!item) return false;
 			var val = netWorkTmVal !== undefined ? netWorkTmVal : item.netWorkTm;
@@ -538,8 +559,10 @@
 
 			var isHoliday = String(item.holidayYn || '').trim() === '휴일';
 			if (isHoliday) {
-				// 휴일인 경우 기술연구소만 시간미달 표시 대상, 그 외 팀은 제외
-				return isTechLabRow(item);
+				// 휴일: 기술연구소 또는 생산팀/생산직(근무시간/타각 존재)인 경우만 시간미달 표시 대상, 그 외 팀은 제외
+				if (isTechLabRow(item)) return true;
+				if (isProdTeamOrWorkerRow(item)) return true;
+				return false;
 			}
 			return true;
 		}
@@ -685,8 +708,30 @@
 		function isApplCellDisabled() {
 			var item = this.item;
 			if (!item) return false;
+			var key = this.key;
 			var isTripType = (item.workTypeNm === '설치시운전' || item.workTypeNm === '설치장애' || item.workTypeNm === 'A/S(무상)' || item.workTypeNm === '기타출장');
 			var hasTripAppl = isTripType && !!(item.tripApplNo || item.tripReplyNo);
+
+			// 1. 출장 전용 편집 필드(pjEquipNm, tripWorkPlace, tripAllwnc):
+			//    근무형태가 출장 계열일 때만 출장신청서/복명서에 의해 비활성화(disabled).
+			//    사내근무/제외/휴일 등 타 근무형태로 변경된 경우 즉시 잠금 해제되어 인라인 텍스트 수정 가능!
+			if (key === 'pjEquipNm' || key === 'tripWorkPlace' || key === 'tripAllwnc') {
+				return !!hasTripAppl;
+			}
+
+			// 2. 비고(rmk) 필드: 출장 계열일 때는 출장신청서가 있으면 disabled, 출장 계열이 아니면 휴가/근무신청서만 확인
+			if (key === 'rmk') {
+				return !!(hasTripAppl || item.vacApplNo || item.workApplNo);
+			}
+
+			// 3. 개별 신청서 필드 (휴가 -> vacApplNo, 대체근무 -> workApplNo)
+			if (key === 'vacationTxt' || key === 'lateTxt' || key === 'earlyLeaveTxt') {
+				return !!item.vacApplNo;
+			}
+			if (key === 'substWorkYn') {
+				return !!item.workApplNo;
+			}
+
 			return !!(hasTripAppl || item.vacApplNo || item.workApplNo);
 		}
 
@@ -1231,6 +1276,25 @@
 							} else {
 								item.isUserEditedWorkType = true;
 								item.workTypeNmChanged = true;
+							}
+
+							var isNewTrip = (currentVal === '설치시운전' || currentVal === '설치장애' || currentVal === 'A/S(무상)' || currentVal === '기타출장');
+							if (!isNewTrip) {
+								// 출장에서 다른 근무형태(사내1, 사내2, 사내3, 제외, 휴일 등)로 변경된 경우:
+								// 출장 연동 키(tripApplNo, tripReplyNo)를 백업 후 분리/초기화하여
+								// 일반 편집 필드(pjEquipNm, tripWorkPlace, tripAllwnc, rmk 등)가 즉시 수정 가능하도록 처리
+								if (item.tripApplNo || item.tripReplyNo) {
+									item._origTripApplNo = item.tripApplNo;
+									item._origTripReplyNo = item.tripReplyNo;
+									item.tripApplNo = '';
+									item.tripReplyNo = '';
+								}
+							} else {
+								// 다시 출장 계열로 복원한 경우 백업해둔 원본 신청번호 복구
+								if (item._origTripApplNo || item._origTripReplyNo) {
+									item.tripApplNo = item._origTripApplNo || '';
+									item.tripReplyNo = item._origTripReplyNo || '';
+								}
 							}
 
 							// 근무형태 변경에 따른 비고(rmk) 즉시 동기화
@@ -1969,7 +2033,7 @@
 				if (detailGroupKeys.indexOf(col.key) === -1) return;
 
 				var item = attendanceGrid.list && attendanceGrid.list[dindex];
-				if (!item || !isApplCellDisabled.call({ item: item })) return;
+				if (!item || !isApplCellDisabled.call({ item: item, key: col.key })) return;
 
 				var isTripType = (item.workTypeNm === '설치시운전' || item.workTypeNm === '설치장애' || item.workTypeNm === 'A/S(무상)' || item.workTypeNm === '기타출장');
 				var replyNo = (isTripType && item.tripReplyNo) ? String(item.tripReplyNo).trim() : '';
