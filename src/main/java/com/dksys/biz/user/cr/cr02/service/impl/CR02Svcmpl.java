@@ -27,6 +27,7 @@ import com.dksys.biz.user.cr.cr01.service.CR01Svc;
 import com.dksys.biz.user.cr.cr02.mapper.CR02Mapper;
 import com.dksys.biz.user.cr.cr02.service.CR02Svc;
 import com.dksys.biz.user.qm.qm01.mapper.QM01Mapper;
+import com.dksys.biz.util.ApprovalLineTypeGuard;
 import com.dksys.biz.util.ExceptionThrower;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
@@ -341,6 +342,7 @@ public class CR02Svcmpl implements CR02Svc {
             //결재
             Type stringList3 = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
             List<Map<String, String>> approvalArr = gson.fromJson(param.get("rowApprovalListArr"), stringList3);
+            approvalArr = ApprovalLineTypeGuard.moveStagePostToEnd(approvalArr, param.get("ordrsNo"));
             if (approvalArr != null && approvalArr.size() > 0 ) {
                 int i = 0;
                 for (Map<String, String> approvalMap : approvalArr) {
@@ -828,6 +830,7 @@ public class CR02Svcmpl implements CR02Svc {
         if (canUpdateApproval) {
             Type stringList3 = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
             List<Map<String, String>> approvalArr = gson.fromJson(param.get("rowApprovalListArr"), stringList3);
+            approvalArr = ApprovalLineTypeGuard.moveStagePostToEnd(approvalArr, param.get("ordrsNo"));
             if (approvalArr != null && approvalArr.size() > 0 ) {
                 int i = 0;
                 for (Map<String, String> approvalMap : approvalArr) {

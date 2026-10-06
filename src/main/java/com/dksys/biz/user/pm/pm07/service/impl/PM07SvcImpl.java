@@ -22,6 +22,7 @@ import com.dksys.biz.user.pm.pm07.mapper.PM07Mapper;
 import com.dksys.biz.user.pm.pm07.service.PM07Svc;
 import com.dksys.biz.user.pm.pm30.service.PM30Svc;
 import com.dksys.biz.user.wb.wb20.service.WB20Svc;
+import com.dksys.biz.util.ApprovalLineTypeGuard;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.reflect.TypeToken;
@@ -344,6 +345,7 @@ public class PM07SvcImpl implements PM07Svc {
 				Gson gsonDtl = new GsonBuilder().disableHtmlEscaping().create();
 				Type dtlMap = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
 				approvalList = gsonDtl.fromJson(approvalArr, dtlMap);
+				approvalList = ApprovalLineTypeGuard.moveStagePostToEnd(approvalList, paramMap.get("coCd") + "/" + reqNo);
 				approvalList = deduplicateApprovalAndShare(approvalList);
 
 				for (Map<String, String> approval : approvalList) {
@@ -561,6 +563,7 @@ public class PM07SvcImpl implements PM07Svc {
 				Gson gsonDtl = new GsonBuilder().disableHtmlEscaping().create();
 				Type dtlMap = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
 				approvalList = gsonDtl.fromJson(approvalArr, dtlMap);
+				approvalList = ApprovalLineTypeGuard.moveStagePostToEnd(approvalList, paramMap.get("coCd") + "/" + paramMap.get("reqNo"));
 				approvalList = deduplicateApprovalAndShare(approvalList);
 
 				for (Map<String, String> approval : approvalList) {

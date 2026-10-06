@@ -51,6 +51,7 @@ public interface PM51Mapper {
 	int updateTripReqPayAmounts(Map<String, String> paramMap);
 
 	int updateTripReqAprvStsCd(Map<String, String> paramMap);
+	int updateTripRptAprvStsCd(Map<String, String> paramMap);
 
 	// 일반결재(2190)+관리부서결재(2191)가 모두 완료되었는지 여부 ('Y'/'N')
 	String selectTripReqAllApprovalDone(Map<String, String> paramMap);

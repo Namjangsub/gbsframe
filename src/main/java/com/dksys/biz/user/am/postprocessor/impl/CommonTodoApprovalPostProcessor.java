@@ -63,7 +63,7 @@ public class CommonTodoApprovalPostProcessor implements ApprovalPostProcessor {
         }
 
         // ERP 개별 업무(PM07 휴가신청서, PM08 대체근무, PM51 출장 등) 사후처리 일원화 위임
-        dispatchBusinessApprovalCompleted(docInfo, paramMap, erpBizKey);
+        dispatchBusinessApprovalCompleted(docInfo, paramMap, erpBizKey, linkedWb20);
     }
 
     @Override
@@ -108,7 +108,7 @@ public class CommonTodoApprovalPostProcessor implements ApprovalPostProcessor {
         logger.info("[CommonTodoPostProcessor] TB_WB20M03 결재 취소 반영: erpBizKey={}, updatedRows={}", erpBizKey, rows);
     }
 
-    private void dispatchBusinessApprovalCompleted(Map<String, Object> docInfo, Map<String, Object> paramMap, String erpBizKey) {
+    private void dispatchBusinessApprovalCompleted(Map<String, Object> docInfo, Map<String, Object> paramMap, String erpBizKey, boolean linkedWb20) {
         String erpBizType = (docInfo != null && docInfo.get("erpBizType") != null)
                 ? String.valueOf(docInfo.get("erpBizType"))
                 : (paramMap.get("erpBizType") != null ? String.valueOf(paramMap.get("erpBizType")) : "");
@@ -121,8 +121,12 @@ public class CommonTodoApprovalPostProcessor implements ApprovalPostProcessor {
         String userId = paramMap.get("userId") != null ? String.valueOf(paramMap.get("userId")) : "";
         String apprOpinion = (String) paramMap.get("apprOpinion");
 
+        // PM07/PM08은 WB20 연계 승인(linkedWb20)일 때 WB20SvcImpl.insertApprovalLine 재진입 단계가 정확한
+        // div2/todoId로 이미 후처리를 수행하므로 여기서 다시 실행하지 않는다(이중 실행·PM08 2420 오대상 쓰기 방지).
+        // WB20 연계가 없는 순수 AM 결재나 보상큐 재실행(linkedWb20=false)에서만 실행한다.
+
         // 1. PM07 휴가신청서 (TODODIV2300, VAC)
-        if (pm07SvcProvider != null && pm07SvcProvider.getIfAvailable() != null
+        if (!linkedWb20 && pm07SvcProvider != null && pm07SvcProvider.getIfAvailable() != null
                 && ("PM07".equals(erpBizType) || "TODODIV2300".equals(div2CodeId) || (erpBizKey != null && erpBizKey.startsWith("VAC")))) {
             try {
                 Map<String, String> pm07Param = new HashMap<>();
@@ -139,7 +143,7 @@ public class CommonTodoApprovalPostProcessor implements ApprovalPostProcessor {
         }
 
         // 2. PM08 휴일대체근무 (TODODIV2410 신청, TODODIV2420 결과, SWR/SWC)
-        if (pm08SvcProvider != null && pm08SvcProvider.getIfAvailable() != null
+        if (!linkedWb20 && pm08SvcProvider != null && pm08SvcProvider.getIfAvailable() != null
                 && ("PM08".equals(erpBizType) || (erpBizKey != null && (erpBizKey.startsWith("SWR") || erpBizKey.startsWith("SWC"))))) {
             try {
                 Map<String, String> pm08Param = new HashMap<>();
@@ -173,6 +177,22 @@ public class CommonTodoApprovalPostProcessor implements ApprovalPostProcessor {
             } catch (Exception e) {
                 logger.error("[CommonTodoPostProcessor] PM51 출장신청서 상태 갱신 실패: tripReqNo={}", erpBizKey, e);
                 throw new RuntimeException("PM51 출장신청서 상태 갱신 실패: " + e.getMessage(), e);
+            }
+        }
+
+        // 4. PM52 출장복명서 (TODODIV2200, TODODIV2201)
+        // WB20 연계 승인일 때는 WB20SvcImpl.updatePm52AprvSts가 이미 처리했으므로 여기서 중복 실행하지 않음
+        if (!linkedWb20 && "PM52".equals(erpBizType)) {
+            try {
+                Map<String, Object> pm52StsParam = new HashMap<>();
+                pm52StsParam.put("tripRptNo", erpBizKey);
+                pm52StsParam.put("aprvStsCd", "APRVSTS03");
+                pm52StsParam.put("userId", userId);
+                am11Mapper.updatePm52TripRptAprvSts(pm52StsParam);
+                logger.info("[CommonTodoPostProcessor] PM52 출장복명서 승인완료 상태 갱신 성공: tripRptNo={}", erpBizKey);
+            } catch (Exception e) {
+                logger.error("[CommonTodoPostProcessor] PM52 출장복명서 상태 갱신 실패: tripRptNo={}", erpBizKey, e);
+                throw new RuntimeException("PM52 출장복명서 상태 갱신 실패: " + e.getMessage(), e);
             }
         }
     }

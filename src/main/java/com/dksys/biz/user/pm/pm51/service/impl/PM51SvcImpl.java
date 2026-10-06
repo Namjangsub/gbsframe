@@ -27,6 +27,7 @@ import com.dksys.biz.user.pm.pm51.service.PM51Svc;
 import com.dksys.biz.user.qm.qm01.mapper.QM01Mapper;
 import com.dksys.biz.user.wb.wb20.service.WB20Svc;
 import com.dksys.biz.user.wb.wb24.mapper.WB24Mapper;
+import com.dksys.biz.util.ApprovalLineTypeGuard;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.reflect.TypeToken;
@@ -290,6 +291,7 @@ public class PM51SvcImpl implements PM51Svc {
 			List<Map<String, String>> approvalArr = gsonDtl.fromJson(paramMap.get("approvalArr"), dtlMap);
 			approvalArr = appendTripReqApplicantApprovals(paramMap, approvalArr);
 			approvalArr = reorderGeneralApprovalArr(paramMap, approvalArr);
+			ApprovalLineTypeGuard.convertPostToAppr(approvalArr, paramMap.get("coCd") + "/" + paramMap.get("tripReqNo"));
 			if (approvalArr != null && approvalArr.size() > 0) {
 				paramMap.put("reqNo", paramMap.get("tripReqNo"));
 				paramMap.put("fileTrgtKey", paramMap.get("tripReqNo"));
@@ -493,6 +495,7 @@ public class PM51SvcImpl implements PM51Svc {
 			List<Map<String, String>> approvalArr = gsonDtl.fromJson(paramMap.get("approvalArr"), dtlMap);
 			approvalArr = appendTripReqApplicantApprovals(paramMap, approvalArr);
 			approvalArr = reorderGeneralApprovalArr(paramMap, approvalArr);
+			ApprovalLineTypeGuard.convertPostToAppr(approvalArr, paramMap.get("coCd") + "/" + paramMap.get("tripReqNo"));
 			if (approvalArr != null && approvalArr.size() > 0) {
 				String pgParam1 = "{\"actionType\":\"" + "T" + "\",";
 				pgParam1 += "\"gubun\":\"" + "팀" + "\",";
@@ -590,6 +593,8 @@ public class PM51SvcImpl implements PM51Svc {
 		}
 
 		List<Map<String, String>> approvalArr = gsonDtl.fromJson(paramMap.get(arrKey), dtlMap);
+		String documentNoKey = hasText(paramMap.get("tripRptNo")) ? "tripRptNo" : "tripReqNo";
+		String documentNo = paramMap.get(documentNoKey);
 		if (approvalArr == null || approvalArr.size() == 0) {
 			return;
 		}
@@ -597,9 +602,7 @@ public class PM51SvcImpl implements PM51Svc {
 		if ("mngApprovalArr".equals(arrKey)) {
 			approvalArr = reorderPayMngApprovalArr(approvalArr);
 		}
-
-		String documentNoKey = hasText(paramMap.get("tripRptNo")) ? "tripRptNo" : "tripReqNo";
-		String documentNo = paramMap.get(documentNoKey);
+		ApprovalLineTypeGuard.convertPostToAppr(approvalArr, paramMap.get("coCd") + "/" + documentNo);
 		String pgParam1 = "{\"actionType\":\"" + "T" + "\",";
 		pgParam1 += "\"gubun\":\"" + gubun + "\",";
 		pgParam1 += "\"coCd\":\"" + paramMap.get("coCd") + "\",";
@@ -1325,6 +1328,7 @@ public class PM51SvcImpl implements PM51Svc {
 			List<Map<String, String>> approvalArr = gsonDtl.fromJson(paramMap.get("approvalArr"), dtlMap);
 			approvalArr = appendTripRptTravelerLeaders(paramMap, approvalArr);
 			approvalArr = reorderRptGeneralApprovalArr(paramMap, approvalArr);
+			ApprovalLineTypeGuard.convertPostToAppr(approvalArr, paramMap.get("coCd") + "/" + paramMap.get("tripRptNo"));
 			if (approvalArr != null && approvalArr.size() > 0) {
 				paramMap.put("reqNo", paramMap.get("tripRptNo"));
 				paramMap.put("fileTrgtKey", paramMap.get("tripRptNo"));
@@ -1508,6 +1512,7 @@ public class PM51SvcImpl implements PM51Svc {
 			List<Map<String, String>> approvalArr = gsonDtl.fromJson(paramMap.get("approvalArr"), dtlMap);
 			approvalArr = appendTripRptTravelerLeaders(paramMap, approvalArr);
 			approvalArr = reorderRptGeneralApprovalArr(paramMap, approvalArr);
+			ApprovalLineTypeGuard.convertPostToAppr(approvalArr, paramMap.get("coCd") + "/" + paramMap.get("tripRptNo"));
 			if (approvalArr != null && approvalArr.size() > 0) {
 				String pgParam1 = "{\"actionType\":\"" + "T" + "\",";
 				pgParam1 += "\"gubun\":\"" + "팀" + "\",";

@@ -983,15 +983,33 @@ public class AM11SvcImpl implements AM11Svc {
                     Map<String, String> wbQuery = new HashMap<>();
                     wbQuery.put("todoNo", erpBizKey);
                     wbQuery.put("coCd", coCd);
+                    // ETC_FIELD2(차수)는 CR02에서만 사용되므로 CR02 문서일 때만 histNo로 한정한다.
+                    String docHistNo = valueOf(docLock.get("histNo"));
+                    if ("CR02".equals(valueOf(docLock.get("erpBizType"))) && !docHistNo.isEmpty()) {
+                        wbQuery.put("histNo", docHistNo);
+                    }
                     List<Map<String, String>> wbLines = wb20Svc.selectGetApprovalList(wbQuery);
                     Map<String, String> currentWbLine = null;
                     String approverIdStr = valueOf(actingLine.get("approverId"));
+                    // WB20 라인의 식별 기준은 TODO_DIV2_CODE_ID + TODO_ID + TODO_NO + ETC_FIELD2(histNo)이다.
+                    // TODO_KEY는 수정 시 바뀔 수 있어 고유키로 쓰지 않는다(AM에 보관된 값이 stale해질 수 있음).
+                    // TODO_NO/ETC_FIELD2는 위 조회(wbQuery)로 한정하고, 여기서는 단계(DIV2)+결재자(TODO_ID)로 특정한다.
+                    String actingWbDiv1 = valueOf(actingLine.get("wb20Div1CodeId"));
+                    String actingWbDiv2 = valueOf(actingLine.get("wb20Div2CodeId"));
                     for (Map<String, String> row : wbLines) {
-                        if ((approverIdStr.equals(row.get("todoId")) || userId.equals(row.get("todoId")))
-                                && !"Y".equals(row.get("sanctnSttus"))) {
-                            currentWbLine = row;
-                            break;
+                        if (!(approverIdStr.equals(row.get("todoId")) || userId.equals(row.get("todoId")))
+                                || "Y".equals(row.get("sanctnSttus"))) {
+                            continue;
                         }
+                        // TODO_DIV1_CODE_ID(결재/공유)도 함께 맞춘다. 일부 기존 API는 DIV1까지 전달돼야 처리된다.
+                        if (!actingWbDiv1.isEmpty() && !actingWbDiv1.equals(valueOf(row.get("todoDiv1CodeId")))) {
+                            continue;
+                        }
+                        if (!actingWbDiv2.isEmpty() && !actingWbDiv2.equals(valueOf(row.get("todoDiv2CodeId")))) {
+                            continue;
+                        }
+                        currentWbLine = row;
+                        break;
                     }
                     if (currentWbLine == null) {
                         throw new IllegalStateException("원본 WB20 결재행을 찾을 수 없어 반려를 취소했습니다.");
@@ -1182,6 +1200,15 @@ public class AM11SvcImpl implements AM11Svc {
         if (!userId.equals(draUserId)) {
             resultMap.put("resultCode", "500");
             resultMap.put("resultMessage", "기안자 본인만 상신 취소(회수)할 수 있습니다.");
+            return resultMap;
+        }
+
+        // 문서 상태 확인: 아직 아무도 결재하지 않은 상신 상태(REQUEST)에서만 회수할 수 있다.
+        // (완료/반려/기취소 문서는 currLineSeq가 1에 남아 순번 검사만으로는 걸러지지 않는다)
+        String cancelDocStatus = valueOf(docLock.get("docStatus"));
+        if (!"REQUEST".equals(cancelDocStatus)) {
+            resultMap.put("resultCode", "500");
+            resultMap.put("resultMessage", "상신 상태의 문서만 취소(회수)할 수 있습니다. (현재 상태: " + cancelDocStatus + ")");
             return resultMap;
         }
 
@@ -1425,6 +1452,15 @@ public class AM11SvcImpl implements AM11Svc {
                     pm51StsParam.put("aprvStsCd", "APRVSTS03");
                     pm51StsParam.put("userId", userId);
                     am11Mapper.updatePm51TripReqAprvSts(pm51StsParam);
+                }
+
+                // 출장복명서(TODODIV2200) 신청부서 전결 완료 시에도 동일하게 APRVSTS03으로 갱신
+                if ("TODODIV2200".equals(currentDiv2CodeId)) {
+                    Map<String, Object> pm52StsParam = new HashMap<>();
+                    pm52StsParam.put("tripRptNo", linkedDocInfo.get("erpBizKey"));
+                    pm52StsParam.put("aprvStsCd", "APRVSTS03");
+                    pm52StsParam.put("userId", userId);
+                    am11Mapper.updatePm52TripRptAprvSts(pm52StsParam);
                 }
             }
         } else {
@@ -2460,53 +2496,47 @@ public class AM11SvcImpl implements AM11Svc {
         String erpBizKey = docLock.get("erpBizKey") == null ? null : String.valueOf(docLock.get("erpBizKey")).trim();
         if (erpBizKey == null || erpBizKey.isEmpty() || wb20Svc == null || amLine == null) return;
 
-        // 1. 유일키 (wb20Div2CodeId + wb20TodoNo) 및 wb20TodoKey 추출
-        String todoNo = amLine.get("wb20TodoNo") != null ? amLine.get("wb20TodoNo").toString().trim() : erpBizKey;
-        String div2CodeId = amLine.get("wb20Div2CodeId") != null ? amLine.get("wb20Div2CodeId").toString().trim() : null;
-        String todoKey = amLine.get("wb20TodoKey") != null ? amLine.get("wb20TodoKey").toString().trim() : null;
+        // 1. WB20 결재행 식별 기준: TODO_DIV1_CODE_ID + TODO_DIV2_CODE_ID + TODO_ID + TODO_NO (+ CR02만 ETC_FIELD2=histNo).
+        //    TODO_KEY는 수정 시 바뀔 수 있어 고유키로 쓰지 않는다(AM에 보관된 wb20TodoKey는 stale할 수 있음).
+        //    SANCTN_SN도 일반/관리부서가 각각 1부터 재시작하므로 단독 매칭하지 않는다.
+        String todoNo = valueOf(amLine.get("wb20TodoNo"));
+        if (todoNo.isEmpty()) todoNo = erpBizKey;
+        String div1CodeId = valueOf(amLine.get("wb20Div1CodeId"));
+        String div2CodeId = valueOf(amLine.get("wb20Div2CodeId"));
 
-        Map<String, String> targetLine = null;
-
-        // 2. wb20TodoKey가 있는 경우, selectCurrentUserApprovalDataListFromTodoKey API를 통해 결재자료 확인
-        if (todoKey != null && !todoKey.isEmpty()) {
-            Map<String, String> chkParam = new HashMap<>();
-            chkParam.put("todoKey", todoKey);
-            chkParam.put("userId", approverId != null ? approverId : userId);
-            List<Map<String, String>> curApprovalList = wb20Svc.selectCurrentUserApprovalDataListFromTodoKey(chkParam);
-            if ((curApprovalList == null || curApprovalList.isEmpty()) && userId != null && !userId.equals(approverId)) {
-                chkParam.put("userId", userId);
-                curApprovalList = wb20Svc.selectCurrentUserApprovalDataListFromTodoKey(chkParam);
-            }
-            if (curApprovalList != null && !curApprovalList.isEmpty()) {
-                targetLine = curApprovalList.get(0);
-            }
+        Map<String, String> findParam = new HashMap<>();
+        findParam.put("todoNo", todoNo);
+        if (!div2CodeId.isEmpty()) findParam.put("todoDiv2CodeId", div2CodeId);
+        // ETC_FIELD2(차수)는 CR02에서만 사용되므로 CR02 문서일 때만 histNo로 한정한다.
+        String histNo = valueOf(docLock.get("histNo"));
+        if ("CR02".equals(valueOf(docLock.get("erpBizType"))) && !histNo.isEmpty()) {
+            findParam.put("histNo", histNo);
         }
 
-        // 3. todoKey로 확인되지 않는 경우, 유일키(todoDiv2CodeId + todoNo) 기반으로 WB20 결재행 조회
-        if (targetLine == null) {
-            Map<String, String> findParam = new HashMap<>();
-            findParam.put("todoNo", todoNo);
-            if (div2CodeId != null && !div2CodeId.isEmpty()) findParam.put("todoDiv2CodeId", div2CodeId);
-            String histNo = docLock.get("histNo") != null ? String.valueOf(docLock.get("histNo")).trim() : null;
-            if (histNo != null && !histNo.isEmpty()) findParam.put("histNo", histNo);
+        List<Map<String, String>> wb20Lines = wb20Svc.selectGetApprovalList(findParam);
+        if (wb20Lines == null || wb20Lines.isEmpty()) {
+            throw new IllegalStateException("연결된 WB20 결재행을 찾을 수 없습니다. (TODO_NO=" + todoNo + "). 결재를 롤백합니다.");
+        }
 
-            List<Map<String, String>> wb20Lines = wb20Svc.selectGetApprovalList(findParam);
-            if (wb20Lines == null || wb20Lines.isEmpty()) {
-                throw new IllegalStateException("연결된 WB20 결재행을 찾을 수 없습니다. (TODO_NO=" + todoNo + "). 결재를 롤백합니다.");
-            }
-
+        // 결재자(원결재자 → 대결자 순)로 DIV1/DIV2가 일치하는 미승인 행을 찾는다.
+        Map<String, String> targetLine = null;
+        String[] candidateIds = (approverId != null && !approverId.equalsIgnoreCase(userId))
+                ? new String[] { approverId, userId } : new String[] { userId };
+        for (String candidateId : candidateIds) {
+            if (candidateId == null) continue;
             for (Map<String, String> row : wb20Lines) {
-                if (todoKey != null && todoKey.equals(row.get("todoKey"))) {
-                    targetLine = row;
-                    break;
-                }
-                if (targetLine == null && approverId != null && approverId.equalsIgnoreCase(row.get("todoId"))) {
-                    targetLine = row;
-                } else if (targetLine == null && String.valueOf(amLineSeq).equals(row.get("sanctnSn"))) {
-                    targetLine = row;
-                }
+                if (!candidateId.equalsIgnoreCase(valueOf(row.get("todoId")))) continue;
+                if (!div1CodeId.isEmpty() && !div1CodeId.equals(valueOf(row.get("todoDiv1CodeId")))) continue;
+                if (!div2CodeId.isEmpty() && !div2CodeId.equals(valueOf(row.get("todoDiv2CodeId")))) continue;
+                if ("Y".equals(row.get("sanctnSttus"))) continue;
+                targetLine = row;
+                break;
             }
-            if (targetLine == null) targetLine = wb20Lines.get(0);
+            if (targetLine != null) break;
+        }
+        if (targetLine == null) {
+            throw new IllegalStateException("연결된 WB20 결재행을 찾을 수 없습니다. (TODO_NO=" + todoNo
+                    + ", DIV2=" + div2CodeId + ", 결재자=" + approverId + "). 결재를 롤백합니다.");
         }
 
         // 4. WB20 승인 실행

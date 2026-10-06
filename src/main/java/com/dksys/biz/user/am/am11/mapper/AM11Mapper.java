@@ -54,6 +54,8 @@ public interface AM11Mapper {
 
     int updatePm51TripReqAprvSts(Map<String, Object> paramMap);
 
+    int updatePm52TripRptAprvSts(Map<String, Object> paramMap);
+
     int insertApprovalHist(Map<String, Object> paramMap);
 
     int deleteApprovalLines(Map<String, Object> paramMap);

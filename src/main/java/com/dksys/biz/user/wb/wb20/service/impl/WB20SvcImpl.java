@@ -202,27 +202,11 @@ public class WB20SvcImpl implements WB20Svc {
 		// AM 연동 판별 및 위임 (1차진입일 때만)
 		boolean isReentry = "Y".equals(paramMap.get("amLinkedApproval"));
 		if (!isReentry && am11Svc != null) {
-			String todoKey = paramMap.get("todoKey");
 			String erpBizKey = paramMap.get("todoNo");
 			String coCd = paramMap.get("coCd");
 
-			// 1차: todoKey 단독 조회
-			Map<String, Object> amCheckParam = new HashMap<>();
-			amCheckParam.put("todoKey", todoKey);
-			String docId = am11Svc.selectDocIdByBizKey(amCheckParam);
-
-			// 1차 실패 시 2차: erpBizKey + coCd + todoDiv2CodeId + histNo
-			if (docId == null || docId.isEmpty()) {
-				amCheckParam.clear();
-				amCheckParam.put("erpBizKey", erpBizKey);
-				amCheckParam.put("coCd", coCd);
-				amCheckParam.put("todoDiv2CodeId", todoDiv2CodeId);
-				Object histNoObj = paramMap.get("histNo");
-				if (histNoObj != null && !String.valueOf(histNoObj).isEmpty()) {
-					amCheckParam.put("histNo", histNoObj);
-				}
-				docId = am11Svc.selectDocIdByBizKey(amCheckParam);
-			}
+			// 진행 중인 AM 연동 문서가 있을 때만 위임한다. 없으면 기존 WB 흐름으로 처리한다.
+			String docId = findActiveAmDocId(paramMap);
 
 			// AM 연동 문서 존재 시 위임
 			if (docId != null && !docId.isEmpty()) {
@@ -410,6 +394,10 @@ public class WB20SvcImpl implements WB20Svc {
 		}
 		if ("TODODIV2190".equals(todoDiv2CodeId)) {
 			updatePm51AprvSts(paramMap, (resultMap != null && "Y".equals(resultMap.get("todoYn"))) ? "APRVSTS03" : "APRVSTS02");
+		}
+		// 출장복명서(TODODIV2200)도 신청서(2190)와 같은 기준으로 결재 진행/완료 상태를 갱신한다.
+		if ("TODODIV2200".equals(todoDiv2CodeId)) {
+			updatePm52AprvSts(paramMap, (resultMap != null && "Y".equals(resultMap.get("todoYn"))) ? "APRVSTS03" : "APRVSTS02");
 		}
 
 		// PM07 휴가신청서: 결재 상태 갱신 + 최종승인 시 일일업무일지(TB_PM01M01) 반영
@@ -772,6 +760,50 @@ public class WB20SvcImpl implements WB20Svc {
 		return "이";
 	}
 
+	/**
+	 * WB20 결재함 승인/반려를 AM 엔진에 위임할 "진행 중인 AM 문서"를 찾는다. 없으면 null(=기존 WB 흐름).
+	 * WB20 결재행 식별키는 TODO_DIV1_CODE_ID + TODO_DIV2_CODE_ID + TODO_ID + TODO_NO + ETC_FIELD2(CR02 차수)이며,
+	 * TODO_KEY는 수정 시 바뀔 수 있어 고유키로 쓰지 않는다. 키가 하나라도 비면 미연동으로 본다.
+	 * CR02는 WB에만 있고 AM 문서가 없는 자료가 있으며, 그런 자료는 AM을 쓰지 않고 기존 WB 모듈로 처리한다.
+	 */
+	private String findActiveAmDocId(Map<String, String> paramMap) {
+		if (am11Svc == null) {
+			return null;
+		}
+		if (!hasText(paramMap.get("todoNo")) || !hasText(paramMap.get("todoId"))
+				|| !hasText(paramMap.get("todoDiv1CodeId")) || !hasText(paramMap.get("todoDiv2CodeId"))) {
+			return null;
+		}
+		Map<String, String> keyParam = new HashMap<>();
+		keyParam.put("todoNo", paramMap.get("todoNo"));
+		keyParam.put("todoId", paramMap.get("todoId"));
+		keyParam.put("todoDiv1CodeId", paramMap.get("todoDiv1CodeId"));
+		keyParam.put("todoDiv2CodeId", paramMap.get("todoDiv2CodeId"));
+		keyParam.put("coCd", paramMap.get("coCd"));
+		String docId = wb20Mapper.selectAmDocIdByWbLineKey(keyParam);
+		return hasText(docId) ? docId : null;
+	}
+
+	/**
+	 * WB20 결재취소 시 되돌릴 AM 문서를 특정한다. 없으면 null(=AM 미연동, 동기화 생략).
+	 * 취소자(userId)가 곧 취소 대상 결재행의 TODO_ID이며, 마지막 결재자가 취소하면 문서가 COMPLETED일 수 있어 완료 문서를 포함한다.
+	 */
+	private String findAmDocIdForCancel(Map<String, String> paramMap) {
+		if (!hasText(paramMap.get("todoNo")) || !hasText(paramMap.get("userId"))
+				|| !hasText(paramMap.get("todoDiv1CodeId")) || !hasText(paramMap.get("todoDiv2CodeId"))) {
+			return null;
+		}
+		Map<String, String> keyParam = new HashMap<>();
+		keyParam.put("todoNo", paramMap.get("todoNo"));
+		keyParam.put("todoId", paramMap.get("userId"));
+		keyParam.put("todoDiv1CodeId", paramMap.get("todoDiv1CodeId"));
+		keyParam.put("todoDiv2CodeId", paramMap.get("todoDiv2CodeId"));
+		keyParam.put("coCd", paramMap.get("coCd"));
+		keyParam.put("includeCompleted", "Y");
+		String docId = wb20Mapper.selectAmDocIdByWbLineKey(keyParam);
+		return hasText(docId) ? docId : null;
+	}
+
 	private boolean isPm51SalesApproval(Map<String, String> paramMap) {
 		return "TODODIV2190".equals(paramMap.get("todoDiv2CodeId"))
 				&& isSalesDept(paramMap.get("deptId"))
@@ -791,6 +823,21 @@ public class WB20SvcImpl implements WB20Svc {
 		tripParam.put("aprvStsCd", aprvStsCd);
 		tripParam.put("todoId", operatorId);
 		pm51Mapper.updateTripReqAprvStsCd(tripParam);
+	}
+
+	private void updatePm52AprvSts(Map<String, String> paramMap, String aprvStsCd) {
+		if (paramMap == null || !hasText(paramMap.get("todoNo"))) {
+			return;
+		}
+		String operatorId = hasText(paramMap.get("todoId")) ? paramMap.get("todoId") : paramMap.get("userId");
+		if (!hasText(operatorId)) {
+			throw new RuntimeException("결재 처리자 ID(todoId/userId)가 누락되어 출장복명서 결재상태를 갱신할 수 없습니다.");
+		}
+		Map<String, String> rptParam = new HashMap<>();
+		rptParam.put("tripRptNo", paramMap.get("todoNo"));
+		rptParam.put("aprvStsCd", aprvStsCd);
+		rptParam.put("todoId", operatorId);
+		pm51Mapper.updateTripRptAprvStsCd(rptParam);
 	}
 
 	private boolean isSalesDept(String deptId) {
@@ -943,13 +990,22 @@ public class WB20SvcImpl implements WB20Svc {
 		int result = wb20Mapper.updateApprovalCancle(paramMap);
 
 		// 기존 WB20 결재취소 결과를 동일 업무의 AM 전자결재 문서/결재선/이력에 반영
-		wb20Mapper.syncAmApprovalCancelNextLine(paramMap);
-		wb20Mapper.syncAmApprovalCancelLine(paramMap);
-		wb20Mapper.syncAmApprovalCancelHist(paramMap);
-		wb20Mapper.syncAmApprovalCancelDocument(paramMap);
+		// 대상 AM 문서를 식별키(DIV1+DIV2+TODO_ID+TODO_NO, CR02만 ETC_FIELD2)로 한 번 특정해 넘기고, 미연동이면 건너뛴다.
+		String amDocId = findAmDocIdForCancel(paramMap);
+		if (hasText(amDocId)) {
+			paramMap.put("amDocId", amDocId);
+			wb20Mapper.syncAmApprovalCancelNextLine(paramMap);
+			wb20Mapper.syncAmApprovalCancelLine(paramMap);
+			wb20Mapper.syncAmApprovalCancelHist(paramMap);
+			wb20Mapper.syncAmApprovalCancelDocument(paramMap);
+		}
 		// PM51 신청결재 완료를 취소하면 업무 상태도 진행중으로 복구한다.
 		if ("TODODIV2190".equals(paramMap.get("todoDiv2CodeId"))) {
 			updatePm51AprvSts(paramMap, "APRVSTS02");
+		}
+		// PM52 복명서 신청부서 결재 완료를 취소하면 복명서 상태도 진행중으로 복구한다(신청서와 동일 기준).
+		if ("TODODIV2200".equals(paramMap.get("todoDiv2CodeId"))) {
+			updatePm52AprvSts(paramMap, "APRVSTS02");
 		}
 
 
@@ -1170,30 +1226,11 @@ public class WB20SvcImpl implements WB20Svc {
 		// AM 연동 판별 및 위임 (1차진입일 때만)
 		boolean isReentry = "Y".equals(paramMap.get("amLinkedApproval"));
 		if (!isReentry && am11Svc != null) {
-			String todoKey = paramMap.get("todoKey");
 			String erpBizKey = paramMap.get("todoNo");
 			String coCd = paramMap.get("coCd");
 
-			// 1차: todoKey 단독 조회
-			Map<String, Object> amCheckParam = new HashMap<>();
-			amCheckParam.put("todoKey", todoKey);
-			String docId = am11Svc.selectDocIdByBizKey(amCheckParam);
-
-			// 1차 실패 시 2차: erpBizKey + coCd + todoDiv2CodeId + histNo
-			if (docId == null || docId.isEmpty()) {
-				String todoDiv2CodeId = paramMap.get("todoDiv2CodeId");
-				amCheckParam.clear();
-				amCheckParam.put("erpBizKey", erpBizKey);
-				amCheckParam.put("coCd", coCd);
-				if (todoDiv2CodeId != null && !todoDiv2CodeId.isEmpty()) {
-					amCheckParam.put("todoDiv2CodeId", todoDiv2CodeId);
-				}
-				Object histNoObj = paramMap.get("histNo");
-				if (histNoObj != null && !String.valueOf(histNoObj).isEmpty()) {
-					amCheckParam.put("histNo", histNoObj);
-				}
-				docId = am11Svc.selectDocIdByBizKey(amCheckParam);
-			}
+			// 진행 중인 AM 연동 문서가 있을 때만 위임한다. 없으면 기존 WB 흐름으로 처리한다.
+			String docId = findActiveAmDocId(paramMap);
 
 			// AM 연동 문서 존재 시 위임
 			if (docId != null && !docId.isEmpty()) {
@@ -1230,15 +1267,15 @@ public class WB20SvcImpl implements WB20Svc {
 				queryParam.put("coCd", coCd);
 				List<Map<String, String>> wb20Lines = selectGetApprovalList(queryParam);
 
-				String targetTodoKey = paramMap.get("todoKey");
+				// 반려 라인 식별: TODO_DIV1_CODE_ID + TODO_DIV2_CODE_ID + TODO_ID (TODO_NO는 위 조회로 한정). TODO_KEY는 쓰지 않는다.
 				String actingLineType = "APPR";
-				if (targetTodoKey != null && !targetTodoKey.isEmpty()) {
-					for (Map<String, String> line : wb20Lines) {
-						if (targetTodoKey.equals(line.get("todoKey"))) {
-							String lt = line.get("lineType");
-							actingLineType = (lt != null && !lt.isEmpty()) ? lt : "APPR";
-							break;
-						}
+				for (Map<String, String> line : wb20Lines) {
+					if (hasText(paramMap.get("todoId")) && paramMap.get("todoId").equals(line.get("todoId"))
+							&& hasText(paramMap.get("todoDiv1CodeId")) && paramMap.get("todoDiv1CodeId").equals(line.get("todoDiv1CodeId"))
+							&& hasText(paramMap.get("todoDiv2CodeId")) && paramMap.get("todoDiv2CodeId").equals(line.get("todoDiv2CodeId"))) {
+						String lt = line.get("lineType");
+						actingLineType = hasText(lt) ? lt : "APPR";
+						break;
 					}
 				}
 				boolean needsWb20Reject = "AGREE".equals(actingLineType);

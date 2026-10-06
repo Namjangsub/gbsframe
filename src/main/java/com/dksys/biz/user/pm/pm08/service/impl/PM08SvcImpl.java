@@ -23,6 +23,7 @@ import com.dksys.biz.user.pm.pm08.service.PM08Svc;
 import com.dksys.biz.user.pm.pm30.service.PM30Svc;
 import com.dksys.biz.user.wb.wb20.service.WB20Svc;
 import com.dksys.biz.user.wb.wb24.service.WB24Svc;
+import com.dksys.biz.util.ApprovalLineTypeGuard;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.reflect.TypeToken;
@@ -142,6 +143,7 @@ public class PM08SvcImpl implements PM08Svc {
 			String approvalArrStr = paramMap.get("approvalArr");
 			if (approvalArrStr != null && !approvalArrStr.isEmpty()) {
 				List<Map<String, String>> approvalList = gsonDtl.fromJson(approvalArrStr, dtlMap);
+				approvalList = ApprovalLineTypeGuard.moveStagePostToEnd(approvalList, paramMap.get("coCd") + "/" + reqNo);
 				approvalList = deduplicateApprovalAndShare(approvalList);
 
 					for (Map<String, String> apprItem : approvalList) {
@@ -288,6 +290,7 @@ public class PM08SvcImpl implements PM08Svc {
 				Gson gsonDtl = new GsonBuilder().disableHtmlEscaping().create();
 				Type dtlMap = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
 				List<Map<String, String>> approvalList = gsonDtl.fromJson(approvalArrStr, dtlMap);
+				approvalList = ApprovalLineTypeGuard.moveStagePostToEnd(approvalList, paramMap.get("coCd") + "/" + reqNoVal);
 				approvalList = deduplicateApprovalAndShare(approvalList);
 
 				// 첫 번째 프로젝트의 salesCd 추출 (TB_WB20M03.SALES_CD 대입용)

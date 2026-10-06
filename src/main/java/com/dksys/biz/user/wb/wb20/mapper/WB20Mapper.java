@@ -47,6 +47,7 @@ public interface WB20Mapper {
 	int updateApprovalLineByTodoNoAndSn(Map<String, String> paramMap);
 	int syncAmApprovalLine(Map<String, String> paramMap);
 	int syncAmApprovalDocument(Map<String, String> paramMap);
+	String selectAmDocIdByWbLineKey(Map<String, String> paramMap);
 	int syncAmApprovalCancelNextLine(Map<String, String> paramMap);
 	int syncAmApprovalCancelLine(Map<String, String> paramMap);
 	int syncAmApprovalCancelHist(Map<String, String> paramMap);

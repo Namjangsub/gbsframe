@@ -793,28 +793,82 @@
 			AND TODO_DIV2_CODE_ID = #{todoDiv2CodeId}	--구분프로그램
 	</update>
 
+	<!-- WB20→AM 위임 판별용: WB20 결재행 식별키(TODO_DIV1_CODE_ID, TODO_DIV2_CODE_ID, TODO_ID, TODO_NO, ETC_FIELD2)로
+	     진행 중인 AM 문서를 찾는다. TODO_KEY는 수정 시 바뀔 수 있어 사용하지 않는다.
+	     ETC_FIELD2(차수)는 CR02에서만 사용되므로 CR02 문서일 때만 AM ERP_HIST_NO와 비교한다. -->
+	<select id="selectAmDocIdByWbLineKey" parameterType="Map" resultType="String">
+		SELECT DOC_ID
+		  FROM (
+		        SELECT M.DOC_ID
+		          FROM TB_AM11M01 M
+		         INNER JOIN TB_AM11D01 D ON D.DOC_ID = M.DOC_ID
+		         WHERE M.ERP_BIZ_KEY        = #{todoNo, jdbcType=VARCHAR}
+		           AND D.WB20_DIV1_CODE_ID  = #{todoDiv1CodeId, jdbcType=VARCHAR}
+		           AND D.WB20_DIV2_CODE_ID  = #{todoDiv2CodeId, jdbcType=VARCHAR}
+		           AND D.APPROVER_ID        = #{todoId, jdbcType=VARCHAR}
+		           <if test="coCd != null and coCd != ''">
+		           AND M.CO_CD = #{coCd, jdbcType=VARCHAR}
+		           </if>
+		           AND (
+		               M.DOC_STATUS IN ('REQUEST', 'PROGRESS', 'POST_PROGRESS')
+		               <if test="includeCompleted != null and includeCompleted == 'Y'">
+		               OR M.DOC_STATUS = 'COMPLETED'
+		               </if>
+		           )
+		           AND (
+		               M.ERP_BIZ_TYPE <![CDATA[ <> ]]> 'CR02'
+		               OR NVL(M.ERP_HIST_NO, '-') = NVL((
+		                   SELECT W.ETC_FIELD2
+		                     FROM TB_WB20M03 W
+		                    WHERE W.TODO_DIV1_CODE_ID = #{todoDiv1CodeId, jdbcType=VARCHAR}
+		                      AND W.TODO_DIV2_CODE_ID = #{todoDiv2CodeId, jdbcType=VARCHAR}
+		                      AND W.TODO_ID           = #{todoId, jdbcType=VARCHAR}
+		                      AND W.TODO_NO           = #{todoNo, jdbcType=VARCHAR}
+		                      AND ROWNUM = 1
+		               ), '-')
+		           )
+		         ORDER BY TO_NUMBER(M.DOC_ID) DESC
+		       )
+		 WHERE ROWNUM = 1
+	</select>
+
 	<!-- WB20 결재취소 연동: 다음 순번 결재선 READY로 복원 -->
+	<!-- 취소 대상 결재행의 AM 전역 순번(LINE_SEQ): 문서 + 결재자 + 순번 + DIV1/DIV2로 특정 -->
+	<sql id="amCancelLineSeq">
+		SELECT MIN(C.LINE_SEQ)
+		  FROM TB_AM11D01 C
+		 WHERE C.DOC_ID            = #{amDocId, jdbcType=VARCHAR}
+		   AND C.APPROVER_ID       = #{userId, jdbcType=VARCHAR}
+		   AND C.WB20_SANCTN_SN    = TO_NUMBER(#{sanctnSn})
+		   AND C.WB20_DIV1_CODE_ID = #{todoDiv1CodeId, jdbcType=VARCHAR}
+		   AND C.WB20_DIV2_CODE_ID = #{todoDiv2CodeId, jdbcType=VARCHAR}
+	</sql>
+
+	<!-- 취소 라인보다 뒤에 열려 있는 PENDING 라인을 READY로 되돌린다. 단, 아래는 되돌리지 않는다.
+	     1) 협조(COOP): 비구속 병렬이라 상신 즉시 열려 있어야 한다.
+	     2) 취소 라인과 같은 병렬 단계의 피어(취소 라인 뒤로 이어진 연속 AGREE): 엔진은 단계 진입 때만 열어 주므로
+	        READY로 밀면 다시 열리지 않아 교착한다. 단계 구성은 엔진(approveDocument)과 동일하게
+	        "헤드 + 뒤따르는 연속 AGREE, 첫 비-AGREE에서 끊김"으로 본다. -->
 	<update id="syncAmApprovalCancelNextLine" parameterType="Map">
-		UPDATE TB_AM11D01
+		UPDATE TB_AM11D01 L
 		   SET LINE_STATUS = 'READY',
 		       UDT_ID      = #{userId},
 		       UDT_PGM     = 'WB20_CANCEL',
 		       UDT_DTTM    = SYSDATE
-		 WHERE DOC_ID IN (
-		       SELECT DOC_ID FROM TB_AM11M01 WHERE ERP_BIZ_KEY = #{todoNo}
-		       <if test="coCd != null and coCd != ''">
-		         AND CO_CD = #{coCd}
-		       </if>
-		 )
-		   AND LINE_STATUS = 'PENDING'
-		   AND (
-		       WB20_SANCTN_SN &gt; TO_NUMBER(#{sanctnSn})
-		       OR LINE_SEQ &gt; NVL((
-		           SELECT MIN(LINE_SEQ)
-		             FROM TB_AM11D01
-		            WHERE DOC_ID IN (SELECT DOC_ID FROM TB_AM11M01 WHERE ERP_BIZ_KEY = #{todoNo})
-		              AND (APPROVER_ID = #{userId} AND WB20_SANCTN_SN = TO_NUMBER(#{sanctnSn}))
-		       ), 9999)
+		 WHERE L.DOC_ID = #{amDocId, jdbcType=VARCHAR}
+		   AND L.LINE_STATUS = 'PENDING'
+		   AND NVL(L.LINE_TYPE, 'APPR') <![CDATA[ <> ]]> 'COOP'
+		   AND L.LINE_SEQ &gt; NVL((<include refid="amCancelLineSeq"/>), 9999)
+		   AND NOT (
+		       NVL(L.LINE_TYPE, 'APPR') = 'AGREE'
+		       AND NOT EXISTS (
+		           SELECT 1
+		             FROM TB_AM11D01 X
+		            WHERE X.DOC_ID = L.DOC_ID
+		              AND X.LINE_SEQ &gt; (<include refid="amCancelLineSeq"/>)
+		              AND X.LINE_SEQ <![CDATA[ <= ]]> L.LINE_SEQ
+		              AND NVL(X.LINE_TYPE, 'APPR') <![CDATA[ <> ]]> 'AGREE'
+		       )
 		   )
 	</update>
 
@@ -829,14 +883,40 @@
 		       UDT_ID         = #{userId},
 		       UDT_PGM        = 'WB20_CANCEL',
 		       UDT_DTTM       = SYSDATE
-		 WHERE DOC_ID IN (
-		       SELECT DOC_ID FROM TB_AM11M01 WHERE ERP_BIZ_KEY = #{todoNo}
-		       <if test="coCd != null and coCd != ''">
-		         AND CO_CD = #{coCd}
-		       </if>
-		 )
-		   AND (APPROVER_ID = #{userId} AND WB20_SANCTN_SN = TO_NUMBER(#{sanctnSn}))
+		 WHERE DOC_ID = #{amDocId, jdbcType=VARCHAR}
+		   AND APPROVER_ID       = #{userId, jdbcType=VARCHAR}
+		   AND WB20_SANCTN_SN    = TO_NUMBER(#{sanctnSn})
+		   AND WB20_DIV1_CODE_ID = #{todoDiv1CodeId, jdbcType=VARCHAR}
+		   AND WB20_DIV2_CODE_ID = #{todoDiv2CodeId, jdbcType=VARCHAR}
 	</update>
+
+	<!-- 취소 후 문서 상태(엔진의 승인 로직과 대칭). 취소 라인 복원(CancelLine)이 끝난 뒤 계산한다.
+	     - 본결(APPR/AGREE)이 모두 승인되고 후결(POST) 라인이 PENDING이면 POST_PROGRESS
+	       (예: 후결자가 자기 승인을 취소해 COMPLETED → 후결 진행으로 돌아가는 경우)
+	     - 승인된 라인이 하나라도 있으면 PROGRESS, 없으면 REQUEST
+	     본결 라인이 PENDING/READY로 남아 있으면 후결은 NextLine이 READY로 되돌렸으므로 POST_PROGRESS가 아니다. -->
+	<sql id="amCancelNextDocStatus">
+		CASE
+		    WHEN EXISTS (
+		        SELECT 1 FROM TB_AM11D01 P
+		         WHERE P.DOC_ID = M.DOC_ID
+		           AND P.LINE_TYPE = 'POST'
+		           AND P.LINE_STATUS = 'PENDING'
+		    ) AND NOT EXISTS (
+		        SELECT 1 FROM TB_AM11D01 B
+		         WHERE B.DOC_ID = M.DOC_ID
+		           AND NVL(B.LINE_TYPE, 'APPR') IN ('APPR', 'AGREE')
+		           AND B.LINE_STATUS IN ('PENDING', 'READY')
+		    ) THEN 'POST_PROGRESS'
+		    WHEN EXISTS (
+		        SELECT 1 FROM TB_AM11D01 L
+		         WHERE L.DOC_ID = M.DOC_ID
+		           AND L.LINE_STATUS = 'APPROVED'
+		           AND L.LINE_TYPE NOT IN ('REFERENCE', 'REF')
+		    ) THEN 'PROGRESS'
+		    ELSE 'REQUEST'
+		END
+	</sql>
 
 	<!-- WB20 결재취소 연동: 전자결재 이력 등록 -->
 	<insert id="syncAmApprovalCancelHist" parameterType="Map">
@@ -862,31 +942,17 @@
 		    (SELECT DEPT_NM FROM TB_CM04M01 D JOIN TB_CM06M01 U ON D.DEPT_ID = U.DEPT_ID WHERE U.ID = #{userId, jdbcType=VARCHAR} AND ROWNUM = 1),
 		    (SELECT LEVEL_NM FROM TB_CM07M01 L JOIN TB_CM06M01 U ON L.LEVEL_CD = U.LEVEL_CD WHERE U.ID = #{userId, jdbcType=VARCHAR} AND ROWNUM = 1),
 		    M.DOC_STATUS,
-		    CASE WHEN EXISTS (
-		        SELECT 1 FROM TB_AM11D01 L
-		         WHERE L.DOC_ID = M.DOC_ID
-		           AND L.LINE_STATUS = 'APPROVED'
-		           AND L.LINE_TYPE NOT IN ('REFERENCE', 'REF')
-		    ) THEN 'PROGRESS' ELSE 'REQUEST' END,
+		    <include refid="amCancelNextDocStatus"/>,
 		    'ERP(WB20) 결재취소',
 		    SYSDATE
 		  FROM TB_AM11M01 M
-		 WHERE M.ERP_BIZ_KEY = #{todoNo}
-		   <if test="coCd != null and coCd != ''">
-		   AND M.CO_CD = #{coCd}
-		   </if>
-		   AND ROWNUM = 1
+		 WHERE M.DOC_ID = #{amDocId, jdbcType=VARCHAR}
 	</insert>
 
 	<!-- WB20 결재취소 연동: 전자결재 문서 마스터 상태 롤백 -->
 	<update id="syncAmApprovalCancelDocument" parameterType="Map">
 		UPDATE TB_AM11M01 M
-		   SET DOC_STATUS = CASE WHEN EXISTS (
-		           SELECT 1 FROM TB_AM11D01 L
-		            WHERE L.DOC_ID = M.DOC_ID
-		              AND L.LINE_STATUS = 'APPROVED'
-		              AND L.LINE_TYPE NOT IN ('REFERENCE', 'REF')
-		       ) THEN 'PROGRESS' ELSE 'REQUEST' END,
+		   SET DOC_STATUS = <include refid="amCancelNextDocStatus"/>,
 		       COMPLETE_DT = NULL,
 		       CURR_LINE_SEQ = NVL((
 		           SELECT MIN(L.LINE_SEQ)
@@ -922,10 +988,7 @@
 		       UDT_ID = #{userId},
 		       UDT_PGM = 'WB20_CANCEL',
 		       UDT_DTTM = SYSDATE
-		 WHERE M.ERP_BIZ_KEY = #{todoNo}
-		   <if test="coCd != null and coCd != ''">
-		   AND M.CO_CD = #{coCd}
-		   </if>
+		 WHERE M.DOC_ID = #{amDocId, jdbcType=VARCHAR}
 	</update>
 
 	<!-- 결재 반려 처리 (TB_WB20M03) -->
