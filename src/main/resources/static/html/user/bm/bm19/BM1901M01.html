@@ -419,6 +419,7 @@ var defaultColumns = [
 			bindTabletLongPressForGrid(this.target, function (grid, dindex, doindex, item, $cell, colKey, evt) {
 				_this.openFile(grid, dindex, doindex, item, $cell, colKey, evt); // 더블클릭과 동일한 처리
 			});
+			resizeGrid();
 			return this;
 		},
 		openFile: function (grid, dindex, doindex, item, $cell, colKey, evt) {
@@ -485,7 +486,7 @@ var defaultColumns = [
 							totalPages    : data.paginationInfo.totalPageCount
 						}
 					});
-					// gridHeightResize(gridView, 194); // 194 = 919 - 725 : 화면 Body 높이 - 그리드 기본크기 725
+					resizeGrid(list.length);
 				} catch (error) {
 					customAlert("오류 발생!! 전산실 연락 바랍니다", error.message);
 					return null; // 오류 발생 시 null 반환
@@ -493,6 +494,50 @@ var defaultColumns = [
 					// console.log("함수 실행 완료.");
 				}
 			});
+		}
+	}
+
+	var resizeDebounceTimer = null;
+
+	/**
+	 * AX5-Grid 높이 동적 계산 및 설정 함수 (AX5-Grid 표준 가이드라인 준수)
+	 * @param {number} [rowCount] - 현재 그리드에 로드된 데이터 행 수
+	 */
+	function resizeGrid(rowCount) {
+		var $grid = $('[data-ax5grid="first-grid"]');
+		if ($grid.length === 0) return;
+
+		var hasData = (rowCount !== undefined && rowCount !== null) 
+			|| (gridView.target && gridView.target.list && gridView.target.list.length > 0);
+		var count = (rowCount !== undefined && rowCount !== null)
+			? Number(rowCount)
+			: (gridView.target && gridView.target.list ? gridView.target.list.length : 0);
+
+		// 1. 헤더 및 구성 요소 높이 계산
+		var headerHeight = 31;      // 단단 헤더 높이
+		var rowHeight = 50;         // BM1901M01 바디 행 높이 (columnHeight: 50)
+		var footSumHeight = 32;     // 합계행(footSum) 높이
+		var pageHeight = 32;        // 페이징(page) 네비게이션 높이
+		var hScrollBarHeight = 18;  // 가로 스크롤바 높이
+		var paddingHeight = 10;     // 내부 여백
+
+		var dataRows = Math.max(count, 1);
+		// 2. 전체 데이터 컨텐츠 필요 높이
+		var contentHeight = headerHeight + (dataRows * rowHeight) + footSumHeight + pageHeight + hScrollBarHeight + paddingHeight;
+
+		// 3. 브라우저 뷰포트 기반 최대 가용 높이 계산
+		var gridTop = $grid.offset().top;
+		var bottomReserve = 15;     // 하단 여백 최소화 (표준 규칙 12)
+		var minHeight = headerHeight + (rowHeight * 3) + footSumHeight + pageHeight + hScrollBarHeight;
+		var maxHeight = Math.max(minHeight, $(window).height() - gridTop - bottomReserve);
+
+		// 4. 컨텐츠 필요 높이와 최대 가용 높이 중 최솟값 적용 (데이터 조회 전에는 maxHeight 기본 적용)
+		var gridHeight = hasData ? Math.min(contentHeight, maxHeight) : maxHeight;
+
+		// 5. DOM 및 AX5-Grid 객체 높이 반영
+		$grid.css('height', gridHeight + 'px');
+		if (gridView && gridView.target && gridView.target.setHeight) {
+			gridView.target.setHeight(gridHeight);
 		}
 	}
 
@@ -526,6 +571,14 @@ var defaultColumns = [
 		// 검색조건 이벤트 bind
 		$('[data-search]').on("change", function(){
 			gridView.setData(0);
+		});
+
+		// 브라우저 창 크기 변경 시 동적 높이 자동 재계산 (디바운스 150ms)
+		$(window).on('resize', function() {
+			clearTimeout(resizeDebounceTimer);
+			resizeDebounceTimer = setTimeout(function() {
+				resizeGrid();
+			}, 150);
 		});
 
 		isFirst = false;
