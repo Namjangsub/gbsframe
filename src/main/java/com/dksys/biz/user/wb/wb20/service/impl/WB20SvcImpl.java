@@ -15,9 +15,11 @@ import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.dksys.biz.admin.cm.cm06.mapper.CM06Mapper;
 import com.dksys.biz.admin.cm.cm16.mapper.CM16Mapper;
 import com.dksys.biz.user.am.am11.service.AM11Svc;
 import com.dksys.biz.admin.cm.cm25.mapper.CM25Mapper;
+import com.dksys.biz.config.RequestUtils;
 import com.dksys.biz.user.im.im01.mapper.IM01Mapper;
 import com.dksys.biz.user.pm.pm07.service.PM07Svc;
 import com.dksys.biz.user.pm.pm08.service.PM08Svc;
@@ -45,6 +47,9 @@ public class WB20SvcImpl implements WB20Svc {
 
 	@Autowired
 	QM01Mapper qm01Mapper;
+
+	@Autowired
+	CM06Mapper cm06Mapper;
 
 	@Autowired
 	CM16Mapper cm16Mapper;
@@ -213,11 +218,8 @@ public class WB20SvcImpl implements WB20Svc {
 				Map<String, Object> amParam = new HashMap<>();
 				amParam.put("docId", docId);
 				amParam.put("userId", paramMap.get("userId"));
-				String userNm = paramMap.get("userNm");
-				if (userNm != null && !userNm.isEmpty()) {
-					amParam.put("userNm", userNm);
-				}
 				amParam.put("apprOpinion", todoCfOpn != null ? todoCfOpn : "");
+				enrichAmEngineParam(amParam, paramMap);
 
 				Map<String, Object> amResult = am11Svc.approveDocument(amParam);
 
@@ -468,6 +470,68 @@ public class WB20SvcImpl implements WB20Svc {
 		}
 
 		return resultMap;
+	}
+
+	private void enrichAmEngineParam(Map<String, Object> amParam, Map<String, String> paramMap) {
+		String userId = (String) amParam.get("userId");
+		if (userId == null) {
+			userId = paramMap.get("userId");
+			if (userId != null) {
+				amParam.put("userId", userId);
+			}
+		}
+
+		if (!amParam.containsKey("userNm") || amParam.get("userNm") == null) {
+			String userNm = paramMap.get("userNm");
+			if (!hasText(userNm)) {
+				if (hasText(userId)) {
+					try {
+						Map<String, String> userParam = new HashMap<>();
+						userParam.put("userId", userId);
+						Map<String, String> userInfo = cm06Mapper.selectUserInfo(userParam);
+						if (userInfo != null && hasText(userInfo.get("name"))) {
+							userNm = userInfo.get("name");
+						}
+					} catch (Exception e) {
+						logger.warn("사용자 정보 조회 실패 (폴백 진행): userId={}", userId, e);
+					}
+				}
+				if (!hasText(userNm)) {
+					userNm = userId;
+				}
+			}
+			amParam.put("userNm", userNm);
+		}
+
+		if (!amParam.containsKey("deptNm") || amParam.get("deptNm") == null) {
+			String deptNm = paramMap.get("deptNm");
+			if (!hasText(deptNm)) {
+				if (hasText(userId)) {
+					try {
+						Map<String, String> userParam = new HashMap<>();
+						userParam.put("userId", userId);
+						Map<String, String> userInfo = cm06Mapper.selectUserInfo(userParam);
+						if (userInfo != null && hasText(userInfo.get("deptNm"))) {
+							deptNm = userInfo.get("deptNm");
+						}
+					} catch (Exception e) {
+						logger.warn("부서 정보 조회 실패 (폴백 진행): userId={}", userId, e);
+					}
+				}
+			}
+			if (hasText(deptNm)) {
+				amParam.put("deptNm", deptNm);
+			}
+		}
+
+		if (!amParam.containsKey("clientIp") || amParam.get("clientIp") == null) {
+			String clientIp = RequestUtils.getClientIp();
+			amParam.put("clientIp", clientIp);
+		}
+
+		if (!amParam.containsKey("pgmId") || amParam.get("pgmId") == null) {
+			amParam.put("pgmId", "AM1201M01");
+		}
 	}
 
 	/* 공통결재 보완요청 insert */
@@ -1245,6 +1309,7 @@ public class WB20SvcImpl implements WB20Svc {
 					rejectOpinion = "";
 				}
 				amParam.put("apprOpinion", rejectOpinion);
+				enrichAmEngineParam(amParam, paramMap);
 
 				Map<String, Object> amResult = am11Svc.rejectDocument(amParam);
 
