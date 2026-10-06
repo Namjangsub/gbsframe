@@ -519,13 +519,35 @@
 			return dec.toFixed(2);
 		}
 
-		// ─ AX5-Grid 포맷터: 실제근무시간(netWorkTm)이 0보다 크면서 8.00 미만이면 시간미달 표시.
-		// 0(근무 없음/휴일/휴가 등)은 blankIfZeroTime과 동일하게 빈칸 유지 — "0.00 (시간미달)"처럼
-		// 근무가 아예 없는 날까지 경고로 잘못 표시되지 않게 한다. ─
+		// ─ 기술연구소(GUN40) 소속 여부 판정 ─
+		function isTechLabRow(item) {
+			if (!item) return false;
+			var allOrg = (String(item.org1Nm || '') + ' ' + String(item.org2Nm || '') + ' ' + String(item.org3Nm || '') + ' ' + String(item.org4Nm || '') + ' ' + String(item.deptNm || '')).trim();
+			var deptId = String(item.deptId || '').trim();
+			return (allOrg.indexOf('기술연구') !== -1 || allOrg.indexOf('연구소') !== -1 || deptId.indexOf('GUN40') === 0);
+		}
+
+		// ─ 실제근무시간(netWorkTm) 시간미달 판정 ─
+		// 1. 실제근무시간이 0보다 크고 8 미만인 경우 대상
+		// 2. 단, 휴일인 경우 기술연구소를 제외한 모든 팀은 (시간미달) 대상에서 제외
+		function isNetWorkTmShortfall(item, netWorkTmVal) {
+			if (!item) return false;
+			var val = netWorkTmVal !== undefined ? netWorkTmVal : item.netWorkTm;
+			var num = Number(val);
+			if (isNaN(num) || num <= 0 || num >= 8) return false;
+
+			var isHoliday = String(item.holidayYn || '').trim() === '휴일';
+			if (isHoliday) {
+				// 휴일인 경우 기술연구소만 시간미달 표시 대상, 그 외 팀은 제외
+				return isTechLabRow(item);
+			}
+			return true;
+		}
+
+		// ─ AX5-Grid 포맷터: 실제근무시간(netWorkTm) 시간미달 표시 포맷터 ─
 		function formatNetWorkTmWithShortfallMark() {
 			var base = blankIfZeroTime.call(this);
-			var num = Number(this.value);
-			if (base && !isNaN(num) && num > 0 && num < 8) {
+			if (base && isNetWorkTmShortfall(this.item, this.value)) {
 				return base + ' (시간미달)';
 			}
 			return base;
@@ -556,19 +578,45 @@
 			var item = this.item;
 			if (!item) return val;
 
+			var isTripType = (item.workTypeNm === '설치시운전' || item.workTypeNm === '설치장애' || item.workTypeNm === 'A/S(무상)' || item.workTypeNm === '기타출장');
+
 			// 만약 특이사항(spclMtr)에 구체적 휴가명이나 출장/휴가 복합명이 존재하면
 			// 기존 val이 generic한 '휴가' 텍스트이거나 비어있을 경우 구체적 명칭(spclMtr)으로 렌더링 보정
 			if (item.spclMtr && (val === '' || val === '휴가')) {
-				val = item.spclMtr;
+				if (!isTripType && (item.spclMtr.indexOf('출장') !== -1 || item.spclMtr.indexOf('설치') !== -1 || item.spclMtr.indexOf('A/S') !== -1)) {
+					if (item.spclMtr.indexOf(' / ') !== -1) {
+						var spParts = item.spclMtr.split(' / ');
+						val = spParts[1] || '';
+					} else {
+						val = '';
+					}
+				} else {
+					val = item.spclMtr;
+				}
+			}
+
+			// 근무형태가 출장 계열이 아닌데 비고 val에 출장 정보가 남아있는 경우 제거
+			if (!isTripType && val) {
+				var valParts = val.split(' / ').filter(function(part) {
+					var p = part.trim();
+					if (p === '설치시운전' || p === '설치장애' || p === 'A/S(무상)' || p === '기타출장') return false;
+					if (item.ordrsNo && p.indexOf(item.ordrsNo) !== -1) return false;
+					if (p.indexOf('설치시운전') !== -1 || p.indexOf('설치장애') !== -1 || p.indexOf('A/S(무상)') !== -1 || p.indexOf('기타출장') !== -1) return false;
+					return true;
+				});
+				val = valParts.join(' / ');
 			}
 
 			var badgeHtml = '';
-			if (item.tripReplyNo) {
-				// 출장복명서 = 남색 (#1e3a8a)
-				badgeHtml += '<span style="display:inline-block; padding:1px 5px; margin-right:4px; font-size:10px; font-weight:bold; line-height:14px; color:#ffffff; background-color:#1e3a8a; border-radius:3px; vertical-align:middle;">복명</span>';
-			} else if (item.tripApplNo) {
-				// 출장신청서 = 파랑 (#2563eb)
-				badgeHtml += '<span style="display:inline-block; padding:1px 5px; margin-right:4px; font-size:10px; font-weight:bold; line-height:14px; color:#ffffff; background-color:#2563eb; border-radius:3px; vertical-align:middle;">출장</span>';
+			// 근무형태가 출장 계열(설치시운전, 설치장애, A/S(무상), 기타출장)일 때만 출장복명서/출장신청서 배지 표시
+			if (isTripType) {
+				if (item.tripReplyNo) {
+					// 출장복명서 = 남색 (#1e3a8a)
+					badgeHtml += '<span style="display:inline-block; padding:1px 5px; margin-right:4px; font-size:10px; font-weight:bold; line-height:14px; color:#ffffff; background-color:#1e3a8a; border-radius:3px; vertical-align:middle;">복명</span>';
+				} else if (item.tripApplNo) {
+					// 출장신청서 = 파랑 (#2563eb)
+					badgeHtml += '<span style="display:inline-block; padding:1px 5px; margin-right:4px; font-size:10px; font-weight:bold; line-height:14px; color:#ffffff; background-color:#2563eb; border-radius:3px; vertical-align:middle;">출장</span>';
+				}
 			}
 
 			var halfType = (typeof getHalfVacationType === 'function') ? getHalfVacationType(item) : null;
@@ -852,8 +900,12 @@
 						{ key: 'rmk',           label: '비고',       width: 140, align: 'center', formatter: formatRmkWithBadge, editor: { type: 'text', disabled: isApplCellDisabled }, styleClass: function() {
 							if (isLateEarlyNoVacFlag(this.item)) return 'grid-cell-pink';
 							var item = this.item;
-							if (item && (item.vacApplNo || item.tripApplNo || item.tripReplyNo || item.workApplNo)) {
-								return 'grid-cell-skyblue';
+							if (item) {
+								var isTripType = (item.workTypeNm === '설치시운전' || item.workTypeNm === '설치장애' || item.workTypeNm === 'A/S(무상)' || item.workTypeNm === '기타출장');
+								var hasTripAppl = isTripType && (item.tripApplNo || item.tripReplyNo);
+								if (item.vacApplNo || hasTripAppl || item.workApplNo) {
+									return 'grid-cell-skyblue';
+								}
 							}
 							return '';
 						} },
@@ -1040,8 +1092,7 @@
 					{ key: 'dedTotal',    label: '합계',       width: 45, align: 'center', formatter: blankIfZeroTime },
 					{ key: 'grossWorkTm', label: '총근무시간', width: 60, align: 'center', formatter: blankIfZeroTime },
 					{ key: 'netWorkTm',   label: '실제근무시간', width: 110, align: 'center', formatter: formatNetWorkTmWithShortfallMark, styleClass: function() {
-						var num = this.item ? Number(this.item.netWorkTm) : NaN;
-						return (!isNaN(num) && num > 0 && num < 8) ? 'grid-cell-changed' : '';
+						return isNetWorkTmShortfall(this.item) ? 'grid-cell-changed' : '';
 					} }
 				]},
 				// 구분선: sepBar9
@@ -1176,6 +1227,11 @@
 							} else {
 								item.isUserEditedWorkType = true;
 								item.workTypeNmChanged = true;
+							}
+
+							// 근무형태 변경에 따른 비고(rmk) 즉시 동기화
+							if (typeof updateRowRmk === 'function') {
+								updateRowRmk(item);
 							}
 						}
 

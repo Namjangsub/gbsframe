@@ -427,9 +427,10 @@ function updateRowRmk(row) {
 	if (!row) return;
 
 	var rmkParts = [];
+	var isTripType = (row.workTypeNm === '설치시운전' || row.workTypeNm === '설치장애' || row.workTypeNm === 'A/S(무상)' || row.workTypeNm === '기타출장');
 
-	// 1. 출장 연동 유형명 (수주번호 ordrsNo가 있으면 "수주번호-유형명")
-	if (row.tripApplNo || row.tripReplyNo) {
+	// 1. 출장 연동 유형명 (수주번호 ordrsNo가 있으면 "수주번호-유형명") - 근무형태가 출장 계열일 때만 반영
+	if ((row.tripApplNo || row.tripReplyNo) && isTripType) {
 		var tripTypeStr = row.workTypeNm || '기타출장';
 		if (row.ordrsNo) {
 			tripTypeStr = row.ordrsNo + '-' + tripTypeStr;
