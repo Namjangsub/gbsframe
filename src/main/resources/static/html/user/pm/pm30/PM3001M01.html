@@ -2134,8 +2134,12 @@
 				var holidayYn = isRedHoliday ? '휴일' : '평일';
 
 				// 휴일이면 타각이 없거나 세콤 판정이 비어있어도 특이사항 기본값을 '휴일'로 설정 (출장/휴가 연동 시 후속 단계에서 덮어씀)
+				// 단, 생산팀이 휴일에 출근(타각 존재 또는 세콤 판정이 출근/휴일출근)한 경우에는 공백을 유지한다.
+				var hasPastedWorkTime = !!(String(inTm || '').trim() || String(outTm || '').trim() || (totWorkTm && totWorkTm !== '00:00' && totWorkTm !== '0'));
 				if (holidayYn === '휴일' && !spclMtr) {
-					spclMtr = '휴일';
+					if (!(isProdOrg && (hasPastedWorkTime || inJudge === '휴일출근'))) {
+						spclMtr = '휴일';
+					}
 				}
 
 				// 대체근무: 기본은 공백이며, 근태담당자가 1 등록 시 비고 및 특이사항 반영
@@ -2623,18 +2627,32 @@
 				// 수정일시, 출장 08:30/17:30 및 비고(rmk) 100% 동일 단일 표준 기반 근태 실적 정보 통합 재계산
 				recalcExcelDetailColumns(row);
 
-				// 생산팀인 경우 특이사항(spclMtr)에 '휴일출근'이 남아있지 않도록 제거
+				// 생산팀 및 휴일 출근(타각) 여부 판정
 				var allOrgStr = (String(row.org1Nm || '') + ' ' + String(row.org2Nm || '') + ' ' + String(row.org3Nm || '') + ' ' + String(row.org4Nm || '') + ' ' + String(row.deptNm || '')).trim();
 				var deptId = String(row.deptId || '').trim();
 				var salesAreaVal = String(row.salesArea || row.salesAreaCd || '').trim();
 				var isProd = (allOrgStr.indexOf('생산') !== -1 || deptId.indexOf('GUN60') === 0 || salesAreaVal === 'SALESAREA60' || salesAreaVal.indexOf('생산') !== -1);
-				if (isProd && row.spclMtr === '휴일출근') {
-					row.spclMtr = '';
-				}
+				var isHoliday = String(row.holidayYn || '').trim() === '휴일';
+				var effIn = String(row.inDttm || row.inTm || '').trim();
+				var effOut = String(row.outDttm || row.outTm || '').trim();
+				var hasWorkTime = !!(effIn || effOut || (row.totWorkTm && row.totWorkTm !== '00:00' && row.totWorkTm !== '0'));
 
-				// 휴일이면 타각이 없거나 근태제외 인원이어도 신청서가 없으면 특이사항에 '휴일' 표시
-				if (String(row.holidayYn || '').trim() === '휴일' && !row.spclMtr && !matchedTrip && !matchedVacation && !row.isUserEditedSpclMtr) {
-					row.spclMtr = '휴일';
+				// 출장/휴가/휴일대체근무 신청서가 없고, 사용자가 직접 수정한 특이사항이 아닌 경우
+				if (!matchedTrip && !matchedVacation && !matchedSubstWork && !row.isUserEditedSpclMtr) {
+					if (isHoliday) {
+						if (isProd && (hasWorkTime || row.inJdgNm === '휴일출근' || row.spclMtr === '휴일출근')) {
+							// 생산팀 휴일 출근인 경우 특이사항은 반드시 공백('')으로 처리
+							row.spclMtr = '';
+						} else if (!hasWorkTime) {
+							// 타각이 없거나 근태제외 인원 등 출근 기록이 없는 휴일은 특이사항에 '휴일' 표시
+							row.spclMtr = '휴일';
+						}
+					} else {
+						// 평일이면서 생산팀 휴일출근 잔여값 방어
+						if (isProd && row.spclMtr === '휴일출근') {
+							row.spclMtr = '';
+						}
+					}
 				}
 			}
 
@@ -2779,8 +2797,21 @@
 						} else if (matchedVacation) {
 							row.spclMtr = fullVacNm;
 						} else if (String(row.holidayYn || '').trim() === '휴일') {
-							// 휴일이면 타각이 없거나 근태제외 인원이어도 특이사항에 '휴일' 표시
-							row.spclMtr = '휴일';
+							var allOrgStr = (String(row.org1Nm || '') + ' ' + String(row.org2Nm || '') + ' ' + String(row.org3Nm || '') + ' ' + String(row.org4Nm || '') + ' ' + String(row.deptNm || '')).trim();
+							var deptId = String(row.deptId || '').trim();
+							var salesAreaVal = String(row.salesArea || row.salesAreaCd || '').trim();
+							var isProd = (allOrgStr.indexOf('생산') !== -1 || deptId.indexOf('GUN60') === 0 || salesAreaVal === 'SALESAREA60' || salesAreaVal.indexOf('생산') !== -1);
+							var effIn = String(row.inDttm || row.inTm || '').trim();
+							var effOut = String(row.outDttm || row.outTm || '').trim();
+							var hasWorkTime = !!(effIn || effOut || (row.totWorkTm && row.totWorkTm !== '00:00' && row.totWorkTm !== '0'));
+
+							if (isProd && (hasWorkTime || row.inJdgNm === '휴일출근' || row.spclMtr === '휴일출근')) {
+								// 생산팀 휴일 출근인 경우 특이사항 공백 유지
+								row.spclMtr = '';
+							} else if (!hasWorkTime) {
+								// 타각이 없거나 근태제외 인원인 휴일은 특이사항에 '휴일' 표시
+								row.spclMtr = '휴일';
+							}
 						}
 					}
 
@@ -3450,12 +3481,19 @@
 			// 휴일 또는 휴일대체근무 신청서(workApplNo/substWorkYn === '1') 기준 출근/퇴근 판정(inJdgNm, outJdgNm) 단일 적용
 			applyAttendanceJudgment(row);
 
-			// 생산팀인 경우 특이사항(spclMtr)에 '휴일출근'이 남아있지 않도록 최종 공백 처리
+			// 생산팀인 경우 특이사항(spclMtr)에 '휴일출근' 또는 잘못 설정된 '휴일'이 남아있지 않도록 최종 공백 처리
 			var allOrgInfo = (String(row.org1Nm || '') + ' ' + String(row.org2Nm || '') + ' ' + String(row.org3Nm || '') + ' ' + String(row.org4Nm || '') + ' ' + String(row.deptNm || '')).trim();
 			var dId = String(row.deptId || '').trim();
 			var sArea = String(row.salesArea || row.salesAreaCd || '').trim();
 			var isProdRow = (allOrgInfo.indexOf('생산') !== -1 || dId.indexOf('GUN60') === 0 || sArea === 'SALESAREA60' || sArea.indexOf('생산') !== -1);
-			if (isProdRow && row.spclMtr === '휴일출근') {
+			var isHoliRow = String(row.holidayYn || '').trim() === '휴일';
+			var hasWorkTimeRow = !!(String(row.inDttm || row.inTm || '').trim() || String(row.outDttm || row.outTm || '').trim() || (row.totWorkTm && row.totWorkTm !== '00:00' && row.totWorkTm !== '0'));
+
+			if (isProdRow && isHoliRow && (hasWorkTimeRow || row.inJdgNm === '휴일출근') && !row.vacApplNo && !row.tripApplNo && !row.tripReplyNo && !row.workApplNo && !row.isUserEditedSpclMtr) {
+				if (row.spclMtr === '휴일출근' || row.spclMtr === '휴일') {
+					row.spclMtr = '';
+				}
+			} else if (isProdRow && row.spclMtr === '휴일출근') {
 				row.spclMtr = '';
 			}
 
