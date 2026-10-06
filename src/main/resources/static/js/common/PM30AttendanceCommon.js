@@ -170,9 +170,15 @@ function applyAttendanceJudgment(row) {
 	var effectiveInStr = row.inDttm ? String(row.inDttm).trim() : (row.inTm ? String(row.inTm).trim() : '');
 	var effectiveOutStr = row.outDttm ? String(row.outDttm).trim() : (row.outTm ? String(row.outTm).trim() : '');
 
+	// 생산팀 소속 여부 판정 (조직1~4/부서명/부서코드/영업구분 기준)
+	var allOrgTeam = (String(row.org1Nm || '') + ' ' + String(row.org2Nm || '') + ' ' + String(row.org3Nm || '') + ' ' + String(row.org4Nm || '') + ' ' + String(row.deptNm || '')).trim();
+	var deptId = String(row.deptId || '').trim();
+	var salesArea = String(row.salesArea || row.salesAreaCd || '').trim();
+	var isProdTeam = (allOrgTeam.indexOf('생산') !== -1 || deptId.indexOf('GUN60') === 0 || salesArea === 'SALESAREA60' || salesArea.indexOf('생산') !== -1);
+
 	if (hasSubstWork) {
-		// 휴일대체근무 신청서가 연동된 행: 출퇴근 시각 유무와 상관없이 무조건 휴일출근 / 휴일퇴근 판정 기본 적용
-		row.inJdgNm = '휴일출근';
+		// 휴일대체근무 신청서가 연동된 행: 출퇴근 시각 유무와 상관없이 무조건 휴일출근 / 휴일퇴근 판정 기본 적용 (생산팀이면 휴일출근 미표시)
+		row.inJdgNm = isProdTeam ? '' : '휴일출근';
 		row.lateTxt = '';
 
 		var otMins = parseHHmmToMinutes(row.otTm);
@@ -195,14 +201,14 @@ function applyAttendanceJudgment(row) {
 		row.lateTxt = '';
 		row.earlyLeaveTxt = '';
 	} else if (isHoliday) {
-		// 순수 휴일인 행: 출퇴근 기록이 있으면 휴일출근/휴일퇴근 판정, 없으면 '휴일' / '휴일'
+		// 순수 휴일인 행: 출퇴근 기록이 있으면 휴일출근/휴일퇴근 판정, 없으면 '휴일' / '휴일' (생산팀이면 휴일출근 미표시)
 		if (!effectiveInStr && !effectiveOutStr) {
 			row.inJdgNm = '휴일';
 			row.outJdgNm = '휴일';
 			row.lateTxt = '';
 			row.earlyLeaveTxt = '';
 		} else {
-			row.inJdgNm = '휴일출근';
+			row.inJdgNm = isProdTeam ? '' : '휴일출근';
 			row.lateTxt = '';
 
 			var otMins = parseHHmmToMinutes(row.otTm);
@@ -508,7 +514,7 @@ function recalcRowAttendanceObject(row) {
 	var wd = row.workDt ? String(row.workDt).replace(/[^0-9]/g, '') : '';
 	var dtFormatted = (wd.length === 8) ? (wd.substr(0, 4) + '-' + wd.substr(4, 2) + '-' + wd.substr(6, 2)) : '';
 
-	// 근무형태가 '제외'인 경우 출퇴근 시각 및 모든 실적/판정/비고 공백 초기화
+	// 근무형태가 '제외'인 경우 출퇴근 시각 및 모든 실적/판정/비고 공백 초기화 (휴일인 경우 spclMtr '휴일' 보존)
 	if (String(row.workTypeNm || '').trim() === '제외') {
 		row.inTm = '';
 		row.outTm = '';
@@ -516,7 +522,7 @@ function recalcRowAttendanceObject(row) {
 		row.outDttm = '';
 		row.inJdgNm = '';
 		row.outJdgNm = '';
-		row.spclMtr = '';
+		row.spclMtr = (String(row.holidayYn || '').trim() === '휴일') ? '휴일' : '';
 		row.otTm = '';
 		row.nghtTm = '';
 		row.totWorkTm = '';
