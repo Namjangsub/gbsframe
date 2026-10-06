@@ -176,24 +176,52 @@ function applyAttendanceJudgment(row) {
 	var salesArea = String(row.salesArea || row.salesAreaCd || '').trim();
 	var isProdTeam = (allOrgTeam.indexOf('생산') !== -1 || deptId.indexOf('GUN60') === 0 || salesArea === 'SALESAREA60' || salesArea.indexOf('생산') !== -1);
 
+	// 생산직(=시급직) 여부 판정: 생산직은 시급직과 동일
+	var orgDiv = String(row.orgDivNm || '').trim();
+	var isHourly = (orgDiv === '시급직' || salesArea === 'SALESAREA60' || salesArea === '시급직(생산)' || salesArea === '시급직(현장)' || salesArea.indexOf('시급직') !== -1);
+	var isProdWorker = isHourly; // 생산직 = 시급직 동일
+
+	// 정규화된 출퇴근 시각(HH:mm) 추출
+	var inTimeNorm = effectiveInStr ? normalizeHHmm(effectiveInStr) : '';
+	var outTimeNorm = effectiveOutStr ? normalizeHHmm(effectiveOutStr) : '';
+
+	// 익일 퇴근(outDt > workDt) 여부 정밀 확인 — 24시 넘겨 익일 새벽 퇴근한 건이 00:44 < 17:30 에 걸려 조퇴로 잘못 판정되는 것을 차단한다.
+	var isNextDayOut = false;
+	var wd = row.workDt ? String(row.workDt).replace(/[^0-9]/g, '') : '';
+	var dtFormatted = (wd.length === 8) ? (wd.substr(0,4)+'-'+wd.substr(4,2)+'-'+wd.substr(6,2)) : '';
+	if (effectiveOutStr && dtFormatted && effectiveOutStr.indexOf('-') !== -1) {
+		var outDtPart = effectiveOutStr.split(' ')[0];
+		if (outDtPart > dtFormatted) {
+			isNextDayOut = true;
+		}
+	}
+
+	var otMins = parseHHmmToMinutes(row.otTm);
+	var ngtMins = parseHHmmToMinutes(row.nghtTm);
+	var totalOtMins = otMins + ngtMins;
+	var hasNight = (ngtMins > 0);
+
 	if (hasSubstWork) {
-		// 휴일대체근무 신청서가 연동된 행: 출퇴근 시각 유무와 상관없이 무조건 휴일출근 / 휴일퇴근 판정 기본 적용 (생산팀이면 휴일출근 미표시)
-		row.inJdgNm = isProdTeam ? '' : '휴일출근';
-		row.lateTxt = '';
+		// 휴일대체근무 신청서가 연동된 행:
+		// 생산직(=시급직)의 경우 지각/조퇴 판정은 평일 기준 적용
+		var isLate = (isProdWorker && inTimeNorm && inTimeNorm > '08:30');
+		row.inJdgNm = isLate ? '지각' : (isProdTeam ? '' : '휴일출근');
+		row.lateTxt = isLate ? '1' : '';
 
-		var otMins = parseHHmmToMinutes(row.otTm);
-		var ngtMins = parseHHmmToMinutes(row.nghtTm);
-		var totalOtMins = otMins + ngtMins;
-		var hasNight = (ngtMins > 0);
-
-		if (hasNight) {
+		var isEarlyLeave = (isProdWorker && outTimeNorm && !isNextDayOut && outTimeNorm < '17:30' && halfType !== 'PM');
+		if (isEarlyLeave) {
+			row.outJdgNm = '조퇴';
+			row.earlyLeaveTxt = '1';
+		} else if (hasNight) {
 			row.outJdgNm = '휴일연장/야간근무';
+			row.earlyLeaveTxt = '';
 		} else if (totalOtMins >= 30) {
 			row.outJdgNm = '휴일연장';
+			row.earlyLeaveTxt = '';
 		} else {
 			row.outJdgNm = '휴일퇴근';
+			row.earlyLeaveTxt = '';
 		}
-		row.earlyLeaveTxt = '';
 	} else if (isVacation) {
 		// 근무형태가 휴가인 행: 휴일과 마찬가지로 출/퇴근 판정 '휴가' 처리 및 지각/조퇴 비움
 		row.inJdgNm = '휴가';
@@ -201,47 +229,35 @@ function applyAttendanceJudgment(row) {
 		row.lateTxt = '';
 		row.earlyLeaveTxt = '';
 	} else if (isHoliday) {
-		// 순수 휴일인 행: 출퇴근 기록이 있으면 휴일출근/휴일퇴근 판정, 없으면 '휴일' / '휴일' (생산팀이면 휴일출근 미표시)
+		// 순수 휴일인 행: 출퇴근 기록이 있으면 휴일출근/휴일퇴근 판정, 없으면 '휴일' / '휴일'
 		if (!effectiveInStr && !effectiveOutStr) {
 			row.inJdgNm = '휴일';
 			row.outJdgNm = '휴일';
 			row.lateTxt = '';
 			row.earlyLeaveTxt = '';
 		} else {
-			row.inJdgNm = isProdTeam ? '' : '휴일출근';
-			row.lateTxt = '';
+			// 생산직(=시급직)의 경우 휴일 출근 시 지각/조퇴 판정은 평일 기준(08:30 이후 지각, 17:30 이전 조퇴) 적용
+			var isLate = (isProdWorker && inTimeNorm && inTimeNorm > '08:30');
+			row.inJdgNm = isLate ? '지각' : (isProdTeam ? '' : '휴일출근');
+			row.lateTxt = isLate ? '1' : '';
 
-			var otMins = parseHHmmToMinutes(row.otTm);
-			var ngtMins = parseHHmmToMinutes(row.nghtTm);
-			var totalOtMins = otMins + ngtMins;
-			var hasNight = (ngtMins > 0);
-
-			if (hasNight) {
+			var isEarlyLeave = (isProdWorker && outTimeNorm && !isNextDayOut && outTimeNorm < '17:30' && halfType !== 'PM');
+			if (isEarlyLeave) {
+				row.outJdgNm = '조퇴';
+				row.earlyLeaveTxt = '1';
+			} else if (hasNight) {
 				row.outJdgNm = '휴일연장/야간근무';
+				row.earlyLeaveTxt = '';
 			} else if (totalOtMins >= 30) {
 				row.outJdgNm = '휴일연장';
+				row.earlyLeaveTxt = '';
 			} else {
 				row.outJdgNm = '휴일퇴근';
+				row.earlyLeaveTxt = '';
 			}
-			row.earlyLeaveTxt = '';
 		}
 	} else {
 		// 평일 출근/퇴근 판정 (수정출근/퇴근일시 최우선, 반차 정상판정 적용)
-		var inTimeNorm = effectiveInStr ? normalizeHHmm(effectiveInStr) : '';
-		var outTimeNorm = effectiveOutStr ? normalizeHHmm(effectiveOutStr) : '';
-		var halfType = getHalfVacationType(row);
-
-		// 익일 퇴근(outDt > workDt) 여부 정밀 확인 — 24시 넘겨 익일 새벽 퇴근한 건이 00:44 < 17:30 에 걸려 조퇴로 잘못 판정되는 것을 차단한다.
-		var isNextDayOut = false;
-		var wd = row.workDt ? String(row.workDt).replace(/[^0-9]/g, '') : '';
-		var dtFormatted = (wd.length === 8) ? (wd.substr(0,4)+'-'+wd.substr(4,2)+'-'+wd.substr(6,2)) : '';
-		if (effectiveOutStr && dtFormatted && effectiveOutStr.indexOf('-') !== -1) {
-			var outDtPart = effectiveOutStr.split(' ')[0];
-			if (outDtPart > dtFormatted) {
-				isNextDayOut = true;
-			}
-		}
-
 		if (!inTimeNorm) {
 			row.inJdgNm = '';
 			row.lateTxt = '';
@@ -258,11 +274,6 @@ function applyAttendanceJudgment(row) {
 			row.outJdgNm = '';
 			row.earlyLeaveTxt = '';
 		} else {
-			var otMins = parseHHmmToMinutes(row.otTm);
-			var ngtMins = parseHHmmToMinutes(row.nghtTm);
-			var totalOtMins = otMins + ngtMins;
-			var hasNight = (ngtMins > 0);
-
 			// 익일 퇴근(isNextDayOut)이 아니며 당일 퇴근 시각이 17:30 미만일 때만 조퇴!
 			// 단, 오후 반차(PM)인 경우 정상퇴근 처리!
 			var isEarlyLeave = (!isNextDayOut && outTimeNorm < '17:30' && halfType !== 'PM');
