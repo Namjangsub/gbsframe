@@ -235,10 +235,8 @@ public class WB20SvcImpl implements WB20Svc {
 				}
 
 				// 위임 경로: WB20 재조회 후 응답계약 구성
-				Map<String, String> queryParam = new HashMap<>();
-				queryParam.put("todoNo", tempReqNo);
-				queryParam.put("coCd", coCd);
-				Map<String, String> todoYnResult = wb20Mapper.selectTodoFinalYn(queryParam);
+				// selectTodoFinalYn은 todoDiv2CodeId + todoNo를 요구하므로 기존 호출(아래 L392)처럼 요청 paramMap을 그대로 넘긴다.
+				Map<String, String> todoYnResult = wb20Mapper.selectTodoFinalYn(paramMap);
 				String todoYn = (todoYnResult != null) ? todoYnResult.get("todoYn") : "N";
 
 				Map<String, String> response = new HashMap<>();
