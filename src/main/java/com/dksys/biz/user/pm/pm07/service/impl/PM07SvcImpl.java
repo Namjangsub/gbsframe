@@ -98,6 +98,24 @@ public class PM07SvcImpl implements PM07Svc {
 		return pm07Mapper.selectVacationOverlapCheck(overlapQuery);
 	}
 
+	private static final String VAC_DT_ARR_EMPTY_MESSAGE = "휴가 일자 정보가 없어 저장할 수 없습니다. 화면을 새로고침한 뒤 다시 시도해 주세요.";
+
+	// 화면에서 영업일 계산 스크립트(workingDayCalc.js)가 로드되지 않으면 vacDtArr 가 빈 배열로 넘어온다.
+	// 그대로 저장하면 달력일수로 VAC_DAYS 가 과다 산정되고, 수정 시에는 기존 휴가일자(D01)가 삭제만 되고 재등록되지 않는다.
+	private boolean isVacDtArrEmpty(String vacDtArr) {
+		if (vacDtArr == null || vacDtArr.trim().isEmpty() || "[]".equals(vacDtArr.trim())) {
+			return true;
+		}
+		try {
+			Type vacDtType = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
+			List<Map<String, String>> vacDtList = new GsonBuilder().disableHtmlEscaping().create().fromJson(vacDtArr, vacDtType);
+			return vacDtList == null || vacDtList.isEmpty();
+		} catch (Exception e) {
+			// 형식 오류는 기존 흐름(저장 단계 파싱 예외 -> 트랜잭션 롤백)에 맡긴다
+			return false;
+		}
+	}
+
 	/**
 	 * DB 저장(등록/수정) 직전 백엔드에서 휴가일수(vacDays) 및 차감일수(deductDays)를 최종 재산정/평가한다.
 	 * 프론트엔드의 전달값에만 의존하지 않고 휴가구분(vacTypeCd) 및 일자 데이터(vacDtArr 또는 stDt~edDt)를 기준으로 백엔드 최종 검증을 수행한다.
@@ -291,6 +309,92 @@ public class PM07SvcImpl implements PM07Svc {
 		}
 	}
 
+	/**
+	 * 하계휴가(PM07TYPE09), 대체휴가(PM07TYPE11), 대체휴가반차(PM07TYPE12) 잔여 검증.
+	 * PM07AnnualCommon.js getUserVacationBalance/validateVacationBalance 와 동일 규칙(selectAnnualGrantList 기준, 기준연도는 휴가 시작일 stDt 연도).
+	 * 수정 시에는 기존 신청건이 이미 사용일수에 포함되어 있으므로 그 기여분을 잔여에 가산한다.
+	 * @return 검증 통과 시 null, 실패 시 오류 메시지
+	 */
+	private String validateSubstSummerVacationBalance(Map<String, String> paramMap, boolean isUpdate) {
+		String vacTypeCd = paramMap.get("vacTypeCd");
+		boolean isSummer = "PM07TYPE09".equals(vacTypeCd);
+		boolean isWorkSubst = "PM07TYPE11".equals(vacTypeCd) || "PM07TYPE12".equals(vacTypeCd);
+		if (!isSummer && !isWorkSubst) {
+			return null;
+		}
+
+		String reqId = paramMap.get("reqId");
+		String coCd = paramMap.get("coCd");
+		// 검증 기준연도: 휴가 시작일(stDt) 연도. stDt 가 없거나 8자리 미만이면 날짜 오류로 처리한다.
+		String stDtDigits = paramMap.get("stDt") == null ? "" : paramMap.get("stDt").replaceAll("[^0-9]", "");
+		if (stDtDigits.length() < 8) {
+			return "휴가 시작일이 올바르지 않습니다. 날짜를 확인해 주세요.";
+		}
+		String yy = stDtDigits.substring(0, 4);
+		double days = parseDoubleSafe(paramMap.get("deductDays"));
+
+		double balance = 0.0;
+		if (reqId != null && !reqId.isEmpty()) {
+			Map<String, String> balanceQuery = new HashMap<String, String>();
+			balanceQuery.put("coCd", (coCd == null || coCd.isEmpty()) ? "GUN" : coCd);
+			balanceQuery.put("yy", yy);
+			balanceQuery.put("userId", reqId);
+			balanceQuery.put("includeLeaveYn", "Y");
+			List<Map<String, String>> list = pm07Mapper.selectAnnualGrantList(balanceQuery);
+			if (list != null && !list.isEmpty() && list.get(0) != null) {
+				Map<String, ?> item = list.get(0);
+				if (isSummer) {
+					balance = parseDoubleSafe(item.get("summerVacDays")) - parseDoubleSafe(item.get("summerVacUsedDays"));
+				} else {
+					balance = parseDoubleSafe(item.get("workSubstDays")) - parseDoubleSafe(item.get("workSubstUsedDays"));
+				}
+			}
+
+			String reqNo = paramMap.get("reqNo");
+			if (isUpdate && reqNo != null && !reqNo.isEmpty()) {
+				Map<String, String> ownQuery = new HashMap<String, String>();
+				ownQuery.put("reqNo", reqNo);
+				ownQuery.put("userId", reqId);
+				ownQuery.put("yy", yy);
+				Map<String, Object> own = pm07Mapper.selectSubstSummerUsedDaysByReq(ownQuery);
+				if (own != null) {
+					balance += parseDoubleSafe(isSummer ? own.get("summerVacUsedDays") : own.get("workSubstUsedDays"));
+				}
+			}
+		}
+		balance = Math.round(balance * 10) / 10.0;
+
+		if (isSummer) {
+			if (balance <= 0 || balance < days) {
+				return "하계휴가 잔여일수가 부족합니다. (잔여: " + formatDays(balance) + "일, 신청: " + formatDays(days) + "일)";
+			}
+		} else {
+			double reqMin = "PM07TYPE12".equals(vacTypeCd) ? 0.5 : 1.0;
+			if (balance < reqMin || balance < days) {
+				return "대체휴가 잔여일수가 부족합니다. (잔여: " + formatDays(balance) + "일, 신청: " + formatDays(days) + "일)";
+			}
+		}
+		return null;
+	}
+
+	private double parseDoubleSafe(Object value) {
+		if (value == null) {
+			return 0.0;
+		}
+		if (value instanceof Number) {
+			return ((Number) value).doubleValue();
+		}
+		try {
+			return Double.parseDouble(String.valueOf(value).trim());
+		} catch (NumberFormatException e) {
+			return 0.0;
+		}
+	}
+
+	private String formatDays(double value) {
+		return String.format("%.1f", value);
+	}
+
 	@Override
 	@Transactional(rollbackFor = Exception.class)
 	public Map<String, String> insertVacation(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
@@ -310,6 +414,12 @@ public class PM07SvcImpl implements PM07Svc {
 			return result;
 		}
 
+		if (isVacDtArrEmpty(paramMap.get("vacDtArr"))) {
+			result.put("resultCode", "409");
+			result.put("resultMessage", VAC_DT_ARR_EMPTY_MESSAGE);
+			return result;
+		}
+
 		// 백엔드 DB 저장 직전에 차감일수 및 휴가일수 최종 평가/산정
 		evaluateVacationAndDeductDays(paramMap);
 
@@ -318,6 +428,13 @@ public class PM07SvcImpl implements PM07Svc {
 		if (awardBalanceError != null) {
 			result.put("resultCode", "409");
 			result.put("resultMessage", awardBalanceError);
+			return result;
+		}
+
+		String substSummerBalanceError = validateSubstSummerVacationBalance(paramMap, false);
+		if (substSummerBalanceError != null) {
+			result.put("resultCode", "409");
+			result.put("resultMessage", substSummerBalanceError);
 			return result;
 		}
 
@@ -530,6 +647,12 @@ public class PM07SvcImpl implements PM07Svc {
 			return result;
 		}
 
+		if (isVacDtArrEmpty(paramMap.get("vacDtArr"))) {
+			result.put("resultCode", "409");
+			result.put("resultMessage", VAC_DT_ARR_EMPTY_MESSAGE);
+			return result;
+		}
+
 		// 백엔드 DB 저장 직전에 차감일수 및 휴가일수 최종 평가/산정
 		evaluateVacationAndDeductDays(paramMap);
 
@@ -538,6 +661,13 @@ public class PM07SvcImpl implements PM07Svc {
 		if (awardBalanceError != null) {
 			result.put("resultCode", "409");
 			result.put("resultMessage", awardBalanceError);
+			return result;
+		}
+
+		String substSummerBalanceError = validateSubstSummerVacationBalance(paramMap, true);
+		if (substSummerBalanceError != null) {
+			result.put("resultCode", "409");
+			result.put("resultMessage", substSummerBalanceError);
 			return result;
 		}
 

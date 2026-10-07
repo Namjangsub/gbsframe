@@ -91,6 +91,8 @@ public interface PM07Mapper {
 
 	Map<String, Object> selectAwardVacationBalanceCheck(Map<String, String> paramMap);
 
+	Map<String, Object> selectSubstSummerUsedDaysByReq(Map<String, String> paramMap);
+
 	List<Map<String, String>> selectUserIdByEmpNo(Map<String, String> paramMap);
 
 	String selectAmDocIdByReqNo(Map<String, String> paramMap);

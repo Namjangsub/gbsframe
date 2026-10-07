@@ -1607,6 +1607,32 @@
 		  AND #{reqStDt} BETWEEN G.ST_DT AND G.ED_DT
 	</select>
 
+	<!-- 수정 시 잔여 이중차감 방지용: 기존 신청건(reqNo)이 selectAnnualGrantList(joinAnnualSubstAndUsage VS 집계)에 기여하는 대체/하계 사용일수 -->
+	<select id="selectSubstSummerUsedDaysByReq" parameterType="Map" resultType="CamelMap">
+		SELECT
+			NVL(SUM(CASE WHEN T.VAC_TYPE_CD IN ('PM07TYPE11','PM07TYPE12') THEN T.DEDUCT_DAYS ELSE 0 END), 0) AS WORK_SUBST_USED_DAYS,
+			NVL(SUM(CASE WHEN T.VAC_TYPE_CD = 'PM07TYPE09' AND T.IS_SUMMER = 1 THEN T.DEDUCT_DAYS ELSE 0 END), 0) AS SUMMER_VAC_USED_DAYS
+		FROM (
+			SELECT
+				V.VAC_TYPE_CD,
+				V.DEDUCT_DAYS,
+				CASE
+					WHEN V.VAC_TYPE_CD = 'PM07TYPE09' AND SV_M4.USER_ID IS NOT NULL THEN 1
+					ELSE 0
+				END AS IS_SUMMER
+			FROM TB_PM07M01 V
+			LEFT JOIN TB_PM07M04 SV_M4 ON SV_M4.USER_ID = V.REQ_ID
+			                           AND SV_M4.AWARD_TYPE_CD = 'PM07M04TYPE51'
+			                           AND SV_M4.GRANT_YY = #{yy, jdbcType=VARCHAR}
+			                           AND REPLACE(V.ST_DT, '-', '') BETWEEN REPLACE(SV_M4.ST_DT, '-', '') AND REPLACE(SV_M4.ED_DT, '-', '')
+			WHERE V.REQ_NO = #{reqNo, jdbcType=VARCHAR}
+			  AND V.REQ_ID = #{userId, jdbcType=VARCHAR}
+			  AND (V.SANCTN_STS IS NULL OR V.SANCTN_STS != 'RTN')
+			  AND V.ST_DT &gt;= #{yy, jdbcType=VARCHAR} || '0101'
+			  AND V.ST_DT &lt;= #{yy, jdbcType=VARCHAR} || '1231'
+		) T
+	</select>
+
 	<select id="selectUserIdByEmpNo" parameterType="Map" resultType="CamelMap">
 		SELECT
 			ID AS USER_ID,

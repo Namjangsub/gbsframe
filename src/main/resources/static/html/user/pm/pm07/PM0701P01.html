@@ -133,6 +133,7 @@
 </div>
 
 <script src="/static/js/common/PM07AnnualCommon.js"></script>
+<script src="/static/js/vacationRules.js"></script>
 <script type="text/javascript">
 
 	// fileTree.js의 selectedNodeId ReferenceError 방어
@@ -175,8 +176,28 @@
 	var __pm07AttendanceCloseYmLoaded = false;
 
 
+	var __pm07BalanceReqYy = null;
+	var __pm07BalanceReqBaseDt = '';
+	var __pm07BalanceReqSeq = 0;
+	// 수정 모드 기존 저장값 (잔여 검증 시 이번 건 기존 사용분 가산용, 신규는 null)
+	var __pm07EditOrigin = null;
+
+	// 시작일(#stDt) 연도. 숫자 8자리 미만이면 '' (서버 validateSubstSummerVacationBalance 기준연도와 동일)
+	function getStDtBalanceYy() {
+		var digits = String($('#stDt').val() || '').replace(/[^0-9]/g, '');
+		return digits.length >= 8 ? digits.substring(0, 4) : '';
+	}
+
+	// 시작일 연도가 현재연도보다 클 때만 시작일(YYYY-MM-DD)을 연차 발생 기준일로 사용, 그 외는 '' (오늘 기준 유지)
+	function getStDtBalanceBaseDate(curYear) {
+		var stYy = getStDtBalanceYy();
+		if (!stYy || Number(stYy) <= Number(curYear)) return '';
+		var digits = String($('#stDt').val() || '').replace(/[^0-9]/g, '');
+		return digits.substring(0, 4) + '-' + digits.substring(4, 6) + '-' + digits.substring(6, 8);
+	}
+
 	// 사원별 휴가 잔여현황 조회 및 휴가유형(vacTypeCd) 옵션 동적 제어 (공통 모듈 위임)
-	// 조회 시점 기준(현재 일자/연도)의 가용 가능 잔여일을 조회하여 옵션에 표출
+	// 기준연도는 시작일(#stDt) 연도, 시작일이 없거나 올바르지 않으면 표시용으로 현재연도 조회
 	function refreshUserVacationBalance(savedTypeCd) {
 		var reqId = $('#popForm').find('#reqId').val() || jwt.userId;
 		var curToday = (window.moment ? moment() : new Date());
@@ -188,13 +209,20 @@
 		}
 
 		var curSaved = savedTypeCd || $('#vacTypeCd').val() || "";
+		var balYy = getStDtBalanceYy() || curYear;
+		var balBaseDt = getStDtBalanceBaseDate(curYear);
+		var reqSeq = ++__pm07BalanceReqSeq;
+		__pm07BalanceReqYy = balYy;
+		__pm07BalanceReqBaseDt = balBaseDt;
 
 		window.PM07Annual.getUserVacationBalance({
 			coCd: coCdVal,
 			userId: reqId,
-			yy: curYear,
-			baseDate: curToday
+			yy: balYy,
+			baseDate: balBaseDt ? moment(balBaseDt, 'YYYY-MM-DD') : curToday
 		}, function(balInfo) {
+			// 늦게 도착한 이전 연도 응답이 최신 결과를 덮어쓰지 않도록 한다
+			if (reqSeq !== __pm07BalanceReqSeq) return;
 			userVacationBalance = balInfo;
 			if (typeof window.PM07Annual.applyVacationTypeOptions === "function") {
 				window.PM07Annual.applyVacationTypeOptions($('#vacTypeCd'), userVacationBalance, curSaved);
@@ -202,16 +230,16 @@
 		});
 	}
 
-	// 유형 판정 함수 (코드명 기반 — 코드값 확정 시 교체)
-	var editInitialSnapshot = null;
-
-	// 반차 유형 판정 함수(코드값 + 코드명 확인)
-	// 코드값 이외에 코드명에 "반차"가 포함된 경우
-	function isHalfDayType(codeNm) {
-		var code = $('#vacTypeCd').val() || '';
-		return code === 'PM07TYPE02' || code === 'PM07TYPE08' || code === 'PM07TYPE12'
-			|| (!!codeNm && codeNm.indexOf("반차") >= 0);
+	// 시작일 연도(또는 내년 이후 연도의 기준일)가 마지막 조회값과 다를 때만 잔여 재조회 (같으면 AJAX 생략)
+	function refreshUserVacationBalanceIfYearChanged() {
+		var stYy = getStDtBalanceYy();
+		var curYear = (window.moment ? moment().format("YYYY") : String(new Date().getFullYear()));
+		if (!stYy || (stYy === __pm07BalanceReqYy && getStDtBalanceBaseDate(curYear) === __pm07BalanceReqBaseDt)) return;
+		refreshUserVacationBalance($('#vacTypeCd').val());
 	}
+
+	// 유형 판정 함수는 /static/js/vacationRules.js 공용 함수 사용
+	var editInitialSnapshot = null;
 
 	function getVacationEditSnapshot() {
 		var values = {};
@@ -239,84 +267,50 @@
 		return JSON.stringify(values);
 	}
 
-	function isTimeType(codeNm) {
-		var code = $('#vacTypeCd').val() || '';
-		if (code === 'PM07TYPE14') return true;
-		if (!codeNm) return false;
-		return codeNm.indexOf("조퇴") >= 0 || codeNm.indexOf("외출") >= 0 || codeNm.indexOf("지각") >= 0;
-	}
-
-	// 연차, 교육훈련, 경조휴가, 포상휴가, 하계휴가, 대체휴가, 병가만 From-Till 기간선택 가능 판정
-	function isMultiDayType(codeNm) {
-		if (!codeNm) return true;
-		var code = $('#vacTypeCd').val() || '';
-		if (code === 'PM07TYPE14') return false;
-		var nm = $.trim(codeNm);
-		if (nm.indexOf("반차") >= 0 || nm.indexOf("조퇴") >= 0 || nm.indexOf("외출") >= 0 || nm.indexOf("지각") >= 0) {
-			return false;
-		}
-		return nm.indexOf("연차") >= 0
-			|| nm.indexOf("교육") >= 0
-			|| nm.indexOf("훈련") >= 0
-			|| nm.indexOf("경조") >= 0
-			|| nm.indexOf("포상") >= 0
-			|| nm.indexOf("하계") >= 0
-			|| nm.indexOf("대체") >= 0
-			|| nm.indexOf("병가") >= 0;
-	}
-
-	// 연차, 반차, 조퇴, 외출, 하계휴가(대체), 병가, 지각은 사유 필수입력 제외 판정
-	function isRmkOptional(codeNm) {
-		if (!codeNm) return false;
-		var code = $('#vacTypeCd').val() || '';
-		if (code === 'PM07TYPE14') return true;
-		var nm = codeNm.trim();
-		return nm.indexOf("연차") >= 0
-			|| nm.indexOf("반차") >= 0
-			|| nm.indexOf("조퇴") >= 0
-			|| nm.indexOf("외출") >= 0
-			|| nm.indexOf("하계") >= 0
-			|| nm.indexOf("대체") >= 0
-			|| nm.indexOf("병가") >= 0
-			|| nm.indexOf("지각") >= 0;
-	}
-
 	// 구분(오전/오후) 선택 변경 이벤트
 	function onAmPmChanged() {
 		onDateChanged();
 	}
 
-	// 시작일자 수동/피커 변경 시 양방향 동일일자 동기화 (단일일 유형)
+	// 시작일자 수동/피커 변경 시 양방향 동일일자 동기화 (단일일 유형), 기간 유형은 역전 시 종료일자 보정
+	// .val() 대입은 onchange 를 발생시키지 않으므로 onEdDtChanged 와 상호 재귀하지 않는다.
 		function onStDtChanged() {
 		// 근태마감 1차 경고
 		checkAttendanceClosedWarning('stDt');
-		
+
 		var selectedOption = $('#vacTypeCd').find('option:selected');
 		var selectedNm = selectedOption.text() || '';
-		if (!isMultiDayType(selectedNm)) {
-			var stVal = $('#stDt').val();
+		var stVal = $('#stDt').val();
+		var edVal = $('#edDt').val();
+		if (!isMultiDayVacationType($('#vacTypeCd').val(), selectedNm)) {
 			if (stVal) {
 				$('#edDt').val(stVal);
 			}
+		} else if (stVal && edVal && stVal.length === 10 && edVal.length === 10 && stVal > edVal) {
+			$('#edDt').val(stVal);
 		}
 		onDateChanged();
-		refreshUserVacationBalance($('#vacTypeCd').val());
+		refreshUserVacationBalanceIfYearChanged();
 	}
 
-	// 종료일자 수동/피커 변경 시 양방향 동일일자 동기화 (단일일 유형)
+	// 종료일자 수동/피커 변경 시 양방향 동일일자 동기화 (단일일 유형), 기간 유형은 역전 시 시작일자 보정
 		function onEdDtChanged() {
 		// 근태마감 1차 경고
 		checkAttendanceClosedWarning('edDt');
-		
+
 		var selectedOption = $('#vacTypeCd').find('option:selected');
 		var selectedNm = selectedOption.text() || '';
-		if (!isMultiDayType(selectedNm)) {
-			var edVal = $('#edDt').val();
+		var stVal = $('#stDt').val();
+		var edVal = $('#edDt').val();
+		if (!isMultiDayVacationType($('#vacTypeCd').val(), selectedNm)) {
 			if (edVal) {
 				$('#stDt').val(edVal);
 			}
+		} else if (stVal && edVal && stVal.length === 10 && edVal.length === 10 && edVal < stVal) {
+			$('#stDt').val(edVal);
 		}
 		onDateChanged();
+		refreshUserVacationBalanceIfYearChanged();
 	}
 
 	// 휴가유형 변경 이벤트
@@ -333,7 +327,7 @@
 		// 잔여일수 검증: 하계휴가, 포상휴가, 포상휴가반차, 대체휴가, 대체휴가반차
 		if (selectedCd && window.PM07Annual && typeof window.PM07Annual.validateVacationBalance === "function" && userVacationBalance) {
 			var deductDays = Number($('#deductDays').val() || 0);
-			var chk = window.PM07Annual.validateVacationBalance(selectedCd, deductDays, userVacationBalance);
+			var chk = window.PM07Annual.validateVacationBalance(selectedCd, deductDays, userVacationBalance, __pm07EditOrigin);
 			if (!chk.isValid) {
 				alert(chk.message);
 				$('#vacTypeCd').val('');
@@ -347,7 +341,7 @@
 		var selectedNm = selectedOption.text();
 
 		// 사유 필수 여부 제어 (연차, 반차, 조퇴, 외출, 하계, 대체, 병가는 필수입력 아님)
-		if (isRmkOptional(selectedNm)) {
+		if (isVacationRmkOptional(selectedCd, selectedNm)) {
 			$('#reqRmkTh').removeClass("hit");
 			$('#reqRmk').attr("placeholder", "");
 		} else {
@@ -356,7 +350,7 @@
 		}
 
 		// 반차류(반차, 포상휴가반차, 대체휴가반차)
-		if (isHalfDayType(selectedNm)) {
+		if (isHalfDayVacationType(selectedCd, selectedNm)) {
 			$('#ampmCd').prop("disabled", false).css("background", "#ffffff !important");
 			$('#ampmTh').addClass("hit");  // 구분(오전/오후) 열리면 필수 표시
 		}
@@ -367,7 +361,7 @@
 		}
 
 		// 기간선택 불가 단일일 전용 유형(반차, 조퇴, 외출 등) 선택 시 종료일자를 시작일자와 동일하게 자동 설정
-		if (!isMultiDayType(selectedNm)) {
+		if (!isMultiDayVacationType(selectedCd, selectedNm)) {
 			var stVal = $('#stDt').val();
 			if (stVal) {
 				$('#edDt').val(stVal);
@@ -378,7 +372,7 @@
 	}
 
 	// 겹침 여부 서버 조회. 반환값 true = 겹침 없음(정상), false = 겹침 있음(경고 표시됨).
-	// 신청자는 로그인 사용자 본인(jwt.userId) 기준 — PM07 화면에는 별도 신청자ID 필드가 없다(kakaoTodo() 주석 참고).
+	// 신청자는 #reqId(휴가신청자) 기준, 없으면 로그인 사용자 본인(jwt.userId).
 	function checkVacationOverlap(showAlert) {
 		var stDtVal = $('#stDt').val();
 		var edDtVal = $('#edDt').val();
@@ -575,24 +569,10 @@
 			vacDays = edDate.diff(stDate, 'days') + 1;
 		}
 
-		// 최종 차감일수 평가는 백엔드 DB 저장하기전에 재평가하여 산정함.
-		// 휴가코드 05.교육/훈련 13.병가는 휴가일수 차감 대상 아님
-		// 반차/포상휴가반차/대체휴가반차는 0.5
-		// 그외 휴가는 휴가일수
+		// 차감일수는 표시 전용. 최종 차감일수는 백엔드(evaluateVacationAndDeductDays)가 저장 직전에 재산정함.
 		var selectedOption = $('#vacTypeCd').find('option:selected');
 		var selectedNm = selectedOption.text();
-		var deductDays = 0;
-
-		var isNonDeduct = selectedNm.indexOf("교육") >= 0 || selectedNm.indexOf("훈련") >= 0 || selectedNm.indexOf("병가") >= 0
-				|| selectedNm.indexOf("조퇴") >= 0 || selectedNm.indexOf("외출") >= 0 || selectedNm.indexOf("재택") >= 0 || selectedNm.indexOf("지각") >= 0;
-
-		if (isHalfDayType(selectedNm)) {
-			deductDays = 0.5;
-		} else if (isNonDeduct) {
-			deductDays = 0;
-		} else {
-			deductDays = vacDays;
-		}
+		var deductDays = getVacationDeductDaysForDisplay(vacTypeCd, selectedNm, vacDays);
 
 		$('#vacDays').val(vacDays.toFixed(1));
 		$('#deductDays').val(deductDays.toFixed(1));
@@ -821,19 +801,6 @@
 		});
 	}
 
-	// SPECRTS17(근태결재라인) 등록 사번 집합 조회 (소문자 키) - 결재선 자동구성/저장시 강제삽입/선택삭제 제한에서 공용으로 사용
-	function getSpecrts17IdSet() {
-		var ids = {};
-		postAjaxSync("/admin/cm/cm05/selectChildCodeList", { "codeId": "SPECRTS17" }, null, function(data) {
-			var codeEtc = (data && data.childCodeList && data.childCodeList[0]) ? (data.childCodeList[0].codeEtc || '') : '';
-			$.each(codeEtc.split(','), function(idx, rawId) {
-				var uId = $.trim(rawId);
-				if (uId) ids[uId.toLowerCase()] = true;
-			});
-		});
-		return ids;
-	}
-
 	// 기본 결재라인 자동 구성 : 담당자 -> 담당자팀장 -> 휴가관리 결재라인(공통코드 SPECRTS17)
 	function setDefaultApprovalLine() {
 		var reqId = $('#popForm').find('#reqId').val() || jwt.userId;
@@ -943,7 +910,7 @@
 				if (!uId) return true;
 				postAjaxSync("/admin/cm/cm06/selectUserInfo", { "userId": uId }, null, function(userData) {
 					if (userData && userData.userInfo) {
-						var lType = (String(uId).toLowerCase() === 'cyh') ? "COOP" : "APPR";
+						var lType = getVacationSpecrtsLineType(uId);
 						var lTypeNm = (lType === "COOP") ? "협조" : "결재";
 						pushApprover(userData.userInfo, lType, lTypeNm);
 					}
@@ -1043,9 +1010,8 @@
 			postAjaxSync("/admin/cm/cm06/selectUserInfo", { "userId": uid }, null, function(data) {
 				if (data && data.userInfo) {
 					// SPECRTS17 결재자 자동 보충 시에만 cyh이면 협조(COOP)
-					var isSpecrtsCyh = (specrtsIdList.indexOf(uid) > -1 && String(uid).toLowerCase() === 'cyh');
-					var lType = isSpecrtsCyh ? "COOP" : "APPR";
-					var lTypeNm = isSpecrtsCyh ? "협조" : "결재";
+					var lType = (specrtsIdList.indexOf(uid) > -1) ? getVacationSpecrtsLineType(uid) : "APPR";
+					var lTypeNm = (lType === "COOP") ? "협조" : "결재";
 					newRows.push(buildRow(data.userInfo, lType, lTypeNm));
 				}
 			});
@@ -1262,7 +1228,7 @@
 			return false;
 		}
 		var selectedOption = $('#vacTypeCd').find('option:selected');
-		if (isHalfDayType(selectedOption.text()) && !$('#ampmCd').val()) {
+		if (isHalfDayVacationType($('#vacTypeCd').val(), selectedOption.text()) && !$('#ampmCd').val()) {
 			alert("구분(오전/오후)을 선택하세요.");
 			$('#ampmCd').focus();
 			return false;
@@ -1272,13 +1238,28 @@
 			$('#stDt').focus();
 			return false;
 		}
+		// 하계/대체휴가 잔여 검증 기준연도 = 시작일 연도 (서버 validateSubstSummerVacationBalance 와 동일)
+		var balTypeCd = $('#vacTypeCd').val();
+		if (balTypeCd === 'PM07TYPE09' || balTypeCd === 'PM07TYPE11' || balTypeCd === 'PM07TYPE12') {
+			var stBalYy = getStDtBalanceYy();
+			if (!stBalYy) {
+				alert("휴가 시작일이 올바르지 않습니다. 날짜를 확인해 주세요.");
+				$('#stDt').focus();
+				return false;
+			}
+			if (userVacationBalance && String(userVacationBalance.yy) !== stBalYy) {
+				refreshUserVacationBalance(balTypeCd);
+				alert("시작일 연도의 휴가 잔여일수를 조회 중입니다. 잠시 후 다시 저장해 주세요.");
+				return false;
+			}
+		}
 		if (!$('#edDt').val()) {
 			alert("종료일자를 입력하세요.");
 			$('#edDt').focus();
 			return false;
 		}
 		var selectedNm = selectedOption.text();
-		if (!isRmkOptional(selectedNm) && !$('#reqRmk').val()) {
+		if (!isVacationRmkOptional($('#vacTypeCd').val(), selectedNm) && !$('#reqRmk').val()) {
 			alert("사유를 입력하세요.");
 			$('#reqRmk').focus();
 			return false;
@@ -1319,7 +1300,7 @@
 		var vacTypeCd = $('#vacTypeCd').val();
 		var deductDays = Number($('#deductDays').val() || 0);
 		if (vacTypeCd && window.PM07Annual && typeof window.PM07Annual.validateVacationBalance === "function" && userVacationBalance) {
-			var chk = window.PM07Annual.validateVacationBalance(vacTypeCd, deductDays, userVacationBalance);
+			var chk = window.PM07Annual.validateVacationBalance(vacTypeCd, deductDays, userVacationBalance, __pm07EditOrigin);
 			if (!chk.isValid) {
 				alert(chk.message);
 				$('#vacTypeCd').focus();
@@ -1399,91 +1380,6 @@
 		return approvalArr;
 	}
 
-	// 알림톡 발송 (설계서 §6 — PM5001P01.html에서 이식)
-	var kakaoErr = [];
-	var kakaoCnt = 0;
-	var teleNo = "";
-
-	function kakaoTodo() {
-		// 결재요청 알림톡은 AM(서버 approveDocument→APPROVE_NEXT)이 순차 발송하므로 프론트에서 발송하지 않는다.
-		// (PM07은 공유 발송 없음)
-	}
-
-	// to-do결재요청 알림톡
-	function commKaKaoSendTodo(param) {
-		// PM07 결재요청은 AM 서버 큐에서만 발송한다. 프론트 직접 발송 및 KKO READY 이력 생성을 차단한다.
-		return;
-		var maxMessageId = null;
-		var talkMessage = null;
-		var mobile = null;
-		var todoDiv2CodeNm = null;
-		var sendList = [];
-		let talkParam = {};
-		let talkBody = {};
-		let sendCnt = 0;
-		postAjaxSync("/user/bm/bm18/selectMaxMessageIdTodo", param, null, function(data) {
-			if(data.resultList.length > 0 ) {
-				if( data.resultList[0].maxMessageId != "" ) {
-					sendList = data.resultList;
-				} else {
-					alert("알림톡 발송을 위한 messageId 생성에 실패 했습니다.");
-					return;
-				}
-			}
-		});
-
-		$.each(sendList, function (key, sendObj) {
-			maxMessageId = sendObj.maxMessageId;
-			talkMessage = sendObj.messageDesc;
-			mobile =  sendObj.telNo;
-			param.rcvId = sendObj.todoId;
-			param.rcvNm = sendObj.name;
-			param.nameTo = sendObj.name;
-			todoDiv2CodeNm = sendObj.todoTitl;
-			param.todoDiv2CodeNm = todoDiv2CodeNm;
-			param.sendDt = sendObj.sendDt;
-
-			if(mobile == "" || mobile == null) {
-				alert('수신전화번호가 없습니다.');
-				return;
-			}
-			if(talkMessage == "" || talkMessage == null) {
-				alert('발송할 내용이 없습니다.');
-				return;
-			}
-
-			let message = talkMessage;
-			let splitStr = Array.from(message.matchAll('\\{(.*?)\\}'), match => `${match[0]}`);
-			$.each(splitStr, function (key, val) {
-				let compKey = val.substring(1, val.length-1);
-				if( compKey != "" && compKey != "undefined" ) {
-					if( typeof(param[compKey]) != "undefined" ) {
-						let val2 = '#'+val;
-						message = message.replaceAll(val2, param[compKey]);
-					}
-				}
-			});
-
-			talkParam.authToken = "e/eDfZOFCsrBqadaECQ0+g==";
-			talkParam.serverName = "gyitt2400";
-			talkParam.paymentType = "P";
-			talkBody.service = "2310086157";
-			talkBody.messageId = maxMessageId;
-			talkBody.title = param.title;
-			talkBody.message = message;
-			talkBody.mobile = mobile;
-			talkBody.template = "10003";
-			let talkJson = JSON.stringify(talkBody);
-			if (typeof jwt !== 'undefined' && jwt.kakaoSend) {
-				sendCnt = kakaoSendReal(talkJson, talkParam, param);
-			}
-		});
-
-		if( sendCnt > 0 ) {
-			kakaoCnt++;
-		}
-	}
-
 	// 저장
 	function saveVacation() {
 		if ($('#actionType').val() === 'U' && editInitialSnapshot !== null
@@ -1508,7 +1404,7 @@
 		// 휴가일자 목록 생성 (주말·공휴일 제외)
 		var selectedOption = $('#vacTypeCd').find('option:selected');
 		var selectedNm = selectedOption.text();
-		var workHour = isHalfDayType(selectedNm) ? 4 : 8;  // 반차류 4, 그 외 8
+		var workHour = isHalfDayVacationType($('#vacTypeCd').val(), selectedNm) ? 4 : 8;  // 반차류 4, 그 외 8
 		var vacDtArr = [];
 		if (typeof listWorkingDays === 'function') {
 			var dayList = listWorkingDays(stDtVal, edDtVal);  // YYYY-MM-DD 형식
@@ -1524,16 +1420,8 @@
 		formData.append("reqTitl", $('#reqTitl').val());
 		formData.append("reqId", $('#popForm').find('#reqId').val() || jwt.userId);
 		formData.append("reqDeptId", $('#popForm').find('#reqDeptId').val() || jwt.deptId);
-		var rawVacTypeNm = $('#vacTypeCd option:selected').text() || '';
-		var cleanVacNm = $.trim(rawVacTypeNm.replace(/\s*\(.*$/, ''));
 		var ampmVal = $('#ampmCd').val();
-		var ampmText = $('#ampmCd option:selected').text();
-		var isHalf = (cleanVacNm.indexOf('반차') !== -1)
-			|| ($('#vacTypeCd').val() === 'PM07TYPE02' || $('#vacTypeCd').val() === 'PM07TYPE08' || $('#vacTypeCd').val() === 'PM07TYPE12');
-		if (isHalf && ampmVal && ampmText && ampmText !== '선택하세요') {
-			var ampmLabel = (ampmText.indexOf('오전') !== -1 || ampmVal === 'PM07AMPM01' || ampmVal === 'AM') ? '오전' : '오후';
-			cleanVacNm += ' (' + ampmLabel + ')';
-		}
+		var cleanVacNm = buildVacationTypeNm($('#vacTypeCd').val(), $('#vacTypeCd option:selected').text(), ampmVal, $('#ampmCd option:selected').text());
 		formData.append("vacTypeCd", $('#vacTypeCd').val());
 		formData.append("vacTypeNm", cleanVacNm);
 		formData.append("ampmCd", $('#ampmCd').val());
@@ -1741,6 +1629,13 @@
 				return;
 			}
 
+			__pm07EditOrigin = {
+				reqId      : dtlData.reqId || '',
+				vacTypeCd  : dtlData.vacTypeCd || '',
+				stDt       : dtlData.stDt || '',
+				deductDays : dtlData.deductDays
+			};
+
 			$('#coCd').val(dtlData.coCd || coCdVal);
 			$('#reqNo').val(dtlData.reqNo || reqNoVal);
 			$('#popForm #fileTrgtKey').val(dtlData.reqNo || reqNoVal);
@@ -1858,7 +1753,7 @@
 			var clickedId = $(this).attr('id'); // 'stDt' 또는 'edDt'
 			var selectedOption = $('#vacTypeCd').find('option:selected');
 			var selectedNm = selectedOption.text() || '';
-			var isMulti = isMultiDayType(selectedNm);
+			var isMulti = isMultiDayVacationType($('#vacTypeCd').val(), selectedNm);
 
 			DateRangePicker.open({
 				startDt: $('#stDt').val() || null,
@@ -1868,7 +1763,7 @@
 				onApply: function(sd, ed){
 					var selectedOption = $('#vacTypeCd').find('option:selected');
 					var selectedNm = selectedOption.text() || '';
-					if (isMultiDayType(selectedNm)) {
+					if (isMultiDayVacationType($('#vacTypeCd').val(), selectedNm)) {
 						// 허용된 7가지 유형(연차, 교육, 훈련, 경조, 포상, 하계, 대체, 병가)은 From-Till 기간선택 적용
 						$('#stDt').val(sd || '');
 						$('#edDt').val(ed || sd || '');
@@ -1883,7 +1778,7 @@
 					// 날짜 선택 직후 근태마감 경고 알림 점검 (저장 버튼 클릭 이전에 점검)
 					checkAttendanceClosedWarning();
 					onDateChanged();
-					refreshUserVacationBalance($('#vacTypeCd').val());
+					refreshUserVacationBalanceIfYearChanged();
 				}
 			});
 		});

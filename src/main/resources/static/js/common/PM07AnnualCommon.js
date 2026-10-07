@@ -408,14 +408,56 @@
 		}
 	};
 
+	// 하계(09) / 대체(11,12) 잔여 버킷 구분. 그 외 유형은 ''
+	function getSubstSummerBucket(vacTypeCd) {
+		if (vacTypeCd === 'PM07TYPE09') return 'SUMMER';
+		if (vacTypeCd === 'PM07TYPE11' || vacTypeCd === 'PM07TYPE12') return 'WORKSUBST';
+		return '';
+	}
+
+	// 수정 저장 시 이번 건이 balanceInfo 사용일수에 이미 기여한 일수 (서버 selectSubstSummerUsedDaysByReq 와 동일 조건).
+	// 신청자·기준연도(시작일 연도)·버킷이 모두 같을 때만 가산하고, 하계는 기존 시작일이 하계 지급기간 안일 때만 집계되므로 그 경우만 가산한다.
+	// RTN 여부는 화면에서 저장값을 알 수 없어 따지지 않고, 버킷 사용일수를 넘지 않게 제한한다 (서버가 최종 검증).
+	function getEditOwnUsedDays(vacTypeCd, balanceInfo, editOrigin) {
+		if (!editOrigin || !balanceInfo) return 0;
+		var bucket = getSubstSummerBucket(vacTypeCd);
+		if (!bucket || bucket !== getSubstSummerBucket(editOrigin.vacTypeCd)) return 0;
+		if (!editOrigin.reqId || String(editOrigin.reqId) !== String(balanceInfo.userId || '')) return 0;
+		var origStDigits = String(editOrigin.stDt || '').replace(/[^0-9]/g, '');
+		if (origStDigits.length < 8 || origStDigits.substring(0, 4) !== String(balanceInfo.yy)) return 0;
+
+		var bucketUsed;
+		if (bucket === 'SUMMER') {
+			var inSummerPeriod = false;
+			var re = /(\d{4})-(\d{2})-(\d{2})~(\d{4})-(\d{2})-(\d{2})/g;
+			var m;
+			var origSt = origStDigits.substring(0, 8);
+			while ((m = re.exec(String(balanceInfo.summerVacGenInfoList || ''))) !== null) {
+				if (origSt >= (m[1] + m[2] + m[3]) && origSt <= (m[4] + m[5] + m[6])) {
+					inSummerPeriod = true;
+					break;
+				}
+			}
+			if (!inSummerPeriod) return 0;
+			bucketUsed = Number(balanceInfo.summerVacUsedDays || 0);
+		} else {
+			bucketUsed = Number(balanceInfo.workSubstUsedDays || 0);
+		}
+
+		var origDays = Number(editOrigin.deductDays || 0);
+		if (!(origDays > 0) || !(bucketUsed > 0)) return 0;
+		return Math.min(origDays, bucketUsed);
+	}
+
 	/**
 	 * 휴가 신청 시 잔여일수 검증 헬퍼
 	 * @param {String} vacTypeCd   선택된 휴가코드
 	 * @param {Number} deductDays  차감일수
 	 * @param {Object} balanceInfo 잔여현황 객체
+	 * @param {Object} [editOrigin] 수정 시 기존 저장값 { reqId, vacTypeCd, stDt, deductDays } (신규/미전달 시 가산 없음)
 	 * @returns {Object} { isValid: boolean, message: string }
 	 */
-	PM07Annual.validateVacationBalance = function(vacTypeCd, deductDays, balanceInfo) {
+	PM07Annual.validateVacationBalance = function(vacTypeCd, deductDays, balanceInfo, editOrigin) {
 		if (!vacTypeCd || !balanceInfo) return { isValid: true, message: "" };
 
 		// 연차(PM07TYPE01), 반차(PM07TYPE02)는 휴가일수가 모자라도 항상 선택 및 등록 가능 (마이너스 연차 허용 정책)
@@ -424,8 +466,9 @@
 		}
 
 		var days = Number(deductDays || 0);
+		var ownAddBack = getEditOwnUsedDays(vacTypeCd, balanceInfo, editOrigin);
 		if (vacTypeCd === 'PM07TYPE09') { // 하계휴가
-			var svBal = Number(balanceInfo.summerVacBalanceDays || 0);
+			var svBal = Math.round((Number(balanceInfo.summerVacBalanceDays || 0) + ownAddBack) * 10) / 10;
 			if (svBal <= 0 || svBal < days) {
 				return {
 					isValid: false,
@@ -442,7 +485,7 @@
 				};
 			}
 		} else if (vacTypeCd === 'PM07TYPE11' || vacTypeCd === 'PM07TYPE12') { // 대체휴가, 대체휴가반차
-			var wsBal = Number(balanceInfo.workSubstBalanceDays || 0);
+			var wsBal = Math.round((Number(balanceInfo.workSubstBalanceDays || 0) + ownAddBack) * 10) / 10;
 			var reqMin = (vacTypeCd === 'PM07TYPE12') ? 0.5 : 1.0;
 			if (wsBal < reqMin || wsBal < days) {
 				return {
