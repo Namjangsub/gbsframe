@@ -1,0 +1,200 @@
+<div id="commonPopup">
+	<div class="popup_table" style="padding: 10px 10px 0 10px;">
+		<div class="search_form">
+			<input type="text" id="pm3002ReportSearch" data-search="searchValue" onkeypress="if(event.keyCode == 13){searchPM3002ReportTree();}">
+			<a id="search" onclick="searchPM3002ReportTree();">
+				<i class="i_search_w"></i>
+			</a>
+		</div>
+	</div>
+	<div style="text-align: left;">
+		<div id="pm3002ReportTree" style="overflow: auto; height: 560px; padding: 0 10px;"></div>
+	</div>
+	<div style="padding: 5px 0px;">
+		<button type="button" class="btn btn-default btn-sm" onclick="confirmPM3002ReportSelection();">선택</button>
+		<button type="button" class="btn btn-default btn-sm" onclick="modalStack.close();">닫기</button>
+	</div>
+</div>
+
+<script type="text/javascript">
+	$(function() {
+		$('#pm3002ReportSearch').focus();
+		loadPM3002ReportTree();
+	});
+
+	function loadPM3002ReportTree() {
+		var modalInfo = modalStack.last();
+		var paramObj = modalInfo && modalInfo.paramObj ? modalInfo.paramObj : {};
+		var treeData = [];
+		var treeParam = {
+			coCd: paramObj.coCd || '',
+			useYn: paramObj.useYn || 'Y'
+		};
+
+		postAjaxSync('/admin/cm/cm06/selectUserTree', treeParam, null, function(data) {
+			treeData = data && Array.isArray(data.userTree) ? data.userTree : [];
+		});
+		treeData = excludePM3002DeptSubtree(treeData, 'GUN95');
+		treeData = flattenPM3002ReportTree(treeData);
+
+		if (!treeData.length) {
+			$('#pm3002ReportTree').html('<div style="padding:12px;color:#777;">조회된 부서 및 담당자가 없습니다.</div>');
+			return;
+		}
+
+		$('#pm3002ReportTree').jstree('destroy');
+		$('#pm3002ReportTree').jstree({
+			plugins: ['types', 'checkbox', 'search', 'sort'],
+			core: {
+				multiple: true,
+				dblclick_toggle: false,
+				data: treeData
+			},
+			types: {
+				unit: { icon: 'glyphicon glyphicon-folder-close' },
+				'unit-open': { icon: 'glyphicon glyphicon-folder-open' },
+				person: { icon: 'glyphicon glyphicon-user' }
+			},
+			checkbox: {
+				keep_selected_style: false,
+				three_state: false,
+				cascade: 'up+down',
+				tie_selection: false,
+				whole_node: false
+			},
+			search: {
+				show_only_matches: false,
+				case_sensitive: false
+			},
+			sort: function(a, b) {
+				var nodeA = this.get_node(a);
+				var nodeB = this.get_node(b);
+				if (nodeA.original.type === 'person' && nodeB.original.type === 'unit') {
+					return -1;
+				}
+			}
+		}).on('loaded.jstree', function() {
+			var tree = $(this).jstree(true);
+			tree.get_node('#').children.forEach(function(rootId) {
+				tree.open_node(rootId);
+			});
+		}).on('open_node.jstree', function(e, data) {
+			data.instance.set_type(data.node, 'unit-open');
+		}).on('close_node.jstree', function(e, data) {
+			data.instance.set_type(data.node, 'unit');
+		});
+	}
+
+	function excludePM3002DeptSubtree(treeData, excludedDeptId) {
+		var excludedIds = {};
+		excludedIds[excludedDeptId] = true;
+		var changed = true;
+
+		// 제외 부서의 모든 하위 부서를 반복적으로 수집한다.
+		while (changed) {
+			changed = false;
+			treeData.forEach(function(node) {
+				if (node.type === 'unit' && excludedIds[node.parent] && !excludedIds[node.id]) {
+					excludedIds[node.id] = true;
+					changed = true;
+				}
+			});
+		}
+
+		return treeData.filter(function(node) {
+			if (node.type === 'unit') return !excludedIds[node.id];
+			if (node.type === 'person') {
+				return !excludedIds[node.parent] && !excludedIds[node.originDeptId];
+			}
+			return true;
+		});
+	}
+
+	// userSearch.html과 동일하게 중간 부서 노드는 숨기고 사용자를 표시 부서에 연결한다.
+	function flattenPM3002ReportTree(nodes) {
+		var nodeMap = nodes.reduce(function(map, node) {
+			map[node.id] = node;
+			return map;
+		}, {});
+		var visibleUnitIds = {};
+
+		nodes.forEach(function(node) {
+			if (node.type === 'unit' && ['#', 'GNG', 'GUN', 'TRN'].indexOf(node.parent) >= 0) {
+				visibleUnitIds[node.id] = true;
+			}
+		});
+
+		nodes.forEach(function(node) {
+			if (node.type !== 'person') return;
+			node.viewDeptId = node.parent;
+			if (visibleUnitIds[node.parent]) return;
+			var parentUnit = nodeMap[node.parent];
+			if (parentUnit && visibleUnitIds[parentUnit.parent]) {
+				node.parent = parentUnit.parent;
+			}
+		});
+
+		return nodes.filter(function(node) {
+			return node.type !== 'unit' || visibleUnitIds[node.id];
+		});
+	}
+
+	function searchPM3002ReportTree() {
+		var tree = $('#pm3002ReportTree').jstree(true);
+		if (tree) tree.search($('#pm3002ReportSearch').val() || '');
+	}
+
+	function getPM3002CheckedNodes() {
+		var tree = $('#pm3002ReportTree').jstree(true);
+		return tree ? tree.get_checked(true) : [];
+	}
+
+	function getPM3002ReportSelectionParts() {
+		var checkedNodes = getPM3002CheckedNodes();
+		var userMap = {};
+
+		checkedNodes.forEach(function(node) {
+			var original = node.original || {};
+			if (node.type === 'person') {
+				userMap[node.id] = {
+					id: node.id,
+					name: node.text,
+					deptId: original.viewDeptId || original.parent || '',
+					originDeptId: original.originDeptId || ''
+				};
+			}
+		});
+
+		return {
+			users: Object.keys(userMap).map(function(id) { return userMap[id]; })
+		};
+	}
+
+	function confirmPM3002ReportSelection() {
+		var modalInfo = modalStack.last();
+		var selection = getPM3002ReportSelectionParts();
+		var userIds = selection.users.map(function(item) { return item.id; });
+		if (!userIds.length) {
+			if (typeof customAlert === 'function') customAlert('담당자를 선택해주세요.');
+			else alert('담당자를 선택해주세요.');
+			return false;
+		}
+
+		var paramObj = modalInfo && modalInfo.paramObj ? modalInfo.paramObj : {};
+		var result = {
+			workYm: paramObj.workYm || '',
+			hrCoCd: paramObj.hrCoCd || '',
+			userIds: userIds
+		};
+		result.reportArgs = {
+			workYm: result.workYm,
+			hrCoCd: result.hrCoCd,
+			userIds: result.userIds.join(',')
+		};
+
+		if (modalInfo && typeof modalInfo.callback === 'function') {
+			modalInfo.callback(result);
+		}
+		modalStack.close();
+	}
+</script>
