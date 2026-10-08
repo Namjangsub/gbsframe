@@ -79,4 +79,6 @@ public interface BM16Mapper {
 
   String selectAsPrjct(Map<String, String> param);
 
+  int selectPrjctOrderCount(Map<String, String> paramMap);
+
 }

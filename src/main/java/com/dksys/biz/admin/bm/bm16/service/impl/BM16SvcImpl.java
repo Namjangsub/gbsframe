@@ -240,6 +240,12 @@ public class BM16SvcImpl implements BM16Svc {
 
   @Override
   public int deletePrjct(Map<String, String> paramMap) throws Exception {
+		// 프로젝트 삭제전 해당 프로젝트로 등록된 수주를 조회해서 수주가 있으면 삭제 불가처리
+		int orderCount = bm16Mapper.selectPrjctOrderCount(paramMap);
+		if (orderCount > 0) {
+			throw new Exception("수주가 등록되어 있어 프로젝트를 삭제할 수 없습니다.");
+		}
+
 	    //---------------------------------------------------------------  
 		//첨부 화일 권한체크  시작 -->삭제 권한 없으면 Exception, 관련 화일 전체 체크
 	  	//   필수값 :  jobType, userId, comonCd
