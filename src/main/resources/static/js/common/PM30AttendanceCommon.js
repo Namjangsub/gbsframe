@@ -516,12 +516,6 @@ function classifyWorkCategory(row) {
 	return null;
 }
 
-// ─ 특이사항(spclMtr) 사용자 소유 판정 — 사용자가 수정했거나 DB에 저장돼 있던 행은 자동채움/재계산이 덮어쓰지 않는다 ─
-// (PM3001M01 에서 isUserEditedSpclMtr / savedSpclMtr 를 세팅. 해당 플래그가 없는 화면(PM3002M01 등)은 항상 false)
-function isSpclMtrOwned(row) {
-	return !!(row && (row.isUserEditedSpclMtr || (row.savedSpclMtr !== undefined && row.savedSpclMtr !== null)));
-}
-
 // ─ 단일 행 근태 실적 정보 재계산 (수정일시 inDttm/outDttm 및 출장 08:30/17:30 기준 근태실적정보 일괄 재계산) ─
 function recalcRowAttendanceObject(row) {
 	if (!row) return row;
@@ -540,10 +534,7 @@ function recalcRowAttendanceObject(row) {
 		row.outDttm = '';
 		row.inJdgNm = '';
 		row.outJdgNm = '';
-		// 사용자가 수정했거나 DB에 저장돼 있던 특이사항(PM3001M01)은 재계산으로 덮어쓰지 않는다
-		if (!isSpclMtrOwned(row)) {
-			row.spclMtr = (String(row.holidayYn || '').trim() === '휴일') ? '휴일' : '';
-		}
+		// 특이사항(spclMtr)은 담당자 입력 전용 — '제외'여도 초기화/자동 변경하지 않는다
 		row.otTm = '';
 		row.nghtTm = '';
 		row.totWorkTm = '';
