@@ -790,7 +790,6 @@
 		$('#btnChangeLine').hide();
 		$('.appr-action-btn').hide();
 		var docId = doc.docId;
-		var currLineSeq = Number(doc.currLineSeq || 0);
 
 		// 전결 권한자 확인
 		$.each(lineList || [], function(idx, line) {
@@ -871,7 +870,13 @@
 				});
 			}
 
-			if (doc.draUserId === jwt.userId && currLineSeq === 1) {
+			// 상신 취소: 기안자 + REQUEST + 구속(APPR/AGREE) 처리 이력 없음 (서버 cancelApproval 판정과 동일)
+			var hasBindingHistory = $.grep(lineList || [], function(line) {
+				var lt = line.lineType || 'APPR';
+				return (lt === 'APPR' || lt === 'APPROVE' || lt === 'AGREE')
+					&& (line.lineStatus === 'APPROVED' || line.lineStatus === 'REJECTED' || line.lineStatus === 'ARBIT');
+			}).length > 0;
+			if (doc.draUserId === jwt.userId && doc.docStatus === 'REQUEST' && !hasBindingHistory) {
 				$('#btnCancelDraft').show();
 			}
 
@@ -913,12 +918,11 @@
 		}
 		if (!currentDocDetail || !currentDocDetail.lineList) return;
 
-		var currLineSeq = Number(currentDocDetail.docInfo.currLineSeq || 1);
 		modifiableLineList = [];
 
-		// 미결재(READY, PENDING)인 잔여 결재선만 추출
+		// 미처리(READY, PENDING) 잔여 결재선만 추출 (처리완료 라인은 위치와 무관하게 제외, 서버 삭제 범위와 동일 기준)
 		$.each(currentDocDetail.lineList, function(idx, line) {
-			if (Number(line.lineSeq) >= currLineSeq && (line.lineStatus === 'READY' || line.lineStatus === 'PENDING')) {
+			if (line.lineStatus === 'READY' || line.lineStatus === 'PENDING') {
 				modifiableLineList.push({
 					approverId: line.approverId,
 					approverNm: line.approverNm,

@@ -716,7 +716,6 @@
         DELETE FROM TB_AM11D01
          WHERE DOC_ID = #{docId}
            AND LINE_STATUS IN ('READY', 'PENDING')
-           AND LINE_SEQ &gt;= #{currLineSeq}
     </delete>
 
     <!-- ================================================================= -->
@@ -966,30 +965,33 @@
     <select id="selectDocIdByBizKey" parameterType="Map" resultType="String">
         SELECT DOC_ID
           FROM (
-                SELECT D.DOC_ID
-                  FROM TB_AM11D01 D
-                 WHERE D.WB20_TODO_KEY = #{todoKey, jdbcType=VARCHAR}
-                 UNION ALL
-                SELECT M.DOC_ID
-                  FROM TB_AM11M01 M
-                 WHERE M.ERP_BIZ_KEY = #{erpBizKey, jdbcType=VARCHAR}
-                   <if test="coCd != null and coCd != ''">
-                   AND M.CO_CD = #{coCd, jdbcType=VARCHAR}
-                   </if>
-                   <if test="todoDiv2CodeId != null and todoDiv2CodeId != ''">
-                   AND (
-                       EXISTS (
-                           SELECT 1 FROM TB_AM11D01 D2
-                            WHERE D2.DOC_ID = M.DOC_ID
-                              AND D2.WB20_DIV2_CODE_ID = #{todoDiv2CodeId, jdbcType=VARCHAR}
-                       )
-                       OR M.ERP_BIZ_TYPE IN ('PM51', 'PM07', 'PM08', 'CR02')
-                   )
-                   </if>
-                   <if test="histNo != null and histNo != ''">
-                   AND M.ERP_HIST_NO = #{histNo, jdbcType=VARCHAR}
-                   </if>
-                 ORDER BY TO_NUMBER(DOC_ID) DESC
+                SELECT U.DOC_ID
+                  FROM (
+                        SELECT D.DOC_ID, 1 AS PRIO_NO
+                          FROM TB_AM11D01 D
+                         WHERE D.WB20_TODO_KEY = #{todoKey, jdbcType=VARCHAR}
+                         UNION ALL
+                        SELECT M.DOC_ID, 2 AS PRIO_NO
+                          FROM TB_AM11M01 M
+                         WHERE M.ERP_BIZ_KEY = #{erpBizKey, jdbcType=VARCHAR}
+                           <if test="coCd != null and coCd != ''">
+                           AND M.CO_CD = #{coCd, jdbcType=VARCHAR}
+                           </if>
+                           <if test="todoDiv2CodeId != null and todoDiv2CodeId != ''">
+                           AND (
+                               EXISTS (
+                                   SELECT 1 FROM TB_AM11D01 D2
+                                    WHERE D2.DOC_ID = M.DOC_ID
+                                      AND D2.WB20_DIV2_CODE_ID = #{todoDiv2CodeId, jdbcType=VARCHAR}
+                               )
+                               OR M.ERP_BIZ_TYPE IN ('PM51', 'PM07', 'CR02')
+                           )
+                           </if>
+                           <if test="histNo != null and histNo != ''">
+                           AND M.ERP_HIST_NO = #{histNo, jdbcType=VARCHAR}
+                           </if>
+                       ) U
+                 ORDER BY U.PRIO_NO, TO_NUMBER(U.DOC_ID) DESC
                )
          WHERE ROWNUM = 1
     </select>

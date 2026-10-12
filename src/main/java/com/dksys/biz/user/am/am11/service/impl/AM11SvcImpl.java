@@ -106,6 +106,12 @@ public class AM11SvcImpl implements AM11Svc {
             return resultMap;
         }
 
+        // 1-1. 비-CR02 결재 커서 보정 (권한 검증 통과 후에만 실행, 보정 시 결재선 재조회)
+        if (!"CR02".equals(String.valueOf(docInfo.get("erpBizType")))
+                && !reconcileBindingCursor(paramMap, docInfo).isEmpty()) {
+            lineList = am11Mapper.selectApprovalLineList(paramMap);
+        }
+
         // 2. 문서 열람(읽음) 이력 자동 기록 (권한이 검증된 경우만)
         if (userId != null && !userId.trim().isEmpty()) {
             try {
@@ -268,9 +274,10 @@ public class AM11SvcImpl implements AM11Svc {
         if (autoCountValue != null) {
             autoApprovedCount = Math.max(0, Math.min(Integer.parseInt(String.valueOf(autoCountValue)), lineList.size()));
         }
-        boolean completedBySource = autoApprovedCount >= lineList.size();
-        Map<String, Object> firstApprover = completedBySource ? lineList.get(lineList.size() - 1) : lineList.get(autoApprovedCount);
-        paramMap.put("currLineSeq", completedBySource ? lineList.size() : autoApprovedCount + 1);
+        int cursorIdx = firstBindingIndex(lineList, autoApprovedCount);
+        boolean completedBySource = autoApprovedCount >= lineList.size() || cursorIdx >= lineList.size();
+        Map<String, Object> firstApprover = completedBySource ? lineList.get(lineList.size() - 1) : lineList.get(cursorIdx);
+        paramMap.put("currLineSeq", completedBySource ? lineList.size() : cursorIdx + 1);
         paramMap.put("currApproverId", completedBySource ? null : firstApprover.get("approverId"));
         paramMap.put("currApproverNm", completedBySource ? null : firstApprover.get("approverNm"));
         paramMap.put("docStatus", completedBySource ? "COMPLETED" : "REQUEST");
@@ -402,6 +409,8 @@ public class AM11SvcImpl implements AM11Svc {
 
         if ("CR02".equals(String.valueOf(docLock.get("erpBizType")))) {
             reconcileCr02CurrentApprovalStage(paramMap, docLock, userId);
+        } else {
+            reconcileBindingCursor(paramMap, docLock);
         }
 
         if (!isCurrentApprovalActor(paramMap, docLock)) {
@@ -1102,6 +1111,37 @@ public class AM11SvcImpl implements AM11Svc {
     }
 
     /**
+     * 결재 진행 이력 판정: 구속(APPR/AGREE) 라인 중 처리완료(APPROVED/REJECTED/ARBIT)가 하나라도 있으면 true.
+     * 커서 위치(currLineSeq)로 판정하면 앞쪽 COOP/REF 라인만으로도 진행으로 오인하므로 라인 상태로 판단한다.
+     * COOP/REF/POST 처리는 진행으로 보지 않는다. 상신 시 선승인(sourceApproved) 구속 라인도 APPROVED로 포함된다.
+     */
+    private boolean hasBindingApprovalHistory(List<Map<String, Object>> lineList) {
+        if (lineList == null) return false;
+        for (Map<String, Object> line : lineList) {
+            String t = lineTypeOf(line);
+            if (!"APPR".equals(t) && !"AGREE".equals(t)) continue;
+            String status = valueOf(line.get("lineStatus"));
+            if ("APPROVED".equals(status) || "REJECTED".equals(status) || "ARBIT".equals(status)) return true;
+        }
+        return false;
+    }
+
+    /** 처리완료(APPROVED/REJECTED/ARBIT) 라인 여부. 결재선 변경에서 미처리(READY/PENDING)와의 구분 기준. */
+    private boolean isProcessedLine(Map<String, Object> line) {
+        String status = valueOf(line.get("lineStatus"));
+        return "APPROVED".equals(status) || "REJECTED".equals(status) || "ARBIT".equals(status);
+    }
+
+    /** fromIdx 이후 첫 구속(APPR/AGREE) 라인 인덱스. 없으면 lineList.size(). */
+    private int firstBindingIndex(List<Map<String, Object>> lineList, int fromIdx) {
+        for (int i = Math.max(0, fromIdx); i < lineList.size(); i++) {
+            String t = lineTypeOf(lineList.get(i));
+            if ("APPR".equals(t) || "AGREE".equals(t)) return i;
+        }
+        return lineList.size();
+    }
+
+    /**
      * openStepAt: 단계 오픈 헬퍼
      * - AGREE 라인이면 런(연속 AGREE들) 전체의 READY를 PENDING으로
      * - 아니면 단건 nextLineSeq만 PENDING으로
@@ -1212,9 +1252,8 @@ public class AM11SvcImpl implements AM11Svc {
             return resultMap;
         }
 
-        // 1차 결재자 승인 여부 확인
-        int currLineSeq = Integer.parseInt(String.valueOf(docLock.get("currLineSeq")));
-        if (currLineSeq > 1) {
+        // 구속 결재 처리 이력 확인 (커서 위치가 아닌 승인 이력으로 판정)
+        if (hasBindingApprovalHistory(am11Mapper.selectApprovalLineList(paramMap))) {
             resultMap.put("resultCode", "500");
             resultMap.put("resultMessage", "이미 결재가 진행된 문서는 상신 취소할 수 없습니다.");
             return resultMap;
@@ -1796,6 +1835,145 @@ public class AM11SvcImpl implements AM11Svc {
         return stage;
     }
 
+    /** PENDING 구속 라인이 없고 첫 미승인 구속 라인이 READY인 교착 상태면 그 라인, 아니면 null. */
+    private Map<String, Object> findStuckBindingHead(List<Map<String, Object>> lineList) {
+        if (lineList == null || lineList.isEmpty()) return null;
+        Map<String, Object> head = null;
+        for (Map<String, Object> line : lineList) {
+            String type = lineTypeOf(line);
+            if (!"APPR".equals(type) && !"AGREE".equals(type)) continue;
+            String status = String.valueOf(line.get("lineStatus")).trim();
+            if ("PENDING".equals(status)) return null;
+            if (head == null && !"APPROVED".equals(status) && !"REJECTED".equals(status) && !"ARBIT".equals(status)) {
+                head = line;
+            }
+        }
+        return head != null && "READY".equals(String.valueOf(head.get("lineStatus")).trim()) ? head : null;
+    }
+
+    /**
+     * 비-CR02 문서 보정: PENDING 구속(APPR/AGREE) 라인이 없는데 첫 미승인 구속 라인이 READY로 남아 있으면
+     * (커서가 협조/후결 등 비구속 라인에 머문 기존 결함으로 인한 교착) 그 단계를 열고 문서 포인터를 정렬한다.
+     * 멱등: 정상 상태(PENDING 구속 존재, 또는 미승인 구속 없음)면 no-op. 실패는 로그 후 무시(조회/승인을 막지 않음).
+     * @return 이번 호출에서 READY→PENDING으로 전환된 라인(알림 대상). 변경 없으면 빈 목록.
+     */
+    private List<Map<String, Object>> reconcileBindingCursor(Map<String, Object> paramMap, Map<String, Object> docLock) {
+        try {
+            Map<String, Object> lineParam = new HashMap<>(paramMap);
+            lineParam.put("docId", docLock.get("docId"));
+            // 1차 판정(무잠금 빠른 경로): 정상 문서는 여기서 바로 빠진다
+            if (findStuckBindingHead(am11Mapper.selectApprovalLineList(lineParam)) == null) {
+                return Collections.emptyList();
+            }
+
+            // 동시 조회/승인 간 중복 개방·중복 알림 방지: 행을 잠근 뒤 재판정한다
+            Map<String, Object> locked = am11Mapper.selectApprovalDocForUpdate(lineParam);
+            if (locked == null) return Collections.emptyList();
+            String docStatus = String.valueOf(locked.get("docStatus"));
+            if (!"REQUEST".equals(docStatus) && !"PROGRESS".equals(docStatus)) {
+                return Collections.emptyList();
+            }
+            String erpBizType = String.valueOf(locked.get("erpBizType"));
+            if (("PM07".equals(erpBizType) || "PM51".equals(erpBizType) || "PM52".equals(erpBizType) || "PM08".equals(erpBizType))
+                    && am11Mapper.selectLinkedSourceCount(locked) == 0) {
+                return Collections.emptyList();
+            }
+
+            List<Map<String, Object>> lineList = am11Mapper.selectApprovalLineList(lineParam);
+            Map<String, Object> head = findStuckBindingHead(lineList);
+            if (head == null) return Collections.emptyList();
+
+            String docId = String.valueOf(docLock.get("docId"));
+            int headSeq = Integer.parseInt(String.valueOf(head.get("lineSeq")));
+            Set<Integer> readyBefore = new HashSet<>();
+            for (Map<String, Object> line : lineList) {
+                if ("READY".equals(String.valueOf(line.get("lineStatus")).trim())) {
+                    readyBefore.add(Integer.parseInt(String.valueOf(line.get("lineSeq"))));
+                }
+            }
+
+            Map<String, Object> openParam = new HashMap<>(paramMap);
+            openParam.put("docId", docLock.get("docId"));
+            if (openParam.get("pgmId") == null) {
+                openParam.put("pgmId", "AM11_RECONCILE");
+            }
+
+            // 문서 포인터를 먼저 정렬하고 단계를 연다: 중간 실패 시에도 다음 호출에서 재보정되도록(멱등)
+            Map<String, Object> docUpdateParam = new HashMap<>(openParam);
+            docUpdateParam.put("nextStatus", docStatus);
+            docUpdateParam.put("currLineSeq", headSeq);
+            docUpdateParam.put("currApproverId", head.get("approverId"));
+            docUpdateParam.put("currApproverNm", head.get("approverNm"));
+            am11Mapper.updateApprovalDocStatus(docUpdateParam);
+            docLock.put("currLineSeq", headSeq);
+            docLock.put("currApproverId", head.get("approverId"));
+            docLock.put("currApproverNm", head.get("approverNm"));
+
+            List<Map<String, Object>> opened = openStepAt(docId, headSeq, lineList, openParam);
+            List<Map<String, Object>> newlyOpened = new ArrayList<>();
+            for (Map<String, Object> line : opened) {
+                if (readyBefore.contains(Integer.parseInt(String.valueOf(line.get("lineSeq"))))) {
+                    newlyOpened.add(line);
+                }
+            }
+            if (newlyOpened.isEmpty()) return Collections.emptyList();
+
+            Map<String, Object> docInfo = am11Mapper.selectApprovalDocInfo(lineParam);
+            String docNo = (String) docLock.get("docNo");
+            String docTitle = docInfo != null ? (String) docInfo.get("docTitle") : null;
+            Map<String, Object> source = new HashMap<>(openParam);
+            source.remove("todoNo");
+            source.put("erpBizType", docLock.get("erpBizType"));
+            source.put("erpBizKey", docLock.get("erpBizKey"));
+            source.put("coCd", docLock.get("coCd"));
+            source.put("docTitle", docTitle);
+
+            try {
+                for (Map<String, Object> line : newlyOpened) {
+                    boolean isCoopLine = "COOP".equals(lineTypeOf(line));
+                    Map<String, Object> notifParam = new HashMap<>();
+                    notifParam.put("docId", docId);
+                    notifParam.put("eventType", "APPROVE_NEXT");
+                    notifParam.put("receiverId", line.get("approverId"));
+                    notifParam.put("receiverNm", line.get("approverNm"));
+                    notifParam.put("notifChannel", "KAKAO");
+                    notifParam.put("notifTitle", isCoopLine
+                            ? "[" + docNo + "] 협조 요청 문서가 도착했습니다" : "[" + docNo + "] 결재 대기 문서가 도착했습니다");
+                    notifParam.put("notifMsg", isCoopLine
+                            ? "협조(의견) 요청이 도착했습니다. 문서를 확인하여 협조 의견을 등록해 주십시오." : "결재 순번이 도래하였습니다. 문서를 확인하십시오.");
+                    Map<String, Object> lineSource = new HashMap<>(source);
+                    lineSource.put("wb20TodoNo", line.get("wb20TodoNo"));
+                    lineSource.put("todoDiv2CodeId", line.get("wb20Div2CodeId"));
+                    enqueueApprovalNotification(notifParam, lineSource);
+                }
+            } catch (Exception ne) {
+                logger.warn("커서 보정 알림 큐 적재 경고: docId={}", docId, ne);
+            }
+
+            Map<String, Object> first = newlyOpened.get(0);
+            Map<String, Object> eventSource = new HashMap<>(source);
+            eventSource.remove("todoNo");
+            eventSource.put("wb20TodoNo", first.get("wb20TodoNo"));
+            eventSource.put("todoDiv2CodeId", first.get("wb20Div2CodeId"));
+            eventSource.put("currLineSeq", first.get("lineSeq"));
+            if (first.get("wb20Div2CodeId") != null) {
+                eventSource.put("rcvTodoDiv2CodeId", first.get("wb20Div2CodeId"));
+            }
+            if (first.get("wb20SanctnSn") != null) {
+                eventSource.put("rcvSanctnSn", first.get("wb20SanctnSn"));
+            }
+            eventPublisher.publishEvent(new ApprovalEvent(
+                "APPROVE_NEXT", docId, docNo, docTitle,
+                (String) docLock.get("draUserId"), docInfo != null ? (String) docInfo.get("draUserNm") : "",
+                (String) first.get("approverId"), (String) first.get("approverNm"), eventSource
+            ));
+            return newlyOpened;
+        } catch (Exception e) {
+            logger.warn("비-CR02 결재 커서 보정 실패(무시하고 진행): docId={}", docLock.get("docId"), e);
+            return Collections.emptyList();
+        }
+    }
+
     private void writeAudit(Map<String, Object> paramMap, Map<String, Object> docInfo,
                             String eventType, String detail) {
         if (paramMap.get("userId") == null || docInfo == null || docInfo.get("docId") == null) {
@@ -1918,6 +2096,7 @@ public class AM11SvcImpl implements AM11Svc {
                 prevLineTypeMap = new HashMap<>();
             }
 
+            int firstPendingSeq = resolveFirstPendingSeq(lineList, paramMap, prevLineTypeMap);
             int seq = 1;
             for (Map<String, Object> line : lineList) {
                 String approverId = (String) line.get("approverId");
@@ -1948,8 +2127,7 @@ public class AM11SvcImpl implements AM11Svc {
                 // 첫 번째 순번 결재자 상태 설정
                 if ("Y".equals(line.get("sourceApproved"))) {
                     lineParam.put("lineStatus", "APPROVED");
-                } else if (seq == (paramMap.get("autoApprovedCount") == null ? 1 : Integer.parseInt(String.valueOf(paramMap.get("autoApprovedCount"))) + 1)
-                        && "PENDING".equals(firstStatus)) {
+                } else if (seq == firstPendingSeq && "PENDING".equals(firstStatus)) {
                     lineParam.put("lineStatus", "PENDING");
                 } else if ("COOP".equals(preservedLineType) && "PENDING".equals(firstStatus)) {
                     // 방안 A: 협조(COOP)는 비구속 병렬이므로 상신 즉시 PENDING으로 개방되어 선결재 가능
@@ -1978,6 +2156,25 @@ public class AM11SvcImpl implements AM11Svc {
                 seq++;
             }
         }
+    }
+
+    /**
+     * 신규 결재선에서 첫 구속(APPR/AGREE) 라인의 LINE_SEQ(1-base). 없으면 size+1.
+     * lineType 판정은 insert 저장 규칙(요청값 → 기존값 → APPR)과 동일하게 맞춘다.
+     */
+    private int resolveFirstPendingSeq(List<Map<String, Object>> lineList, Map<String, Object> paramMap,
+                                       Map<String, String> prevLineTypeMap) {
+        int autoCnt = paramMap.get("autoApprovedCount") == null ? 0
+                : Math.max(0, Math.min(Integer.parseInt(String.valueOf(paramMap.get("autoApprovedCount"))), lineList.size()));
+        for (int i = autoCnt; i < lineList.size(); i++) {
+            Map<String, Object> line = lineList.get(i);
+            Object raw = line.get("lineType");
+            String incoming = raw == null ? "" : String.valueOf(raw).trim();
+            String effective = incoming.isEmpty()
+                    ? prevLineTypeMap.getOrDefault(String.valueOf(line.get("approverId")), "APPR") : incoming;
+            if ("APPR".equals(effective) || "AGREE".equals(effective)) return i + 1;
+        }
+        return lineList.size() + 1;
     }
 
     // 헬퍼 메소드: Object -> List<Map<String, Object>> 안전 변환
@@ -2117,10 +2314,9 @@ public class AM11SvcImpl implements AM11Svc {
                 }
             }
 
-            int currLineSeq = Integer.parseInt(String.valueOf(docInfo.get("currLineSeq") != null ? docInfo.get("currLineSeq") : 1));
-            if (currLineSeq > 1) {
+            if (hasBindingApprovalHistory(lineList)) {
                 resultMap.put("skipped", true);
-                resultMap.put("reason", "결재 진행 중 상태 (currLineSeq=" + currLineSeq + ")");
+                resultMap.put("reason", "결재 진행 중 상태 (구속 결재 처리 이력 있음)");
                 return resultMap;
             }
 
@@ -2153,17 +2349,24 @@ public class AM11SvcImpl implements AM11Svc {
             Map<String, String> prevLineTypeMap = captureLineTypeMap(docId);
             rebuildParam.put("_prevLineTypeMap", prevLineTypeMap);
 
+            int cursorSeq = resolveFirstPendingSeq(incomingLineList, rebuildParam, prevLineTypeMap);
+            if (cursorSeq > incomingLineList.size()) {
+                resultMap.put("skipped", true);
+                resultMap.put("reason", "재동기화할 구속(결재/합의) 결재선 없음");
+                return resultMap;
+            }
+
             am11Mapper.deleteApprovalLines(rebuildParam);
             insertApprovalLinesSnapshot(docId, rebuildParam, firstLineStatus);
 
             if (!incomingLineList.isEmpty()) {
-                Map<String, Object> firstApprover = incomingLineList.get(0);
+                Map<String, Object> firstApprover = incomingLineList.get(cursorSeq - 1);
                 Map<String, Object> docUpdateParam = new HashMap<>();
                 docUpdateParam.put("docId", docId);
                 // 진행 전 재빌드는 문서 상태를 변경하지 않는다: 기존 DOC_STATUS를 그대로 보존
                 // (updateApprovalDocStatus는 DOC_STATUS=#{nextStatus}를 무조건 세팅하므로 null이면 상태가 유실됨)
                 docUpdateParam.put("nextStatus", docInfo.get("docStatus"));
-                docUpdateParam.put("currLineSeq", 1);
+                docUpdateParam.put("currLineSeq", cursorSeq);
                 docUpdateParam.put("currApproverId", firstApprover.get("approverId"));
                 docUpdateParam.put("currApproverNm", firstApprover.get("approverNm"));
                 docUpdateParam.put("userId", paramMap.get("userId"));
@@ -2233,7 +2436,6 @@ public class AM11SvcImpl implements AM11Svc {
 
         // 3. 변경 전 결재선 목록 조회 (Snapshot용)
         List<Map<String, Object>> beforeLineList = am11Mapper.selectApprovalLineList(paramMap);
-        int currLineSeq = Integer.parseInt(String.valueOf(docLock.get("currLineSeq")));
 
         // 2-1. 동시성 확인: 화면이 로드한 시점의 진행정보(결재순번/문서상태)와 현재 DB가 다르면
         // (그 사이 다른 사용자가 결재/반려하여 진행이 바뀐 것) 결재선 변경을 거부한다.
@@ -2265,7 +2467,7 @@ public class AM11SvcImpl implements AM11Svc {
         Set<String> approvedUserIds = new HashSet<>();
         for (Map<String, Object> prevLine : beforeLineList) {
             int prevSeq = Integer.parseInt(String.valueOf(prevLine.get("lineSeq")));
-            if (prevSeq < currLineSeq || "APPROVED".equals(prevLine.get("lineStatus"))) {
+            if (isProcessedLine(prevLine)) {
                 approvedUserIds.add((String) prevLine.get("approverId"));
             }
         }
@@ -2287,12 +2489,20 @@ public class AM11SvcImpl implements AM11Svc {
             return resultMap;
         }
 
-        // 5. 잔여 미결재선만 원자적 삭제 (LINE_SEQ >= currLineSeq 인 READY/PENDING 대상만 삭제)
-        paramMap.put("currLineSeq", currLineSeq);
+        // 5. 미처리(READY/PENDING) 결재선만 원자적 삭제 (처리완료 라인은 위치와 무관하게 보존)
         am11Mapper.deleteRemainingApprovalLines(paramMap);
 
-        // 6. 신규 잔여 결재선 등록 (currLineSeq부터 순차 번호 강제 부여하여 번호 왜곡 차단)
-        int nextSeq = currLineSeq;
+        // 6. 신규 잔여 결재선 등록. 보존 라인(처리완료) 최대 순번 다음부터 순차 부여해 PK 충돌을 피한다.
+        int keptMaxSeq = 0;
+        for (Map<String, Object> prevLine : beforeLineList) {
+            if (!isProcessedLine(prevLine)) continue;
+            keptMaxSeq = Math.max(keptMaxSeq, Integer.parseInt(String.valueOf(prevLine.get("lineSeq"))));
+        }
+        int startSeq = keptMaxSeq + 1;
+        int nextSeq = startSeq;
+        // 커서는 신규 결재선의 첫 구속(APPR/AGREE) 라인. 구속이 하나도 없으면 레거시대로 첫 라인 유지.
+        int cursorIdx = firstBindingIndex(newLines, 0);
+        int cursorSeq = startSeq + (cursorIdx < newLines.size() ? cursorIdx : 0);
         String nextFirstApproverId = null;
         String nextFirstApproverNm = null;
 
@@ -2341,7 +2551,7 @@ public class AM11SvcImpl implements AM11Svc {
             lineParam.put("wb20Div1CodeId", lnkDiv1);
             lineParam.put("wb20Div2CodeId", lnkDiv2);
 
-            if (nextSeq == currLineSeq) {
+            if (nextSeq == cursorSeq) {
                 lineParam.put("lineStatus", "PENDING");
                 nextFirstApproverId = (approverOrg != null) ? (String) approverOrg.get("userId") : approverId;
                 nextFirstApproverNm = (approverOrg != null) ? (String) approverOrg.get("userNm") : (String) line.get("approverNm");
@@ -2441,7 +2651,7 @@ public class AM11SvcImpl implements AM11Svc {
         if (nextFirstApproverId != null) {
             Map<String, Object> docUpdate = new HashMap<>(paramMap);
             docUpdate.put("nextStatus", docStatus);
-            docUpdate.put("currLineSeq", currLineSeq);
+            docUpdate.put("currLineSeq", cursorSeq);
             docUpdate.put("currApproverId", nextFirstApproverId);
             docUpdate.put("currApproverNm", nextFirstApproverNm);
             am11Mapper.updateApprovalDocStatus(docUpdate);
