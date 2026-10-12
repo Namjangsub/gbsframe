@@ -222,6 +222,21 @@
 			color: #fff;
 		}
 		.pm08p-bottom-bar #approvalBtn:active { background: var(--pm08-navy-dark); }
+		.pm08p-bottom-bar #submitResultBtn {
+			background: var(--pm08-navy);
+			color: #fff;
+		}
+		.pm08p-bottom-bar #submitResultBtn:active { background: var(--pm08-navy-dark); }
+		.pm08p-btn-sm {
+			height: 30px;
+			padding: 0 10px;
+			border-radius: 8px;
+			border: 1px solid var(--pm08-line);
+			background: #fff;
+			color: var(--pm08-navy);
+			font-size: 12px;
+			font-weight: 700;
+		}
 
 		/* 좌우 짤림 방지: 좁은 화면에서 폭이 고정된 자식(첨부파일 썸네일, 결재선 테이블 등)이
 		   화면 밖으로 밀려나가는 대신 그 영역 안에서만 가로 스크롤되게 가둔다. */
@@ -366,6 +381,17 @@
 							<textarea id="workResult" name="workResult" class="pm08p-input" placeholder="근무결과를 입력하세요" style="width: 100%; min-height: 80px; resize: vertical; box-sizing: border-box;"></textarea>
 						</div>
 
+						<div class="pm08p-field" id="resultApprArea" style="display: none; margin-top: 14px;">
+							<div class="pm08p-field-label required" style="display: flex; justify-content: space-between; align-items: center;">
+								<span>근무결과 결재선 및 공유선</span>
+								<span id="btnResultApprovalArea">
+									<button type="button" class="pm08p-btn-sm" onclick="insertResultShareUser();">결재자/공유자 지정</button>
+								</span>
+							</div>
+							<div id="resultApprovalList" style="display: flex; flex-direction: column; gap: 6px;"></div>
+							<div id="resultApprGuide" class="text-danger" style="display: none; font-size: 12px; margin-top: 6px;">결과 상신은 가능하나 결과 승인은 신청 결재 완료 후 처리됩니다.</div>
+						</div>
+
 						<div class="pm08p-field" style="display:none; margin-top: 14px;" id="pm08MngOpnGroup">
 							<div class="pm08p-field-label" id="pm08MngOpnLabel">담당팀장 의견</div>
 							<textarea id="pm08MngOpn" name="pm08MngOpn" class="pm08p-input" readonly style="width: 100%; min-height: 60px; resize: vertical; background:#f4f4f4; box-sizing: border-box;"></textarea>
@@ -393,6 +419,7 @@
 			<button type="button" class="close_btn" id="closeBtn" onclick="closeModal();">닫기</button>
 			<button type="button" id="actionBtn" style="display: none;" onclick="saveTempData();">저장</button>
 			<button type="button" id="approvalBtn" style="display: none;" onclick="doMobileSubstituteApproval();">승인</button>
+			<button type="button" id="submitResultBtn" style="display: none;" onclick="submitResultApproval();">결과결재 상신</button>
 		</div>
 	</div> <!-- #main_area -->
 </body>
@@ -404,6 +431,13 @@
 	var paramObj = null;
 	var commApproval = null;
 	var isReadonly = false;
+		var pm08ResultApprAllowYn = 'N';
+		var resultApprovalList = [];
+		var resultApprEditable = false;
+		// global.js kakaoSendReal() 이 전역 kakaoErr 를 참조한다 (PM0701P01_M 과 동일)
+		var kakaoErr = [];
+		var kakaoCnt = 0;
+		var teleNo = "";
 
 	// 시간 포맷팅
 	function formatTime(timeStr) {
@@ -755,10 +789,11 @@
 		formData.append("edTm", ($('#edTm').val() || "").replace(/:/g, ''));
 		formData.append("totalTm", $('#totalTm').val());
 		formData.append("specialReason", $('#specialReason').val());
-		formData.append("realStTm", ($('#realStTm').val() || "").replace(/:/g, ''));
-		formData.append("realEdTm", ($('#realEdTm').val() || "").replace(/:/g, ''));
+		// 신청서 저장 경로(updateSubstituteWork 비결과단계)는 REAL_*/WORK_RESULT 를 덮어쓰므로 결과값은 항상 빈값 전송 (PC submitApproval 과 동일)
+		formData.append("realStTm", "");
+		formData.append("realEdTm", "");
 		formData.append("realTotalTm", $('#realTotalTm').val());
-		formData.append("workResult", $('#workResult').val());
+		formData.append("workResult", "");
 		formData.append("projectArr", JSON.stringify(projectCardDataList));
 		formData.append("approvalArr", JSON.stringify([]));
 		formData.append("userId", jwt.userId);
@@ -792,7 +827,534 @@
 		});
 	}
 
-	// 참여 프로젝트 추가 (모바일)
+	// ===== 근무결과 등록 및 결과결재 상신 (PC PM0801P01.html 과 동일 규칙) =====
+		// 신청자 모드(결재자 진입 아님)에서만 사용. 결재자 진입(M08 → actionType A)은 기존 로직 그대로.
+		function checkHasRealResult(dtlData) {
+			dtlData = dtlData || {};
+			var isValidTm = function(tm) {
+				if (!tm) return false;
+				var s = String(tm).replace(/[^0-9]/g, '');
+				return s.length > 0 && s !== '0000';
+			};
+			return isValidTm(dtlData.realStTm) || isValidTm(dtlData.realEdTm)
+				|| !!(dtlData.workResult && $.trim(dtlData.workResult) !== '')
+				|| !!(dtlData.resultStatus);
+		}
+
+		// 신청자 모드 편집 규칙 (PC applyApprStatusPolicy 의 신청서/결과 영역 기준과 동일)
+		function applyRequesterResultPolicy(dtlData) {
+			dtlData = dtlData || {};
+			var reqId = dtlData.reqId || $('#reqId').val() || "";
+			var isWriter = (!reqId || reqId === jwt.userId);
+			var hasResult = checkHasRealResult(dtlData);
+			var resultStatus = dtlData.resultStatus;
+			var isReqEditable = !hasResult && isWriter && (paramObj.openStage !== 'RESULT')
+				&& (!dtlData.reqStatus || dtlData.reqStatus === 'REQ');
+			resultApprEditable = isWriter && (!resultStatus || resultStatus === 'REQ');
+
+			$('#holidayDt, #stTm, #edTm, #specialReason').prop('readonly', !isReqEditable);
+			$('#actionBtn').toggle(isReqEditable);
+
+			$('#realStTm, #realEdTm, #workResult').prop('readonly', !resultApprEditable);
+			$('#resultApprArea').show();
+			$('#btnResultApprovalArea').toggle(resultApprEditable);
+
+			var isFirstResult = !hasResult;
+			$('#submitResultBtn').text(isFirstResult ? '결과결재 상신' : '결과수정').toggle(resultApprEditable);
+			$('#resultApprGuide').toggle(resultApprEditable && isFirstResult && pm08ResultApprAllowYn !== 'Y');
+		}
+
+		// 결과 결재선 기본값: 신청자 본인 + 공통코드 SPECRTS19 (PC setDefaultResultApprovalLine 과 동일)
+		function setDefaultResultApprovalLine() {
+			var reqId = $('#reqId').val() || jwt.userId;
+			if (!reqId || $.trim(reqId) === '') return;
+
+			var autoList = [];
+			var addedIds = {};
+
+			function pushApprover(u) {
+				if (!u || !u.id) return;
+				var key = String(u.id).toLowerCase();
+				if (addedIds[key]) return;
+				addedIds[key] = true;
+				autoList.push({
+					gb: "결재", usrNm: u.id, todoId: u.id, name: u.name || u.id,
+					jik: u.levelNm || '', dtNm: u.deptNm || '', telNo: u.telNo || '', email: u.email || '',
+					sanctnSttus: 'N', sanctnSttusNm: ''
+				});
+			}
+
+			postAjaxSync("/admin/cm/cm06/selectUserInfo", { "userId": reqId }, null, function(data) {
+				if (data && data.userInfo) pushApprover(data.userInfo);
+			});
+
+			postAjaxSync("/admin/cm/cm05/selectChildCodeList", { "codeId": "SPECRTS19" }, null, function(data) {
+				var list = (data && data.childCodeList) ? data.childCodeList : [];
+				if (list.length === 0) return;
+				var codeEtc = list[0].codeEtc || '';
+				if (!codeEtc) return;
+				$.each(codeEtc.split(','), function(idx, rawId) {
+					var uId = $.trim(rawId);
+					if (!uId) return true;
+					postAjaxSync("/admin/cm/cm06/selectUserInfo", { "userId": uId }, null, function(userData) {
+						if (userData && userData.userInfo) pushApprover(userData.userInfo);
+					});
+				});
+			});
+
+			$.each(autoList, function(idx, row) { row.sanctnSn = idx + 1; });
+			resultApprovalList = autoList;
+			renderResultApprovalList();
+		}
+
+		// 기존 결과 결재선 로드 (결과결재 TODODIV2420 / 결과공유 TODODIV1420). 없으면 기본 결재선 구성 (PC loadApprovalLine 과 동일)
+		function loadResultApprovalLine(reqNo) {
+			var rows = [];
+			$.each([{ cd: "TODODIV2420", gb: "결재" }, { cd: "TODODIV1420", gb: "공유" }], function(i, div) {
+				postAjaxSync("/user/wb/wb20/selectGetApprovalList", { "todoNo": reqNo, "todoDiv2CodeId": div.cd }, null, function(data) {
+					$.each(data.resultList || [], function(idx, r) {
+						rows.push({
+							gb: div.gb,
+							sanctnSn: Number(r.sanctnSn || 0),
+							usrNm: r.todoId,
+							empNo: r.empNo || r.todoId,
+							name: r.todoNm || r.name,
+							jik: r.jik,
+							dtNm: r.dtNm,
+							telNo: r.telNo || '',
+							email: r.email || '',
+							lineType: r.lineType || (div.gb === "공유" ? "REF" : "APPR"),
+							sanctnSttus: r.sanctnSttus || 'N'
+						});
+					});
+				});
+			});
+
+			var gbOrder = { "결재": 0, "공유": 1 };
+			rows.sort(function(a, b) {
+				var gbDiff = (gbOrder[a.gb] || 0) - (gbOrder[b.gb] || 0);
+				if (gbDiff !== 0) return gbDiff;
+				return a.sanctnSn - b.sanctnSn;
+			});
+
+			resultApprovalList = rows;
+			if (rows.length === 0) {
+				setDefaultResultApprovalLine();
+				return;
+			}
+			renderResultApprovalList();
+		}
+
+		function renderResultApprovalList() {
+			var $area = $('#resultApprovalList');
+			$area.empty();
+			if (resultApprovalList.length === 0) {
+				$area.html('<div style="color: #aaa; font-size: 12px; text-align: center; padding: 12px; background: #fafafa; border: 1px dashed #ddd; border-radius: 6px;">지정된 결재선이 없습니다.</div>');
+				return;
+			}
+			$.each(resultApprovalList, function(idx, row) {
+				var isApr = (row.gb === "결재");
+				var $item = $('<div style="display: flex; align-items: center; gap: 8px; background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 8px; padding: 8px 10px;"></div>');
+				var $tag = $('<span style="font-size: 11px; font-weight: 700; color: ' + (isApr ? '#304a8a' : '#6b7280') + '; white-space: nowrap;"></span>').text(isApr ? '결재' : '공유');
+				var $name = $('<span style="font-size: 12.5px; font-weight: 600; color: #1e293b;"></span>').text((row.name || row.usrNm || '') + (row.jik ? ' ' + row.jik : ''));
+				var $dept = $('<span style="font-size: 11px; color: #666; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"></span>').text(row.dtNm || '');
+				$item.append($tag).append($name).append($dept);
+				if (resultApprEditable) {
+					var $del = $('<button type="button" class="pm08p-btn-sm" style="margin-left: auto; flex-shrink: 0;">삭제</button>');
+					$del.on('click', function() { removeResultApprovalRow(idx); });
+					$item.append($del);
+				}
+				$area.append($item);
+			});
+		}
+
+		function removeResultApprovalRow(idx) {
+			if (!resultApprEditable) return;
+			resultApprovalList.splice(idx, 1);
+			renderResultApprovalList();
+		}
+
+		// 결재자/공유자 지정 (PC insertShareUser 와 동일 계약: approvalGrid/shareGrid → 콜백)
+		function insertResultShareUser() {
+			if (!resultApprEditable) return;
+			var toPicker = function(item) {
+				return {
+					gb: item.gb,
+					id: item.usrNm,
+					text: item.name,
+					parent: item.jik,
+					deptNm: item.dtNm,
+					lineType: item.lineType || "APPR",
+					lineTypeNm: item.lineTypeNm || "결재",
+					telNo: item.telNo,
+					offTelNo: item.offTelNo,
+					email: item.email
+				};
+			};
+			var pickerParam = {
+				"coCd": "GUN",
+				"useYn": "Y",
+				"userId": jwt.userId,
+				"userNm": jwt.userNm,
+				"pgmId": "PM0801P01_M",
+				"approvalGrid": resultApprovalList.filter(function(item) { return item.gb === "결재"; }).map(toPicker),
+				"shareGrid": resultApprovalList.filter(function(item) { return item.gb === "공유"; }).map(toPicker)
+			};
+			var opener = (modalStack.size() >= 2) ? openThirdModal : openSecondModal;
+			opener("/static/mobile/modal/userLstSearchMobile.html", 900, 500, "결재 및 공유자 선택", pickerParam, function(approvalGrid, shareGrid) {
+				var appArray = approvalGrid.target.list.map(function(item, idx) {
+					var lType = item.lineType || "APPR";
+					return {
+						gb: "결재",
+						sanctnSn: idx + 1,
+						coCd: "GUN",
+						usrNm: item.id,
+						todoId: item.id,
+						empNo: item.id,
+						name: item.text,
+						jik: item.parent,
+						lineType: lType,
+						lineTypeNm: (lType === "AGREE" ? "합의" : lType === "COOP" ? "협조" : lType === "POST" ? "후결" : "결재"),
+						dtNm: item.deptNm,
+						telNo: item.telNo,
+						offTelNo: item.offTelNo,
+						email: item.email,
+						sanctnSttus: 'N'
+					};
+				});
+				var shaArray = shareGrid.target.list.map(function(item, idx) {
+					return {
+						gb: "공유",
+						sanctnSn: idx + 1,
+						coCd: "GUN",
+						usrNm: item.id,
+						todoId: item.id,
+						empNo: item.id,
+						name: item.text,
+						jik: item.parent,
+						lineType: "REF",
+						lineTypeNm: "참조",
+						dtNm: item.deptNm,
+						telNo: item.telNo,
+						offTelNo: item.offTelNo,
+						email: item.email,
+						sanctnSttus: 'N'
+					};
+				});
+				var appIds = {};
+				$.each(appArray, function(idx, item) {
+					var uid = item ? (item.usrNm || item.todoId || item.empNo) : null;
+					if (uid) appIds[uid] = true;
+				});
+				shaArray = shaArray.filter(function(item) {
+					var uid = item ? (item.usrNm || item.todoId || item.empNo) : null;
+					return !uid || !appIds[uid];
+				});
+				$.each(shaArray, function(idx, item) { item.sanctnSn = idx + 1; });
+				resultApprovalList = appArray.concat(shaArray);
+				renderResultApprovalList();
+			});
+		}
+
+		// 결과 결재선 → approvalArr (PC processApprovalGrid("RESULT") 와 동일 구조)
+		function buildResultApprovalArr(reqNo, salesCd) {
+			var arr = [];
+			var coCdVal = $('#coCd').val() || "GUN";
+			var seenAppIds = {};
+			$.each(resultApprovalList, function(idx, item) {
+				if (item.gb === "결재") {
+					var uid = item.usrNm || item.todoId || item.empNo;
+					if (uid) seenAppIds[uid] = true;
+				}
+			});
+			var appSn = 0;
+			var shaSn = 0;
+			$.each(resultApprovalList, function(idx, item) {
+				var todoDiv1CodeId, todoDiv2CodeId, sanctnSn;
+				if (item.gb === "결재") {
+					appSn += 1;
+					todoDiv1CodeId = "TODODIV20";
+					todoDiv2CodeId = "TODODIV2420";
+					sanctnSn = appSn;
+				} else if (item.gb === "공유") {
+					var sUid = item.usrNm || item.todoId || item.empNo;
+					if (sUid && seenAppIds[sUid]) return true;
+					shaSn += 1;
+					todoDiv1CodeId = "TODODIV10";
+					todoDiv2CodeId = "TODODIV1420";
+					sanctnSn = shaSn;
+				} else {
+					return true;
+				}
+				arr.push({
+					coCd: coCdVal,
+					todoCoCd: coCdVal,
+					todoDiv1CodeId: todoDiv1CodeId,
+					todoDiv2CodeId: todoDiv2CodeId,
+					salesCd: salesCd,
+					sanctnSn: sanctnSn,
+					sanctnSttus: item.sanctnSttus || "N",
+					todoNo: reqNo,
+					todoFileTrgtKey: reqNo,
+					todoTitl: "휴일대체근무 결과보고서",
+					pgPath: "/user/pm/pm08/PM0801P01.html",
+					pgParam: JSON.stringify({
+						actionType: "A",
+						coCd: coCdVal,
+						reqNo: reqNo || "",
+						todoFileTrgtKey: reqNo || "",
+						openStage: "RESULT",
+						todoDiv2CodeId: todoDiv2CodeId,
+						pgmId: "PM0801P01"
+					}),
+					todoId: item.usrNm,
+					empNo: item.usrNm,
+					name: item.name,
+					telNo: item.telNo,
+					email: item.email,
+					gb: item.gb,
+					lineType: item.lineType || (item.gb === "공유" ? "REF" : "APPR"),
+					userId: jwt.userId,
+					pgmId: "PM0801P01"
+				});
+			});
+			return arr;
+		}
+
+		// 결과 등록 및 결과결재 상신 (PC submitResultApproval 과 동일 검증/전송 계약 + 모바일 첨부 규약)
+		function submitResultApproval() {
+			var reqNo = $('#reqNo').val();
+			if (!reqNo) {
+				alert("신청건이 먼저 등록되어야 결과를 상신할 수 있습니다.");
+				return;
+			}
+			if (!$.trim($('#realStTm').val())) {
+				alert("실제 시작시간을 선택하세요.");
+				$('#realStTm').focus();
+				return;
+			}
+			if (!$.trim($('#realEdTm').val())) {
+				alert("실제 종료시간을 선택하세요.");
+				$('#realEdTm').focus();
+				return;
+			}
+			if (!$.trim($('#workResult').val())) {
+				alert("실제 근무결과를 입력하세요.");
+				$('#workResult').focus();
+				return;
+			}
+
+			var hasResultApprover = resultApprovalList.some(function(item) { return item.gb === "결재"; });
+			if (!hasResultApprover) {
+				setDefaultResultApprovalLine();
+			}
+
+			var pList = projectCardDataList || [];
+			var firstSalesCd = (pList.length > 0 && (pList[0].salesCd || pList[0].SALES_CD))
+				? (pList[0].salesCd || pList[0].SALES_CD) : reqNo;
+
+			var approvalList = buildResultApprovalArr(reqNo, firstSalesCd);
+			var hasResultApproval = approvalList.some(function(item) { return item.todoDiv2CodeId === "TODODIV2420" && item.gb === "결재"; });
+			if (!hasResultApproval) {
+				alert("근무결과 결재자를 1명 이상 지정해 주세요.");
+				return;
+			}
+
+			var reqNm = $('#reqTitl').val() || jwt.userNm;
+			var confirmMsg = "신청자(" + reqNm + ")는 등록내용과 틀림없이 휴일대체근무를 진행하였으니 검토 후 재가바랍니다.";
+			if (!confirm(confirmMsg)) return;
+
+			var formData = new FormData();
+			formData.append("coCd", $('#coCd').val() || "GUN");
+			formData.append("salesCd", firstSalesCd);
+			formData.append("actionType", "U");
+			formData.append("reqNo", reqNo);
+			formData.append("reqId", $('#reqId').val() || jwt.userId);
+			formData.append("reqNm", $('#reqTitl').val() || "");
+			formData.append("deptId", jwt.deptId);
+			formData.append("deptNm", $('#reqDeptNm').val() || "");
+			formData.append("holidayDt", ($('#holidayDt').val() || "").replace(/-/g, ''));
+			formData.append("realStTm", ($('#realStTm').val() || "").replace(/:/g, ''));
+			formData.append("realEdTm", ($('#realEdTm').val() || "").replace(/:/g, ''));
+			formData.append("workResult", $('#workResult').val() || "");
+			formData.append("approvalArr", JSON.stringify(approvalList));
+			formData.append("approvalStage", "RESULT");
+			formData.append("userId", jwt.userId);
+			formData.append("pgmId", "PM0801P01_M");
+
+			// 파일 첨부 처리 (saveTempData 와 동일 규약)
+			formData.append("comonCd", "FITR9902");
+			$.each(attachedFiles, function(idx, fileObj) {
+				formData.append('files', fileObj);
+			});
+			formData.append('deleteFileArr', JSON.stringify(deleteFileArr));
+
+			filePostAjax("/user/pm/pm08/updateSubstituteWork", formData, function(data) {
+				if (data && (data.resultCode == 200 || data.resultCode == "200")) {
+					try {
+						kakaoTodoResult();
+					} catch (e) {
+						console.error("알림톡 발송 실패 (저장은 정상 처리됨):", e);
+					}
+					alert("결과결재 상신이 완료되었습니다.");
+					closeModal();
+				} else {
+					var msg = (data && data.resultMessage) ? data.resultMessage : "저장 실패";
+					alert(msg);
+				}
+			});
+		}
+
+		// 알림톡 본문 (PC buildSubstituteWorkKakaoMessage 와 동일)
+		function buildSubstituteWorkKakaoMessage(sanctnDiv2, clntNm, teleNo) {
+			var holidayDt = $('#holidayDt').val() || '';
+			var stTm = $('#stTm').val() || '';
+			var edTm = $('#edTm').val() || '';
+			var specialReason = $('#specialReason').val() || '';
+			var workResult = $('#workResult').val() || '';
+
+			var docNm = (sanctnDiv2 === '결과공유') ? '휴일대체근무 결과보고서' : '휴일대체근무 신청서';
+			var msg = '내용 : [' + docNm + '] ' + sanctnDiv2 + ' 요청 건';
+			msg += '\n근무일자 : ' + holidayDt + (stTm && edTm ? (' (' + stTm + '~' + edTm + ')') : '');
+			if (specialReason) {
+				msg += '\n신청사유 : ' + specialReason;
+			}
+			if (workResult) {
+				msg += '\n근무결과 : ' + workResult;
+			}
+			msg += '\n\n요청일시 : #{sendDt}';
+			msg += '\n요청자 : ' + jwt.userNm;
+			msg += '\n\n' + sanctnDiv2 + ' 확인 바랍니다.';
+			msg += '\n\n' + clntNm + '/' + teleNo;
+			return msg;
+		}
+
+		// 알림톡 발송 (결과공유 TODODIV1420, PC kakaoTodoResult 와 동일)
+		function kakaoTodoResult() {
+			if (kakaoErr.length == 0) {
+				var paramObj = {
+					"userId": jwt.userId,
+					"codeKind": "KAKAOMSG"
+				};
+				postAjaxSync("/user/sm/sm02/selectCurrToday", paramObj, null, function(data) {
+					if (data.resultList.length > 0) {
+						kakaoErr = data.resultList;
+					}
+				});
+			}
+			let clntNm = (jwt.coCd == "GUN") ? "(주)건양ITT" : "트루넷";
+
+			var reqUserId = $('#reqId').val() || jwt.userId;
+			var paramObj1 = {
+				"coCd": $('#coCd').val() || "GUN",
+				"userId": reqUserId
+			};
+			postAjaxSync("/user/wb/wb24/selectMemberTelNo", paramObj1, null, function(data) {
+				if (!data || !data.result || !data.result[0] || !data.result[0].telNo) {
+					teleNo = "051-312-2400";
+				} else {
+					teleNo = data.result[0].telNo;
+				}
+			});
+
+			let shareParam = {
+				"tmplatDiv": "TMPLATDIV02",
+				"coCd": $('#coCd').val(),
+				"todoDiv1CodeId": "TODODIV10",
+				"todoDiv2CodeId": "TODODIV1420",
+				"todoDiv1CodeNm": "공유",
+				"title": "휴일대체근무 결과보고서",
+				"sanctnDiv2": "결과공유",
+				"todoNo": $('#reqNo').val(),
+				"clntCd": "1",
+				"clntNm": clntNm,
+				"ordrgMngNm": $('#reqTitl').val(),
+				"ordrgMngTelNo": teleNo,
+				"creatPgm": 'PM0801P01',
+				"chkSentYn": "Y",
+				"customMessage": buildSubstituteWorkKakaoMessage("결과공유", clntNm, teleNo)
+			};
+			commKaKaoSendTodo(shareParam);
+
+			if (kakaoCnt > 0) {
+				kakaoCnt = 0;
+			}
+		}
+
+		// to-do 공유 알림톡 (PC commKaKaoSendTodo 와 동일)
+		function commKaKaoSendTodo(param) {
+			var maxMessageId = null;
+			var talkMessage = null;
+			var mobile = null;
+			var todoDiv2CodeNm = null;
+			var sendList = [];
+			let talkParam = {};
+			let talkBody = {};
+			let sendCnt = 0;
+			postAjaxSync("/user/bm/bm18/selectMaxMessageIdTodo", param, null, function(data) {
+				if (data.resultList.length > 0) {
+					if (data.resultList[0].maxMessageId != "") {
+						sendList = data.resultList;
+					} else {
+						alert("알림톡 발송을 위한 messageId 생성에 실패 했습니다.");
+						return;
+					}
+				}
+			});
+
+			$.each(sendList, function(key, sendObj) {
+				maxMessageId = sendObj.maxMessageId;
+				talkMessage = sendObj.messageDesc;
+				mobile = sendObj.telNo;
+				param.rcvId = sendObj.todoId;
+				param.rcvNm = sendObj.name;
+				param.nameTo = sendObj.name;
+				todoDiv2CodeNm = sendObj.todoTitl;
+				param.todoDiv2CodeNm = todoDiv2CodeNm;
+				param.sendDt = sendObj.sendDt;
+
+				if (mobile == "" || mobile == null) {
+					alert('수신전화번호가 없습니다.');
+					return;
+				}
+				if ((talkMessage == "" || talkMessage == null) && !param.customMessage) {
+					alert('발송할 내용이 없습니다.');
+					return;
+				}
+
+				let message = param.customMessage ? param.customMessage : talkMessage;
+				let splitStr = Array.from(message.matchAll('\\{(.*?)\\}'), match => `${match[0]}`);
+				$.each(splitStr, function(key, val) {
+					let compKey = val.substring(1, val.length - 1);
+					if (compKey != "" && compKey != "undefined") {
+						if (typeof (param[compKey]) != "undefined") {
+							let val2 = '#' + val;
+							message = message.replaceAll(val2, param[compKey]);
+						}
+					}
+				});
+
+				talkParam.authToken = "e/eDfZOFCsrBqadaECQ0+g==";
+				talkParam.serverName = "gyitt2400";
+				talkParam.paymentType = "P";
+				talkBody.service = "2310086157";
+				talkBody.messageId = maxMessageId;
+				talkBody.title = param.title;
+				talkBody.message = message;
+				talkBody.mobile = mobile;
+				talkBody.template = "10003";
+				let talkJson = JSON.stringify(talkBody);
+				if (typeof jwt !== 'undefined' && jwt.kakaoSend) {
+					sendCnt = kakaoSendReal(talkJson, talkParam, param);
+				}
+			});
+
+			if (sendCnt > 0) {
+				kakaoCnt++;
+			}
+		}
+
+		// 참여 프로젝트 추가 (모바일)
 	function addProjectCardMobile() {
 		var paramObj = { "coCd": "GUN" };
 		openSecondModal("/static/html/cmn/modal/wbsSalesCodeSearch.html", 1200, 700, "SALES CODE 검색", paramObj, function (grid) {
@@ -874,13 +1436,13 @@
 		var isResultStage = isResultStageMode(dtlData);
 
 		// [요구사항] 휴일대체근무 신청 시 실제 근무 결과 숨김, 결과 등록 시에만 노출
-		if (isResultStage) {
+		var isApprovalModeNow = (paramObj.actionType === "A" || paramObj.pgmId === "M08");
+		if (isResultStage || (!isApprovalModeNow && !!paramObj.reqNo)) {
 			$('#secResultSection').show();
-			$('#popupTitle').text('휴일대체근무 결과');
 		} else {
 			$('#secResultSection').hide();
-			$('#popupTitle').text('휴일대체근무 신청');
 		}
+		$('#popupTitle').text(isResultStage ? '휴일대체근무 결과' : '휴일대체근무 신청');
 
 		var isApprovalMode = (paramObj.actionType === "A" || paramObj.pgmId === "M08");
 
@@ -889,6 +1451,7 @@
 		$("#closeBtn").text("닫기").show();
 		$("#approvalBtn").hide();
 		$("#approvalActionSection").hide();
+			$("#resultApprArea, #submitResultBtn").hide();
 		$("#pm08MngOpnGroup").hide();
 
 		if (isApprovalMode) {
@@ -912,6 +1475,7 @@
 		$("#pm08MngOpnGroup").hide();
 		$("#approvalBtn").hide();
 		$("#actionBtn").text("저장").show();
+			if (paramObj.reqNo) applyRequesterResultPolicy(dtlData);
 		$("#closeBtn").text("닫기").show();
 	}
 
@@ -1046,6 +1610,7 @@
 					$('#realEdTm').val(dtl.realEdTm || '');
 					$('#realTotalTm').val(dtl.realTotalTm || '');
 					$('#workResult').val(dtl.workResult || '');
+						pm08ResultApprAllowYn = (dtl.resultApprAllowYn === 'Y') ? 'Y' : 'N';
 
 					// 참여 프로젝트 목록 로드
 					projectCardDataList = dtl.projectList || [];
@@ -1058,6 +1623,11 @@
 
 					// 모드별 UI 제어 (신규/수정/결재자 진입)
 					renderFinalModeUI(dtl);
+
+						// 신청자 모드에서만 결과 결재선 로드 (결재자 진입 모드는 기존 승인 위젯 로직 유지)
+						if (!(paramObj.actionType === "A" || paramObj.pgmId === "M08")) {
+							loadResultApprovalLine(paramObj.reqNo);
+						}
 				}
 			});
 		}

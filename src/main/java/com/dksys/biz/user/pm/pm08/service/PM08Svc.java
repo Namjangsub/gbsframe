@@ -29,6 +29,12 @@ public interface PM08Svc {
 
 	boolean isRequestApprovedOrMissing(String reqNo);
 
+	boolean isDrafterSelfResultApprovalAllowed(String reqNo, String coCd, String todoId, String userId);
+
+	boolean isRequestRejected(String reqNo, String coCd);
+
+	Map<String, String> resolveRequestRedirect(String docId, String reqNo, String coCd, String userId);
+
 	int selectApprovalCount(Map<String, String> paramMap);
 
 	List<Map<String, String>> selectSubstituteVacationStatusList(Map<String, String> paramMap);

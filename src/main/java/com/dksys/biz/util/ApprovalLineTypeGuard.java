@@ -71,7 +71,7 @@ public class ApprovalLineTypeGuard {
 		}
 	}
 
-	private static boolean isShareLine(Map<String, String> item) {
+	public static boolean isShareLine(Map<String, String> item) {
 		if (item == null) {
 			return false;
 		}

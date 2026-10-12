@@ -37,6 +37,9 @@ public class PM08SvcImpl implements PM08Svc {
 
 	private final Logger logger = LoggerFactory.getLogger(getClass());
 
+	// 김재현 전무: 휴일대체근무 신청/결과 결재선에서 항상 후결(POST)로 저장 (단일 상수, 다른 위치에서 재사용 금지)
+	private static final String POST_ONLY_APPROVER_ID = "kimjhv";
+
 	@Autowired
 	PM08Mapper pm08Mapper;
 
@@ -77,7 +80,7 @@ public class PM08SvcImpl implements PM08Svc {
 		if (m01 != null) {
 			result.putAll(m01);
 		}
-		// 결과 결재 허용 여부(신청결재 최종 승인 완료). 화면 게이팅용이며, 최종 방어선은 updateSubstituteWork/WB20 가드
+		// 결과 결재 허용 여부(신청결재 최종 승인 완료). 화면 게이팅용이며, 최종 방어선은 WB20 가드
 		String resultApprAllowYn = (m01 != null && isRequestApprovedOrMissing(m01.get("reqNo"))) ? "Y" : "N";
 		result.put("resultApprAllowYn", resultApprAllowYn);
 		result.put("projectList", projectList);
@@ -154,6 +157,7 @@ public class PM08SvcImpl implements PM08Svc {
 			String approvalArrStr = paramMap.get("approvalArr");
 			if (approvalArrStr != null && !approvalArrStr.isEmpty()) {
 				List<Map<String, String>> approvalList = gsonDtl.fromJson(approvalArrStr, dtlMap);
+				forcePostLineForFixedApprover(approvalList);
 				approvalList = ApprovalLineTypeGuard.moveStagePostToEnd(approvalList, paramMap.get("coCd") + "/" + reqNo);
 				approvalList = deduplicateApprovalAndShare(approvalList);
 
@@ -257,20 +261,26 @@ public class PM08SvcImpl implements PM08Svc {
 		checkMap.put("todoDiv2CodeId", targetCheckCode);
 
 		int approvedCnt = pm08Mapper.selectApprovedCountExceptApplicant(checkMap);
-		if (approvedCnt > 0) {
+		if (approvedCnt > 0 && !(!isResultStage && isRequestRejected(paramMap.get("reqNo"), paramMap.get("coCd")))) {
 			result.put("resultCode", "500");
 			result.put("resultMessage", isResultStage ? "이미 결과결재가 진행된 건은 수정할 수 없습니다." : "이미 신청자 외의 결재가 진행된 건은 수정할 수 없습니다.");
 			return result;
 		}
 
-		// 결과 상신(RESULT + 결재선 등록)은 신청결재(TODODIV2410) 최종 승인 완료 후에만 허용
-		String approvalArrForGuard = paramMap.get("approvalArr");
-		if (isResultStage && approvalArrForGuard != null && !approvalArrForGuard.isEmpty()
-				&& !isRequestApprovedOrMissing(paramMap.get("reqNo"))) {
-			throw new IllegalStateException("신청 결재가 완료된 후 결과 결재를 상신할 수 있습니다.");
-		}
-
 		paramMap.put("udtId", paramMap.get("userId"));
+
+		if (!isResultStage) {
+			// 신청서 수정(REQ)은 결과 컬럼을 건드리지 않는다: 화면은 결과 값을 보내지 않으므로 DB 현재값을 유지
+			Map<String, String> resultQuery = new HashMap<>();
+			resultQuery.put("coCd", paramMap.get("coCd"));
+			resultQuery.put("reqNo", paramMap.get("reqNo"));
+			Map<String, String> resultDtl = pm08Mapper.selectSubstituteWorkDtl(resultQuery);
+			if (resultDtl != null) {
+				paramMap.put("realStTm", resultDtl.get("rawRealStTm"));
+				paramMap.put("realEdTm", resultDtl.get("rawRealEdTm"));
+				paramMap.put("workResult", resultDtl.get("workResult"));
+			}
+		}
 
 		// 2. 결과 작성/상신 모드(RESULT)일 때: 신청서 필드는 절대 수정하지 않고, 결과 영역(REAL_ST_TM, REAL_ED_TM, WORK_RESULT)만 수정
 		int updateResult = isResultStage ? pm08Mapper.updateSubstituteWorkResult(paramMap) : pm08Mapper.updateSubstituteWork(paramMap);
@@ -308,6 +318,7 @@ public class PM08SvcImpl implements PM08Svc {
 				Gson gsonDtl = new GsonBuilder().disableHtmlEscaping().create();
 				Type dtlMap = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
 				List<Map<String, String>> approvalList = gsonDtl.fromJson(approvalArrStr, dtlMap);
+				forcePostLineForFixedApprover(approvalList);
 				approvalList = ApprovalLineTypeGuard.moveStagePostToEnd(approvalList, paramMap.get("coCd") + "/" + reqNoVal);
 				approvalList = deduplicateApprovalAndShare(approvalList);
 
@@ -713,6 +724,140 @@ public class PM08SvcImpl implements PM08Svc {
 		return finalYn == null || "Y".equals(finalYn.get("todoYn"));
 	}
 
+	/**
+	 * 신청결재 미완료 상태에서 결과결재(TODODIV2420) 상신 시 기안자 본인의 자체승인 행만 예외 허용.
+	 * 결과 결재선에 기안자 외 결재자가 있어야 한다(기안자만 있으면 자체승인이 최종 승인이 되어 신청 완료 전 결과가 END 됨).
+	 */
+	@Override
+	public boolean isDrafterSelfResultApprovalAllowed(String reqNo, String coCd, String todoId, String userId) {
+		if (reqNo == null || reqNo.trim().isEmpty() || todoId == null || todoId.trim().isEmpty() || !todoId.equals(userId)) {
+			return false;
+		}
+		String useCoCd = (coCd == null || coCd.trim().isEmpty()) ? "GUN" : coCd;
+		Map<String, String> dtlQuery = new HashMap<>();
+		dtlQuery.put("coCd", useCoCd);
+		dtlQuery.put("reqNo", reqNo);
+		Map<String, String> dtl = pm08Mapper.selectSubstituteWorkDtl(dtlQuery);
+		if (dtl == null || !todoId.equalsIgnoreCase(dtl.get("reqId"))) {
+			return false;
+		}
+		Map<String, String> lineQuery = new HashMap<>();
+		lineQuery.put("todoNo", reqNo);
+		lineQuery.put("coCd", useCoCd);
+		for (Map<String, String> row : wb20Svc.selectGetApprovalList(lineQuery)) {
+			if ("TODODIV2420".equals(row.get("todoDiv2CodeId")) && !todoId.equalsIgnoreCase(row.get("todoId"))) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	/**
+	 * 신청결재(TODODIV2410) 결재선 중 반려(APPR_REJECT_YN='Y') 라인 존재 여부. 공유 라인은 판정에서 제외한다.
+	 */
+	@Override
+	public boolean isRequestRejected(String reqNo, String coCd) {
+		if (reqNo == null || reqNo.trim().isEmpty()) {
+			return false;
+		}
+		String useCoCd = (coCd == null || coCd.trim().isEmpty()) ? "GUN" : coCd;
+		Map<String, String> lineQuery = new HashMap<>();
+		lineQuery.put("todoNo", reqNo);
+		lineQuery.put("coCd", useCoCd);
+		List<Map<String, String>> reqLines = new ArrayList<>();
+		for (Map<String, String> row : wb20Svc.selectGetApprovalList(lineQuery)) {
+			if ("TODODIV2410".equals(row.get("todoDiv2CodeId")) && !ApprovalLineTypeGuard.isShareLine(row)) {
+				reqLines.add(row);
+			}
+		}
+		return hasRejectedRequestLine(reqLines);
+	}
+
+	private boolean hasRejectedRequestLine(List<Map<String, String>> reqLines) {
+		for (Map<String, String> row : reqLines) {
+			if ("Y".equalsIgnoreCase(row.get("apprRejectYn"))) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	/**
+	 * AM 업무키 조회 결과가 휴일대체근무 결과결재(2420) 문서이고, 현재 사용자가 신청결재(2410)에 미승인 라인을 가진 경우
+	 * 신청결재 문서로 연결한다. 그 외에는 입력 docId를 그대로 반환한다(redirectedYn=N). 실패 시에도 입력 docId를 유지한다.
+	 */
+	@Override
+	public Map<String, String> resolveRequestRedirect(String docId, String reqNo, String coCd, String userId) {
+		Map<String, String> result = new HashMap<>();
+		result.put("docId", docId);
+		result.put("redirectedYn", "N");
+		if (docId == null || docId.trim().isEmpty() || reqNo == null || reqNo.trim().isEmpty()
+				|| userId == null || userId.trim().isEmpty()) {
+			return result;
+		}
+		try {
+			String useCoCd = (coCd == null || coCd.trim().isEmpty()) ? "GUN" : coCd;
+			Map<String, String> docQuery = new HashMap<>();
+			docQuery.put("reqNo", reqNo);
+			docQuery.put("coCd", useCoCd);
+			docQuery.put("todoDiv2CodeId", "TODODIV2420");
+			if (!docId.equals(pm08Mapper.selectAmDocIdByReqNo(docQuery))) {
+				return result;
+			}
+			if (isRequestApprovedOrMissing(reqNo)) {
+				return result;
+			}
+
+			Map<String, String> lineQuery = new HashMap<>();
+			lineQuery.put("todoNo", reqNo);
+			lineQuery.put("coCd", useCoCd);
+			Map<String, String> myReqLine = null;
+			List<Map<String, String>> reqLines = new ArrayList<>();
+			for (Map<String, String> row : wb20Svc.selectGetApprovalList(lineQuery)) {
+				if ("TODODIV2410".equals(row.get("todoDiv2CodeId")) && !ApprovalLineTypeGuard.isShareLine(row)) {
+					reqLines.add(row);
+				}
+			}
+			if (hasRejectedRequestLine(reqLines)) {
+				return result;
+			}
+			for (Map<String, String> row : reqLines) {
+				if (!userId.equals(row.get("todoId"))) {
+					continue;
+				}
+				String lineType = row.get("lineType");
+				if (lineType != null && !"APPR".equals(lineType) && !"AGREE".equals(lineType)) {
+					continue;
+				}
+				if ("Y".equalsIgnoreCase(row.get("sanctnSttus"))) {
+					continue;
+				}
+				myReqLine = row;
+				break;
+			}
+			if (myReqLine == null) {
+				return result;
+			}
+
+			docQuery.put("todoDiv2CodeId", "TODODIV2410");
+			String reqDocId = pm08Mapper.selectAmDocIdByReqNo(docQuery);
+			if (reqDocId == null || reqDocId.trim().isEmpty()) {
+				return result;
+			}
+			result.put("docId", reqDocId);
+			result.put("redirectedYn", "Y");
+			result.put("redirectReason", "신청 결재가 완료되지 않아 휴일대체근무 신청서 결재 문서로 연결했습니다.");
+			result.put("redirectTodoKey", myReqLine.get("todoKey"));
+		} catch (Exception e) {
+			logger.warn("[PM08] 신청결재 리다이렉트 판정 실패(입력 docId 유지): reqNo={}, userId={}", reqNo, userId, e);
+			result.put("docId", docId);
+			result.put("redirectedYn", "N");
+			result.remove("redirectReason");
+			result.remove("redirectTodoKey");
+		}
+		return result;
+	}
+
 	@Override
 	public int selectApprovalCount(Map<String, String> paramMap) {
 		return pm08Mapper.selectApprovalCount(paramMap);
@@ -780,6 +925,17 @@ public class PM08SvcImpl implements PM08Svc {
 		if (uid == null || uid.trim().isEmpty()) uid = item.get("empNo");
 		if (uid == null || uid.trim().isEmpty()) uid = item.get("userId");
 		return uid == null ? null : uid.trim();
+	}
+
+	private void forcePostLineForFixedApprover(List<Map<String, String>> approvalList) {
+		if (approvalList == null) {
+			return;
+		}
+		for (Map<String, String> item : approvalList) {
+			if (!ApprovalLineTypeGuard.isShareLine(item) && POST_ONLY_APPROVER_ID.equals(getApproverUserId(item))) {
+				item.put("lineType", "POST");
+			}
+		}
 	}
 
 	private void syncSubstituteWorkToAm(Map<String, String> paramMap, String todoDiv2CodeId) {

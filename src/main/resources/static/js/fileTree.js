@@ -861,6 +861,7 @@ var approvalWorkingGrid; //팝업화면에서 결재정보 저장용
 		} else if( row.todoDiv1CodeNm == "결재" ) {
 			// AM 전자결재 연동 문서(PM51, PM07, PM08 등)의 DOC_ID 우선 조회
 			var amDocId = "";
+			var amRedirectRes = null;
 			var amSearchParam = {
 				erpBizKey: row.todoNo,
 				todoKey: row.todoKey,
@@ -872,6 +873,7 @@ var approvalWorkingGrid; //팝업화면에서 결재정보 저장용
 				postAjaxSync("/user/am/am12/selectDocIdByBizKey", amSearchParam, null, function(res) {
 					if (res && res.resultCode === "200" && res.docId) {
 						amDocId = res.docId;
+						amRedirectRes = res;
 					}
 				});
 			} catch (e) {
@@ -890,6 +892,7 @@ var approvalWorkingGrid; //팝업화면에서 결재정보 저장용
 					todoDiv2CodeId: row.todoDiv2CodeId
 				};
 
+				amParamObj = applyAmRedirectParam(amRedirectRes, amParamObj);
 				openThirdModal("/static/html/user/am/am12/AM1201P01.html", 980, 840, "전자결재 문서 상세", amParamObj, function(data) {
 					$('.callApprovalWorking').last().remove();
 					if (typeof gridView !== 'undefined') {

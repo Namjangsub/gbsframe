@@ -204,8 +204,12 @@ public class WB20SvcImpl implements WB20Svc {
 		validatePm51SalesApproval(paramMap);
 		validatePm51SequentialApproval(paramMap);
 
-		// PM08 결과결재(TODODIV2420) 승인은 신청결재(TODODIV2410) 최종 완료 후에만 허용 (AM 위임 재진입 포함)
-		if ("TODODIV2420".equals(todoDiv2CodeId) && !pm08Svc.isRequestApprovedOrMissing(tempReqNo)) {
+		// PM08 결과결재(TODODIV2420) 승인은 신청결재(TODODIV2410) 최종 완료 후에만 허용 (AM 위임 재진입 포함, 기안자 본인 자체승인은 예외)
+		if ("TODODIV2420".equals(todoDiv2CodeId) && !pm08Svc.isRequestApprovedOrMissing(tempReqNo)
+				&& !pm08Svc.isDrafterSelfResultApprovalAllowed(tempReqNo, paramMap.get("coCd"), paramMap.get("todoId"), paramMap.get("userId"))) {
+			if (pm08Svc.isRequestRejected(tempReqNo, paramMap.get("coCd"))) {
+				throw new IllegalStateException("신청 결재가 반려되었습니다. 신청서 재상신 후 결과 결재를 처리할 수 있습니다.");
+			}
 			throw new IllegalStateException("신청 결재가 완료된 후 결과 결재를 처리할 수 있습니다.");
 		}
 

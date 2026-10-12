@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 
 import com.dksys.biz.config.RequestUtils;
 import com.dksys.biz.user.am.am11.service.AM11Svc;
+import com.dksys.biz.user.pm.pm08.service.PM08Svc;
 
 @Controller
 @RequestMapping("/user/am/am12")
@@ -22,6 +23,9 @@ public class AM12Ctr {
 
     @Autowired
     private AM11Svc am11Svc;
+
+    @Autowired
+    private PM08Svc pm08Svc;
 
     // 결재문서 상세 및 결재선/이력 조회
     @PostMapping(value = "/selectApprovalDocDetail")
@@ -131,9 +135,21 @@ public class AM12Ctr {
     public String selectDocIdByBizKey(@RequestBody Map<String, Object> paramMap, HttpServletRequest request, ModelMap model) {
         enrichRequestInfo(paramMap, request);
         String docId = am11Svc.selectDocIdByBizKey(paramMap);
+        Map<String, String> redirect = pm08Svc.resolveRequestRedirect(docId, bizKeyStr(paramMap, "erpBizKey"),
+                bizKeyStr(paramMap, "coCd"), bizKeyStr(paramMap, "userId"));
         model.addAttribute("resultCode", "200");
-        model.addAttribute("docId", docId != null ? docId : "");
+        model.addAttribute("docId", redirect.get("docId") != null ? redirect.get("docId") : "");
+        model.addAttribute("redirectedYn", redirect.get("redirectedYn"));
+        if ("Y".equals(redirect.get("redirectedYn"))) {
+            model.addAttribute("redirectReason", redirect.get("redirectReason"));
+            model.addAttribute("redirectTodoKey", redirect.get("redirectTodoKey"));
+        }
         return "jsonView";
+    }
+
+    private String bizKeyStr(Map<String, Object> paramMap, String key) {
+        Object value = paramMap.get(key);
+        return value == null ? null : String.valueOf(value);
     }
 
     private void enrichRequestInfo(Map<String, Object> paramMap, HttpServletRequest request) {

@@ -644,6 +644,15 @@ var openSecondModal = function(url, width, height, title, paramObj, callback) {
     });
 };
 
+// AM 업무키 조회(am12/selectDocIdByBizKey) 응답이 신청결재 리다이렉트(redirectedYn=Y)면 안내 후 paramObj 를 신청결재 건으로 교체
+var applyAmRedirectParam = function(res, paramObj) {
+	if (!res || res.redirectedYn !== 'Y' || !paramObj) return paramObj;
+	alert(res.redirectReason || '신청 결재를 먼저 처리해야 합니다. 신청서 결재 화면으로 이동합니다.');
+	paramObj.todoKey = res.redirectTodoKey || paramObj.todoKey;
+	paramObj.todoDiv2CodeId = 'TODODIV2410';
+	return paramObj;
+};
+
 var openThirdModal = function(url, width, height, title, paramObj, callback) {
 	var size = {width, height};
 	if (deviceType != 'desktop') {

@@ -204,7 +204,7 @@
 			<div class="col-xs-12 text-right popup_bottom_btn" style="margin-top: 0px; padding-right: 0;">
 				<button type="button" class="btn btn-warning btn-sm" id="fileUpBtn" form="popForm" onclick="fileUpload($(this.form));" style="display: none;">첨부파일저장</button>
 				<button type="button" class="btn btn-info btn-sm" id="btnSubmitApproval" onclick="submitApproval();" style="display: none;">신청결재 상신</button>
-				<span id="resultApprGuide" class="text-danger" style="display: none; line-height: 30px; margin-right: 6px;">신청 결재 완료 후 결과 결재가 가능합니다.</span>
+				<span id="resultApprGuide" class="text-danger" style="display: none; line-height: 30px; margin-right: 6px;">결과 상신은 가능하나 결과 승인은 신청 결재 완료 후 처리됩니다.</span>
 				<button type="button" class="btn btn-success btn-sm" id="btnSubmitResult" onclick="submitResultApproval();" style="display: none;">결과결재 상신</button>
 				<button type="button" class="btn btn-danger btn-sm" id="btnDelete" onclick="deleteData();" style="display: none;">삭 제</button>
 				<button type="button" class="btn btn-default btn-sm" onclick="modalStack.close();">닫 기</button>
@@ -239,7 +239,7 @@
 	// fileTree.js의 selectedNodeId ReferenceError 방어
 	window.selectedNodeId = window.selectedNodeId || "";
 
-	// 결과 결재 허용 플래그(서버 resultApprAllowYn). 상세 로드 시 갱신, 'Y'일 때만 결과 결재/상신 가능. 미수신·신규는 'N'(차단).
+	// 결과 결재 허용 플래그(서버 resultApprAllowYn). 상세 로드 시 갱신, 'Y'일 때만 결과 결재(승인) 가능. 결과 상신은 제한 없음. 미수신·신규는 'N'.
 	// 서버 가드(updateSubstituteWork/WB20)가 최종 방어선이며, 이 값은 화면 표시용이다.
 	var pm08ResultApprAllowYn = 'N';
 
@@ -1055,7 +1055,8 @@
 							todoKey       : r.todoKey || "",
 							flag          : r.flag || "",
 							sanctnSttus   : r.sanctnSttus || ((sanctnSttusNmVal === '승인') ? 'Y' : 'N'),
-							sanctnSttusNm : sanctnSttusNmVal
+							sanctnSttusNm : sanctnSttusNmVal,
+							apprRejectYn  : r.apprRejectYn || r.APPR_REJECT_YN || 'N'
 						};
 
 						if (div.target === "REQ") {
@@ -1171,7 +1172,30 @@
 			}
 		}
 
-		// 신청 결재가 승인완료(END)되기 전에는 결과 결재 버튼을 노출하지 않는다 (안내 문구는 applyApprStatusPolicy에서 표시)
+		// (C) 결과 To-Do 진입 + 신청 결재 미완료 시 신청 결재로 이동시킬 대상 탐색 (후결/협조 라인 제외, 결재 구분만)
+		var redirectReq = null;
+		var reqWaitTurn = false;
+		var reqRejected = false;
+		for (var q = 0; q < reqList.length; q++) {
+			if (reqList[q].gb === '결재' && (reqList[q].apprRejectYn === 'Y' || reqList[q].sanctnSttusNm === '반려')) {
+				reqRejected = true;
+				break;
+			}
+		}
+		for (var k = 0; k < reqList.length && !reqRejected; k++) {
+			var r3 = reqList[k];
+			if (r3.gb !== '결재' || r3.lineType === 'POST' || r3.lineType === 'COOP') continue;
+			if (!(isSameUser(r3.usrNm, curUserId) || isSameUser(r3.todoId, curUserId))) continue;
+			if (r3.sanctnSttus === 'N' || r3.sanctnSttusNm === '미승인') {
+				if (isMyTurn(reqList, k)) {
+					redirectReq = r3;
+					break;
+				}
+				reqWaitTurn = true;
+			}
+		}
+
+		// 신청 결재가 승인완료(END)되기 전에는 결과 결재 버튼을 노출하지 않는다 (2420 분기에서 이동/안내 처리)
 		if (pm08ResultApprAllowYn !== 'Y') myResultAppr = null;
 
 		// ===== [진입 시점 1: To-Do 결재함/공유함에서 특정 건으로 진입한 경우] =====
@@ -1196,9 +1220,21 @@
 				var isShare2 = (todoCode === 'TODODIV1420');
 				var btnText2 = isShare2 ? "결과공유 확인" : "결과결재 승인";
 
-				if (myResultAppr && myResultAppr.todoKey) {
-					var cmd2 = '<button type="button" class="btn btn-primary btn-sm callApprovalWorkingAuto" onclick="treeModule.callApprovalWorking(\'' + myResultAppr.todoKey + '\', \'PM0801P01\')">' + btnText2 + '</button> ';
-					if ($closeBtn.length) { $closeBtn.before(cmd2); } else { $popBottom.append(cmd2); }
+				var $resultGuide = $('#resultApprGuide');
+				if (pm08ResultApprAllowYn === 'Y') {
+					$resultGuide.hide();
+					if (myResultAppr && myResultAppr.todoKey) {
+						var cmd2 = '<button type="button" class="btn btn-primary btn-sm callApprovalWorkingAuto" onclick="treeModule.callApprovalWorking(\'' + myResultAppr.todoKey + '\', \'PM0801P01\')">' + btnText2 + '</button> ';
+						if ($closeBtn.length) { $closeBtn.before(cmd2); } else { $popBottom.append(cmd2); }
+					}
+				} else if (reqRejected) {
+					$resultGuide.text('신청 결재가 반려되었습니다. 신청서를 수정해 재상신해야 결과 결재가 가능합니다.').show();
+				} else if (redirectReq && redirectReq.todoKey) {
+					var cmd3 ='<button type="button" class="btn btn-info btn-sm callApprovalWorkingAuto" onclick="treeModule.callApprovalWorking(\'' + redirectReq.todoKey + '\', \'PM0801P01\')">신청 결재 먼저 처리</button> ';
+					if ($closeBtn.length) { $closeBtn.before(cmd3); } else { $popBottom.append(cmd3); }
+					$resultGuide.hide();
+				} else {
+					$resultGuide.text(reqWaitTurn ? '신청 결재 순서 대기 중입니다. 앞 순번 신청 결재 완료 후 결과 결재가 가능합니다.' : '신청 결재 완료 후 결과 결재가 가능합니다.').show();
 				}
 				$('#popupTitle').text("휴일대체근무 신청 " + (isShare2 ? "[결과공유]" : "[결과결재]"));
 				return;
@@ -1839,10 +1875,6 @@
 			alert("신청건이 먼저 등록되어야 결과를 상신할 수 있습니다.");
 			return;
 		}
-		if (pm08ResultApprAllowYn !== 'Y') {
-			alert("신청 결재 완료 후 결과 결재가 가능합니다.");
-			return;
-		}
 		if (!checkAttendanceClosedWarning_PM08("holidayDt")) {
 			return;
 		}
@@ -2164,9 +2196,11 @@
 		}
 
 		// [3. 신청서 영역(secReq) 편집 가능 여부 제어]
-		// 결과가 이미 등록되었거나 결과등록 모드이면 신청서는 무조건 수정 불가 (읽기 전용)
-		// 결과가 아직 없는 경우에만 신청서 결재 대기(REQ) + 작성자 본인 시 수정 가능
-		var isReqEditable = !hasResult && (openStage !== 'RESULT') && !isResultTodo && isWriter && (!dtlData.reqStatus || dtlData.reqStatus === 'REQ') && (actionType !== 'A' && actionType !== 'V');
+		// 신청 결재 반려(RTN)는 결과 등록 여부와 무관하게 작성자가 신청서를 수정·재상신할 수 있다(결과 컬럼은 서버가 보존)
+		// 그 외에는 결과가 없고 신청 결재 대기(REQ) + 작성자 본인이며, 결과등록 모드/결과 To-Do 인입이 아닐 때만 수정 가능
+		var isReqRejected = (dtlData.reqStatus === 'RTN');
+		var isReqEditable = isWriter && (actionType !== 'A' && actionType !== 'V')
+			&& (isReqRejected || (!hasResult && (openStage !== 'RESULT') && !isResultTodo && (!dtlData.reqStatus || dtlData.reqStatus === 'REQ')));
 
 		$('#secReq').find('input, select, textarea').prop('disabled', !isReqEditable).css('background', isReqEditable ? '' : '#fafafa !important');
 		if (isReqEditable) {
@@ -2174,7 +2208,7 @@
 			$('#secReq').find('.input_calendar').css({'cursor': 'pointer', 'pointer-events': ''});
 			bindHolidayDatePicker();
 			$('#btnProjectArea, #btnReqApprovalArea').show();
-			$('#btnSubmitApproval').text('신청서수정').show();
+			$('#btnSubmitApproval').text(isReqRejected ? '신청결재 재상신' : '신청서수정').show();
 			$('#btnDelete').text('삭 제').show();
 		} else {
 			$('#secReq').find('input, select, textarea, button, a').attr('readonly', true).css({'pointer-events': 'none'});
@@ -2195,14 +2229,14 @@
 				$('#btnResultApprovalArea').show();
 
 				var isFirstResult = !hasResult;
-				$('#btnSubmitResult').text(isFirstResult ? '결과결재 상신' : '결과수정').toggle(isReqApprDone);
-				$('#resultApprGuide').toggle(!isReqApprDone);
+				$('#btnSubmitResult').text(isFirstResult ? '결과결재 상신' : '결과수정').show();
+				$('#resultApprGuide').text('결과 상신은 가능하나 결과 승인은 신청 결재 완료 후 처리됩니다.').toggle(isFirstResult && !isReqApprDone);
 				$('#btnDelete').text('결과삭제').toggle(!isFirstResult).show();
 			} else {
 				// 결과 결재 진행 중(ING) 또는 완료(END), 또는 조회/결재 모드 시 읽기 전용
 				$('#secResult').find('input, select, textarea').prop('disabled', true).css({'background': '#fafafa !important', 'pointer-events': 'none'});
 				$('#btnResultApprovalArea, #btnSubmitResult').hide();
-				$('#resultApprGuide').toggle(!isReqApprDone && isResultTodo);
+				$('#resultApprGuide').hide();
 				if (!isReqEditable) {
 					$('#btnDelete').hide();
 				}
@@ -2223,7 +2257,7 @@
 		// [6. 근태 마감 잠금]
 		var isClosed = isAttendanceClosed(dtlData.holidayDt || $('#holidayDt').val());
 		if (isClosed && (actionType !== 'C' || hasReq)) {
-			$('#btnSubmitApproval, #btnSubmitResult, #btnDelete').hide();
+			$('#btnSubmitApproval, #btnSubmitResult, #btnDelete, #resultApprGuide').hide();
 			$('#btnProjectArea, #btnReqApprovalArea, #btnResultApprovalArea').hide();
 			$('#secReq, #secResult').find('input, select, textarea').prop('disabled', true).css('background', '#fafafa !important');
 			$('#secReq, #secResult').find('.input_calendar').off('click').css({'cursor': 'default', 'pointer-events': 'none'});
