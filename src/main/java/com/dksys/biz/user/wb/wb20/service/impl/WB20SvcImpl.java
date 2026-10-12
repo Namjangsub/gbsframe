@@ -871,8 +871,14 @@ public class WB20SvcImpl implements WB20Svc {
 		keyParam.put("todoDiv2CodeId", paramMap.get("todoDiv2CodeId"));
 		keyParam.put("coCd", paramMap.get("coCd"));
 		keyParam.put("includeCompleted", "Y");
-		String docId = wb20Mapper.selectAmDocIdByWbLineKey(keyParam);
-		return hasText(docId) ? docId : null;
+		try {
+			String docId = wb20Mapper.selectAmDocIdByWbLineKey(keyParam);
+			return hasText(docId) ? docId : null;
+		} catch (Exception e) {
+			logger.warn("[findAmDocIdForCancel] AM docId 탐색 중 예외 발생 (일반 결재취소 정상 진행): todoNo={}, userId={}, msg={}",
+					paramMap.get("todoNo"), paramMap.get("userId"), e.getMessage());
+			return null;
+		}
 	}
 
 	private boolean isPm51SalesApproval(Map<String, String> paramMap) {
