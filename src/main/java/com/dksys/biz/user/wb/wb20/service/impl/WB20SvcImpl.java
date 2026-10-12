@@ -1326,8 +1326,8 @@ public class WB20SvcImpl implements WB20Svc {
 					return result;
 				}
 
-				// 엔진 rejectDocument는 AGREE 반려 시에만 WB20 전파를 스킵한다(AM11SvcImpl L955).
-				// 따라서 반려한 라인의 LINE_TYPE이 AGREE일 때만 WB20 원본행을 직접 반려한다.
+				// AM rejectDocument는 APPR/AGREE 모두 원본 WB20 행을 반려 처리하고 linkedWb20=true 를 남긴다(AM11SvcImpl L1040).
+				// 따라서 linkedWb20 이 없을 때(AM 전파 생략)에만, 반려한 라인의 LINE_TYPE이 AGREE이면 WB20 원본행을 직접 반려한다.
 				// (APPR은 엔진 콜백이 이미 반려 처리하므로 직접 반려하면 이중 처리가 된다.
 				//  COOP/REF는 엔진이 반려 자체를 차단하므로 이 지점에 도달하지 않는다.)
 				Map<String, String> queryParam = new HashMap<>();
@@ -1346,9 +1346,10 @@ public class WB20SvcImpl implements WB20Svc {
 						break;
 					}
 				}
-				boolean needsWb20Reject = "AGREE".equals(actingLineType);
+				boolean needsWb20Reject = "AGREE".equals(actingLineType) && !Boolean.TRUE.equals(amParam.get("linkedWb20"));
 
 				if (needsWb20Reject) {
+					paramMap.put("rejectOpinion", rejectOpinion);
 					int wbCount = wb20Mapper.rejectApprovalLine(paramMap);
 					result.put("resultCount", String.valueOf(wbCount));
 					result.put("RESULT_COUNT", String.valueOf(wbCount));

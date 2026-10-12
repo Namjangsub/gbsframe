@@ -329,7 +329,7 @@ function Approval(htmlParam, param, popParam) {
 								let editable = false; // 투입공수 입력여부 플래그
 								// 본인결재건이면서 팀장일때
 								if (applyBtn && (data.deptTeamManager === 'TEAM01' || data.teamManager === '평가' || data.teamManager === 'Y') && jwt.userId === data.todoId && ['GUN30', 'GUN40', 'TRN50', 'GUN60', 'GUN70'].includes(jwt.deptId.slice(0, 5))) {
-									if  ((data.todoDiv2CodeId === 'TODODIV2020' && sameTimeResultChk === 'Y') 
+									if  ((data.todoDiv2CodeId === 'TODODIV2020' && sameTimeResultChk === 'Y')
 											|| (data.todoDiv2CodeId === 'TODODIV2090' || data.todoDiv2CodeId === 'TODODIV2030')){
 											editable = true;
 									}
@@ -349,9 +349,9 @@ function Approval(htmlParam, param, popParam) {
 										`<input type="text" name="actMh" readonly value="${gPasIntChk((data.actMh)) || ''}" style='text-align:center; padding-right:5px; height:40px;' comma>`
 									);
 								}
-								
+
 								// ==============================================================================================
-								
+
 								//console.log('--applyBtn--' + applyBtn);
 								html = html.replace(/@@item5@@/gi, data.sanctnSttusNm);		//상태명
 								html = html.replace(/@@item6@@/gi, data.todoCfDt);		//확인(결재)일자
@@ -500,7 +500,7 @@ function Approval(htmlParam, param, popParam) {
 
 				// dept-id 기준으로 대상 tr 선택
 				var $tr = $('tr[data-dept-id="'+ jwt.userId+'"]');
-				
+
 				// 각 항목 추출
 				var actMh = gPasIntChk($tr.find('input[name="actMh"]').val());
 				var requiredMh = $tr.find('input[name="requiredMh"]').val();
@@ -590,7 +590,7 @@ function Approval(htmlParam, param, popParam) {
 	//보완요청 ajax
 	this.approvalMemoComment = function(param) {
 		// dept-id 기준으로 대상 tr 선택
-		var $tr = $('tr[data-dept-id="'+ jwt.userId+'"]').first();	
+		var $tr = $('tr[data-dept-id="'+ jwt.userId+'"]').first();
 		var todoCfOpn = ($tr.find('textarea[name="todoCfOpn"]').val() ?? '').trim();
 			// 조건에 맞는 첫 번째 tr의 data-todokey 값
 		const todoKey = $tr.attr('data-todokey');
@@ -607,14 +607,14 @@ function Approval(htmlParam, param, popParam) {
 		postAjaxSync("/user/wb/wb20/insertApprovalMemoComment", paramMap, null, function(data){
 			var list = data.result;
 			if (list != undefined) {
-//			    $.each(list, function (key, val) {  
-//			        if ($('#mForm #' + key)[0]) { 	                        	   
+//			    $.each(list, function (key, val) {
+//			        if ($('#mForm #' + key)[0]) {
 //			            if (key == "todoDiv2CodeNm"){
-//			                $('.tit').text(val +' 보기');                             
+//			                $('.tit').text(val +' 보기');
 //			            }
 //			            $('#mForm #' + key).val(val);
 //			         }
-//			    });  
+//			    });
 			}
 			if(data.resultCode == 200){
 				list.creatPgm = "WB2001P01";
@@ -781,7 +781,7 @@ function Approval(htmlParam, param, popParam) {
 					요청자 : #{rcvNm}
 					#{confirmCnts} 바랍니다.
 					(주)건양아이티티/051-312-2400
-					
+
 					내용 : [발주/출장요청 REQ2503169] 결재 요청 건
 					업무 : 지상거래처,AK,출도(정상), 정상[발주/출장요청REQ2503169]
 					요청일시 : 2025-10-31 14:46
@@ -810,13 +810,13 @@ function Approval(htmlParam, param, popParam) {
 						"message": "내용 : 최지상 지상거래처,AK,출도(정상), 정상[발주/출장요청REQ2503169] 요청 건\n업무 : 지상거래처,AK,출도(정상), 정상[발주/출장요청REQ2503169]\n\n요청일시 : 2025-10-31 14:46\n요청자 : 남장섭\n\n[최지상 보완요청 코멘트(결재보류):현재 대응상황 점검 확인후 별도 보고 바람.] 확인 바랍니다.\n\n(주)건양아이티티/051-312-2400",
 					}
 				*/
-				
+
 				let talkJson = JSON.stringify(talkBody);
 				sendCnt = kakaoSendReal(talkJson, talkParam, param);
 			}
-			
+
 		});	//user search ajax end
-				
+
 		//대상 loop end
 		if( sendCnt > 0 ) {
 	// 		alert("알림톡 정상 발송되었습니다.");

@@ -5286,3 +5286,34 @@ if (typeof $ !== 'undefined' && !$.gridNoSet) {
 		}
 	};
 }
+
+/**
+ * 결재선 단일 행이 반려 상태인지 판정하는 공통 헬퍼 (PC/모바일 공용 정본)
+ * @param {Object} r - 결재선 행
+ * @return {boolean}
+ */
+function gbsIsApprovalRowRejected(r) {
+	if (!r) return false;
+	return r.apprRejectYn === 'Y' || r.APPR_REJECT_YN === 'Y' || r.sanctnSttusNm === '반려' || r.sanctnStsNm === '반려' || r.sanctnSttus === 'R';
+}
+
+/**
+ * 결재상태 셀 HTML 공통 렌더러 (반려/승인/미승인)
+ * - 반려(apprRejectYn='Y' 또는 상태명 '반려') -> 빨간색 굵은 글씨
+ * - 승인 -> 파란색 굵은 글씨, 미승인 -> 빨간색 굵은 글씨, 그 외 -> 원문 그대로
+ * @param {string} val - 결재상태명 (sanctnSttusNm)
+ * @param {Object} [row] - 결재선 행 (apprRejectYn 판정용)
+ * @return {string}
+ */
+function gbsApprovalStatusHtml(val, row) {
+	if (gbsIsApprovalRowRejected(row) || val === '반려') {
+		return '<span style="color: #d9534f; font-weight: bold;">반려</span>';
+	}
+	if (val === '승인') {
+		return '<span style="color: #2e6da4; font-weight: bold;">승인</span>';
+	}
+	if (val === '미승인') {
+		return '<span style="color: #d9534f; font-weight: bold;">미승인</span>';
+	}
+	return val;
+}

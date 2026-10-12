@@ -18,6 +18,8 @@ public interface PM07Mapper {
 
 	Map<String, String> selectVacationDtl(Map<String, String> paramMap);
 
+	int selectVacationRejectedCount(Map<String, String> paramMap);
+
 	int insertVacation(Map<String, String> paramMap);
 
 	int updateVacation(Map<String, String> paramMap);

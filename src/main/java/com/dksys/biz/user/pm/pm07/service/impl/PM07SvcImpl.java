@@ -13,6 +13,8 @@ import java.util.HashSet;
 import com.dksys.biz.user.am.am11.service.AM11Svc;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartHttpServletRequest;
@@ -595,6 +597,13 @@ public class PM07SvcImpl implements PM07Svc {
 
 		String reqId = currentDtl.get("reqId");
 
+		// 반려(RTN, WB20 라인 APPR_REJECT_YN='Y') 건은 신청자 본인이면 타 결재자 승인 이력과 무관하게 수정/삭제 허용
+		Map<String, String> rejectQuery = new HashMap<String, String>();
+		rejectQuery.put("reqNo", reqNo);
+		if (reqId != null && reqId.equals(getLoginUserId()) && pm07Mapper.selectVacationRejectedCount(rejectQuery) > 0) {
+			return true;
+		}
+
 		Map<String, String> approvalQuery = new HashMap<String, String>();
 		approvalQuery.put("todoNo", reqNo);
 		List<Map<String, String>> approvalList = wb20Svc.selectGetApprovalList(approvalQuery);
@@ -626,6 +635,14 @@ public class PM07SvcImpl implements PM07Svc {
 			}
 		}
 		return true; // 본인 외에는 결재자가 여러 명 지정되어 있어도 아직 결재를 완료하지 않은 대기중 상태 -> 수정/삭제 100% 가능!
+	}
+
+	private String getLoginUserId() {
+		Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+		if (auth == null || !auth.isAuthenticated() || "anonymousUser".equals(auth.getPrincipal())) {
+			return null;
+		}
+		return auth.getName();
 	}
 
 	@Override

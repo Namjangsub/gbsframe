@@ -223,7 +223,7 @@ function gbsIsApprovalLineRejected(rows) {
 		if (!r) continue;
 		var gb = r.gb || r.todoDiv1CodeNm || '';
 		if (gb && gb !== '결재' && gb !== 'APPR') continue;
-		if (r.apprRejectYn === 'Y' || r.APPR_REJECT_YN === 'Y' || r.sanctnSttusNm === '반려' || r.sanctnStsNm === '반려' || r.sanctnSttus === 'R') {
+		if (gbsIsApprovalRowRejected(r)) {
 			return true;
 		}
 	}
@@ -577,10 +577,7 @@ function Approval(htmlParam, param, popParam) {
 							}
 
 							// ==============================================================================================
-							var __wbStsNm = data.sanctnSttusNm || '';
-							var __wbStsHtml = (__wbStsNm === '승인') ? '<span style="color:#2e6da4;font-weight:bold;">승인</span>'
-											: (__wbStsNm === '미승인') ? '<span style="color:#d9534f;font-weight:bold;">미승인</span>'
-											: __wbStsNm;
+							var __wbStsHtml = gbsApprovalStatusHtml(data.sanctnSttusNm || '', data);
 							html = html.replace(/@@item5@@/gi, __wbStsHtml);		//상태명(색상)
 							html = html.replace(/@@item7@@/gi, data.reqDate || '');		//요청일자
 							html = html.replace(/@@item6@@/gi, data.todoCfDt);		//확인(결재)일자
