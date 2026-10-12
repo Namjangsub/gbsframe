@@ -567,6 +567,7 @@
 			NVL((
 				SELECT
 					CASE
+						WHEN SUM(CASE WHEN NVL(W.APPR_REJECT_YN, 'N') = 'Y' THEN 1 ELSE 0 END) > 0 THEN 'RTN'
 						WHEN SUM(CASE WHEN W.TODO_CF_DT IS NOT NULL AND (W.SANCTN_STTUS = 'N' OR W.SANCTN_STTUS = 'R' OR W.SANCTN_STTUS = '4') THEN 1 ELSE 0 END) > 0 THEN 'RTN'
 						WHEN COUNT(W.TODO_KEY) = 0 THEN 'TEMP'
 						WHEN COUNT(W.TODO_KEY) > 0 AND COUNT(W.TODO_KEY) = SUM(CASE WHEN W.TODO_CF_DT IS NOT NULL AND W.SANCTN_STTUS != 'N' THEN 1 ELSE 0 END) THEN 'END'
@@ -664,6 +665,20 @@
 			FROM TB_AM11M01
 			WHERE ERP_BIZ_KEY = #{reqNo}
 				AND ERP_BIZ_TYPE = 'PM07'
+			ORDER BY TO_NUMBER(DOC_ID) DESC
+		)
+		WHERE ROWNUM = 1
+	</select>
+
+	<!-- 재상신 시 반려/취소 문서를 제외한 활성 AM 문서만 재사용 대상으로 본다 (반려 문서는 이력으로 보존, 신규 문서 생성) -->
+	<select id="selectActiveAmDocIdByReqNo" parameterType="Map" resultType="String">
+		SELECT DOC_ID
+		FROM (
+			SELECT DOC_ID
+			FROM TB_AM11M01
+			WHERE ERP_BIZ_KEY = #{reqNo, jdbcType=VARCHAR}
+				AND ERP_BIZ_TYPE = 'PM07'
+				AND DOC_STATUS NOT IN ('REJECTED', 'CANCELLED')
 			ORDER BY TO_NUMBER(DOC_ID) DESC
 		)
 		WHERE ROWNUM = 1

@@ -97,6 +97,8 @@ public interface PM07Mapper {
 
 	String selectAmDocIdByReqNo(Map<String, String> paramMap);
 
+	String selectActiveAmDocIdByReqNo(Map<String, String> paramMap);
+
 	int deleteAmD01ByDocId(Map<String, String> paramMap);
 
 	int deleteAmM01ByDocId(Map<String, String> paramMap);

@@ -1037,6 +1037,7 @@ public class AM11SvcImpl implements AM11Svc {
                     if (!"1".equals(rejectCnt)) {
                         throw new IllegalStateException("원본 WB20 반려 처리에 실패하여 롤백했습니다.");
                     }
+                    paramMap.put("linkedWb20", true);
                 }
             }
             resultMap.put("resultCode", "200");
@@ -1051,6 +1052,7 @@ public class AM11SvcImpl implements AM11Svc {
             paramMap.put("nextStatus", "REJECTED");
             paramMap.put("actOpinion", apprOpinion);
             paramMap.put("rejectOpinion", apprOpinion);
+            paramMap.put("rejectUserNm", valueOf(actingLine.get("approverNm")));
             am11Mapper.insertApprovalHist(paramMap);
             writeAudit(paramMap, docLock, "REJECT", "결재 반려: " + ApprovalSecurityUtil.maskSensitiveData(apprOpinion));
 
@@ -1058,21 +1060,6 @@ public class AM11SvcImpl implements AM11Svc {
             Map<String, Object> docInfo = am11Mapper.selectApprovalDocInfo(paramMap);
             String erpBizType = (docInfo != null) ? (String) docInfo.get("erpBizType") : null;
             postProcessorRegistry.processRejected(erpBizType, docInfo, paramMap);
-
-            // 기안자 반려 알림 큐 적재
-            try {
-                Map<String, Object> notifParam = new HashMap<>();
-                notifParam.put("docId", docId);
-                notifParam.put("eventType", "REJECT");
-                notifParam.put("receiverId", docLock.get("draUserId"));
-                notifParam.put("receiverNm", docInfo != null ? docInfo.get("draUserNm") : "");
-                notifParam.put("notifChannel", "KAKAO");
-                notifParam.put("notifTitle", "[" + docLock.get("docNo") + "] 결재가 반려되었습니다");
-                notifParam.put("notifMsg", "상신하신 문서가 반려되었습니다: " + ApprovalSecurityUtil.maskSensitiveData(apprOpinion));
-                enqueueApprovalNotification(notifParam, paramMap);
-            } catch (Exception ne) {
-                logger.warn("반려 알림 큐 적재 경고: docId={}", docId, ne);
-            }
 
             // Fix C: 반려 통지 식별자 보강 (enqueue 스킵된 경우 이벤트만 수신되도록)
             if (paramMap.get("todoNo") == null || valueOf(paramMap.get("todoNo")).isEmpty()) {

@@ -102,7 +102,7 @@ public class ApprovalNotificationEventListener {
                     sendNotification(event.getDraUserId(), event.getDraUserNm(),
                             "[" + event.getDocNo() + "] 결재 반려",
                             "[" + event.getDocNo() + "] 상신하신 문서가 반려되었습니다: " + event.getDocTitle()
-                                    + approvalOpinionSuffix(event),
+                                    + approvalOpinionSuffix(event) + rejecterSuffix(event),
                             event.getDocId(), approvalTodoNo(event), approvalTodoDiv2CodeId(event));
                     break;
                 case "CANCEL":
@@ -147,6 +147,12 @@ public class ApprovalNotificationEventListener {
     private String approvalOpinionSuffix(ApprovalEvent event) {
         String opinion = approvalOpinion(event);
         return opinion.isEmpty() ? "" : "\n결재의견: " + opinion;
+    }
+
+    private String rejecterSuffix(ApprovalEvent event) {
+        Object rejecter = event.getExtraInfo() == null ? null : event.getExtraInfo().get("rejectUserNm");
+        String rejecterNm = rejecter == null ? "" : String.valueOf(rejecter).trim();
+        return rejecterNm.isEmpty() ? "" : "\n반려자: " + rejecterNm;
     }
 
     private String approvalOpinion(ApprovalEvent event) {

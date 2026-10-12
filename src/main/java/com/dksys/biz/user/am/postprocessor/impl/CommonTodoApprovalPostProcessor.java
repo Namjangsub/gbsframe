@@ -75,6 +75,15 @@ public class CommonTodoApprovalPostProcessor implements ApprovalPostProcessor {
             return;
         }
 
+        boolean linkedWb20 = Boolean.TRUE.equals(paramMap.get("linkedWb20"))
+                || "Y".equals(String.valueOf(paramMap.get("linkedWb20")))
+                || (docInfo != null && "Y".equals(String.valueOf(docInfo.get("linkedWb20"))));
+        // WB20 반려가 연계 전파된 경우 rejectApprovalLine이 이미 반려 상태를 기록했으므로 재기록하지 않는다.
+        // 재기록 시 TODO_CF_DT가 NULL로 되돌아가 RTN 판정이 깨진다.
+        if (linkedWb20) {
+            return;
+        }
+
         Map<String, Object> updateParam = new HashMap<>();
         updateParam.put("erpBizKey", erpBizKey);
         updateParam.put("userId", paramMap.get("userId"));

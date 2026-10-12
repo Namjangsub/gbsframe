@@ -739,6 +739,13 @@ public class PM07SvcImpl implements PM07Svc {
 				if (!paramMap.containsKey("todoNo") || paramMap.get("todoNo") == null) paramMap.put("todoNo", paramMap.get("reqNo"));
 				if (!paramMap.containsKey("todoDiv2CodeId") || paramMap.get("todoDiv2CodeId") == null) paramMap.put("todoDiv2CodeId", "TODODIV2300");
 				wb20Svc.insertTodoMaster(paramMap);
+				// 반려 후 재상신: 반려 흔적(APPR_REJECT_YN) 초기화 후 AM 활성 문서가 없으면 신규 문서 생성 (PM51 선례)
+				Map<String, String> resetParam = new HashMap<String, String>();
+				resetParam.put("coCd", paramMap.get("coCd"));
+				resetParam.put("todoNo", paramMap.get("reqNo"));
+				resetParam.put("userId", paramMap.get("userId"));
+				resetParam.put("pgmId", "PM0701P01");
+				wb20Svc.resetRejectedApprovalLines(resetParam);
 				syncVacationToAm(paramMap);
 			}
 
@@ -1018,7 +1025,7 @@ public class PM07SvcImpl implements PM07Svc {
 			Map<String, String> docIdParam = new HashMap<>();
 			docIdParam.put("reqNo", reqNo);
 			docIdParam.put("coCd", coCd);
-			String existingDocId = pm07Mapper.selectAmDocIdByReqNo(docIdParam);
+			String existingDocId = pm07Mapper.selectActiveAmDocIdByReqNo(docIdParam);
 
 			Map<String, Object> amParam = new HashMap<>();
 			if (existingDocId != null && !existingDocId.trim().isEmpty()) {
