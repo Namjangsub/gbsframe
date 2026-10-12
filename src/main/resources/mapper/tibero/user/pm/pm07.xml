@@ -464,7 +464,14 @@
 					M.DEDUCT_DAYS,
 					M.REQ_RMK,
 					M.MNG_RMK,
-					NVL(M.SANCTN_STS, 'TEMP') AS SANCTN_STS,
+					/* 실시간 결재선(TB_WB20M03) 기준 결재상태 (반려 RTN 우선). 저장 컬럼은 반려 시 갱신되지 않으므로 상세(selectVacationDtl)와 동일 산출 */
+					NVL((
+						SELECT
+							<include refid="calcSanctnStsCase"/>
+						FROM TB_WB20M03 W
+						WHERE W.TODO_NO = M.REQ_NO
+						  AND W.TODO_DIV1_CODE_ID = 'TODODIV20'
+					), NVL(M.SANCTN_STS, 'TEMP')) AS SANCTN_STS,
 					M.WORK_RPT_YN,
 					M.CREAT_ID,
 					TO_CHAR(M.CREAT_DTTM, 'YYYY-MM-DD HH24:MI:SS') AS CREAT_DTTM
@@ -497,7 +504,13 @@
 				AND D.DEPT_NM LIKE '%' || #{reqDeptNm} || '%'
 				</if>
 				<if test="sanctnSts != null and !sanctnSts.equals('')">
-				AND M.SANCTN_STS = #{sanctnSts}
+				AND NVL((
+						SELECT
+							<include refid="calcSanctnStsCase"/>
+						FROM TB_WB20M03 W
+						WHERE W.TODO_NO = M.REQ_NO
+						  AND W.TODO_DIV1_CODE_ID = 'TODODIV20'
+					), NVL(M.SANCTN_STS, 'TEMP')) = #{sanctnSts}
 				</if>
 				ORDER BY NVL(D.SORT_NO, 9999) ASC, D.DEPT_NM ASC, U.NAME ASC, M.ST_DT DESC, M.REQ_NO DESC
 			) T
