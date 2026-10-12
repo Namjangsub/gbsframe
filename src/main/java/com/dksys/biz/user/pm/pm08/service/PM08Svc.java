@@ -27,6 +27,8 @@ public interface PM08Svc {
 
 	int applySubstituteWorkResultApproved(Map<String, String> paramMap);
 
+	boolean isRequestApprovedOrMissing(String reqNo);
+
 	int selectApprovalCount(Map<String, String> paramMap);
 
 	List<Map<String, String>> selectSubstituteVacationStatusList(Map<String, String> paramMap);

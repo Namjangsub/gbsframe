@@ -831,7 +831,7 @@ var PM51_SEQUENTIAL_TITLE = {
 	'TODODIV2200': '출장복명서', 'TODODIV2201': '출장복명서',
 	'TODODIV2300': '휴가신청서',                          // PM07 추가
 	'TODODIV2410': '휴일대체근무 신청서',                // PM08 신청 추가
-	'TODODIV2420': '휴일대체근무 신청서'                 // PM08 결과 추가
+	'TODODIV2420': '휴일대체근무 결과보고서'             // PM08 결과 추가
 };
 
 // 지정된 todoNo/todoDiv2CodeId 결재선에서 아직 미완료(sanctnSttus!=='Y')인 최소 순번(sanctnSn) 결재자를 찾아

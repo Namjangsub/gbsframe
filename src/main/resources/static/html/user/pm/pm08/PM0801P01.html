@@ -204,6 +204,7 @@
 			<div class="col-xs-12 text-right popup_bottom_btn" style="margin-top: 0px; padding-right: 0;">
 				<button type="button" class="btn btn-warning btn-sm" id="fileUpBtn" form="popForm" onclick="fileUpload($(this.form));" style="display: none;">첨부파일저장</button>
 				<button type="button" class="btn btn-info btn-sm" id="btnSubmitApproval" onclick="submitApproval();" style="display: none;">신청결재 상신</button>
+				<span id="resultApprGuide" class="text-danger" style="display: none; line-height: 30px; margin-right: 6px;">신청 결재 완료 후 결과 결재가 가능합니다.</span>
 				<button type="button" class="btn btn-success btn-sm" id="btnSubmitResult" onclick="submitResultApproval();" style="display: none;">결과결재 상신</button>
 				<button type="button" class="btn btn-danger btn-sm" id="btnDelete" onclick="deleteData();" style="display: none;">삭 제</button>
 				<button type="button" class="btn btn-default btn-sm" onclick="modalStack.close();">닫 기</button>
@@ -237,6 +238,10 @@
 
 	// fileTree.js의 selectedNodeId ReferenceError 방어
 	window.selectedNodeId = window.selectedNodeId || "";
+
+	// 결과 결재 허용 플래그(서버 resultApprAllowYn). 상세 로드 시 갱신, 'Y'일 때만 결과 결재/상신 가능. 미수신·신규는 'N'(차단).
+	// 서버 가드(updateSubstituteWork/WB20)가 최종 방어선이며, 이 값은 화면 표시용이다.
+	var pm08ResultApprAllowYn = 'N';
 
 	// fileTree.js가 결재목록 첫번째(신청결재)를 임의로 꺼내 결재버튼을 중복/오생성하는 것을 차단하고
 	// PM0801P01 화면 전용 결재제어(checkAndAppendApprovalBtn)가 진입시점에 맞게 정밀 제어하도록 위임
@@ -1178,6 +1183,9 @@
 			}
 		}
 
+		// 신청 결재가 승인완료(END)되기 전에는 결과 결재 버튼을 노출하지 않는다 (안내 문구는 applyApprStatusPolicy에서 표시)
+		if (pm08ResultApprAllowYn !== 'Y') myResultAppr = null;
+
 		// ===== [진입 시점 1: To-Do 결재함/공유함에서 특정 건으로 진입한 경우] =====
 		if (entryPoint === 'TODO' || todoCode === 'TODODIV2410' || todoCode === 'TODODIV1410' || todoCode === 'TODODIV2420' || todoCode === 'TODODIV1420') {
 			if (todoCode === 'TODODIV2410' || todoCode === 'TODODIV1410') {
@@ -1436,7 +1444,8 @@
 		var specialReason = $('#specialReason').val() || '';
 		var workResult = $('#workResult').val() || '';
 
-		var msg = '내용 : [휴일대체근무 신청서] ' + sanctnDiv2 + ' 요청 건';
+		var docNm = (sanctnDiv2 === '결과공유') ? '휴일대체근무 결과보고서' : '휴일대체근무 신청서';
+		var msg = '내용 : [' + docNm + '] ' + sanctnDiv2 + ' 요청 건';
 		msg += '\n근무일자 : ' + holidayDt + (stTm && edTm ? (' (' + stTm + '~' + edTm + ')') : '');
 		if (specialReason) {
 			msg += '\n신청사유 : ' + specialReason;
@@ -1543,7 +1552,7 @@
 			"todoDiv1CodeId": "TODODIV10",
 			"todoDiv2CodeId": "TODODIV1420",
 			"todoDiv1CodeNm": "공유",
-			"title": "휴일대체근무 신청서",
+			"title": "휴일대체근무 결과보고서",
 			"sanctnDiv2": "결과공유",
 			"todoNo": $('#reqNo').val(),
 			"clntCd": "1",
@@ -1842,6 +1851,10 @@
 			alert("신청건이 먼저 등록되어야 결과를 상신할 수 있습니다.");
 			return;
 		}
+		if (pm08ResultApprAllowYn !== 'Y') {
+			alert("신청 결재 완료 후 결과 결재가 가능합니다.");
+			return;
+		}
 		if (!checkAttendanceClosedWarning_PM08("holidayDt")) {
 			return;
 		}
@@ -2110,6 +2123,7 @@
 		var openStage = (pObj && pObj.openStage) ? pObj.openStage : ($('#popForm').find('#openStage').val() || '');
 		var todoCode = (pObj && pObj.todoDiv2CodeId) ? pObj.todoDiv2CodeId : ($('#popForm').find('#todoDiv2CodeId').val() || '');
 		var isResultTodo = (todoCode === 'TODODIV2420' || todoCode === 'TODODIV1420');
+		var isReqApprDone = (pm08ResultApprAllowYn === 'Y');
 
 		var currentUserId = (typeof jwt !== 'undefined' && jwt.userId) ? jwt.userId : "";
 		var reqUserId = dtlData.reqId || $('#popForm').find('#reqId').val() || "";
@@ -2193,18 +2207,21 @@
 				$('#btnResultApprovalArea').show();
 
 				var isFirstResult = !hasResult;
-				$('#btnSubmitResult').text(isFirstResult ? '결과결재 상신' : '결과수정').show();
+				$('#btnSubmitResult').text(isFirstResult ? '결과결재 상신' : '결과수정').toggle(isReqApprDone);
+				$('#resultApprGuide').toggle(!isReqApprDone);
 				$('#btnDelete').text('결과삭제').toggle(!isFirstResult).show();
 			} else {
 				// 결과 결재 진행 중(ING) 또는 완료(END), 또는 조회/결재 모드 시 읽기 전용
 				$('#secResult').find('input, select, textarea').prop('disabled', true).css({'background': '#fafafa !important', 'pointer-events': 'none'});
 				$('#btnResultApprovalArea, #btnSubmitResult').hide();
+				$('#resultApprGuide').toggle(!isReqApprDone && isResultTodo);
 				if (!isReqEditable) {
 					$('#btnDelete').hide();
 				}
 			}
 		} else {
 			$('#btnSubmitResult').hide();
+			$('#resultApprGuide').hide();
 		}
 
 		// [5. 결재 모드(actionType === 'A' || 'V') 또는 타인 접근 시 CUD 버튼 완전 차단]
@@ -2423,6 +2440,7 @@
 		$('#actionType').val(actionType);
 
 		if (actionType === "C" && !reqNoVal) {
+			pm08ResultApprAllowYn = 'N';
 			$('#popupTitle').text("휴일대체근무 신청 - 신청등록");
 			var isMng = isMngUser();
 			if (isMng) {
@@ -2499,6 +2517,7 @@
 
 			$('#coCd').val(dtlData.coCd || coCdVal);
 			$('#reqNo').val(dtlData.reqNo || reqNoVal);
+			pm08ResultApprAllowYn = (dtlData.resultApprAllowYn === 'Y') ? 'Y' : 'N';
 			$('#popForm #fileTrgtKey').val(dtlData.reqNo || reqNoVal);
 			$('#popForm #fileTrgtTyp').val("PM0801P01");
 			$('#popForm #pgmId').val("PM0801P01");

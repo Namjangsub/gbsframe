@@ -642,7 +642,7 @@ function Approval(htmlParam, param, popParam) {
 		'TODODIV2200': '출장복명서', 'TODODIV2201': '출장복명서',
 		'TODODIV2300': '휴가신청서',                          // PM07 추가
 		'TODODIV2410': '휴일대체근무 신청서',                // PM08 신청 추가
-		'TODODIV2420': '휴일대체근무 신청서'                 // PM08 결과 추가
+		'TODODIV2420': '휴일대체근무 결과보고서'             // PM08 결과 추가
 	};
 
 	//최종결재시 결재완료 최초작성자(1번)에게 전송

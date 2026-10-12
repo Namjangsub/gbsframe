@@ -204,6 +204,11 @@ public class WB20SvcImpl implements WB20Svc {
 		validatePm51SalesApproval(paramMap);
 		validatePm51SequentialApproval(paramMap);
 
+		// PM08 결과결재(TODODIV2420) 승인은 신청결재(TODODIV2410) 최종 완료 후에만 허용 (AM 위임 재진입 포함)
+		if ("TODODIV2420".equals(todoDiv2CodeId) && !pm08Svc.isRequestApprovedOrMissing(tempReqNo)) {
+			throw new IllegalStateException("신청 결재가 완료된 후 결과 결재를 처리할 수 있습니다.");
+		}
+
 		// AM 연동 판별 및 위임 (1차진입일 때만)
 		boolean isReentry = "Y".equals(paramMap.get("amLinkedApproval"));
 		if (!isReentry && am11Svc != null) {
@@ -429,7 +434,7 @@ public class WB20SvcImpl implements WB20Svc {
 				pm08Param.put("todoYn", (resultMap != null && resultMap.get("todoYn") != null) ? resultMap.get("todoYn") : "N");
 				pm08Svc.applySubstituteWorkApproved(pm08Param);
 			} catch (Exception e) {
-				e.printStackTrace();
+				logger.error("[PM08] 신청결재 후처리 호출 실패: todoNo={}", paramMap.get("todoNo"), e);
 			}
 		}
 
@@ -446,7 +451,7 @@ public class WB20SvcImpl implements WB20Svc {
 				pm08Param.put("todoYn", (resultMap != null && resultMap.get("todoYn") != null) ? resultMap.get("todoYn") : "N");
 				pm08Svc.applySubstituteWorkResultApproved(pm08Param);
 			} catch (Exception e) {
-				e.printStackTrace();
+				logger.error("[PM08] 결과결재 후처리 호출 실패: todoNo={}", paramMap.get("todoNo"), e);
 			}
 		}
 

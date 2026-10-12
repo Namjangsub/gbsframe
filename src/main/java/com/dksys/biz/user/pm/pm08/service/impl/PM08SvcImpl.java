@@ -11,6 +11,8 @@ import java.util.HashSet;
 import java.util.Collections;
 import java.util.Comparator;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -21,6 +23,7 @@ import com.dksys.biz.user.am.am11.service.AM11Svc;
 import com.dksys.biz.user.pm.pm08.mapper.PM08Mapper;
 import com.dksys.biz.user.pm.pm08.service.PM08Svc;
 import com.dksys.biz.user.pm.pm30.service.PM30Svc;
+import com.dksys.biz.user.wb.wb20.mapper.WB20Mapper;
 import com.dksys.biz.user.wb.wb20.service.WB20Svc;
 import com.dksys.biz.user.wb.wb24.service.WB24Svc;
 import com.dksys.biz.util.ApprovalLineTypeGuard;
@@ -32,11 +35,16 @@ import com.google.gson.reflect.TypeToken;
 @Transactional(rollbackFor = Exception.class)
 public class PM08SvcImpl implements PM08Svc {
 
+	private final Logger logger = LoggerFactory.getLogger(getClass());
+
 	@Autowired
 	PM08Mapper pm08Mapper;
 
 	@Autowired
 	WB20Svc wb20Svc;
+
+	@Autowired
+	WB20Mapper wb20Mapper;
 
 	@Autowired
 	WB24Svc wb24Svc;
@@ -69,6 +77,9 @@ public class PM08SvcImpl implements PM08Svc {
 		if (m01 != null) {
 			result.putAll(m01);
 		}
+		// 결과 결재 허용 여부(신청결재 최종 승인 완료). 화면 게이팅용이며, 최종 방어선은 updateSubstituteWork/WB20 가드
+		String resultApprAllowYn = (m01 != null && isRequestApprovedOrMissing(m01.get("reqNo"))) ? "Y" : "N";
+		result.put("resultApprAllowYn", resultApprAllowYn);
 		result.put("projectList", projectList);
 		return result;
 	}
@@ -250,6 +261,13 @@ public class PM08SvcImpl implements PM08Svc {
 			result.put("resultCode", "500");
 			result.put("resultMessage", isResultStage ? "이미 결과결재가 진행된 건은 수정할 수 없습니다." : "이미 신청자 외의 결재가 진행된 건은 수정할 수 없습니다.");
 			return result;
+		}
+
+		// 결과 상신(RESULT + 결재선 등록)은 신청결재(TODODIV2410) 최종 승인 완료 후에만 허용
+		String approvalArrForGuard = paramMap.get("approvalArr");
+		if (isResultStage && approvalArrForGuard != null && !approvalArrForGuard.isEmpty()
+				&& !isRequestApprovedOrMissing(paramMap.get("reqNo"))) {
+			throw new IllegalStateException("신청 결재가 완료된 후 결과 결재를 상신할 수 있습니다.");
 		}
 
 		paramMap.put("udtId", paramMap.get("userId"));
@@ -616,7 +634,7 @@ public class PM08SvcImpl implements PM08Svc {
 
 			return 1;
 		} catch (Exception e) {
-			e.printStackTrace();
+			logger.error("[PM08] 신청결재 후처리 실패(REQ_STATUS 갱신 누락 가능): reqNo={}", paramMap.get("reqNo"), e);
 			return 0;
 		}
 	}
@@ -674,9 +692,25 @@ public class PM08SvcImpl implements PM08Svc {
 
 			return 1;
 		} catch (Exception e) {
-			e.printStackTrace();
+			logger.error("[PM08] 결과결재 후처리 실패(RESULT_STATUS 갱신 누락 가능): reqNo={}", paramMap.get("reqNo"), e);
 			return 0;
 		}
+	}
+
+	/**
+	 * 신청결재(TODODIV2410) 최종 승인 여부. 신청 결재 라인이 없으면(과거 단독 결과 건) true.
+	 * 판정은 WB20 selectTodoFinalYn(todoYn='Y')과 동일하며, 완료 시 REQ_STATUS=END 가 세팅되는 기준과 같다.
+	 */
+	@Override
+	public boolean isRequestApprovedOrMissing(String reqNo) {
+		if (reqNo == null || reqNo.trim().isEmpty()) {
+			return true;
+		}
+		Map<String, String> param = new HashMap<>();
+		param.put("todoDiv2CodeId", "TODODIV2410");
+		param.put("todoNo", reqNo);
+		Map<String, String> finalYn = wb20Mapper.selectTodoFinalYn(param);
+		return finalYn == null || "Y".equals(finalYn.get("todoYn"));
 	}
 
 	@Override
