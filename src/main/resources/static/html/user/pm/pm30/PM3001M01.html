@@ -603,23 +603,14 @@
 
 			var isTripType = (item.workTypeNm === '설치시운전' || item.workTypeNm === '설치장애' || item.workTypeNm === 'A/S(무상)' || item.workTypeNm === '기타출장');
 
-			// 만약 특이사항(spclMtr)에 구체적 휴가명이나 출장/휴가 복합명이 존재하면
-			// 기존 val이 generic한 '휴가' 텍스트이거나 비어있을 경우 구체적 명칭(spclMtr)으로 렌더링 보정
-			if (item.spclMtr && (val === '' || val === '휴가')) {
-				if (!isTripType && (item.spclMtr.indexOf('출장') !== -1 || item.spclMtr.indexOf('설치') !== -1 || item.spclMtr.indexOf('A/S') !== -1)) {
-					if (item.spclMtr.indexOf(' / ') !== -1) {
-						var spParts = item.spclMtr.split(' / ');
-						val = spParts[1] || '';
-					} else {
-						val = '';
-					}
-				} else {
-					val = item.spclMtr;
-				}
+			// 특이사항(spclMtr)에 등록된 내용이 있으면 비고에는 특이사항만 표기
+			var hasSpclMtr = (item.spclMtr !== undefined && item.spclMtr !== null && String(item.spclMtr).trim() !== '');
+			if (hasSpclMtr) {
+				return String(item.spclMtr).trim();
 			}
 
-			// 근무형태가 출장 계열이 아닌데 비고 val에 출장 정보가 남아있는 경우 제거
-			if (!isTripType && val) {
+			// 근무형태가 출장 계열이 아닌데 비고 val에 출장 정보가 남아있는 경우 제거 (특이사항이 별도로 없을 때만 정제)
+			if (!hasSpclMtr && !isTripType && val) {
 				var valParts = val.split(' / ').filter(function(part) {
 					var p = part.trim();
 					if (p === '설치시운전' || p === '설치장애' || p === 'A/S(무상)' || p === '기타출장') return false;
@@ -724,12 +715,9 @@
 				return !!(hasTripAppl || item.vacApplNo || item.workApplNo);
 			}
 
-			// 3. 개별 신청서 필드 (휴가 -> vacApplNo, 대체근무 -> workApplNo)
-			if (key === 'vacationTxt' || key === 'lateTxt' || key === 'earlyLeaveTxt') {
-				return !!item.vacApplNo;
-			}
-			if (key === 'substWorkYn') {
-				return !!item.workApplNo;
+			// 3. 개별 신청서 필드 (대체근무, 지각, 조퇴, 휴가 -> 사용자가 직접 인라인 수정 가능하도록 항상 잠금 해제)
+			if (key === 'substWorkYn' || key === 'lateTxt' || key === 'earlyLeaveTxt' || key === 'vacationTxt') {
+				return false; // 담당자가 직접 입력/수정 가능하도록 항상 잠금 해제
 			}
 
 			return !!(hasTripAppl || item.vacApplNo || item.workApplNo);
@@ -991,9 +979,9 @@
 						{ key: 'vacationTxt',   label: '휴가',       width:  60, align: 'center', editor: { type: 'text', disabled: isApplCellDisabled }, styleClass: function() {
 							var item = this.item;
 							if (!item || String(item.workTypeNm || '').trim() === '제외') return '';
-							var isEarly = String(item.earlyLeaveTxt || '').trim() === '1';
+							var hasVac = String(item.vacationTxt || '').trim() !== '' && String(item.vacationTxt || '').trim() !== '0';
 							var hasVacAppl = !!(item.vacApplNo && String(item.vacApplNo).trim() !== '');
-							return (isEarly && !hasVacAppl) ? 'grid-cell-pink' : '';
+							return (hasVac && !hasVacAppl) ? 'grid-cell-pink' : '';
 						} }
 					]
 				},
@@ -1257,6 +1245,24 @@
 						// 셀 데이터 변경 시(식대 지원, 근무형태 등) 에디터 소멸 후 비동기 안전 재계산 및 리렌더링
 						// 재계산(_isSyncing) 중 들어온 편집도 "사용자 수정" 플래그는 반드시 세팅 (값만 바뀌고 플래그가 없으면 자동채움이 덮어씀)
 						if (this.item && this.key === 'spclMtr') this.item.isUserEditedSpclMtr = true;
+						if (this.item && this.key === 'inDttm') this.item.isUserEditedInDttm = true;
+						if (this.item && this.key === 'outDttm') this.item.isUserEditedOutDttm = true;
+						if (this.item && this.key === 'substWorkYn') {
+							this.item.isUserEditedSubstWork = true;
+							this.item.userSubstWorkYn = (this.item.substWorkYn !== undefined && this.item.substWorkYn !== null) ? String(this.item.substWorkYn).trim() : '';
+						}
+						if (this.item && this.key === 'lateTxt') {
+							this.item.isUserEditedLateTxt = true;
+							this.item.userLateTxt = (this.item.lateTxt !== undefined && this.item.lateTxt !== null) ? String(this.item.lateTxt).trim() : '';
+						}
+						if (this.item && this.key === 'earlyLeaveTxt') {
+							this.item.isUserEditedEarlyLeave = true;
+							this.item.userEarlyLeaveTxt = (this.item.earlyLeaveTxt !== undefined && this.item.earlyLeaveTxt !== null) ? String(this.item.earlyLeaveTxt).trim() : '';
+						}
+						if (this.item && this.key === 'vacationTxt') {
+							this.item.isUserEditedVacation = true;
+							this.item.userVacationTxt = (this.item.vacationTxt !== undefined && this.item.vacationTxt !== null) ? String(this.item.vacationTxt).trim() : '';
+						}
 						if (this.key !== '__selected__') gridDirty = true; // 저장 전 변경내용 있음 (행 선택 체크는 제외)
 						// 큰따옴표는 인라인 편집기(value="...")를 깨뜨리므로 입력 시 자동 제거
 						if (this.item && this.key && typeof this.item[this.key] === 'string' && this.item[this.key].indexOf('"') !== -1) {
@@ -1684,6 +1690,14 @@
 				if (!row || !key || allEditableKeys.indexOf(key) === -1) return;
 				if (isApplCellDisabled.call({ item: row })) return; // 결재 연동 잠금 셀은 건너뜀
 				row[key] = '';
+				if (key === 'inDttm') row.isUserEditedInDttm = true;
+				if (key === 'outDttm') row.isUserEditedOutDttm = true;
+				if (key === 'spclMtr') row.isUserEditedSpclMtr = true;
+				if (key === 'workTypeNm') row.isUserEditedWorkType = true;
+				if (key === 'substWorkYn') { row.isUserEditedSubstWork = true; row.userSubstWorkYn = ''; }
+				if (key === 'lateTxt') { row.isUserEditedLateTxt = true; row.userLateTxt = ''; }
+				if (key === 'earlyLeaveTxt') { row.isUserEditedEarlyLeave = true; row.userEarlyLeaveTxt = ''; }
+				if (key === 'vacationTxt') { row.isUserEditedVacation = true; row.userVacationTxt = ''; }
 				attendanceGrid.setValue(c.dindex, key, '');
 				touchedRows[c.dindex] = row;
 			});
@@ -1844,6 +1858,10 @@
 					if (targetKey === 'outDttm') list[calRow].isUserEditedOutDttm = true;
 					if (targetKey === 'spclMtr') list[calRow].isUserEditedSpclMtr = true;
 					if (targetKey === 'workTypeNm') list[calRow].isUserEditedWorkType = true;
+					if (targetKey === 'substWorkYn') { list[calRow].isUserEditedSubstWork = true; list[calRow].userSubstWorkYn = cellData; }
+					if (targetKey === 'lateTxt') { list[calRow].isUserEditedLateTxt = true; list[calRow].userLateTxt = cellData; }
+					if (targetKey === 'earlyLeaveTxt') { list[calRow].isUserEditedEarlyLeave = true; list[calRow].userEarlyLeaveTxt = cellData; }
+					if (targetKey === 'vacationTxt') { list[calRow].isUserEditedVacation = true; list[calRow].userVacationTxt = cellData; }
 
 					attendanceGrid.setValue(calRow, targetKey, cellData);
 				}
@@ -1952,6 +1970,10 @@
 					if (key === 'outDttm') row.isUserEditedOutDttm = true;
 					if (key === 'spclMtr') row.isUserEditedSpclMtr = true;
 					if (key === 'workTypeNm') row.isUserEditedWorkType = true;
+					if (key === 'substWorkYn') { row.isUserEditedSubstWork = true; row.userSubstWorkYn = ''; }
+					if (key === 'lateTxt') { row.isUserEditedLateTxt = true; row.userLateTxt = ''; }
+					if (key === 'earlyLeaveTxt') { row.isUserEditedEarlyLeave = true; row.userEarlyLeaveTxt = ''; }
+					if (key === 'vacationTxt') { row.isUserEditedVacation = true; row.userVacationTxt = ''; }
 					attendanceGrid.setValue(i, key, '');
 				}
 				recalcExcelDetailColumns(row);
@@ -2061,6 +2083,8 @@
 
 				var detailGroupKeys = ['pjEquipNm', 'tripAllwnc', 'tripWorkPlace', 'rmk', 'substWorkYn', 'lateTxt', 'earlyLeaveTxt', 'vacationTxt'];
 				if (detailGroupKeys.indexOf(col.key) === -1) return;
+				// 대체근무, 지각, 조퇴, 휴가 셀은 모달 대신 인라인 텍스트 입력기로 직접 수정 가능하도록 팝업 인터셉트 제외
+				if (col.key === 'substWorkYn' || col.key === 'lateTxt' || col.key === 'earlyLeaveTxt' || col.key === 'vacationTxt') return;
 
 				var item = attendanceGrid.list && attendanceGrid.list[dindex];
 				if (!item || !isApplCellDisabled.call({ item: item, key: col.key })) return;
@@ -2671,7 +2695,9 @@
 					row.vacApplNo = matchedVacation.reqNo || '';
 					var isHalfVac = (Number(matchedVacation.workHour) === 4) || (vacNm.indexOf('반차') !== -1);
 					if (VAC_DEDUCT_TYPE_CDS.indexOf(matchedVacation.vacTypeCd) !== -1) {
-						row.vacationTxt = isHalfVac ? '0.5' : '1.0';
+						if (!row.isUserEditedVacation) {
+							row.vacationTxt = isHalfVac ? '0.5' : '1.0';
+						}
 					}
 
 					var ampmTxt = '';
@@ -2751,7 +2777,9 @@
 				// 휴일/출장/휴가/휴일대체근무 근무형태 단일 판정 (applyWorkTypeNmDecision 공용 함수)
 				applyWorkTypeNmDecision(row, matchedTrip, matchedVacation, matchedSubstWork);
 				if (matchedSubstWork) {
-					row.substWorkYn = '1';
+					if (!row.isUserEditedSubstWork) {
+						row.substWorkYn = '1';
+					}
 					row.workApplNo = matchedSubstWork.reqNo || '';
 				}
 
@@ -2850,10 +2878,32 @@
 					row.tripApplNo = matchedTrip ? (matchedTrip.tripReqNo || '') : '';
 					row.tripTypeCds = matchedTrip ? (matchedTrip.tripTypeCds || '') : '';
 					row.vacApplNo = matchedVacation ? (matchedVacation.reqNo || '') : '';
-					row.substWorkYn = matchedSubstWork ? '1' : '';
 					row.workApplNo = matchedSubstWork ? (matchedSubstWork.reqNo || '') : '';
 					if (matchedTrip && matchedTrip.ordrsNo) {
 						row.ordrsNo = matchedTrip.ordrsNo;
+					}
+
+					// 대체근무(substWorkYn): 사용자가 수정했거나 DB에 저장된 값이 있으면 우선 적용, 없으면 신청서 매칭 결과 적용
+					if (row.isUserEditedSubstWork) {
+						// 사용자 수정값 유지
+					} else if (row.savedSubstWorkYn !== undefined && row.savedSubstWorkYn !== null) {
+						row.substWorkYn = row.savedSubstWorkYn;
+					} else {
+						row.substWorkYn = matchedSubstWork ? '1' : '';
+					}
+
+					// 휴가(vacationTxt): 사용자가 수정했거나 DB에 저장된 값이 있으면 우선 적용, 없으면 신청서 매칭 결과 적용
+					if (row.isUserEditedVacation) {
+						// 사용자 수정값 유지
+					} else if (row.savedVacationTxt !== undefined && row.savedVacationTxt !== null) {
+						row.vacationTxt = row.savedVacationTxt;
+					} else if (matchedVacation) {
+						var rawVacNm = String(matchedVacation.vacTypeNm || matchedVacation.pureVacTypeNm || matchedVacation.vacTypeCdNm || '').trim();
+						var vacNm = rawVacNm.replace(/\s*\(.*?\)/g, '').trim();
+						var isHalfVac = (Number(matchedVacation.workHour) === 4) || (vacNm.indexOf('반차') !== -1);
+						if (VAC_DEDUCT_TYPE_CDS.indexOf(matchedVacation.vacTypeCd) !== -1) {
+							row.vacationTxt = isHalfVac ? '0.5' : '1.0';
+						}
 					}
 
 					// 특이사항(spclMtr)은 100% 사용자 입력 필드 — 자동 채움 없음.
@@ -2969,7 +3019,10 @@
 					for (var i = 0; i < attendanceData.length; i++) {
 						// DB에 저장돼 있던 근무형태를 스냅샷으로 보존 — refreshApplicationLinkageNos가
 						// 신청서 재매칭 후 workTypeNm을 덮어쓰면 이 값과 비교해서 판정변경 여부를 표시한다.
+						attendanceData[i].isSavedRow = true;
 						attendanceData[i].savedWorkTypeNm = attendanceData[i].workTypeNm;
+						attendanceData[i].savedInJdgNm = (attendanceData[i].inJdgNm !== undefined && attendanceData[i].inJdgNm !== null) ? String(attendanceData[i].inJdgNm) : '';
+						attendanceData[i].savedOutJdgNm = (attendanceData[i].outJdgNm !== undefined && attendanceData[i].outJdgNm !== null) ? String(attendanceData[i].outJdgNm) : '';
 						// DB에 저장돼 있던 특이사항(spclMtr)도 스냅샷으로 영구 보존 — 이후 자동 채움으로 절대 덮어쓰지 않고 저장된 값 유지
 						attendanceData[i].savedSpclMtr = (attendanceData[i].spclMtr !== undefined && attendanceData[i].spclMtr !== null) ? String(attendanceData[i].spclMtr) : '';
 						attendanceData[i].isUserEditedSpclMtr = false;
@@ -2978,6 +3031,15 @@
 						attendanceData[i].savedOutDttm = (attendanceData[i].outDttm !== undefined && attendanceData[i].outDttm !== null) ? String(attendanceData[i].outDttm) : '';
 						attendanceData[i].isUserEditedInDttm = false;
 						attendanceData[i].isUserEditedOutDttm = false;
+						// DB에 저장돼 있던 대체근무, 지각, 조퇴, 휴가 필드도 스냅샷으로 보존 및 사용자 수정 플래그 초기화
+						attendanceData[i].savedSubstWorkYn = (attendanceData[i].substWorkYn !== undefined && attendanceData[i].substWorkYn !== null) ? String(attendanceData[i].substWorkYn) : '';
+						attendanceData[i].isUserEditedSubstWork = false;
+						attendanceData[i].savedLateTxt = (attendanceData[i].lateTxt !== undefined && attendanceData[i].lateTxt !== null) ? String(attendanceData[i].lateTxt) : '';
+						attendanceData[i].isUserEditedLateTxt = false;
+						attendanceData[i].savedEarlyLeaveTxt = (attendanceData[i].earlyLeaveTxt !== undefined && attendanceData[i].earlyLeaveTxt !== null) ? String(attendanceData[i].earlyLeaveTxt) : '';
+						attendanceData[i].isUserEditedEarlyLeave = false;
+						attendanceData[i].savedVacationTxt = (attendanceData[i].vacationTxt !== undefined && attendanceData[i].vacationTxt !== null) ? String(attendanceData[i].vacationTxt) : '';
+						attendanceData[i].isUserEditedVacation = false;
 						recalcExcelDetailColumns(attendanceData[i]);
 					}
 					attendanceGrid.setData({
@@ -3046,6 +3108,33 @@
 			attendanceGrid.exportExcel("근태데이터변환목록_" + todayStr + ".xls");
 		}
 
+		// ─ 실시간 최신 근태마감년월 조회 및 검증 헬퍼 (화면 로딩 시점이 아닌 저장/삭제 실행 시점에 최신 DB 기준 실시간 확인) ─
+		function checkAttendanceCloseRealtime(targetList, callback) {
+			if (!targetList || targetList.length === 0) {
+				callback(true);
+				return;
+			}
+			postAjax('/user/pm/pm30/selectAttendanceCloseYm', {}, null, function(data) {
+				__attendanceCloseYm = (data && data.closeYm) ? data.closeYm : null;
+				__attendanceCloseYmLoaded = true;
+
+				if (__attendanceCloseYm) {
+					for (var m = 0; m < targetList.length; m++) {
+						var wDt = String(targetList[m].workDt || '').replace(/[^0-9]/g, '');
+						if (wDt.length >= 6 && wDt.substring(0, 6) <= __attendanceCloseYm) {
+							var closeYmDisp = __attendanceCloseYm.length === 6 ? 
+								(__attendanceCloseYm.substring(0, 4) + '/' + __attendanceCloseYm.substring(4, 6)) : 
+								__attendanceCloseYm;
+							alert('근태마감으로 ' + closeYmDisp + '월 이전 근태 자료는 등록·수정·삭제할 수 없습니다. (조회만 가능합니다.)');
+							callback(false);
+							return;
+						}
+					}
+				}
+				callback(true);
+			});
+		}
+
 		// ─ 저장 ─
 		function saveAttendanceData() {
 			// AX5-Grid에는 finishEditing이 없으므로 편집 셀 블러 처리
@@ -3057,96 +3146,87 @@
 				return;
 			}
 
-			// 근태마감 검증 (마감월 이전 데이터 포함 시 저장 즉시 차단)
-			if (__attendanceCloseYmLoaded && __attendanceCloseYm) {
-				for (var m = 0; m < gridData.length; m++) {
-					var wDt = String(gridData[m].workDt || '').replace(/[^0-9]/g, '');
-					if (wDt.length >= 6 && wDt.substring(0, 6) <= __attendanceCloseYm) {
-						var closeYmDisp = __attendanceCloseYm.length === 6 ? 
-							(__attendanceCloseYm.substring(0, 4) + '/' + __attendanceCloseYm.substring(4, 6)) : 
-							__attendanceCloseYm;
-						alert('근태마감으로 ' + closeYmDisp + '월 이전 근태 자료는 등록·수정·삭제할 수 없습니다. (조회만 가능합니다.)');
-						return;
+			// 자료 저장 시점에 실시간 최신 근태마감 여부 확인
+			checkAttendanceCloseRealtime(gridData, function(isPass) {
+				if (!isPass) return;
+
+				// 저장 전 수정퇴근일시 유효성 전수 검사 (근무일 다음날 08:30 이후 등록 차단)
+				for (var k = 0; k < gridData.length; k++) {
+					var rItem = gridData[k];
+					if (rItem.outDttm) {
+						var check = validateOutDttm(rItem.workDt, rItem.outDttm);
+						if (!check.valid) {
+							var rowNum = k + 1;
+							var empName = rItem.empNm ? (' [' + rItem.empNm + ']') : '';
+							alert(rowNum + '행' + empName + ': ' + check.msg);
+							return; // 저장 즉시 차단
+						}
 					}
 				}
-			}
 
-			// 저장 전 수정퇴근일시 유효성 전수 검사 (근무일 다음날 08:30 이후 등록 차단)
-			for (var k = 0; k < gridData.length; k++) {
-				var rItem = gridData[k];
-				if (rItem.outDttm) {
-					var check = validateOutDttm(rItem.workDt, rItem.outDttm);
-					if (!check.valid) {
-						var rowNum = k + 1;
-						var empName = rItem.empNm ? (' [' + rItem.empNm + ']') : '';
-						alert(rowNum + '행' + empName + ': ' + check.msg);
-						return; // 저장 즉시 차단
-					}
-				}
-			}
+				// AX5-Grid 내부 속성 제거, 명시적 필드만 매핑
+				var list = gridData.map(function(r) {
+					return {
+						workDt: r.workDt,
+						empNm: r.empNm,
+						empNo: r.empNo,
+						org1Nm: r.org1Nm,
+						org2Nm: r.org2Nm,
+						org3Nm: r.org3Nm,
+						org4Nm: r.org4Nm,
+						inTm: r.inTm,
+						outTm: r.outTm,
+						inDttm: r.inDttm,
+						outDttm: r.outDttm,
+						userId: r.userId,
+						inJdgNm: r.inJdgNm,
+						outJdgNm: r.outJdgNm,
+						spclMtr: r.spclMtr,
+						otTm: r.otTm,
+						nghtTm: r.nghtTm,
+						totWorkTm: r.totWorkTm,
+						pjEquipNm: r.pjEquipNm,
+						tripAllwnc: r.tripAllwnc,
+						tripWorkPlace: r.tripWorkPlace,
+						rmk: r.rmk,
+						substWorkYn: r.substWorkYn,
+						lateTxt: r.lateTxt,
+						earlyLeaveTxt: r.earlyLeaveTxt,
+						vacationTxt: r.vacationTxt,
+						workTypeNm: r.workTypeNm,
+						orgDivNm: r.orgDivNm,
+						holidayYn: r.holidayYn,
+						lunchYn: r.lunchYn,
+						dinnerYn: r.dinnerYn,
+						nightMealYn: r.nightMealYn,
+						salaryPayYn: r.salaryPayYn,
+						vacApplNo: r.vacApplNo,
+						tripApplNo: r.tripApplNo,
+						tripReplyNo: r.tripReplyNo,
+						workApplNo: r.workApplNo,
+						clsNormal: r.clsNormal,
+						clsOt: r.clsOt,
+						clsNight: r.clsNight,
+						clsTotal: r.clsTotal
+					};
+				});
 
-			// AX5-Grid 내부 속성 제거, 명시적 필드만 매핑
-			var list = gridData.map(function(r) {
-				return {
-					workDt: r.workDt,
-					empNm: r.empNm,
-					empNo: r.empNo,
-					org1Nm: r.org1Nm,
-					org2Nm: r.org2Nm,
-					org3Nm: r.org3Nm,
-					org4Nm: r.org4Nm,
-					inTm: r.inTm,
-					outTm: r.outTm,
-					inDttm: r.inDttm,
-					outDttm: r.outDttm,
-					userId: r.userId,
-					inJdgNm: r.inJdgNm,
-					outJdgNm: r.outJdgNm,
-					spclMtr: r.spclMtr,
-					otTm: r.otTm,
-					nghtTm: r.nghtTm,
-					totWorkTm: r.totWorkTm,
-					pjEquipNm: r.pjEquipNm,
-					tripAllwnc: r.tripAllwnc,
-					tripWorkPlace: r.tripWorkPlace,
-					rmk: r.rmk,
-					substWorkYn: r.substWorkYn,
-					lateTxt: r.lateTxt,
-					earlyLeaveTxt: r.earlyLeaveTxt,
-					vacationTxt: r.vacationTxt,
-					workTypeNm: r.workTypeNm,
-					orgDivNm: r.orgDivNm,
-					holidayYn: r.holidayYn,
-					lunchYn: r.lunchYn,
-					dinnerYn: r.dinnerYn,
-					nightMealYn: r.nightMealYn,
-					salaryPayYn: r.salaryPayYn,
-					vacApplNo: r.vacApplNo,
-					tripApplNo: r.tripApplNo,
-					tripReplyNo: r.tripReplyNo,
-					workApplNo: r.workApplNo,
-					clsNormal: r.clsNormal,
-					clsOt: r.clsOt,
-					clsNight: r.clsNight,
-					clsTotal: r.clsTotal
+				var saveParams = {
+					coCd: jwt.coCd,
+					loginId: jwt.userId,
+					list: list,
+					rawList: rawDataList
 				};
-			});
 
-			var saveParams = {
-				coCd: jwt.coCd,
-				loginId: jwt.userId,
-				list: list,
-				rawList: rawDataList
-			};
-
-			postAjax('/user/pm/pm30/saveAttendanceList', saveParams, null, function(data) {
-				if (data && data.resultCode === '0000') {
-					alert('저장되었습니다. (' + data.resultCount + '건, 원본 ' + (data.rawResultCount || 0) + '건)');
-					gridDirty = false;
-					searchAttendanceData();
-				} else {
-					alert('저장 중 오류가 발생했습니다: ' + (data ? (data.resultMessage || '') : ''));
-				}
+				postAjax('/user/pm/pm30/saveAttendanceList', saveParams, null, function(data) {
+					if (data && data.resultCode === '0000') {
+						alert('저장되었습니다. (' + data.resultCount + '건, 원본 ' + (data.rawResultCount || 0) + '건)');
+						gridDirty = false;
+						searchAttendanceData();
+					} else {
+						alert('저장 중 오류가 발생했습니다: ' + (data ? (data.resultMessage || '') : ''));
+					}
+				});
 			});
 		}
 
@@ -3160,25 +3240,15 @@
 				return;
 			}
 
-			// 삭제 확인(confirm) 전 근태마감 검증
-			if (__attendanceCloseYmLoaded && __attendanceCloseYm) {
-				for (var d = 0; d < selectedList.length; d++) {
-					var swDt = String(selectedList[d].workDt || '').replace(/[^0-9]/g, '');
-					if (swDt.length >= 6 && swDt.substring(0, 6) <= __attendanceCloseYm) {
-						var closeYmDisp = __attendanceCloseYm.length === 6 ? 
-							(__attendanceCloseYm.substring(0, 4) + '/' + __attendanceCloseYm.substring(4, 6)) : 
-							__attendanceCloseYm;
-						alert('근태마감으로 ' + closeYmDisp + '월 이전 근태 자료는 등록·수정·삭제할 수 없습니다. (조회만 가능합니다.)');
-						return;
-					}
+			// 삭제 실행 시점에 실시간 최신 근태마감 여부 확인
+			checkAttendanceCloseRealtime(selectedList, function(isPass) {
+				if (!isPass) return;
+
+				if (!confirm('선택된 ' + selectedList.length + '건의 행을 삭제하시겠습니까?')) {
+					return;
 				}
-			}
 
-			if (!confirm('선택된 ' + selectedList.length + '건의 행을 삭제하시겠습니까?')) {
-				return;
-			}
-
-			// 삭제 대상 행 식별 키 맵 및 백엔드 전송용 목록 생성
+				// 삭제 대상 행 식별 키 맵 및 백엔드 전송용 목록 생성
 			var selectedKeyMap = {};
 			var deleteList = [];
 			for (var i = 0; i < selectedList.length; i++) {
@@ -3266,6 +3336,7 @@
 				} else {
 					alert('삭제 실패: ' + (data ? (data.resultMessage || '') : ''));
 				}
+			});
 			});
 		}
 
@@ -3400,6 +3471,43 @@
 				row.diffDayCnt = 0; row.diffNormal = 0; row.diffOt = 0; row.diffNight = 0;
 
 				applyAttendanceJudgment(row);
+
+				// 휴일/휴가 행에서도 사용자가 직접 입력/수정한 값(isUserEdited*) 또는 DB에 저장된 값(saved*) 우선 보존
+				if (row.isUserEditedSubstWork) {
+					if (row.userSubstWorkYn !== undefined) row.substWorkYn = row.userSubstWorkYn;
+				} else if (row.savedSubstWorkYn !== undefined && row.savedSubstWorkYn !== null) {
+					row.substWorkYn = row.savedSubstWorkYn;
+				}
+				if (row.isUserEditedLateTxt) {
+					if (row.userLateTxt !== undefined) row.lateTxt = row.userLateTxt;
+					if (row.lateTxt === '1' && row.inJdgNm !== '지각') row.inJdgNm = '지각';
+					else if (!row.lateTxt && row.inJdgNm === '지각') row.inJdgNm = (wt === '휴가') ? '휴가' : '휴일';
+				} else if (row.savedLateTxt !== undefined && row.savedLateTxt !== null) {
+					row.lateTxt = row.savedLateTxt;
+					if (row.savedInJdgNm) {
+						row.inJdgNm = row.savedInJdgNm;
+					} else if (!row.lateTxt && row.inJdgNm === '지각') {
+						row.inJdgNm = (wt === '휴가') ? '휴가' : '휴일';
+					}
+				}
+				if (row.isUserEditedEarlyLeave) {
+					if (row.userEarlyLeaveTxt !== undefined) row.earlyLeaveTxt = row.userEarlyLeaveTxt;
+					if (row.earlyLeaveTxt === '1' && row.outJdgNm !== '조퇴') row.outJdgNm = '조퇴';
+					else if (!row.earlyLeaveTxt && row.outJdgNm === '조퇴') row.outJdgNm = (wt === '휴가') ? '휴가' : '휴일';
+				} else if (row.savedEarlyLeaveTxt !== undefined && row.savedEarlyLeaveTxt !== null) {
+					row.earlyLeaveTxt = row.savedEarlyLeaveTxt;
+					if (row.savedOutJdgNm) {
+						row.outJdgNm = row.savedOutJdgNm;
+					} else if (!row.earlyLeaveTxt && row.outJdgNm === '조퇴') {
+						row.outJdgNm = (wt === '휴가') ? '휴가' : '휴일';
+					}
+				}
+				if (row.isUserEditedVacation) {
+					if (row.userVacationTxt !== undefined) row.vacationTxt = row.userVacationTxt;
+				} else if (row.savedVacationTxt !== undefined && row.savedVacationTxt !== null) {
+					row.vacationTxt = row.savedVacationTxt;
+				}
+
 				return row;
 			}
 
@@ -3540,6 +3648,62 @@
 
 			// 휴일 또는 휴일대체근무 신청서(workApplNo/substWorkYn === '1') 기준 출근/퇴근 판정(inJdgNm, outJdgNm) 단일 적용
 			applyAttendanceJudgment(row);
+
+			// [대체근무, 지각, 조퇴, 휴가 우선순위 보존 원칙]
+			// 사용자가 직접 입력/수정한 값(isUserEdited*) 또는 DB에 저장된 값(saved*)이 있으면 우선 처리하고,
+			// 없으면 자동 판정(신청서 연동/출퇴근시간 판정) 결과를 보여준다.
+			// 1. 대체근무
+			if (row.isUserEditedSubstWork) {
+				if (row.userSubstWorkYn !== undefined) {
+					row.substWorkYn = row.userSubstWorkYn;
+				}
+			} else if (row.savedSubstWorkYn !== undefined && row.savedSubstWorkYn !== null) {
+				row.substWorkYn = row.savedSubstWorkYn;
+			}
+			// 2. 지각 (연차/휴가 판정 상태라도 사용자가 1을 입력하면 1 유지 및 저장, 지각 판정 상태에서 빈값을 입력하면 빈값 유지)
+			if (row.isUserEditedLateTxt) {
+				if (row.userLateTxt !== undefined) {
+					row.lateTxt = row.userLateTxt;
+				}
+				if (row.lateTxt === '1' && row.inJdgNm !== '지각') {
+					row.inJdgNm = '지각';
+				} else if (!row.lateTxt && row.inJdgNm === '지각') {
+					row.inJdgNm = (wt === '휴가') ? '휴가' : ((wt === '휴일') ? '휴일' : '정상출근');
+				}
+			} else if (row.savedLateTxt !== undefined && row.savedLateTxt !== null) {
+				row.lateTxt = row.savedLateTxt;
+				if (row.savedInJdgNm) {
+					row.inJdgNm = row.savedInJdgNm;
+				} else if (!row.lateTxt && row.inJdgNm === '지각') {
+					row.inJdgNm = (wt === '휴가') ? '휴가' : ((wt === '휴일') ? '휴일' : '정상출근');
+				}
+			}
+			// 3. 조퇴 (연차/휴가 판정 상태라도 사용자가 1을 입력하면 1 유지 및 저장, 조퇴 판정 상태에서 빈값을 입력하면 빈값 유지)
+			if (row.isUserEditedEarlyLeave) {
+				if (row.userEarlyLeaveTxt !== undefined) {
+					row.earlyLeaveTxt = row.userEarlyLeaveTxt;
+				}
+				if (row.earlyLeaveTxt === '1' && row.outJdgNm !== '조퇴') {
+					row.outJdgNm = '조퇴';
+				} else if (!row.earlyLeaveTxt && row.outJdgNm === '조퇴') {
+					row.outJdgNm = (wt === '휴가') ? '휴가' : ((wt === '휴일') ? '휴일' : '정상퇴근');
+				}
+			} else if (row.savedEarlyLeaveTxt !== undefined && row.savedEarlyLeaveTxt !== null) {
+				row.earlyLeaveTxt = row.savedEarlyLeaveTxt;
+				if (row.savedOutJdgNm) {
+					row.outJdgNm = row.savedOutJdgNm;
+				} else if (!row.earlyLeaveTxt && row.outJdgNm === '조퇴') {
+					row.outJdgNm = (wt === '휴가') ? '휴가' : ((wt === '휴일') ? '휴일' : '정상퇴근');
+				}
+			}
+			// 4. 휴가
+			if (row.isUserEditedVacation) {
+				if (row.userVacationTxt !== undefined) {
+					row.vacationTxt = row.userVacationTxt;
+				}
+			} else if (row.savedVacationTxt !== undefined && row.savedVacationTxt !== null) {
+				row.vacationTxt = row.savedVacationTxt;
+			}
 
 			// (특이사항 spclMtr은 사용자 입력 전용 — 재계산에서 자동 정리하지 않는다)
 			return row;
