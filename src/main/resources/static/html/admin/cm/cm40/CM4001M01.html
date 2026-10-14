@@ -118,6 +118,7 @@
 					<input type="checkbox" id="autoRefresh_S" name="autoRefresh_S" checked onchange="toggleAutoRefresh();"> 자동 갱신(5초)
 				</label>
 				<div style="float: right; height: 30px; line-height: 30px;">
+					<a id="btnCloseHandle" class="btn btn-default btn-sm" style="margin-left: 10px; display: none;" onclick="closeHandleOpen();"><i class="fas fa-unlock"></i> 점유해제</a>
 					<a id="btnTreeToggle" class="btn btn-default btn-sm" style="margin-left: 10px;" onclick="toggleViewMode();"><i class="fas fa-list"></i> 목록보기</a>
 				</div>
 			</div>
@@ -137,6 +138,43 @@
 			</div>
 		</div>
 	</div>
+
+	<!-- 점유해제 모달 (#main_area 밖, body 마지막 - applyFilter 검색조건 범위와 분리) -->
+	<div class="modal fade" id="closeModal" tabindex="-1" role="dialog" aria-labelledby="closeModalTitle" aria-hidden="true">
+		<div class="modal-dialog" role="document">
+			<div class="modal-content">
+				<div class="modal-header">
+					<button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+					<h4 class="modal-title" id="closeModalTitle"><i class="fas fa-unlock"></i> 파일 점유해제</h4>
+				</div>
+				<div class="modal-body">
+					<p style="margin-bottom: 4px;">대상 파일 : <strong id="closeModalFileName">-</strong></p>
+					<p style="margin-bottom: 10px; word-break: break-all;">상대경로 : <span id="closeModalPath">-</span></p>
+					<table class="table table-bordered" style="margin-bottom: 10px;">
+						<thead>
+							<tr>
+								<th style="width: 50px; text-align: center;">선택</th>
+								<th>사용자</th>
+								<th>접속PC</th>
+							</tr>
+						</thead>
+						<tbody id="closeModalHandleBody"></tbody>
+					</table>
+					<div class="alert alert-warning" style="margin-bottom: 10px;">
+						강제 종료하면 사용자가 저장하지 않은 작업이 손실되거나 파일이 손상될 수 있습니다.
+					</div>
+					<div class="form-group" style="margin-bottom: 0;">
+						<label for="closeReason">사유 <span style="color: red;">*</span></label>
+						<textarea id="closeReason" name="closeReason" class="form-control" rows="3" maxlength="200" placeholder="점유해제 사유를 입력하십시오. (최대 200자)"></textarea>
+					</div>
+				</div>
+				<div class="modal-footer">
+					<button type="button" class="btn btn-danger" id="btnCloseHandleConfirm" onclick="closeHandleConfirm();"><i class="fas fa-unlock"></i> 점유해제</button>
+					<button type="button" class="btn btn-default" data-dismiss="modal">취소</button>
+				</div>
+			</div>
+		</div>
+	</div>
 </body>
 </html>
 
@@ -151,6 +189,7 @@
 	var viewMode = 'tree';        // 'tree'(기본) | 'list'
 	var treeCollapse = {};        // 트리 노드별 접힘 상태 보존 (자동 갱신 시 유지)
 	var UNKNOWN_SHARE = '(공유폴더 미확인)';
+	var closeHandleState = null;  // 점유해제 모달이 열릴 때의 선택 정보 스냅샷 (자동 갱신 재렌더와 분리)
 
 	// HTML 이스케이프 (그리드 formatter 는 HTML 로 렌더링됨)
 	function esc(v) {
@@ -227,7 +266,7 @@
 			this.target.setConfig({
 				showLineNumber : true,
 				lineNumberColumnWidth : 40,
-				showRowSelector : false,
+				showRowSelector : true,
 				multipleSelect : false,
 				sortable : true,
 				target : $('[data-ax5grid="first-grid"]'),
@@ -237,7 +276,34 @@
 				},
 				body : {
 					onClick : function() {
-						this.self.select(this.dindex);
+						if (!this.item || this.item.isDirectory === true) {
+							return false;
+						}
+						var selfGrid = gridView.target;
+						var targetIndex = this.dindex;
+						$.each(selfGrid.list || [], function(idx, obj) {
+							if (obj && obj.__index !== targetIndex && obj.__selected__) {
+								selfGrid.select(obj.__index, {selected: false});
+							}
+						});
+						selfGrid.select(targetIndex, {selected: true});
+					},
+					onDataChanged : function() {
+						if (this.key === '__selected__') {
+							var selfGrid = gridView.target;
+							if (this.item && this.item.__selected__) {
+								if (this.item.isDirectory === true) {
+									selfGrid.select(this.dindex, {selected: false});
+									return;
+								}
+								var targetIndex = this.dindex;
+								$.each(selfGrid.list || [], function(idx, obj) {
+									if (obj && obj.__index !== targetIndex && obj.__selected__) {
+										selfGrid.select(obj.__index, {selected: false});
+									}
+								});
+							}
+						}
 					}
 				},
 				page : {
@@ -278,15 +344,24 @@
 
 				var rows = data.files || [];
 				var collectedAt = fmtUtc(data.collectedAtUtc);
+
 				for (var i = 0; i < rows.length; i++) {
 					rows[i].collectedAt = collectedAt;
-					// 구분: 수집기가 IsDirectory 를 주지 않는 구버전 JSON 은 파일로 취급
-					rows[i].entryKind   = (rows[i].isDirectory === true) ? 'DIR' : 'FILE';
-					rows[i].entryKindNm = (rows[i].isDirectory === true) ? '폴더' : '파일';
+					var rawRel = String(rows[i].shareRelativePath || '').replace(/\//g, '\\').trim();
+
+					// 판정: 수집기가 실제 파일시스템(MFT/속성)에서 확인한 물리 속성 그대로 반영 (계층/확장자 임의 추정 금지)
+					var isDir = (rows[i].isDirectory === true) || (rawRel === '');
+					rows[i].isDirectory = isDir;
+					rows[i].entryKind   = isDir ? 'DIR' : 'FILE';
+					rows[i].entryKindNm = isDir ? '폴더' : '파일';
+					// 파일인 경우에만 선택 및 점유해제 가능
+					rows[i].__disable_selection__ = isDir;
 				}
 				lastFiles = rows;
 
 				renderStatus(data, collectedAt);
+				// 서버가 계산한 현재 사용자 권한에 따라 점유해제 버튼 표시 (기본 숨김)
+				closeHandleApplyPermission(data.canClose === true);
 				gridView.applyFilter();
 				scheduleNext();
 			}, false);   // 자동 갱신 조회이므로 blockUI 사용 안 함
@@ -321,6 +396,7 @@
 			}
 
 			if (!this.target) return;
+			var keepKey = closeHandleSelectedKey(this, false);   // 자동 갱신 재렌더 전 선택 보존
 			this.target.setData({
 				list : list,
 				page : noPage(list.length)
@@ -333,6 +409,7 @@
 					this.target.setConfig(this.target.config);
 				} catch (e) {}
 			}
+			closeHandleRestoreSelect(this, false, keepKey);
 		}
 	};
 
@@ -347,8 +424,8 @@
 			this.target = new ax5.ui.grid();
 			this.target.setConfig({
 				showLineNumber : false,
-				showRowSelector : false,
-				multipleSelect : false,
+				showRowSelector : true,
+				multipleSelect : true,
 				sortable : false,      // 정렬하면 계층이 깨지므로 사용 안 함
 				target : $('[data-ax5grid="tree-grid"]'),
 				header : {
@@ -357,7 +434,37 @@
 				},
 				body : {
 					onClick : function() {
-						this.self.select(this.dindex);
+						if (!this.item || this.item.closeType !== 'FILE') {
+							// 파일이 아닌 폴더나 공유 루트는 점유해제 대상이 아니므로 선택 불가
+							return false;
+						}
+						var selfGrid = treeView.target;
+						var targetIndex = this.doindex;
+						$.each(selfGrid.list || [], function(idx, obj) {
+							if (obj && obj.__index !== targetIndex && obj.__selected__) {
+								selfGrid.select(obj.__index, {selected: false});
+							}
+						});
+						selfGrid.select(targetIndex, {selected: true});
+					},
+					onDataChanged : function() {
+						if (this.key === '__selected__') {
+							var selfGrid = treeView.target;
+							if (this.item && this.item.__selected__) {
+								// 폴더나 공유 루트가 체크된 경우 즉시 해제
+								if (this.item.closeType !== 'FILE') {
+									selfGrid.select(this.dindex, {selected: false});
+									return;
+								}
+								// 다른 모든 행의 선택 해제 (마지막 체크된 행만 유지)
+								var targetIndex = this.dindex;
+								$.each(selfGrid.list || [], function(idx, obj) {
+									if (obj && obj.__index !== targetIndex && obj.__selected__) {
+										selfGrid.select(obj.__index, {selected: false});
+									}
+								});
+							}
+						}
 					}
 				},
 				page : {
@@ -406,6 +513,7 @@
 		render : function(list, expandAll) {
 			if (!this.target) return;
 			this.captureCollapse();
+			var keepKey = closeHandleSelectedKey(this, true);   // 자동 갱신 재렌더 전 선택 보존
 
 			var rows = buildTreeRows(list, expandAll);
 			this.lastExpandAll = expandAll;
@@ -422,6 +530,7 @@
 					this.target.setConfig(this.target.config);
 				} catch (e) {}
 			}
+			closeHandleRestoreSelect(this, true, keepKey);
 		}
 	};
 
@@ -439,7 +548,7 @@
 			if (!node) {
 				node = nodes[key] = {
 					id: key, pid: pid, name: name, depth: depth, isRoot: !!isRoot,
-					opened: false, users: {}, pcs: {}, children: [], openCount: 0
+					opened: false, users: {}, pcs: {}, children: [], openCount: 0, handles: []
 				};
 				if (pid) {
 					nodes[pid].children.push(key);
@@ -452,10 +561,21 @@
 
 		function addOpener(node, row) {
 			node.opened = true;
-			if (row.isDirectory === true) node.isDir = true;
+			if (row.isDirectory === true || row.entryKind === 'DIR' || row.entryKindNm === '폴더') node.isDir = true;
 			if (row.clientUserName) node.users[row.clientUserName] = true;
 			if (row.clientComputerName) node.pcs[row.clientComputerName] = true;
 			node.collectedAt = row.collectedAt;
+			// 점유해제 대상: 파일 핸들만 모은다 (폴더 핸들은 제외)
+			if (row.isDirectory !== true && row.entryKind !== 'DIR') {
+				node.handles.push({
+					fileId: row.fileId,
+					sessionId: row.sessionId,
+					clientUserName: row.clientUserName,
+					clientComputerName: row.clientComputerName,
+					shareRelativePath: row.shareRelativePath,
+					isDirectory: row.isDirectory
+				});
+			}
 		}
 
 		for (var i = 0; i < list.length; i++) {
@@ -518,16 +638,23 @@
 						collapse = (treeCollapse[nd.id] !== undefined) ? treeCollapse[nd.id] : false;
 					}
 				}
+				// 루트이거나, 하위 자식 노드를 거느린 부모이거나, 수집기가 실제 디렉토리로 판정한 경우에만 폴더로 취급
+				var isDirectoryNode = nd.isRoot || hasChildren || nd.isDir;
 				var rowOut = {
 					id: nd.id,
 					nodeName: nd.name + (hasChildren ? ' (' + nd.openCount + ')' : ''),
-					kind: nd.isRoot ? '공유' : (nd.opened ? (nd.isDir ? '폴더(열림)' : '파일') : '폴더'),
+					kind: nd.isRoot ? '공유' : (hasChildren ? (nd.opened ? '폴더(열림)' : '폴더') : (nd.opened ? (isDirectoryNode ? '폴더(열림)' : '파일') : '폴더')),
 					clientUserName: Object.keys(nd.users).join(', '),
 					clientComputerName: Object.keys(nd.pcs).join(', '),
 					collectedAt: nd.collectedAt || ''
 				};
 				if (nd.pid) rowOut.pid = nd.pid;     // 최상위는 pid 를 두지 않는다
 				if (hasChildren) rowOut.collapse = collapse;
+				// 점유해제 정보: 자식이 없는 리프 파일 핸들만 모은 노드인 경우에만 FILE 유형으로 지정
+				rowOut.handles = isDirectoryNode ? [] : nd.handles.slice();
+				rowOut.closeType = nd.isRoot ? '' : (!isDirectoryNode && nd.handles.length > 0 ? 'FILE' : (nd.opened ? 'DIR' : ''));
+				// 대상이 파일인 경우에만 선택 및 점유해제 가능 (폴더, 공유는 선택 비활성화)
+				rowOut.__disable_selection__ = (rowOut.closeType !== 'FILE');
 				out.push(rowOut);
 				emit(nd.children.slice());
 			}
@@ -603,6 +730,207 @@
 		}
 	});
 
+	// ----------------------------------------------------------------
+	// 점유해제 기능
+	// ----------------------------------------------------------------
+
+	// 서버가 내려준 권한(canClose)에 따라 점유해제 버튼 표시/숨김
+	function closeHandleApplyPermission(canClose) {
+		if (canClose) {
+			$('#btnCloseHandle').show();
+		} else {
+			$('#btnCloseHandle').hide();
+		}
+	}
+
+	// 상대경로에서 파일명(마지막 경로조각) 추출
+	function closeHandleBaseName(path) {
+		if (!path) return '';
+		var p = String(path).replace(/\//g, '\\');
+		var parts = p.split('\\');
+		for (var i = parts.length - 1; i >= 0; i--) {
+			if (parts[i] !== '') return parts[i];
+		}
+		return p;
+	}
+
+	// 행에서 재선택용 안정 키 생성 (트리=노드 id, 목록=fileId|sessionId).
+	// 식별자가 없으면(구버전 JSON 등) null 을 반환해 엉뚱한 행(0번) 복원을 막는다.
+	function closeHandleRowKey(row, isTree) {
+		if (!row) return null;
+		if (isTree) {
+			return (row.id == null || row.id === '') ? null : ('T|' + row.id);
+		}
+		if (row.fileId == null || row.fileId === '' || row.sessionId == null || row.sessionId === '') return null;
+		return 'L|' + row.fileId + '|' + row.sessionId;
+	}
+
+	// 자동 갱신 재렌더 전 현재 선택행의 안정 키 추출
+	function closeHandleSelectedKey(view, isTree) {
+		if (!view || !view.target || !view.target.getList) return null;
+		var sel;
+		try { sel = view.target.getList('selected') || []; } catch (e) { return null; }
+		return closeHandleRowKey(sel[0], isTree);
+	}
+
+	// 재렌더 후 같은 키의 행을 다시 선택 (폴링으로 선택이 풀리지 않도록)
+	function closeHandleRestoreSelect(view, isTree, key) {
+		if (!key || !view || !view.target || !view.target.getList) return;
+		var list;
+		try { list = view.target.getList() || []; } catch (e) { return; }
+		for (var i = 0; i < list.length; i++) {
+			if (closeHandleRowKey(list[i], isTree) === key) {
+				try {
+					if (isTree) {
+						var selfGrid = view.target;
+						$.each($.extend({}, selfGrid.list), function(idx, obj) {
+							selfGrid.select(obj.__index, {selected: false});
+						});
+						selfGrid.select(i, {selected: true});
+					} else {
+						view.target.select(i, {selected: true});
+					}
+				} catch (e) {}
+				return;
+			}
+		}
+	}
+
+	// 현재 보기의 선택행에서 해제 가능한 파일 핸들/유형 판정
+	function closeHandleResolveSelection() {
+		var isTree = (viewMode === 'tree');
+		var view = isTree ? treeView : gridView;
+		var sel = (view && view.target && view.target.getList) ? (view.target.getList('selected') || []) : [];
+		var row = sel[0];
+		if (!row) return {ok: false, msg: '점유 중인 파일을 목록에서 먼저 선택하십시오.'};
+
+		var handles, type;
+		if (isTree) {
+			handles = row.handles || [];
+			type = row.closeType || '';
+		} else {
+			if (row.isDirectory === true) {
+				handles = [];
+				type = 'DIR';
+			} else {
+				handles = [{
+					fileId: row.fileId,
+					sessionId: row.sessionId,
+					clientUserName: row.clientUserName,
+					clientComputerName: row.clientComputerName,
+					shareRelativePath: row.shareRelativePath,
+					isDirectory: row.isDirectory
+				}];
+				type = 'FILE';
+			}
+		}
+
+		if (type === 'DIR') return {ok: false, msg: '폴더는 점유해제할 수 없습니다. 점유 중인 파일을 선택하십시오.'};
+		if (type !== 'FILE' || handles.length === 0) return {ok: false, msg: '선택한 항목은 점유 중인 파일이 아닙니다.'};
+		return {ok: true, handles: handles};
+	}
+
+	// 점유해제 버튼 클릭 -> 선택 정보 스냅샷 후 모달 오픈
+	function closeHandleOpen() {
+		var res = closeHandleResolveSelection();
+		if (!res.ok) {
+			alert(res.msg);
+			return;
+		}
+
+		var handles = res.handles;
+		var relPath = (handles[0] && handles[0].shareRelativePath != null) ? String(handles[0].shareRelativePath) : '';
+		var fileName = closeHandleBaseName(relPath);
+
+		// 선택 정보를 복사해 보관 (이후 폴링 재렌더에 영향받지 않게)
+		closeHandleState = {handles: handles, fileName: fileName, relativePath: relPath};
+
+		$('#closeModalFileName').text(fileName || '-');
+		$('#closeModalPath').text(relPath || '-');
+		$('#closeReason').val('');
+
+		var html = '';
+		for (var i = 0; i < handles.length; i++) {
+			var h = handles[i];
+			var checked = (i === 0) ? ' checked' : '';
+			html += '<tr style="cursor: pointer;">'
+				+ '<td style="text-align: center;"><input type="radio" name="closeHandlePick" value="' + i + '"' + checked + '></td>'
+				+ '<td>' + esc(h.clientUserName) + '</td>'
+				+ '<td>' + esc(h.clientComputerName) + '</td>'
+				+ '</tr>';
+		}
+		$('#closeModalHandleBody').html(html);
+		$('#btnCloseHandleConfirm').prop('disabled', false);
+		$('#closeModal').modal('show');
+	}
+
+	// 모달 [점유해제] 확인 -> 검증 후 서버 요청
+	function closeHandleConfirm() {
+		var st = closeHandleState;
+		if (!st || !st.handles || st.handles.length === 0) {
+			alert('점유 중인 파일을 선택하십시오.');
+			return;
+		}
+
+		var reason = $.trim($('#closeReason').val() || '');
+		if (reason === '') {
+			alert('사유를 입력하십시오.');
+			return;
+		}
+
+		var picked = $('input[name="closeHandlePick"]:checked').val();
+		if (picked === undefined || picked === null || picked === '') {
+			alert('해제할 사용자/접속PC 를 선택하십시오.');
+			return;
+		}
+		var h = st.handles[parseInt(picked, 10)];
+		if (!h) {
+			alert('해제할 사용자/접속PC 를 선택하십시오.');
+			return;
+		}
+
+		if (!confirm('정말 점유를 해제하시겠습니까?')) return;
+
+		var $btn = $('#btnCloseHandleConfirm');
+		if ($btn.prop('disabled')) return;      // 이중 클릭 방지
+		$btn.prop('disabled', true);
+
+		var payload = {
+			fileId:       String(h.fileId == null ? '' : h.fileId),
+			sessionId:    String(h.sessionId == null ? '' : h.sessionId),
+			expectedPath: String(h.shareRelativePath == null ? '' : h.shareRelativePath),
+			expectedUser: String(h.clientUserName == null ? '' : h.clientUserName),
+			reason:       reason
+		};
+
+		// 사용자 조작이므로 blockUI 기본값(표시) 허용
+		postAjax('/admin/cm/cm40/closeOpenFile', payload, null, function(data) {
+			$btn.prop('disabled', false);
+
+			// HTTP 오류 시 postAjax 가 xhr 객체(data.status 가 숫자)를 넘긴다.
+			// 단, 서버가 본문(JSON)을 함께 내려주면 responseJSON 으로 결과를 우선 처리한다.
+			var body = data;
+			if (data && typeof data.status === 'number') {
+				body = (data.responseJSON && data.responseJSON.resultCode !== undefined) ? data.responseJSON : null;
+			}
+			if (!body || body.resultCode === undefined) {
+				alert('요청에 실패했습니다.');
+				return;
+			}
+
+			var code = body.resultCode;
+			var msg = body.resultMessage;
+			if (code === 200) {
+				alert(msg || '점유가 해제되었습니다.');
+				$('#closeModal').modal('hide');
+				gridView.setData();      // 즉시 목록 재조회
+			} else {
+				alert(msg || '점유 해제에 실패했습니다.');
+				gridView.setData();      // 409/404 등도 상태 변화 반영 위해 재조회, 모달은 유지
+			}
+		});
+	}
+
 	function DataSearch() {
 		gridView.setData();
 	}
@@ -622,6 +950,21 @@
 		treeView.initView();
 		adjustGridHeight();
 		gridView.setData();
+
+		// 점유해제 모달 열림 시 자동 갱신 중지, 닫힘 시 재개
+		$('#closeModal').on('show.bs.modal', function() {
+			stopTimer();
+		});
+		$('#closeModal').on('hidden.bs.modal', function() {
+			closeHandleState = null;
+			scheduleNext();
+		});
+
+		// 모달 내부 사용자/접속PC 테이블 행 클릭 시 라디오 선택 연동
+		$('#closeModalHandleBody').on('click', 'tr', function(e) {
+			if ($(e.target).is('input[type="radio"]')) return;
+			$(this).find('input[name="closeHandlePick"]').prop('checked', true);
+		});
 	});
 
 </script>
