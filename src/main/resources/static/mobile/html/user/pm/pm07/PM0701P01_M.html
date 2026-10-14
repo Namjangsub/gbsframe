@@ -659,7 +659,27 @@
 				if (typeof window.PM07Annual.applyVacationTypeOptions === "function") {
 					window.PM07Annual.applyVacationTypeOptions($("#vacTypeCd"), userVacationBalance, curSaved);
 				}
+				blockHalfDayForHourlyProd(reqId, savedTypeCd);
 			});
+		}
+
+		// 생산팀(GUN60*) 시급직(SALES_AREA=SALESAREA60) 신청자는 반차(PM07TYPE02) 선택 불가
+		// 기등록 건 수정(savedTypeCd 가 반차)인 경우에는 기존 값 보존을 위해 막지 않는다 (PC PM0701P01.html과 100% 동일)
+		function blockHalfDayForHourlyProd(reqId, savedTypeCd) {
+			var blocked = false;
+			postAjaxSync("/admin/cm/cm06/selectUserInfo", { "userId": reqId }, null, function(data) {
+				var u = data && data.userInfo;
+				if (u) {
+					blocked = !!(u.deptId && u.deptId.indexOf('GUN60') === 0) && u.salesArea === 'SALESAREA60';
+				}
+			});
+			var $opt = $('#vacTypeCd').find('option[value="PM07TYPE02"]');
+			if (!blocked || savedTypeCd === 'PM07TYPE02' || $opt.length === 0) return;
+			$opt.prop('disabled', true).css('color', '#aaa');
+			if ($('#vacTypeCd').val() === 'PM07TYPE02') {
+				$('#vacTypeCd').val('');
+				onVacTypeChanged();
+			}
 		}
 
 		// 시작일 연도(또는 내년 이후 연도의 기준일)가 마지막 조회값과 다를 때만 잔여 재조회 (같으면 AJAX 생략)
@@ -1790,6 +1810,23 @@
 			}
 			var selectedOption = $("#vacTypeCd").find("option:selected");
 			var selectedNm = selectedOption.text();
+			var selVacType = $("#vacTypeCd").val();
+			if (selVacType === 'PM07TYPE02') {
+				var reqIdForCheck = $("#popForm #reqId").val() || (paramObj && (paramObj.reqId || paramObj.userId)) || ((typeof jwt !== 'undefined' && jwt.userId) ? jwt.userId : "");
+				var isHourlyProdBlocked = false;
+				postAjaxSync("/admin/cm/cm06/selectUserInfo", { "userId": reqIdForCheck }, null, function(data) {
+					var u = data && data.userInfo;
+					if (u) {
+						isHourlyProdBlocked = !!(u.deptId && u.deptId.indexOf('GUN60') === 0) && u.salesArea === 'SALESAREA60';
+					}
+				});
+				var origSavedType = (__pm07EditOrigin && __pm07EditOrigin.vacTypeCd) || "";
+				if (isHourlyProdBlocked && origSavedType !== 'PM07TYPE02') {
+					alert("생산팀 시급직은 반차를 신청할 수 없습니다.");
+					$("#vacTypeCd").focus();
+					return false;
+				}
+			}
 			if (isHalfDayVacationType($("#vacTypeCd").val(), selectedNm) && !$("#ampmCd").val()) {
 				alert("구분(오전/오후)을 선택하세요.");
 				$("#ampmCd").focus();
