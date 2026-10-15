@@ -20,6 +20,26 @@ var approvalWorkingGrid; //팝업화면에서 결재정보 저장용
 			return true;
 		}
 	}
+
+	// 결재/공유 처리 후 호출 화면의 목록 그리드를 다시 조회한다.
+	// 대부분의 화면은 gridView를 사용하지만 WB2401M01은 salesGridView를 사용한다.
+	function refreshApprovalSourceGrid() {
+		if (typeof gridView !== 'undefined' && gridView) {
+			if (typeof gridView.initView === 'function') {
+				gridView.initView().setData(0);
+			} else if (typeof gridView.setData === 'function') {
+				gridView.setData(0);
+			}
+		}
+		if (typeof salesGridView !== 'undefined' && salesGridView
+				&& (typeof gridView === 'undefined' || salesGridView !== gridView)) {
+			if (typeof salesGridView.setData === 'function') {
+				salesGridView.setData(0);
+			} else if (typeof salesGridView.initView === 'function') {
+				salesGridView.initView().setData(0);
+			}
+		}
+	}
 	//최초 진입시점---
 	//   1. 파일트리명 = 각 화면의 트리구조를 보여줄 div테그 ID ex) <div id="deptTree" ></div>
 	//   2. 그리드명  = 각 화면의 ax5-grid Html Tag ID  ex) <div id="my-grid" data-ax5grid="file-grid" data-ax5grid-config="{}" style="height: 100%; width: 100%"></div>
@@ -118,19 +138,20 @@ var approvalWorkingGrid; //팝업화면에서 결재정보 저장용
 							$('.popup_bottom_btn').last().append(callCmd);
 						}
 
-						if (approvalWorkingGrid.teamManager) {
+						if (approvalWorkingGrid.teamManager == '평가') {
 							//발주요청처리결과화면이면
 							if (params.fileTrgtTyp == 'QM0101P03' || params.fileTrgtTyp == 'QM0101P01') {
 								$('#measRst').attr('readonly', false).css({'background-color': '#ffffff', 'color': '#00000'});
 								$('#resltRst').attr('readonly', false).css({'background-color': '#ffffff', 'color': '#00000'});
-								$('#FDMTSOLUT-radioButtonContainer').css({'background-color':'#ffffff','pointer-events':'auto'}).find('input[type=radio], input[type=checkbox]').off('click').prop('readonly', false).removeAttr('readonly');
-								$('#fdmtSolutCnt').attr('readonly', false).css({'background-color': '#ffffff', 'color': '#00000'});
+								$('.teamManagerApproval').removeClass('no-click');
+								$('#FDMTSOLUT-radioButtonContainer').removeClass('disabled-area').css({'background-color':'#ffffff','pointer-events':'auto'}).find('input[type=radio], input[type=checkbox]').off('click').prop({'disabled': false, 'readonly': false}).removeAttr('readonly');
+								$('#fdmtSolutCnt').off('click').prop({'disabled': false, 'readonly': false}).css({'background-color': '#ffffff', 'color': '#00000', 'pointer-events': 'auto'});
 								$('#COBGB-checkboxContainer').css({'background-color':'#ffffff','pointer-events':'auto'}).find('input[type=radio], input[type=checkbox]').off('click');
 							} else if (params.fileTrgtTyp == 'WB2401P01' || params.fileTrgtTyp == 'WB2401P11') { //계획문제, 결과문제
 								$('#measRst').css('pointer-events', 'auto').prop('readonly', false).css('background-color', '#ffffff');
 								$('#actCnts').css('pointer-events', 'auto').prop('readonly', false).css('background-color', '#ffffff');
-								$('#FDMTSOLUT-radioButtonContainer').css('pointer-events', 'auto').prop('readonly', false).css('background-color', '#ffffff');
-								$('#fdmtSolutCnt').css('pointer-events', 'auto').prop('readonly', false).css('background-color', '#ffffff');
+								$('#FDMTSOLUT-radioButtonContainer').removeClass('disabled-area').css('pointer-events', 'auto').css('background-color', '#ffffff').find('input[type=radio], input[type=checkbox]').off('click').prop({'disabled': false, 'readonly': false});
+								$('#fdmtSolutCnt').off('click').css('pointer-events', 'auto').prop({'disabled': false, 'readonly': false}).css('background-color', '#ffffff');
 								$('.issAct').removeClass('no-click');
 							}
 
@@ -180,14 +201,15 @@ var approvalWorkingGrid; //팝업화면에서 결재정보 저장용
 										}
 										$(currFormId + ' #measRst').attr('readonly', false).css({'background-color': '#ffffff', 'color': '#00000'});
 										$(currFormId + ' #resltRst').attr('readonly', false).css({'background-color': '#ffffff', 'color': '#00000'});
-										$(currFormId + ' #FDMTSOLUT-radioButtonContainer').css({'background-color':'#ffffff','pointer-events':'auto'}).find('input[type=radio], input[type=checkbox]').off('click');
-										$(currFormId + ' #fdmtSolutCnt').attr('readonly', false).css({'background-color': '#ffffff', 'color': '#00000'});
+										$(currFormId + ' .teamManagerApproval').removeClass('no-click');
+										$(currFormId + ' #FDMTSOLUT-radioButtonContainer').removeClass('disabled-area').css({'background-color':'#ffffff','pointer-events':'auto'}).find('input[type=radio], input[type=checkbox]').off('click').prop({'disabled': false, 'readonly': false});
+										$(currFormId + ' #fdmtSolutCnt').off('click').prop({'disabled': false, 'readonly': false}).css({'background-color': '#ffffff', 'color': '#00000', 'pointer-events': 'auto'});
 										$(currFormId + ' #COBGB-checkboxContainer').css({'background-color':'#ffffff','pointer-events':'auto'}).find('input[type=radio], input[type=checkbox]').off('click');
 									} else if (params.fileTrgtTyp == 'WB2401P01' || params.fileTrgtTyp == 'WB2401P11') {
 										$('#measRst').css('pointer-events', 'auto').prop('readonly', false).css('background-color', '#ffffff');
 										$('#actCnts').css('pointer-events', 'auto').prop('readonly', false).css('background-color', '#ffffff');
-										$('#FDMTSOLUT-radioButtonContainer').css('pointer-events', 'auto').prop('readonly', false).css('background-color', '#ffffff');
-										$('#fdmtSolutCnt').css('pointer-events', 'auto').prop('readonly', false).css('background-color', '#ffffff');
+										$('#FDMTSOLUT-radioButtonContainer').removeClass('disabled-area').css('pointer-events', 'auto').css('background-color', '#ffffff').find('input[type=radio], input[type=checkbox]').off('click').prop({'disabled': false, 'readonly': false});
+										$('#fdmtSolutCnt').off('click').css('pointer-events', 'auto').prop({'disabled': false, 'readonly': false}).css('background-color', '#ffffff');
 										$('.issAct').removeClass('no-click');
 									}
 								} else {  //평가자가 아닌경우 필수 입력 필드 제외 처리
@@ -846,9 +868,7 @@ var approvalWorkingGrid; //팝업화면에서 결재정보 저장용
 							if(data.resultCode == 200){
 								$('.callApprovalWorking').last().remove();	//마지막 callApprovalWorking class에서 버튼 제거
 //								alert("공유 확인되었습니다.");
-								if (typeof gridView !== 'undefined') {
-									gridView.initView().setData(0);
-								}
+								refreshApprovalSourceGrid();
 									modalStack.close();
 							}
 						});
@@ -895,13 +915,7 @@ var approvalWorkingGrid; //팝업화면에서 결재정보 저장용
 				amParamObj = applyAmRedirectParam(amRedirectRes, amParamObj);
 				openThirdModal("/static/html/user/am/am12/AM1201P01.html", 980, 840, "전자결재 문서 상세", amParamObj, function(data) {
 					$('.callApprovalWorking').last().remove();
-					if (typeof gridView !== 'undefined') {
-						if (typeof gridView.initView === 'function') {
-							gridView.initView().setData(0);
-						} else if (typeof gridView.setData === 'function') {
-							gridView.setData(0);
-						}
-					}
+					refreshApprovalSourceGrid();
 					modalStack.close();
 				});
 			} else {
@@ -928,9 +942,7 @@ var approvalWorkingGrid; //팝업화면에서 결재정보 저장용
 				// openFourthModal("/static/html/user/wb/wb20/WB2001P01.html", 730, 300, "", paramObj, function(data){
 					if (data == "승인완료") {
 						$('.callApprovalWorking').last().remove();		//마지막 callApprovalWorking class에서 버튼 제거
-						if (typeof gridView !== 'undefined') {
-							gridView.initView().setData(0);
-						}
+						refreshApprovalSourceGrid();
 						modalStack.close();
 						if ($('#areaApproval').length && jwt.userId == 'EMJ8105') updateApprovalHold();
 					}

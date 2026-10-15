@@ -322,6 +322,26 @@
 		var isWorkerAutoMode = true; // 근무자 변경 시 직종서식 자동 연동 모드 플래그
 		var pendingPM3002ReportSelection = null;
 
+		function escapePm3002Text(value) {
+			return String(value == null ? '' : value).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+		}
+
+		// 화면과 같은 휴일 판정으로 출력월의 휴일을 YYYYMMDD CSV로 전달한다.
+		function getPm3002HolidayYmds(workYm) {
+			var ym = String(workYm || '').replace(/-/g, '');
+			if (!/^\d{6}$/.test(ym)) return '';
+			var year = parseInt(ym.slice(0, 4), 10);
+			var month = parseInt(ym.slice(4, 6), 10);
+			if (month < 1 || month > 12) return '';
+			var lastDay = new Date(year, month, 0).getDate();
+			var holidays = [];
+			for (var day = 1; day <= lastDay; day++) {
+				var ymd = ym + ('0' + day).slice(-2);
+				if (isRedHolidayYmd(ymd)) holidays.push(ymd);
+			}
+			return holidays.join(',');
+		}
+
 		// 보고서 출력 대상 부서/담당자를 선택한 뒤 Ubi 보고서를 호출한다.
 		function openPm3002ReportSelector() {
 			var paramObj = {
@@ -344,6 +364,7 @@
 				var arg = 'workYm#' + workYm
 						+ '#hrCoCd#' + hrCoCd
 						+ '#userIds#' + userIds
+						+ '#holidayYmds#' + getPm3002HolidayYmds(workYm)
 						+ '#';
 
 				callReport('PM3002R01.jrf', arg, 1150, 720, '근태현황');
@@ -1057,7 +1078,7 @@
 				// 야간시간만 있는 날(정상/연장은 0)도 근무일수/집계에 포함되어야 함
 				var workDayCnt = (normVal > 0 || otVal > 0 || nghtVal > 0) ? 1 : 0;
 				// 비고(P/J 장비명) 컬럼: pjEquipNm에 등록된 내용 표기
-				var rmkTxt = (rowData && rowData.pjEquipNm) ? String(rowData.pjEquipNm).trim() : '';
+				var rmkTxt = escapePm3002Text((rowData && rowData.pjEquipNm) ? String(rowData.pjEquipNm).trim() : '');
 
 				// 근무형태 분류 (classifyWorkCategory 공용 함수 사용)
 				var category = classifyWorkCategory(rowData);
@@ -1373,7 +1394,7 @@
 				deductTimeTotal += deductVal;
 
 				// 비고(연차,공휴일) 컬럼: 특이사항(spclMtr)에 저장된 내용만 최종 표출
-				var rmkTxt = (rowData && rowData.spclMtr) ? String(rowData.spclMtr).trim() : '';
+				var rmkTxt = escapePm3002Text((rowData && rowData.spclMtr) ? String(rowData.spclMtr).trim() : '');
 
 				if (isSubstWork || (!isSat && !isHoli)) {
 					sumNorm += normVal;
@@ -1426,7 +1447,7 @@
 				// 출장대기수당: rowData.tripAllwnc
 				// 출장근무지: tripWorkPlace 에 등록된 내용 표기
 				var tripAllwncTxt = rowData.tripAllwnc || '';
-				var placeTxt = (rowData && rowData.tripWorkPlace) ? String(rowData.tripWorkPlace).trim() : '';
+				var placeTxt = escapePm3002Text((rowData && rowData.tripWorkPlace) ? String(rowData.tripWorkPlace).trim() : '');
 
 				html += '<td>' + (deductVal > 0 ? deductVal.toFixed(1) : '') + '</td>'; // 공제확인
 				html += '<td>' + tripAllwncTxt + '</td>'; // 출장대기수당

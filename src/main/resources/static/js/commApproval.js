@@ -699,6 +699,33 @@ function Approval(htmlParam, param, popParam) {
 			}
         }
 
+		// 발주요청서,문제조치의 평가 결재자는 결재 전에 근본원인과 예방대책을 함께 저장한다.
+		const rootCauseTodoTypes = ['TODODIV2020', 'TODODIV2030', 'TODODIV2090'];
+		if (this.applyBtn && rootCauseTodoTypes.includes(this.param.todoDiv2CodeId) && this.param.teamManager == '평가') {
+			const normalOrderFlag = ['COBTP01', 'COBTP04', 'COBTP06', 'COBTP08', 'COBTP09'].includes($('#partCd').val());
+			if (this.param.todoDiv2CodeId === 'TODODIV2090' || !normalOrderFlag) {
+				if (!inputValidation($('.popup_area [required]'))) {
+					return false;
+				}
+				if (!$('input[name="FDMTSOLUT"]:checked').val()) {
+					customAlert('근본원인을 선택해주세요.');
+					return false;
+				}
+			}
+
+			let rootCauseSaved = false;
+			if (this.param.todoDiv2CodeId === 'TODODIV2020' && typeof ModalApp !== 'undefined' && typeof ModalApp.updateQualityResultComment === 'function') {
+				rootCauseSaved = ModalApp.updateQualityResultComment('결과수정');
+			} else if ((this.param.todoDiv2CodeId === 'TODODIV2020' || this.param.todoDiv2CodeId === 'TODODIV2030') && typeof updateQualityResultComment === 'function') {
+				rootCauseSaved = updateQualityResultComment('결과수정');
+			} else if (this.param.todoDiv2CodeId === 'TODODIV2090' && typeof updateIssueComment === 'function') {
+				rootCauseSaved = updateIssueComment('결과수정');
+			}
+			if (!rootCauseSaved) {
+				return false;
+			}
+		}
+
 		if (!inputValidation($('.popup_area [required]'))) {
 			return false;
 		}
