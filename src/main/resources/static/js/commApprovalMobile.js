@@ -434,7 +434,7 @@ function Approval(htmlParam, param, popParam) {
 	//승인 ajax
 	this.confirmApproval = function(param) {
 
-		if (((this.param.todoDiv2CodeId === "TODODIV2020") || (this.param.todoDiv2CodeId === "TODODIV2030") || (this.param.todoDiv2CodeId === "TODODIV2090")) && this.param.teamManager == '평가' ) {
+		if (this.applyBtn && ((this.param.todoDiv2CodeId === "TODODIV2020") || (this.param.todoDiv2CodeId === "TODODIV2030") || (this.param.todoDiv2CodeId === "TODODIV2090")) && this.param.teamManager == '평가' ) {
 			if ((this.param.todoDiv2CodeId === "TODODIV2020") || (this.param.todoDiv2CodeId === "TODODIV2030")) {
 				if (!['COBTP01', 'COBTP04', 'COBTP06', 'COBTP08', 'COBTP09'].includes($("#partCd").val())) {
 					if (!inputValidation($('.popup_area [required]'))) {
@@ -459,11 +459,17 @@ function Approval(htmlParam, param, popParam) {
 		// 평가대상인지 확인하고 평가대상은 결재방지
 		let chkFlag = true;
 
-		if (this.param.teamManager == '평가') {
+		if (this.applyBtn && this.param.teamManager == '평가') {
 			if (this.param.todoDiv2CodeId === "TODODIV2020" || this.param.todoDiv2CodeId === "TODODIV2030") {
-				chkFlag = updateQualityResultComment('결과수정');
+				if (this.param.todoDiv2CodeId === "TODODIV2020" && typeof ModalApp !== 'undefined' && typeof ModalApp.updateQualityResultComment === 'function') {
+					chkFlag = ModalApp.updateQualityResultComment('결과수정');
+				} else if (typeof updateQualityResultComment === 'function') {
+					chkFlag = updateQualityResultComment('결과수정');
+				} else {
+					chkFlag = false;
+				}
 			} else if (this.param.todoDiv2CodeId === "TODODIV2090") {
-				chkFlag = updateIssueComment('결과수정');
+				chkFlag = (typeof updateIssueComment === 'function') ? updateIssueComment('결과수정') : false;
 			}
 
 			if (!chkFlag) {

@@ -436,6 +436,9 @@
     var rsltNo = null;
     var clntPjt = "";
 	var teamManagerFlag = false;
+	var issuerManagerFlag = false;
+	var currentApproverFlag = false;
+	var issuerViewDeptId = "";
 	var ordrsDiv3Chk = false;
     var teleNo = ""; //카카오 접수자 전화번호변수
  	// 카톡 정상알림 카운터 변수
@@ -454,6 +457,48 @@
 	//분류,등록사유 자동생성시 20240708이전에는 전체 옵션 표시, 이후에는 정상, 문제 분리 표시용 end
 
 	var fromJobType = "REQ"; //default 발주요청서 작업구분--> REQ,  이슈에서 처리할경우 ISS//작업 구분 발주요청서가 시작이면 default 값인 REQ로 작업 진행하고 아니면 ISS가 파라메터로 넘오옴
+
+	function refreshRootCauseAccess() {
+		const issuerId = $('#popForm2 #ordrgId').val() || '';
+		const regId = $('#popForm2 #regId').val() || '';
+		const regDeptId = (($('#popForm2 #regDeptId').val() || '').slice(0, 5));
+		const loginDeptId = ((jwt.deptId || '').slice(0, 5));
+		const effectiveIssuerDeptId = ((issuerViewDeptId || $('#popForm2 #deptCd').val() || '').slice(0, 5));
+		const specialDepts = ['TRN50', 'GUN60'];
+		const retiredIssuer = issuerId.indexOf('gyrsult') === 0;
+
+		let issuerSelfFlag = issuerId === jwt.userId && specialDepts.includes(effectiveIssuerDeptId || loginDeptId);
+		if (retiredIssuer && regId === jwt.userId && specialDepts.includes(loginDeptId)) {
+			issuerSelfFlag = true;
+		}
+		if (retiredIssuer && regDeptId && regDeptId === loginDeptId) {
+			issuerSelfFlag = true;
+		}
+
+		const currentCobtp = $('#popForm2 #partCd').val();
+		const normalOrderFlag = ['COBTP01', 'COBTP04', 'COBTP06', 'COBTP08', 'COBTP09'].includes(currentCobtp);
+		teamManagerFlag = (issuerManagerFlag && currentApproverFlag) || issuerSelfFlag;
+		const editable = teamManagerFlag && !normalOrderFlag;
+		const $rootContainer = $('#popForm2 #FDMTSOLUT-radioButtonContainer');
+		const $rootContent = $('#popForm2 #fdmtSolutCnt');
+		const $rootRows = $('#popForm2 .teamManagerApproval');
+
+		if (editable) {
+			$rootContainer.closest('td').prev('th').addClass('hit');
+			$rootContent.closest('td').prev('th').addClass('hit');
+			$rootContent.attr('required', 'true');
+			$rootRows.removeClass('no-click');
+			$rootContainer.removeClass('disabled-area').css({'pointer-events': 'auto', 'background-color': ''});
+			$rootContainer.find(':radio, :checkbox').off('click').prop({'disabled': false, 'readonly': false});
+			$rootContent.off('click').prop({'disabled': false, 'readonly': false}).css({'pointer-events': 'auto', 'background-color': ''});
+		} else {
+			$rootContainer.closest('td').prev('th').removeClass('hit');
+			$rootContent.closest('td').prev('th').removeClass('hit');
+			$rootContent.removeAttr('required');
+			$rootRows.addClass('no-click');
+			$rootContainer.css('pointer-events', 'none');
+		}
+	}
 	if (modalStack.last().paramObj.issNo != undefined && modalStack.last().paramObj.issNo != "") fromJobType = "ISS"; //기존 등록자료 수정모드로 진입시 처리하기 위함
 	if (modalStack.last().paramObj.fromJobType != undefined) fromJobType = modalStack.last().paramObj.fromJobType;
 
@@ -529,22 +574,10 @@
 											totalElements : list.length
 								}
 							});
-							// 결재자가 해당 작성자의 부서 팀장여부 확인 
-							// teamManagerFlag == true 이면 근본원인, 근본예방대책 필드 필수입력 및 활성화 2025-08-06 최지상
-							list.forEach(function(item){
-								if (item.deptId.slice(0,5) === $("#deptCd").val() && item.teamManager === 'Y' && item.todoId === jwt.userId) {
-									teamManagerFlag = true;
-								}
+							currentApproverFlag = list.some(function(item) {
+								return item.gb === '결재' && item.todoId === jwt.userId;
 							});
-
-							if (teamManagerFlag && !['COBTP01', 'COBTP04', 'COBTP06', 'COBTP08', 'COBTP09'].includes($("#partCd").val())) {
-								$('#FDMTSOLUT-radioButtonContainer').closest('td').prev('th').addClass('hit');
-								$('#fdmtSolutCnt').closest('td').prev('th').addClass('hit');
-								$('#fdmtSolutCnt').attr('required', 'true');
-								$('.teamManagerApproval').removeClass('no-click');
-							} else {
-								$('#FDMTSOLUT-radioButtonContainer').addClass('disabled-area').find(':radio, :checkbox').on('click', function(e){e.preventDefault();});
-							}
+							refreshRootCauseAccess();
 
 
 							gridResize(gridViewPop1, list.length); //그리드 높이 조정
@@ -1110,9 +1143,8 @@
 							$(`input[name="FDMTSOLUT"][value="${code}"]`).prop('checked', true);
 						});
 					}
-					if (key == 'teamManagerYn' && value == 'Y') {
-						teamManagerFlag = true;
-					}
+					if (key == 'teamManagerYn') {issuerManagerFlag = (value == 'Y');}
+					if (key == 'ordrgViewDeptId') {issuerViewDeptId = value || '';}
                 }
             }
 
@@ -1178,10 +1210,20 @@
             //if (data.result.ordrgId.slice(0,7) == 'gyrsult') return false
             //    -->퇴사자인경우 작성자를 기준으로 생성해야함므로 작성자의 부서가 필요함
             // 작성자의 부서는 작성자 정보 출력시 저장해야함.
-            if (data.result.ordrgId.slice(0,7) == 'gyrsult') {
-          		createCheckBox(data.result.regDeptId);	//퇴사자인경우 작성자기준으로 등록사유 생성함
+			const linkedIssueDeptId = data.result.workRptNo
+				? (data.result.issActId === 'jjw'
+					? 'GUN40'
+					: (data.result.issActViewDeptId || data.result.issActDeptId || '').slice(0, 5))
+				: '';
+			if (linkedIssueDeptId) {
+				createCheckBox(linkedIssueDeptId);	//문제 연계자료는 문제 조치담당자의 표시부서 기준
+			} else if (data.result.ordrgId.slice(0,7) == 'gyrsult') {
+				createCheckBox(data.result.regViewDeptId || data.result.regDeptId);	//퇴사자인 경우 작성자의 표시부서 기준
             } else {
-    			createCheckBox(data.result.deptCd);	//부서별 장애원인 자동 생성 (수정일경우 등록된 자료에 따라 재설정함.)
+				const issuerDeptId = data.result.ordrgId === 'jjw'
+					? 'GUN40'
+					: (data.result.ordrgViewDeptId || data.result.deptCd);
+				createCheckBox(issuerDeptId);	//발행자의 표시부서 기준으로 장애유형 재생성
             }
             $('#popForm2 #' + data.result.subCd).prop("checked", true);
 			
@@ -1207,17 +1249,7 @@
 				//  setMouseTrackerVisible(true, `발행자 ${data.result.ordrgNm}만 결과 등록 가능합니다....`);
 			}
 
-			// 팀장여부에 따른 근본원인, 근본예방대책 필드 활성/비활성 처리
-			if (teamManagerFlag && ($('#popForm2 #ordrgId').val() == jwt.userId)) {
-				$('#popForm2 #FDMTSOLUT-radioButtonContainer').closest('td').prev('th').addClass('hit');
-				$('#popForm2 #fdmtSolutCnt').closest('td').prev('th').addClass('hit');
-				$('#popForm2 #fdmtSolutCnt').attr('required', 'true');
-				$('#popForm2 .teamManagerApproval').removeClass('no-click');
-			} else {
-				$('#FDMTSOLUT-radioButtonContainer').closest('td').prev('th').removeClass('hit');
-				$('#fdmtSolutCnt').closest('td').prev('th').removeClass('hit');
-				$('.teamManagerApproval').addClass('no-click');		// 근본원인, 근본예방대책 필드 비활성화
-			}
+			refreshRootCauseAccess();
 		});
 	
 
@@ -1584,6 +1616,7 @@
 				txtareaHeightResize($('#popForm2 #fdmtSolutCnt'));
 
 				gridViewPop1.setData();
+				refreshRootCauseAccess();
 			}
 		});
 
@@ -1603,8 +1636,11 @@
         				var checkedNode = tree.get_node(checkedId);
         				$('#popForm2 #resRegId').val(checkedNode.id);
         				$('#popForm2 #resRegNm').val(checkedNode.text);
-                        createCheckBox(checkedNode.parent.slice(0,5))
-                        selectAuth(checkedNode.parent);
+						const issueDeptId = checkedId === 'jjw'
+							? 'GUN40'
+							: ((checkedNode.parent || checkedNode.original.originDeptId || '').slice(0, 5));
+						createCheckBox(issueDeptId)
+						selectAuth(issueDeptId);
         			});
 //     	}
     }
