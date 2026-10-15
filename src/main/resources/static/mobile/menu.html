@@ -200,6 +200,53 @@
 		}
 
 
+		var mSseSource = null;
+
+		function closeMobileSse() {
+			if (mSseSource) {
+				try { mSseSource.close(); } catch (e) {}
+				mSseSource = null;
+			}
+		}
+
+		function initMobileSse() {
+			if (!window.EventSource || !jwt || !jwt.userId) return;
+			if (mSseSource && mSseSource.readyState !== EventSource.CLOSED) return;
+
+			try {
+				var sseUrl = "/user/wb/wb20/sseTodoCount?userId=" + encodeURIComponent(jwt.userId) + "&coCd=" + encodeURIComponent(jwt.coCd || "GUN");
+				mSseSource = new EventSource(sseUrl);
+
+				mSseSource.addEventListener("todoCount", function(e) {
+					if (!e.data) return;
+					try {
+						var countMap = JSON.parse(e.data);
+						var appCnt = Number(countMap.approvalCnt || 0);
+						var shareCnt = Number(countMap.shareCnt || 0);
+
+						$('#mApprovalCount').text(appCnt);
+						$('#mShareCount').text(shareCnt);
+
+						var cacheKey = "GBS:todoCnt:" + (jwt.coCd || "") + ":" + jwt.userId;
+						var cacheObj = {
+							approvalCnt: appCnt,
+							shareCnt: shareCnt,
+							at: Date.now()
+						};
+						localStorage.setItem(cacheKey, JSON.stringify(cacheObj));
+					} catch (err) {}
+				});
+
+				mSseSource.onerror = function() {
+					if (this && this.readyState === EventSource.CLOSED) {
+						closeMobileSse();
+					}
+				};
+			} catch (e) {
+				closeMobileSse();
+			}
+		}
+
 		function loadMobileTodoCount() {
 			if (!jwt || !jwt.userId) return;
 			var cacheKey = "GBS:todoCnt:" + (jwt.coCd || "") + ":" + jwt.userId;
@@ -249,6 +296,26 @@
 			}
 
 			loadMobileTodoCount();
+			initMobileSse();
+
+			// 모바일 화면 변경/복귀(뒤로가기, 타 탭/앱 전환 후 복귀) 시 자동 최신화
+			window.addEventListener("pageshow", function() {
+				loadMobileTodoCount();
+				initMobileSse();
+			});
+
+			document.addEventListener("visibilitychange", function() {
+				if (!document.hidden) {
+					loadMobileTodoCount();
+					initMobileSse();
+				} else {
+					closeMobileSse();
+				}
+			});
+
+			window.addEventListener("beforeunload", function() {
+				closeMobileSse();
+			});
 
 			const authSet = buildAuthSet(jwt && jwt.authInfo); //AUTH100 추출
 			renderMobileMenu(MENU_CONFIG, authSet);

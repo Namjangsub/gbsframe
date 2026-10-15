@@ -1,5 +1,7 @@
 package com.dksys.biz.user.wb.wb20;
 
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -34,6 +36,9 @@ public class WB20Ctr {
     @Autowired
     WB20Svc wb20Svc;
 
+    @Autowired
+    private com.dksys.biz.user.wb.wb20.service.SseNotificationService sseNotificationService;
+
     //<!-- WBS 일정계획 등록 메인 화면 조회 리스트  -->
 	  @PostMapping(value = "/selectToDoList")
 	  public String selectToDoList(@RequestBody Map<String, String> paramMap, ModelMap model) {
@@ -54,6 +59,17 @@ public class WB20Ctr {
 		  Map<String, Integer> countMap = wb20Svc.selectToDoCountGrouped(paramMap);
 		  model.addAttribute("result", countMap);
 		  return "jsonView";
+	  }
+
+	  /**
+	   * SSE 결재/공유 건수 실시간 스트리밍 엔드포인트
+	   * - 브라우저(EventSource)가 구독 요청 시 연결 유지 및 실시간 이벤트 스트리밍 제공
+	   */
+	  @org.springframework.web.bind.annotation.GetMapping(value = "/sseTodoCount", produces = org.springframework.http.MediaType.TEXT_EVENT_STREAM_VALUE)
+	  public org.springframework.web.servlet.mvc.method.annotation.SseEmitter sseTodoCount(
+			  @RequestParam(value = "userId", required = true) String userId,
+			  @RequestParam(value = "coCd", required = false, defaultValue = "GUN") String coCd) {
+		  return sseNotificationService.subscribe(userId, coCd);
 	  }
 
 	  @PostMapping(value = "/M08selectToDoList")
@@ -91,6 +107,14 @@ public class WB20Ctr {
 		wb20Svc.toDoCfDtUpdate(paramMap);
     	model.addAttribute("resultCode", 200);
     	model.addAttribute("resultMessage", messageUtils.getMessage("update"));
+    	try {
+    		// 공유 확인 시 본인의 미확인 카운트 즉시 갱신
+    		String usrId = paramMap.get("usrId");
+    		String coCd = paramMap.get("coCd");
+    		if (usrId != null && !usrId.isEmpty()) {
+    			sseNotificationService.triggerCountUpdate(coCd, usrId);
+    		}
+    	} catch (Exception ignored) {}
     	return "jsonView";
       }
 
@@ -174,6 +198,58 @@ public class WB20Ctr {
 
 		    	model.addAttribute("resultCode", 200);
 		    	model.addAttribute("resultMessage", messageUtils.getMessage("update"));
+		    	try {
+		    		// 결재 처리자 및 신청자/다음결재자의 미결재 건수 갱신
+		    		String coCd = paramMap.get("coCd");
+		    		String usrId = paramMap.get("usrId");
+		    		String reqId = paramMap.get("reqId");
+		    		String salesMngId = paramMap.get("salesMngId");
+
+		    		// 다음 차례가 된 결재자(Next Approver)를 실시간 결재선에서 조회하여 툴팁 알림 전달
+		    		String nextApprover = null;
+		    		try {
+		    			Map<String, String> qMap = new HashMap<>();
+		    			String tNo = paramMap.get("todoNo") != null ? paramMap.get("todoNo") : reqId;
+		    			qMap.put("todoNo", tNo);
+		    			qMap.put("coCd", coCd);
+		    			if (paramMap.get("todoDiv2CodeId") != null) {
+		    				qMap.put("todoDiv2CodeId", paramMap.get("todoDiv2CodeId"));
+		    			}
+		    			List<Map<String, String>> lines = wb20Svc.selectGetApprovalList(qMap);
+		    			if (lines != null) {
+		    				// selectGetApprovalList는 SANCTN_SN DESC로 정렬되므로, 결재 순번(오름차순)으로 재정렬
+		    				List<Map<String, String>> sortedLines = new ArrayList<>(lines);
+		    				sortedLines.sort((a, b) -> {
+		    					int snA = 0, snB = 0;
+		    					try { snA = Integer.parseInt(String.valueOf(a.get("sanctnSn"))); } catch (Exception e) {}
+		    					try { snB = Integer.parseInt(String.valueOf(b.get("sanctnSn"))); } catch (Exception e) {}
+		    					return Integer.compare(snA, snB);
+		    				});
+		    				for (Map<String, String> line : sortedLines) {
+		    					if ("N".equals(line.get("sanctnSttus")) && !"공유".equals(line.get("todoDiv1CodeNm"))) {
+		    						nextApprover = line.get("todoId");
+		    						break;
+		    					}
+		    				}
+		    			}
+		    		} catch (Exception ignored) {}
+
+		    		if (nextApprover != null) {
+		    			Map<String, Object> notiInfo = new HashMap<>();
+		    			String senderNm = paramMap.get("userNm") != null ? paramMap.get("userNm") : usrId;
+		    			String senderId = usrId != null ? usrId : (paramMap.get("userId") != null ? paramMap.get("userId") : paramMap.get("todoId"));
+		    			notiInfo.put("senderNm", senderNm);
+		    			notiInfo.put("senderId", senderId);
+		    			notiInfo.put("todoTitl", paramMap.get("todoTitl"));
+		    			notiInfo.put("todoDiv2Nm", paramMap.get("todoDiv2CodeNm"));
+		    			notiInfo.put("todoDiv2CodeId", paramMap.get("todoDiv2CodeId"));
+		    			notiInfo.put("todoNo", paramMap.get("todoNo") != null ? paramMap.get("todoNo") : reqId);
+		    			notiInfo.put("actionType", "NEW_APPROVAL");
+		    			sseNotificationService.triggerSequentialApprovalNoti(coCd, nextApprover, notiInfo, usrId, reqId, salesMngId, senderId);
+		    		} else {
+		    			sseNotificationService.triggerCountUpdate(coCd, usrId, reqId, salesMngId);
+		    		}
+		    	} catch (Exception ignored) {}
 	    	}catch(Exception e) {
 		    	 model.addAttribute("resultCode", 500);
 		    	 String errMsg = e.getMessage();
@@ -208,6 +284,12 @@ public class WB20Ctr {
 	  public String rejectApprovalLine(@RequestBody Map<String, String> paramMap, ModelMap model) {
 		  Map<String, String> result = wb20Svc.rejectApprovalLine(paramMap);
 		  model.addAttribute("result", result);
+		  try {
+			  String coCd = paramMap.get("coCd");
+			  String usrId = paramMap.get("usrId");
+			  String reqId = paramMap.get("reqId");
+			  sseNotificationService.triggerCountUpdate(coCd, usrId, reqId);
+		  } catch (Exception ignored) {}
 		  return "jsonView";
 	  }
 

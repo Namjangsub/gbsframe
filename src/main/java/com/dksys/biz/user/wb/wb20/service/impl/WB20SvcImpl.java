@@ -18,6 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.dksys.biz.admin.cm.cm06.mapper.CM06Mapper;
 import com.dksys.biz.admin.cm.cm16.mapper.CM16Mapper;
 import com.dksys.biz.user.am.am11.service.AM11Svc;
+import com.dksys.biz.user.am.util.ApprovalLineRules;
 import com.dksys.biz.admin.cm.cm25.mapper.CM25Mapper;
 import com.dksys.biz.config.RequestUtils;
 import com.dksys.biz.user.im.im01.mapper.IM01Mapper;
@@ -72,6 +73,10 @@ public class WB20SvcImpl implements WB20Svc {
 	@Autowired
 	@Lazy
 	private AM11Svc am11Svc;
+
+	@Autowired
+	@Lazy
+	private com.dksys.biz.user.wb.wb20.service.SseNotificationService sseNotificationService;
 
 	@Autowired
 	ExceptionThrower thrower;
@@ -594,64 +599,19 @@ public class WB20SvcImpl implements WB20Svc {
 	}
 
 	// 순차결재 취소 검증: 다음 차례 결재자가 이미 승인한 상태에서는 이전 결재자가 결재를 취소할 수 없다 (역순 취소 원칙)
-	/**
-	 * 두 라인이 같은 병렬 AGREE 런에 속하는지 판정
-	 * - 둘 다 AGREE이고
-	 * - 두 라인 사이에 비-AGREE 구속라인(APPR,POST)이 없으면 true
-	 */
-	private boolean isSameStep(Map<String, String> currentLine, Map<String, String> prevLine, List<Map<String, String>> allLines) {
-		if (currentLine == null || prevLine == null) return false;
-		String currType = nvlLineType(currentLine.get("lineType"));
-		String prevType = nvlLineType(prevLine.get("lineType"));
-		// currentLine은 AGREE여야 함, prevLine은 AGREE 또는 APPR 헤드
-		if (!"AGREE".equals(currType) || (!("AGREE".equals(prevType) || "APPR".equals(prevType)))) return false;
-
-		// 두 라인 사이에 비-AGREE 구속 라인(APPR/POST)이 없는지 확인
-		int currSn = Integer.parseInt(String.valueOf(currentLine.get("sanctnSn")));
-		int prevSn = Integer.parseInt(String.valueOf(prevLine.get("sanctnSn")));
-		int minSn = Math.min(currSn, prevSn);
-		int maxSn = Math.max(currSn, prevSn);
-
-		for (Map<String, String> line : allLines) {
-			try {
-				int sn = Integer.parseInt(String.valueOf(line.get("sanctnSn")));
-				if (sn > minSn && sn < maxSn) {
-					String type = nvlLineType(line.get("lineType"));
-					if ("APPR".equals(type) || "POST".equals(type)) {
-						return false;  // 구속 라인 발견
-					}
-				}
-			} catch (Exception e) {
-				continue;
-			}
-		}
-		return true;
-	}
-
-	private boolean isSameAgreeRun(Map<String, String> currentLine, Map<String, String> prevLine, List<Map<String, String>> allLines) {
-		return isSameStep(currentLine, prevLine, allLines);
-	}
-
-	/**
-	 * lineType 정규화: null → 'APPR'
-	 */
-	private String nvlLineType(String lineType) {
-		return (lineType == null || "".equals(lineType.trim())) ? "APPR" : lineType.trim();
-	}
-
-	private void validatePm51SequentialCancel(Map<String, String> paramMap) {
+	// 단계/비구속 판정은 ApprovalLineRules(AM 결재 규칙 기준), 비교 앵커는 현재 라인(currentSn)이다.
+	private void validateSequentialCancel(Map<String, String> paramMap) {
 		String todoDiv1CodeId = paramMap.get("todoDiv1CodeId");
 		String todoDiv2CodeId = paramMap.get("todoDiv2CodeId");
 		if (!"TODODIV20".equals(todoDiv1CodeId)) {
 			return;
 		}
+		// 출장/복명서(PM51/PM52) 관리부서 연계 여부 체크용 플래그
 		boolean isGeneralLine = "TODODIV2190".equals(todoDiv2CodeId) || "TODODIV2200".equals(todoDiv2CodeId)
 			|| "TODODIV2202".equals(todoDiv2CodeId)
 			|| "TODODIV2300".equals(todoDiv2CodeId) || "TODODIV2410".equals(todoDiv2CodeId) || "TODODIV2420".equals(todoDiv2CodeId);
 		boolean isMngLine = GENERAL_TO_MNG_TODODIV2.containsKey(todoDiv2CodeId);
-		if (!isGeneralLine && !isMngLine) {
-			return;
-		}
+
 		String todoNo = paramMap.get("todoNo");
 		if (!hasText(todoNo)) {
 			return;
@@ -669,7 +629,6 @@ public class WB20SvcImpl implements WB20Svc {
 		selfParam.put("todoDiv1CodeId", "TODODIV20");
 		selfParam.put("todoDiv2CodeId", todoDiv2CodeId);
 		List<Map<String, String>> lines = wb20Mapper.selectApprovalLineOrder(selfParam);
-		Map<String, String> prevLine = null;
 		for (Map<String, String> line : lines) {
 			int sn;
 			try {
@@ -677,17 +636,14 @@ public class WB20SvcImpl implements WB20Svc {
 			} catch (Exception e) {
 				continue;
 			}
-			String lineType = nvlLineType(line.get("lineType"));
 
-			// COOP/POST면 선행차단 하지 않음
-			if ("COOP".equals(lineType) || "POST".equals(lineType)) {
-				prevLine = line;
+			// COOP/REF/POST면 선행차단 하지 않음
+			if (ApprovalLineRules.isNonBinding(ApprovalLineRules.lineType(line.get("lineType")))) {
 				continue;
 			}
 
-			// 같은 AGREE 런이면 상호 비차단
-			if (prevLine != null && isSameAgreeRun(line, prevLine, lines)) {
-				prevLine = line;
+			// 현재 라인과 같은 단계(병렬 AGREE 런)이면 상호 비차단
+			if (ApprovalLineRules.isSameStep(lines, "sanctnSn", currentSn, sn)) {
 				continue;
 			}
 
@@ -695,7 +651,6 @@ public class WB20SvcImpl implements WB20Svc {
 				String nextName = pm51ApproverNameWithJik(line);
 				throw new RuntimeException("다음 결재자 " + (hasText(nextName) ? nextName + "님이 " : "") + "이미 결재를 완료하여 결재 취소할 수 없습니다.\n다음 결재자의 결재를 먼저 취소해야 합니다.");
 			}
-			prevLine = line;
 		}
 
 		// 2. 신청부서 결재선 취소 시, 관리부서 결재선에서 이미 결재가 진행된 건이 있는지 검사
@@ -762,7 +717,6 @@ public class WB20SvcImpl implements WB20Svc {
 		selfParam.put("todoDiv1CodeId", "TODODIV20");
 		selfParam.put("todoDiv2CodeId", todoDiv2CodeId);
 		List<Map<String, String>> lines = wb20Mapper.selectApprovalLineOrder(selfParam);
-		Map<String, String> prevLine = null;
 		for (Map<String, String> line : lines) {
 			int sn;
 			try {
@@ -770,17 +724,15 @@ public class WB20SvcImpl implements WB20Svc {
 			} catch (Exception e) {
 				continue;
 			}
-			String lineType = nvlLineType(line.get("lineType"));
+			String lineType = ApprovalLineRules.lineType(line.get("lineType"));
 
 			// COOP/POST면 선행차단 하지 않음
 			if ("COOP".equals(lineType) || "POST".equals(lineType)) {
-				prevLine = line;
 				continue;
 			}
 
-			// 같은 AGREE 런이면 상호 비차단
-			if (prevLine != null && isSameAgreeRun(line, prevLine, lines)) {
-				prevLine = line;
+			// 현재 라인과 같은 단계(병렬 AGREE 런)이면 상호 비차단
+			if (ApprovalLineRules.isSameStep(lines, "sanctnSn", currentSn, sn)) {
 				continue;
 			}
 
@@ -788,13 +740,11 @@ public class WB20SvcImpl implements WB20Svc {
 			// 2번 결재자(이영만)가 결재할 때 1번(최정민)의 미승인은 차단 사유가 되지 않는다.
 			// 단, 3번 이상(부사장 등)은 1번과 2번이 모두 승인되어야만 결재 가능하다.
 			if (isMngLine && currentSn == 2 && sn == 1) {
-				prevLine = line;
 				continue;
 			}
 			if (sn < currentSn && !"Y".equals(line.get("sanctnSttus"))) {
 				throw new RuntimeException(pm51PendingApproverMessage("이전결재자", line));
 			}
-			prevLine = line;
 		}
 	}
 
@@ -1025,31 +975,161 @@ public class WB20SvcImpl implements WB20Svc {
 			for (Map<String, String> dtl : detailMap) {
                 // 조치자가 팀장일경우 insertWbsApprovalList 에서 결재완료처리로 등록되므로 상태코드를 진행으로 변경하기 위해 아래 쿼리 실행함
                 // insertWbsApprovalList --> usrNm 을 todoId 에 저장하고 있음
-                if (dtl.get("userId").equals(dtl.get("todoId"))) {
-                    if ("TODODIV2150".equals(dtl.get("todoDiv2CodeId")) || "TODODIV2160".equals(dtl.get("todoDiv2CodeId"))) { // 개선 제안서이면
-                        //개선 제안서이면 자체 승인처리 없음.  결재하면서 의견등록하기 위함
-                    } else {
-                        dtl.put("todoCfOpn", "자체승인");
-                        insertApprovalLine(dtl);
-                    }
-                }
+                 if (dtl.get("userId").equals(dtl.get("todoId"))) {
+                     if ("TODODIV2150".equals(dtl.get("todoDiv2CodeId")) || "TODODIV2160".equals(dtl.get("todoDiv2CodeId"))) { // 개선 제안서이면
+                         //개선 제안서이면 자체 승인처리 없음.  결재하면서 의견등록하기 위함
+                     } else {
+                         dtl.put("todoCfOpn", "자체승인");
+                         insertApprovalLine(dtl);
+                     }
+                 }
+ 			}
+
+			// 3) 신규 상신/수정 결재선에 포함된 대상자들에게 실시간 카운트 갱신 푸시
+			try {
+				if (sseNotificationService != null) {
+					Set<String> targetUserIds = new HashSet<>();
+					String drafterId = paramMap.get("userId");
+					if (drafterId != null) targetUserIds.add(drafterId);
+					for (Map<String, String> dtl : detailMap) {
+						if (dtl.get("todoId") != null && !dtl.get("todoId").isEmpty()) {
+							targetUserIds.add(dtl.get("todoId"));
+						}
+					}
+
+					// 결재 대상자에게 표출할 알림 상세 정보 구성
+					Map<String, Object> notiInfo = new HashMap<>();
+					String senderNm = paramMap.get("userNm");
+					if (senderNm == null || senderNm.isEmpty() || senderNm.equals(drafterId)) {
+						senderNm = paramMap.get("creatNm");
+					}
+					// 이름이 누락되었거나 ID로만 넘어온 경우 TB_CM06M01에서 사용자명 조회
+					if ((senderNm == null || senderNm.isEmpty() || senderNm.equals(drafterId)) && drafterId != null) {
+						try {
+							Map<String, String> userQry = new HashMap<>();
+							userQry.put("userId", drafterId);
+							Map<String, String> uInfo = cm06Mapper.selectUserInfo(userQry);
+							if (uInfo != null && uInfo.get("name") != null && !uInfo.get("name").isEmpty()) {
+								senderNm = uInfo.get("name");
+							}
+						} catch (Exception ignored) {}
+					}
+					if (senderNm == null || senderNm.isEmpty()) {
+						senderNm = drafterId != null ? drafterId : "신청자";
+					}
+
+					String workNm = paramMap.get("todoDiv2CodeNm");
+					if (workNm == null || workNm.isEmpty()) {
+						workNm = paramMap.get("todoDiv2Nm");
+					}
+					// 결재종류명이 비어있는 경우 코드ID로 이름 보완
+					if ((workNm == null || workNm.isEmpty()) && paramMap.get("todoDiv2CodeId") != null) {
+						String div2 = paramMap.get("todoDiv2CodeId");
+						if ("TODODIV2300".equals(div2)) workNm = "휴가신청";
+						else if ("TODODIV2410".equals(div2)) workNm = "휴일대체근무신청";
+						else if ("TODODIV2420".equals(div2)) workNm = "휴일대체근무결과";
+						else if ("TODODIV2190".equals(div2)) workNm = "출장신청";
+						else if ("TODODIV2191".equals(div2)) workNm = "출장관리부서결재";
+						else if ("TODODIV2200".equals(div2)) workNm = "출장복명서";
+						else if ("TODODIV2201".equals(div2)) workNm = "출장복명관리결재";
+						else if ("TODODIV2030".equals(div2)) workNm = "발주/출장요청(결과)";
+						else if ("TODODIV2020".equals(div2)) workNm = "발주요청";
+						else if ("TODODIV2090".equals(div2)) workNm = "문제조치";
+						else if ("TODODIV2100".equals(div2)) workNm = "수주목표원가";
+						else if ("TODODIV2130".equals(div2)) workNm = "업무요청";
+						else if ("TODODIV2150".equals(div2)) workNm = "개선제안";
+						else if ("TODODIV2160".equals(div2)) workNm = "개선제안실시";
+						else workNm = "결재문서";
+					}
+
+					// detailMap 내에 개별적으로 들어있는 구체적인 todoTitl(예: "[휴가] 최지상 연차 (2026-10-15)") 확인
+					String detailTodoTitl = paramMap.get("todoTitl");
+					for (Map<String, String> dtl : detailMap) {
+						if (dtl.get("todoTitl") != null && !dtl.get("todoTitl").trim().isEmpty()) {
+							detailTodoTitl = dtl.get("todoTitl").trim();
+							break;
+						}
+					}
+
+					notiInfo.put("senderNm", senderNm);
+					notiInfo.put("senderId", drafterId);
+					notiInfo.put("todoTitl", detailTodoTitl);
+					notiInfo.put("todoDiv2Nm", workNm);
+					notiInfo.put("todoDiv2CodeId", paramMap.get("todoDiv2CodeId"));
+					notiInfo.put("todoNo", paramMap.get("todoNo"));
+					notiInfo.put("salesCd", paramMap.get("salesCd"));
+					// 순차결재 판정: 기안자 자체승인 이후 첫 번째 미승인(N)인 '실제 다음 결재자 1명'만 툴팁 수신 대상자로 추출
+					String nextApproverId = null;
+					// detailMap 정렬 (sanctnSn 기준)
+					List<Map<String, String>> sortedLines = new ArrayList<>(detailMap);
+					sortedLines.sort((a, b) -> {
+						int snA = 0, snB = 0;
+						try { snA = Integer.parseInt(a.get("sanctnSn")); } catch (Exception e) {}
+						try { snB = Integer.parseInt(b.get("sanctnSn")); } catch (Exception e) {}
+						return Integer.compare(snA, snB);
+					});
+
+					for (Map<String, String> dtl : sortedLines) {
+						String uid = dtl.get("todoId");
+						String sttus = dtl.get("sanctnSttus");
+						// 결재선 중 기안자 본인이 아니고, 아직 승인되지 않은 첫 번째 결재자
+						if (uid != null && !uid.equals(drafterId) && !"Y".equals(sttus)) {
+							nextApproverId = uid;
+							break;
+						}
+					}
+
+					// 실제 내 차례인 다음 결재자에게만 툴팁(noti) 발송, 나머지 관련자에게는 조용한 카운트 갱신(무알림) 발송
+					sseNotificationService.triggerSequentialApprovalNoti(
+							paramMap.get("coCd"),
+							nextApproverId,
+							notiInfo,
+							targetUserIds.toArray(new String[0])
+					);
+				}
+			} catch (Exception ignored) {}
+ 		}
+ 		return result;
+ 	}
+
+ 	// wb20 todo 삭제
+ 	@Override
+ 	public int deleteTodoMaster(Map<String, String> param) {
+ 		int result = wb20Mapper.deleteTodoMaster(param);
+ 		result = wb20Mapper.updateTodoMasterSanctnSn(param);
+		try {
+			if (sseNotificationService != null && param.get("todoId") != null) {
+				sseNotificationService.triggerCountUpdate(param.get("coCd"), param.get("todoId"));
 			}
-		}
-		return result;
-	}
+		} catch (Exception ignored) {}
+ 		return result;
+ 	}
 
-	// wb20 todo 삭제
-	@Override
-	public int deleteTodoMaster(Map<String, String> param) {
-		int result = wb20Mapper.deleteTodoMaster(param);
-		result = wb20Mapper.updateTodoMasterSanctnSn(param);
-		return result;
-	}
+ 	@Override
+ 	public int deleteTodoMasterByTodoNo(Map<String, String> param) {
+		// 삭제 전 대상 결재선의 결재자/공유자 사번을 미리 수집하여 삭제 후 카운트 갱신 트리거
+		Set<String> targetUserIds = new HashSet<>();
+		try {
+			Map<String, String> queryParam = new HashMap<>();
+			queryParam.put("todoNo", param.get("todoNo"));
+			if (param.get("coCd") != null) queryParam.put("coCd", param.get("coCd"));
+			List<Map<String, String>> existingLines = wb20Mapper.selectGetApprovalList(queryParam);
+			if (existingLines != null) {
+				for (Map<String, String> line : existingLines) {
+					if (line.get("todoId") != null) targetUserIds.add(line.get("todoId"));
+				}
+			}
+		} catch (Exception ignored) {}
 
-	@Override
-	public int deleteTodoMasterByTodoNo(Map<String, String> param) {
-		return wb20Mapper.deleteTodoMasterByTodoNo(param);
-	}
+ 		int result = wb20Mapper.deleteTodoMasterByTodoNo(param);
+
+		try {
+			if (sseNotificationService != null && !targetUserIds.isEmpty()) {
+				sseNotificationService.triggerCountUpdate(param.get("coCd"), targetUserIds.toArray(new String[0]));
+			}
+		} catch (Exception ignored) {}
+ 		return result;
+ 	}
 
 	@Override
 	public Map<String, String> selectMobileTodoSelect(Map<String, String> paramMap) {
@@ -1063,7 +1143,7 @@ public class WB20SvcImpl implements WB20Svc {
 
 	@Override
 	public int updateApprovalCancle(Map<String, String> paramMap) {
-		validatePm51SequentialCancel(paramMap);
+		validateSequentialCancel(paramMap);
 		int result = wb20Mapper.updateApprovalCancle(paramMap);
 
 		// 기존 WB20 결재취소 결과를 동일 업무의 AM 전자결재 문서/결재선/이력에 반영
@@ -1167,7 +1247,47 @@ public class WB20SvcImpl implements WB20Svc {
 			}
 		}
 
+		try {
+			if (sseNotificationService != null) {
+				sseNotificationService.triggerCountUpdate(paramMap.get("coCd"), collectCancelNotifyTargets(paramMap));
+			}
+		} catch (Exception ignored) {}
+
 		return result;
+	}
+
+	/**
+	 * 결재 취소 후 건수 갱신 대상 사번: 취소자/대상자 + 같은 결재선(TODO_NO + 구분코드)의 관련자 전원(중복 제거).
+	 * 조회 실패 시에는 취소자/대상자 2명(기존 동작)만 남긴다. 취소 트랜잭션에는 영향을 주지 않는다.
+	 */
+	private String[] collectCancelNotifyTargets(Map<String, String> paramMap) {
+		Set<String> targets = new HashSet<>();
+		addNotifyTarget(targets, paramMap.get("userId"));
+		addNotifyTarget(targets, paramMap.get("todoId"));
+		try {
+			if (hasText(paramMap.get("todoNo"))) {
+				Map<String, String> queryParam = new HashMap<>();
+				queryParam.put("todoNo", paramMap.get("todoNo"));
+				if (hasText(paramMap.get("todoDiv1CodeId"))) queryParam.put("todoDiv1CodeId", paramMap.get("todoDiv1CodeId"));
+				if (hasText(paramMap.get("todoDiv2CodeId"))) queryParam.put("todoDiv2CodeId", paramMap.get("todoDiv2CodeId"));
+				if (hasText(paramMap.get("coCd"))) queryParam.put("coCd", paramMap.get("coCd"));
+				List<Map<String, String>> lines = wb20Mapper.selectGetApprovalList(queryParam);
+				if (lines != null) {
+					for (Map<String, String> line : lines) {
+						addNotifyTarget(targets, line.get("todoId"));
+					}
+				}
+			}
+		} catch (Exception e) {
+			logger.warn("[SSE] 결재취소 알림 대상 수집 실패, 취소자/대상자만 갱신: todoNo={}, {}", paramMap.get("todoNo"), e.getMessage());
+		}
+		return targets.toArray(new String[0]);
+	}
+
+	private void addNotifyTarget(Set<String> targets, String userId) {
+		if (hasText(userId)) {
+			targets.add(userId.trim());
+		}
 	}
 
 	@Override

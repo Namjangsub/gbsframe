@@ -78,26 +78,108 @@
     border: 1px solid #cce5ff;
   }
 
-  /* 상단 우측 버튼/메뉴 수직 중앙 정렬 */
-  .btn_area {
-    margin-top: 7px;
+  /* 본문 컨텐츠 좌측상단 실시간 결재알림 툴팁 (토스트) */
+  #todoToastNotice {
+    display: none;
+    position: fixed;
+    top: 55px;
+    left: 215px; /* 좌측 LNB 메뉴 너비(195px) 바깥인 본문 컨텐츠 영역 좌측 상단에 배치 */
+    z-index: 99999;
+    min-width: 320px;
+    max-width: 420px;
+    background: #ffffff;
+    border: 1px solid #d9534f;
+    border-left: 5px solid #d9534f;
+    border-radius: 6px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+    padding: 12px 14px;
+    cursor: pointer;
+    font-family: inherit;
+    animation: toastSlideIn 0.35s ease-out;
+    transition: opacity 0.3s ease, transform 0.3s ease, left 0.2s ease;
   }
-  .btn_area > * {
-    display: inline-flex !important;
-    align-items: center !important;
+  /* 좌측 메뉴 축소(.on) 시 툴팁 위치도 함께 좌측으로 이동 */
+  body.menu-collapsed #todoToastNotice,
+  #top_area.on #todoToastNotice {
+    left: 35px;
   }
-  .btn_area .topUserName {
-    display: inline-flex;
+  #todoToastNotice:hover {
+    background-color: #fff9f9;
+    box-shadow: 0 6px 20px rgba(217, 83, 79, 0.3);
+  }
+  @keyframes toastSlideIn {
+    from { opacity: 0; transform: translateY(-15px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .toast-header {
+    display: flex;
+    justify-content: space-between;
     align-items: center;
-    line-height: normal;
-    margin-right: 8px;
+    margin-bottom: 6px;
   }
-  .btn_area .navbar-nav > li > a {
-    padding-top: 0 !important;
-    padding-bottom: 0 !important;
-    line-height: 30px !important;
+  .toast-title {
+    font-size: 13px;
+    font-weight: bold;
+    color: #d9534f;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+  .toast-close-btn {
+    background: none;
+    border: none;
+    font-size: 16px;
+    color: #888;
+    cursor: pointer;
+    line-height: 1;
+    padding: 0 4px;
+  }
+  .toast-close-btn:hover {
+    color: #333;
+  }
+  .toast-body {
+    font-size: 12px;
+    color: #333;
+    line-height: 1.4;
+  }
+  .toast-sender {
+    font-weight: bold;
+    color: #1a56a0;
+  }
+  .toast-desc {
+    margin-top: 3px;
+    color: #555;
+    word-break: break-all;
+  }
+  .toast-footer {
+    margin-top: 8px;
+    font-size: 11px;
+    color: #888;
+    text-align: right;
   }
 </style>
+
+<!-- 본문 좌측 상단 실시간 결재 툴팁 알림창 -->
+<div id="todoToastNotice" onclick="handleToastClick(event)">
+	<div class="toast-header">
+		<span class="toast-title">
+			<i class="fa fa-bell"></i> <span id="toastCategory">결재 요청 도착</span>
+		</span>
+		<button type="button" class="toast-close-btn" onclick="closeTodoToast(event)">&times;</button>
+	</div>
+	<div class="toast-body">
+		<div style="font-size: 13px; margin-bottom: 3px;">
+			<span id="toastSender" class="toast-sender"></span> 님이 결재를 요청하였습니다.
+		</div>
+		<div style="font-size: 11.5px; color: #555; background: #f8f9fa; border: 1px solid #eee; border-radius: 4px; padding: 6px 8px; margin-top: 4px;">
+			<div><strong style="color: #333;">문서종류:</strong> <span id="toastDocType" style="color: #d9534f; font-weight: bold;"></span></div>
+			<div style="margin-top: 2px;"><strong style="color: #333;">요청내용:</strong> <span id="toastDesc" style="color: #444;"></span></div>
+		</div>
+	</div>
+	<div class="toast-footer">
+		<span>👉 클릭 시 결재함으로 바로 이동</span>
+	</div>
+</div>
 
 <!-- 페이지 타이틀 -->
 <h3 class="location">
@@ -197,10 +279,11 @@
 		$("#topUserNm").click(function() {topinsertDailyWorkModal("C");});
 		$("#personalStatus").click(function() {callPersonalStatus();});
 
-		//결재미완료 / 공유미확인 건수 처리 (최초 조회 + 3분 간격 갱신 + 탭간 동기화)
+		// 결재미완료 / 공유미확인 건수 처리 (SSE 실시간 수신 + 캐시 렌더링 + 탭간 동기화)
 		window.addEventListener("storage", function(e) {
 			if (e.key === "access_token" && !e.newValue) {
 				renderMyTodoCount(0, 0);
+				closeSseTodo();
 				return;
 			}
 			var key = getTodoCacheKey();
@@ -212,25 +295,29 @@
 			}
 		});
 
+		// 탭 활성화 복귀 시 연결 점검 및 최신화
 		document.addEventListener("visibilitychange", function() {
 			if (!document.hidden) {
+				if (!sseTodoSource || sseTodoSource.readyState === EventSource.CLOSED) {
+					initSseTodo();
+				}
+				// 탭 복귀 시 캐시가 비었거나 오래되었으면 1회 갱신
 				myTodoStatusRtv(false);
 			}
 		});
 
-		// 최초 화면 진입 시: 캐시 먼저 표시 후, 백엔드 최신 조회 1회 수행(isForce=true)
+		// 화면 언로드 시 SSE 연결 정리
+		window.addEventListener("beforeunload", function() {
+			closeSseTodo();
+		});
+
+		// 최초 진입: 로컬 캐시 즉시 표시 후 실시간 SSE 연결 시작
 		renderFromCache();
-		myTodoStatusRtv(true);
-		setInterval(function() { myTodoStatusRtv(false); }, TODO_TTL_MS);
+		initSseTodo();
 
 	});
 
-	var TODO_TTL_MS = 180000;       // 3분
-	var FETCH_LOCK_TTL_MS = 5000;   // 5초
-
-	var TODO_TAB_ID =
-		Date.now() + "_" +
-		Math.random().toString(36).substring(2);
+	var sseTodoSource = null;
 
 	function getTodoCacheKey() {
 		if (!jwt || !jwt.userId) {
@@ -275,59 +362,154 @@
 		return cached;
 	}
 
+	// ─ SSE 실시간 연결 초기화 ─
+	function initSseTodo() {
+		if (!window.EventSource || !jwt || !jwt.userId) {
+			// EventSource 미지원 브라우저는 1회 조회 fallback
+			myTodoStatusRtv(true);
+			return;
+		}
+
+		if (sseTodoSource && sseTodoSource.readyState !== EventSource.CLOSED) {
+			return;
+		}
+
+		try {
+			var sseUrl = "/user/wb/wb20/sseTodoCount?userId=" + encodeURIComponent(jwt.userId) + "&coCd=" + encodeURIComponent(jwt.coCd || "GUN");
+			sseTodoSource = new EventSource(sseUrl);
+
+			// 서버 푸시 실시간 수신
+			sseTodoSource.addEventListener("todoCount", function(e) {
+				if (!e.data) return;
+				try {
+					var countMap = JSON.parse(e.data);
+					var appCnt = Number(countMap.approvalCnt || 0);
+					var shareCnt = Number(countMap.shareCnt || 0);
+
+					renderMyTodoCount(appCnt, shareCnt);
+
+					var cacheKey = getTodoCacheKey();
+					if (cacheKey) {
+						var cacheObj = {
+							approvalCnt: appCnt,
+							shareCnt: shareCnt,
+							at: Date.now()
+						};
+						localStorage.setItem(cacheKey, JSON.stringify(cacheObj));
+					}
+
+					// 실시간 신규 결재 요청 알림(noti)이 포함되어 있는 경우 좌측상단 툴팁 팝업 표출
+					// (서버에서 이미 해당 순번의 다음 결재자에게만 타겟팅하여 noti를 전송함)
+					if (countMap.noti && countMap.noti.actionType === "NEW_APPROVAL") {
+						var noti = countMap.noti;
+						showTodoToast(noti);
+					}
+				} catch (err) {
+					console.warn("[SSE] parse error:", err);
+				}
+			});
+
+			sseTodoSource.onerror = function() {
+				// 에러 또는 서버 재시작 시 자동 재연결 지원되므로 로그만 남김
+				if (this && this.readyState === EventSource.CLOSED) {
+					closeSseTodo();
+				}
+			};
+		} catch (e) {
+			console.warn("[SSE] init error:", e);
+			myTodoStatusRtv(true);
+		}
+	}
+
+	var toastTimer = null;
+
+	// 좌측 상단 실시간 결재 툴팁 팝업 표출
+	function showTodoToast(noti) {
+		if (!noti) return;
+
+		var senderNm = noti.senderNm || "기안자";
+		var workNm = noti.todoDiv2Nm || "결재문서";
+
+		// 요청 내용 파싱: 휴가 유형(연차, 반차, 외출 등) 및 기간/사유가 직관적으로 보이도록 정제
+		var rawTitl = noti.todoTitl || "";
+		var docDesc = "";
+		if (rawTitl) {
+			// "[휴가] 최지상 연차 (2026-10-15)" 형태인 경우: 신청자명과 접두어를 정리하고 "연차 (2026-10-15)" 형식으로 추출
+			docDesc = rawTitl.replace(/^\[[^\]]+\]\s*/, "") // [휴가] 제거
+			                 .replace(new RegExp("^" + senderNm + "\\s*"), "") // 기안자명 접두어 제거
+			                 .replace(/^\(주\)건양[^\-]*\-?/, "") // 회사명 제거
+			                 .trim();
+		}
+		if (!docDesc || docDesc === workNm) {
+			docDesc = workNm + (noti.todoNo ? " (" + noti.todoNo + ")" : "");
+		}
+
+		$("#toastCategory").text("결재 요청 알림");
+		$("#toastSender").text(senderNm);
+		$("#toastDocType").text(workNm);
+		$("#toastDesc").text(docDesc);
+
+		var $toast = $("#todoToastNotice");
+		// 좌측 LNB 메뉴 너비(195px)를 고려하여 본문 시작 위치에 정확히 표시되도록 동적 계산
+		var isMenuCollapsed = $("body").hasClass("menu-collapsed") || $("#top_area").hasClass("on") || $(".menu_off").css("left") === "0px";
+		var targetLeft = isMenuCollapsed ? "35px" : "215px";
+		$toast.data("notiInfo", noti);
+		$toast.stop(true, true).css({ opacity: 1, display: "block", left: targetLeft });
+
+		if (toastTimer) {
+			clearTimeout(toastTimer);
+		}
+		// 8초 후 자동 페이드아웃
+		toastTimer = setTimeout(function() {
+			closeTodoToast();
+		}, 8000);
+	}
+
+	// 툴팁 닫기
+	function closeTodoToast(e) {
+		if (e && e.stopPropagation) {
+			e.stopPropagation();
+		}
+		if (toastTimer) {
+			clearTimeout(toastTimer);
+			toastTimer = null;
+		}
+		var $toast = $("#todoToastNotice");
+		$toast.fadeOut(300);
+	}
+
+	// 툴팁 클릭 시 결재함(To-Do List)으로 바로 이동
+	function handleToastClick(e) {
+		if (e && e.target && $(e.target).hasClass("toast-close-btn")) {
+			return;
+		}
+		closeTodoToast();
+		goToApprovalScreen();
+	}
+
+	function closeSseTodo() {
+		if (sseTodoSource) {
+			try { sseTodoSource.close(); } catch (e) {}
+			sseTodoSource = null;
+		}
+	}
+
+	// Fallback용 HTTP 조회 함수 (초기 로드 또는 강제 갱신 시만 사용, 무차별 polling 제거)
 	function myTodoStatusRtv(isForce) {
-		if (!localStorage.getItem("access_token") ||
-			!jwt ||
-			!jwt.userId) {
+		if (!localStorage.getItem("access_token") || !jwt || !jwt.userId) {
 			renderMyTodoCount(0, 0);
 			return;
 		}
 
-		if (document.hidden && !isForce) {
-			return;
-		}
-
 		var cacheKey = getTodoCacheKey();
-		if (!cacheKey) {
-			return;
-		}
-
-		var lockKey = cacheKey + ":fetching";
-		var now = Date.now();
 		var cached = getTodoCache();
+		var now = Date.now();
 
-		// 캐시 먼저 화면 반영
-		if (cached) {
-			renderMyTodoCount(
-				cached.approvalCnt,
-				cached.shareCnt
-			);
-		}
-
-		// 일반 주기적 조회의 경우만 TTL(3분) 이내면 스킵 (최초 진입/결재완료/isForce=true는 통신 수행)
-		if (!isForce &&
-			cached &&
-			now - cached.at < TODO_TTL_MS) {
+		// 캐시가 유효(5분 이내)하고 강제 조회가 아니면 HTTP 요청 생략 (DB 보호)
+		if (!isForce && cached && (now - cached.at < 300000)) {
+			renderMyTodoCount(cached.approvalCnt, cached.shareCnt);
 			return;
 		}
-
-		// ★ Force 여부와 관계없이 Lock 확인
-		var fetchLock = localStorage.getItem(lockKey);
-		if (fetchLock &&
-			now - Number(fetchLock) < FETCH_LOCK_TTL_MS) {
-			return;
-		}
-
-		// 만료 Lock 정리
-		if (fetchLock) {
-			localStorage.removeItem(lockKey);
-		}
-
-		// Fetching Lock
-		localStorage.setItem(
-			lockKey,
-			String(now)
-		);
 
 		var formData = {
 			coCd: jwt.coCd,
@@ -345,26 +527,16 @@
 				var appCnt = Number(result.approvalCnt || 0);
 				var shareCnt = Number(result.shareCnt || 0);
 
-				var cacheObj = {
-					approvalCnt: appCnt,
-					shareCnt: shareCnt,
-					at: Date.now()
-				};
+				renderMyTodoCount(appCnt, shareCnt);
 
-				// 현재 탭 즉시 갱신
-				renderMyTodoCount(
-					appCnt,
-					shareCnt
-				);
-
-				// 다른 탭으로 전달
-				localStorage.setItem(
-					cacheKey,
-					JSON.stringify(cacheObj)
-				);
-
-				// Lock 해제
-				localStorage.removeItem(lockKey);
+				if (cacheKey) {
+					var cacheObj = {
+						approvalCnt: appCnt,
+						shareCnt: shareCnt,
+						at: Date.now()
+					};
+					localStorage.setItem(cacheKey, JSON.stringify(cacheObj));
+				}
 			},
 			false
 		);

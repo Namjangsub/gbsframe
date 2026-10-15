@@ -51,6 +51,9 @@ public class AM11SvcImpl implements AM11Svc {
     private WB20Svc wb20Svc;
 
     @Autowired(required = false)
+    private com.dksys.biz.user.wb.wb20.service.SseNotificationService sseNotificationService;
+
+    @Autowired(required = false)
     private com.dksys.biz.user.pm.pm07.service.PM07Svc pm07Svc;
 
     @Autowired(required = false)
@@ -356,6 +359,37 @@ public class AM11SvcImpl implements AM11Svc {
             (String) paramMap.get("currApproverId"), (String) paramMap.get("currApproverNm"),
             paramMap
         ));
+
+        // SSE 알림 및 카운트 갱신 트리거 (상신 완료 시 첫 결재자에게 툴팁 전송)
+        if (sseNotificationService != null) {
+            try {
+                String coCd = String.valueOf(paramMap.get("coCd") != null ? paramMap.get("coCd") : "GUN");
+                String firstApproverId = (String) paramMap.get("currApproverId");
+                String draUserId = (String) paramMap.get("draUserId");
+
+                if (firstApproverId != null && !firstApproverId.isEmpty()) {
+                    Map<String, Object> notiInfo = new HashMap<>();
+                    notiInfo.put("senderNm", paramMap.get("draUserNm") != null ? paramMap.get("draUserNm") : draUserId);
+                    notiInfo.put("senderId", draUserId);
+                    notiInfo.put("todoTitl", paramMap.get("docTitle"));
+                    notiInfo.put("todoDiv2Nm", paramMap.get("docNm") != null ? paramMap.get("docNm") : "전자결재");
+                    notiInfo.put("todoDiv2CodeId", paramMap.get("todoDiv2CodeId"));
+                    notiInfo.put("todoNo", paramMap.get("erpBizKey"));
+                    notiInfo.put("actionType", "NEW_APPROVAL");
+
+                    sseNotificationService.triggerSequentialApprovalNoti(
+                        coCd,
+                        firstApproverId,
+                        notiInfo,
+                        draUserId
+                    );
+                } else {
+                    sseNotificationService.triggerCountUpdate(coCd, draUserId);
+                }
+            } catch (Exception sseEx) {
+                logger.warn("AM 상신 후 SSE 알림 트리거 실패: docId={}", docId, sseEx);
+            }
+        }
 
         resultMap.put("docId", docId);
         resultMap.put("docNo", paramMap.get("docNo"));
@@ -874,6 +908,55 @@ public class AM11SvcImpl implements AM11Svc {
                 resultMap.put("resultMessage", "처리되었습니다.");
             }
         }
+
+        // 7. 실시간 SSE 알림 및 결재 건수 카운트 갱신 트리거
+        if (sseNotificationService != null) {
+            try {
+                String coCd = String.valueOf(paramMap.get("coCd") != null ? paramMap.get("coCd") : "GUN");
+                String draUserId = (String) docLock.get("draUserId");
+                String nextApproverId = null;
+
+                if (!openedLines.isEmpty()) {
+                    for (Map<String, Object> line : openedLines) {
+                        String lType = lineTypeOf(line);
+                        if (!"REF".equals(lType) && !"COOP".equals(lType)) {
+                            nextApproverId = (String) line.get("approverId");
+                            break;
+                        }
+                    }
+                    if (nextApproverId == null) {
+                        nextApproverId = (String) openedLines.get(0).get("approverId");
+                    }
+                } else if (nextLine != null) {
+                    nextApproverId = (String) nextLine.get("approverId");
+                }
+
+                if (nextApproverId != null) {
+                    Map<String, Object> notiInfo = new HashMap<>();
+                    notiInfo.put("senderNm", docInfo != null && docInfo.get("draUserNm") != null ? docInfo.get("draUserNm") : userNm);
+                    notiInfo.put("senderId", docLock.get("draUserId") != null ? docLock.get("draUserId") : userId);
+                    notiInfo.put("todoTitl", paramMap.get("docTitle"));
+                    notiInfo.put("todoDiv2Nm", docInfo != null && docInfo.get("docNm") != null ? docInfo.get("docNm") : "전자결재");
+                    notiInfo.put("todoDiv2CodeId", paramMap.get("todoDiv2CodeId"));
+                    notiInfo.put("todoNo", docLock.get("erpBizKey"));
+                    notiInfo.put("actionType", "NEW_APPROVAL");
+
+                    sseNotificationService.triggerSequentialApprovalNoti(
+                        coCd,
+                        nextApproverId,
+                        notiInfo,
+                        userId,
+                        draUserId
+                    );
+                } else {
+                    // 최종 완료 또는 대기 결재자 없음: 관련자 건수만 조용히 갱신
+                    sseNotificationService.triggerCountUpdate(coCd, userId, draUserId);
+                }
+            } catch (Exception sseEx) {
+                logger.warn("AM 승인 후 SSE 알림 트리거 실패 (비구속 예외 방어): docId={}", docId, sseEx);
+            }
+        }
+
         return resultMap;
     }
 
@@ -1075,6 +1158,17 @@ public class AM11SvcImpl implements AM11Svc {
                 "REJECT", docId, (String) docLock.get("docNo"), docInfo != null ? (String) docInfo.get("docTitle") : "",
                 (String) docLock.get("draUserId"), docInfo != null ? (String) docInfo.get("draUserNm") : "", "", "", paramMap
             ));
+        }
+
+        // SSE 알림 및 카운트 갱신 트리거 (반려 시 관련자 카운트 갱신)
+        if (sseNotificationService != null) {
+            try {
+                String coCd = String.valueOf(paramMap.get("coCd") != null ? paramMap.get("coCd") : "GUN");
+                String draUserId = (String) docLock.get("draUserId");
+                sseNotificationService.triggerCountUpdate(coCd, userId, draUserId);
+            } catch (Exception sseEx) {
+                logger.warn("AM 반려 후 SSE 카운트 갱신 실패: docId={}", docId, sseEx);
+            }
         }
 
         resultMap.put("docId", docId);
@@ -1288,6 +1382,17 @@ public class AM11SvcImpl implements AM11Svc {
             "CANCEL", docId, (String) docLock.get("docNo"), docInfo != null ? (String) docInfo.get("docTitle") : "",
             draUserId, "", "", "", paramMap
         ));
+
+        // SSE 카운트 갱신 트리거 (회수 시 기존 대기결재자 및 기안자 건수 갱신)
+        if (sseNotificationService != null) {
+            try {
+                String coCd = String.valueOf(paramMap.get("coCd") != null ? paramMap.get("coCd") : "GUN");
+                String currApproverId = (String) docLock.get("currApproverId");
+                sseNotificationService.triggerCountUpdate(coCd, draUserId, currApproverId);
+            } catch (Exception sseEx) {
+                logger.warn("AM 회수 후 SSE 카운트 갱신 실패: docId={}", docId, sseEx);
+            }
+        }
 
         resultMap.put("docId", docId);
         resultMap.put("resultCode", "200");
