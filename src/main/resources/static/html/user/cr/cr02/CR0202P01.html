@@ -365,6 +365,8 @@
 		<div style="float: right" class="add_btn_small pdl10 coAuthChk">
 			<a id="addDetailButton" style="height: 20px; line-height: 18px">+</a>
 			<a id="deleteDetailButton" style="height: 20px; line-height: 18px">-</a>
+			<a id="moveUpDetailButton" style="height: 20px; line-height: 18px; width: 26px;" title="위로 이동"><i class="fa fa-arrow-up"></i></a>
+			<a id="moveDownDetailButton" style="height: 20px; line-height: 18px; width: 26px;" title="아래로 이동"><i class="fa fa-arrow-down"></i></a>
 			<!-- 엑셀다운로드 버튼 -->
 			<a onclick="excelDown1();"
 				style="height: 30px; line-height: 28px; width: 90px;"><i
@@ -1339,6 +1341,7 @@
 				}
 				var detailObj = {
 					"ordrsSeq"				: elem.ordrsSeq,
+					"sortNo"				: (idx + 1),
 					"cudCheck"				: cudCheck,
 					"devDiv"				: elem.devDiv,
 					"ordrsDtlDiv10"			: elem.ordrsDtlDiv10,
@@ -2363,19 +2366,19 @@
 									}
 									$('#actionOrdrsBtn').hide();
 									$('#fileUpBtn').show();		// 파일업로드 버튼 보이기
-									$('#addPaymentButton, #deletePaymentButton, #addDetailButton, #deleteDetailButton, #plus-minus').hide();
+									$('#addPaymentButton, #deletePaymentButton, #addDetailButton, #deleteDetailButton, #moveUpDetailButton, #moveDownDetailButton, #plus-minus').hide();
 								} else if (inGb > 0 && inCnt > 0 && inCnt < inGb) {
 									// 결재자가 있고, 결재가 진행 중일 경우 (결재자 3명 중 1~2명 완료)
 									$('#createHistory').hide();
 									$('#actionOrdrsBtn').hide();
 									$('#fileUpBtn').show();		// 파일업로드 버튼 보이기
-									$('#addPaymentButton, #deletePaymentButton, #addDetailButton, #deleteDetailButton, #plus-minus').hide();
+									$('#addPaymentButton, #deletePaymentButton, #addDetailButton, #deleteDetailButton, #moveUpDetailButton, #moveDownDetailButton, #plus-minus').hide();
 								} else {
 									// 결재자가 없거나 아무도 결재를 하지 않았을 경우 (작성중 / 결재 대기)
 									$('#createHistory').hide();
 									$('#actionOrdrsBtn').show();
 									$('#fileUpBtn').hide();
-									$('#addPaymentButton, #deletePaymentButton, #addDetailButton, #deleteDetailButton, #plus-minus').show();
+									$('#addPaymentButton, #deletePaymentButton, #addDetailButton, #deleteDetailButton, #moveUpDetailButton, #moveDownDetailButton, #plus-minus').show();
 								}
 								list.forEach(elem => {
 									if (!elem.lineType) {
@@ -2982,6 +2985,69 @@
 
 	}
 
+	//설비&원가정보 순서 위/아래 이동 함수
+	function moveDetailRow(direction) {
+		if ($('#actionOrdrsBtn').length === 0 || $('#actionOrdrsBtn').is(':hidden')) {
+			alert("결재 진행 중이거나 완료된 수주는 수정할 수 없습니다.");
+			return false;
+		}
+		if (isSjEnded) {
+			customAlert("이 수주과제는 마감되었습니다.");
+			return false;
+		}
+		var curIdx = -1;
+		if (gridOrdrsDetail.selectedDataIndexs && gridOrdrsDetail.selectedDataIndexs.length > 0) {
+			curIdx = gridOrdrsDetail.selectedDataIndexs[0];
+		} else if (typeof thisGridRow === 'number') {
+			curIdx = thisGridRow;
+		}
+		if (curIdx < 0 || curIdx >= gridOrdrsDetail.list.length) {
+			alert("이동할 행을 선택해 주십시오.");
+			return false;
+		}
+
+		var targetIdx = (direction === 'up') ? curIdx - 1 : curIdx + 1;
+		if (targetIdx < 0) {
+			alert("첫 번째 행입니다.");
+			return false;
+		}
+		if (targetIdx >= gridOrdrsDetail.list.length) {
+			alert("마지막 행입니다.");
+			return false;
+		}
+
+		var list = gridOrdrsDetail.getList();
+		var temp = list[curIdx];
+		list[curIdx] = list[targetIdx];
+		list[targetIdx] = temp;
+
+		// 변경된 순서에 맞게 sortNo 재부여 및 cudCheck 플래그 갱신
+		for (var i = 0; i < list.length; i++) {
+			list[i].sortNo = i + 1;
+			if (list[i].cudCheck !== "C") {
+				list[i].cudCheck = "U";
+			}
+		}
+
+		gridOrdrsDetail.setData({
+			list: list,
+			page: {
+				totalElements: list.length
+			}
+		});
+		gridOrdrsDetail.select(targetIdx);
+		thisGridRow = targetIdx;
+		selectedRowKey2 = targetIdx;
+	}
+
+	$("#moveUpDetailButton").on("click", function () {
+		moveDetailRow('up');
+	});
+
+	$("#moveDownDetailButton").on("click", function () {
+		moveDetailRow('down');
+	});
+
 	$("#addDetailButton").on("click", function () {
 		if ($('#actionOrdrsBtn').length === 0 || $('#actionOrdrsBtn').is(':hidden')) {
 			alert("결재 진행 중이거나 완료된 수주는 수정할 수 없습니다.");
@@ -3526,7 +3592,7 @@
 				$('#actionOrdrsBtn').show();
 				$('#createHistory').hide();
 				$('#fileUpBtn').hide();
-				$('#addPaymentButton, #deletePaymentButton, #addDetailButton, #deleteDetailButton, #plus-minus').show();
+				$('#addPaymentButton, #deletePaymentButton, #addDetailButton, #deleteDetailButton, #moveUpDetailButton, #moveDownDetailButton, #plus-minus').show();
 				updateGridGrouping();
 				alert("이력생성이 완료되었습니다.");
 			});
