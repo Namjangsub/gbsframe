@@ -69,6 +69,10 @@ public class CR02Svcmpl implements CR02Svc {
     @Autowired
     com.dksys.biz.user.wb.wb20.service.WB20Svc wb20Svc;
 
+    @Autowired
+    @org.springframework.context.annotation.Lazy
+    private com.dksys.biz.user.wb.wb20.service.SseNotificationService sseNotificationService;
+
     @Override
     public int selectOrdrsCount(Map<String, String> param) {
         return cr02Mapper.selectOrdrsCount(param);
@@ -390,6 +394,33 @@ public class CR02Svcmpl implements CR02Svc {
             } catch (Exception e) {
                 throw new RuntimeException("전자결재(AM) 연동 중 오류가 발생했습니다: " + e.getMessage(), e);
             }
+
+            // 실시간 결재/공유 카운트 및 툴팁 알림 트리거 (CR02 결재자 대상)
+            try {
+                if (sseNotificationService != null && approvalArr != null && !approvalArr.isEmpty()) {
+                    java.util.Set<String> targetUserIds = new java.util.HashSet<>();
+                    String drafterId = param.get("userId");
+                    if (drafterId != null) targetUserIds.add(drafterId);
+                    for (Map<String, String> app : approvalArr) {
+                        String uid = app.get("todoId") != null ? app.get("todoId") : app.get("usrNm");
+                        if (uid != null && !uid.trim().isEmpty()) {
+                            targetUserIds.add(uid.trim());
+                        }
+                    }
+
+                    Map<String, Object> notiInfo = new java.util.HashMap<>();
+                    notiInfo.put("senderNm", param.get("userNm") != null ? param.get("userNm") : drafterId);
+                    notiInfo.put("senderId", drafterId);
+                    notiInfo.put("todoTitl", param.get("clntNm") != null ? param.get("clntNm") + " 수주목표원가" : param.get("ordrsNo"));
+                    notiInfo.put("todoDiv2Nm", "수주목표원가");
+                    notiInfo.put("todoDiv2CodeId", "TODODIV2100");
+                    notiInfo.put("todoNo", param.get("ordrsNo"));
+                    notiInfo.put("salesCd", param.get("ordrsNo"));
+                    notiInfo.put("actionType", "NEW_APPROVAL");
+
+                    sseNotificationService.triggerCountUpdateWithNoti(param.get("coCd"), notiInfo, targetUserIds.toArray(new String[0]));
+                }
+            } catch (Exception ignored) {}
 
 //      if("".equals(param.get("newOrdrsNo")) || param.get("newOrdrsNo") == null) {
 //          // 수주일자의 년도가 변경되었을 경우 수주번호를 갱신
@@ -827,9 +858,10 @@ public class CR02Svcmpl implements CR02Svc {
         //pgParam2 += "\"salesCd\":\""+ param.get("salesCd") +"\",";
         pgParam2 += "\"ordrsNo\":\""+ param.get("ordrsNo") +"\"}";
         //결재
+        List<Map<String, String>> approvalArr = null;
         if (canUpdateApproval) {
             Type stringList3 = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
-            List<Map<String, String>> approvalArr = gson.fromJson(param.get("rowApprovalListArr"), stringList3);
+            approvalArr = gson.fromJson(param.get("rowApprovalListArr"), stringList3);
             approvalArr = ApprovalLineTypeGuard.moveStagePostToEnd(approvalArr, param.get("ordrsNo"));
             if (approvalArr != null && approvalArr.size() > 0 ) {
                 int i = 0;
@@ -878,6 +910,33 @@ public class CR02Svcmpl implements CR02Svc {
         } catch (Exception e) {
             throw new RuntimeException("전자결재(AM) 연동 중 오류가 발생했습니다: " + e.getMessage(), e);
         }
+
+        // 실시간 결재/공유 카운트 및 툴팁 알림 트리거 (CR02 결재자 대상)
+        try {
+            if (sseNotificationService != null && approvalArr != null && !approvalArr.isEmpty()) {
+                java.util.Set<String> targetUserIds = new java.util.HashSet<>();
+                String drafterId = param.get("userId");
+                if (drafterId != null) targetUserIds.add(drafterId);
+                for (Map<String, String> app : approvalArr) {
+                    String uid = app.get("todoId") != null ? app.get("todoId") : app.get("usrNm");
+                    if (uid != null && !uid.trim().isEmpty()) {
+                        targetUserIds.add(uid.trim());
+                    }
+                }
+
+                Map<String, Object> notiInfo = new java.util.HashMap<>();
+                notiInfo.put("senderNm", param.get("userNm") != null ? param.get("userNm") : drafterId);
+                notiInfo.put("senderId", drafterId);
+                notiInfo.put("todoTitl", param.get("clntNm") != null ? param.get("clntNm") + " 수주목표원가 (" + param.get("histNo") + "차)" : param.get("ordrsNo"));
+                notiInfo.put("todoDiv2Nm", "수주목표원가");
+                notiInfo.put("todoDiv2CodeId", "TODODIV2100");
+                notiInfo.put("todoNo", param.get("ordrsNo"));
+                notiInfo.put("salesCd", param.get("ordrsNo"));
+                notiInfo.put("actionType", "NEW_APPROVAL");
+
+                sseNotificationService.triggerCountUpdateWithNoti(param.get("coCd"), notiInfo, targetUserIds.toArray(new String[0]));
+            }
+        } catch (Exception ignored) {}
 
 //      if("".equals(param.get("newOrdrsNo")) || param.get("newOrdrsNo") == null) {
 //          // 수주일자의 년도가 변경되었을 경우 수주번호를 갱신
