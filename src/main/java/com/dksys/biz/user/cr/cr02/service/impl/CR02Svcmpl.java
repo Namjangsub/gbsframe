@@ -29,6 +29,7 @@ import com.dksys.biz.user.cr.cr02.service.CR02Svc;
 import com.dksys.biz.user.qm.qm01.mapper.QM01Mapper;
 import com.dksys.biz.util.ApprovalLineTypeGuard;
 import com.dksys.biz.util.ExceptionThrower;
+import com.dksys.biz.util.SenderNameResolver;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.reflect.TypeToken;
@@ -62,6 +63,9 @@ public class CR02Svcmpl implements CR02Svc {
 
     @Autowired
     ExceptionThrower thrower;
+
+    @Autowired
+    SenderNameResolver senderNameResolver;
 
     @Autowired
     com.dksys.biz.user.am.am11.service.AM11Svc am11Svc;
@@ -409,7 +413,7 @@ public class CR02Svcmpl implements CR02Svc {
                     }
 
                     Map<String, Object> notiInfo = new java.util.HashMap<>();
-                    notiInfo.put("senderNm", param.get("userNm") != null ? param.get("userNm") : drafterId);
+                    notiInfo.put("senderNm", senderNameResolver.resolveSenderNm(param.get("userNm"), null, drafterId));
                     notiInfo.put("senderId", drafterId);
                     notiInfo.put("todoTitl", param.get("clntNm") != null ? param.get("clntNm") + " 수주목표원가" : param.get("ordrsNo"));
                     notiInfo.put("todoDiv2Nm", "수주목표원가");
@@ -925,7 +929,7 @@ public class CR02Svcmpl implements CR02Svc {
                 }
 
                 Map<String, Object> notiInfo = new java.util.HashMap<>();
-                notiInfo.put("senderNm", param.get("userNm") != null ? param.get("userNm") : drafterId);
+                notiInfo.put("senderNm", senderNameResolver.resolveSenderNm(param.get("userNm"), null, drafterId));
                 notiInfo.put("senderId", drafterId);
                 notiInfo.put("todoTitl", param.get("clntNm") != null ? param.get("clntNm") + " 수주목표원가 (" + param.get("histNo") + "차)" : param.get("ordrsNo"));
                 notiInfo.put("todoDiv2Nm", "수주목표원가");

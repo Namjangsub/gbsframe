@@ -22,6 +22,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import com.dksys.biz.cmn.vo.PaginationInfo;
 import com.dksys.biz.user.wb.wb20.service.WB20Svc;
 import com.dksys.biz.util.MessageUtils;
+import com.dksys.biz.util.SenderNameResolver;
 
 @Controller
 @Transactional(rollbackFor = Exception.class)
@@ -38,6 +39,9 @@ public class WB20Ctr {
 
     @Autowired
     private com.dksys.biz.user.wb.wb20.service.SseNotificationService sseNotificationService;
+
+    @Autowired
+    SenderNameResolver senderNameResolver;
 
     //<!-- WBS 일정계획 등록 메인 화면 조회 리스트  -->
 	  @PostMapping(value = "/selectToDoList")
@@ -207,6 +211,7 @@ public class WB20Ctr {
 
 		    		// 다음 차례가 된 결재자(Next Approver)를 실시간 결재선에서 조회하여 툴팁 알림 전달
 		    		String nextApprover = null;
+		    		List<Map<String, String>> lines = null;
 		    		try {
 		    			Map<String, String> qMap = new HashMap<>();
 		    			String tNo = paramMap.get("todoNo") != null ? paramMap.get("todoNo") : reqId;
@@ -215,7 +220,7 @@ public class WB20Ctr {
 		    			if (paramMap.get("todoDiv2CodeId") != null) {
 		    				qMap.put("todoDiv2CodeId", paramMap.get("todoDiv2CodeId"));
 		    			}
-		    			List<Map<String, String>> lines = wb20Svc.selectGetApprovalList(qMap);
+		    			lines = wb20Svc.selectGetApprovalList(qMap);
 		    			if (lines != null) {
 		    				// selectGetApprovalList는 SANCTN_SN DESC로 정렬되므로, 결재 순번(오름차순)으로 재정렬
 		    				List<Map<String, String>> sortedLines = new ArrayList<>(lines);
@@ -236,8 +241,23 @@ public class WB20Ctr {
 
 		    		if (nextApprover != null) {
 		    			Map<String, Object> notiInfo = new HashMap<>();
-		    			String senderNm = paramMap.get("userNm") != null ? paramMap.get("userNm") : usrId;
-		    			String senderId = usrId != null ? usrId : (paramMap.get("userId") != null ? paramMap.get("userId") : paramMap.get("todoId"));
+		    			String drafterNm = paramMap.get("creatNm");
+		    			String drafterId = paramMap.get("creatId");
+		    			if ((drafterNm == null || drafterNm.isEmpty()) && (drafterId == null || drafterId.isEmpty())) {
+		    				try {
+		    					if (lines != null && !lines.isEmpty()) {
+		    						for (Map<String, String> l : lines) {
+		    							if (l.get("creatNm") != null && !l.get("creatNm").isEmpty()) {
+		    								drafterNm = l.get("creatNm");
+		    								drafterId = l.get("creatId");
+		    								break;
+		    							}
+		    						}
+		    					}
+		    				} catch (Exception ignored) {}
+		    			}
+		    			String senderNm = senderNameResolver.resolveSenderNm(drafterNm != null ? drafterNm : paramMap.get("userNm"), drafterNm, drafterId != null ? drafterId : usrId);
+		    			String senderId = drafterId != null ? drafterId : (usrId != null ? usrId : (paramMap.get("userId") != null ? paramMap.get("userId") : paramMap.get("todoId")));
 		    			notiInfo.put("senderNm", senderNm);
 		    			notiInfo.put("senderId", senderId);
 		    			notiInfo.put("todoTitl", paramMap.get("todoTitl"));

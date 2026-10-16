@@ -30,6 +30,7 @@ import com.dksys.biz.user.wb.wb20.mapper.WB20Mapper;
 import com.dksys.biz.user.wb.wb20.service.WB20Svc;
 import com.dksys.biz.user.wb.wb24.mapper.WB24Mapper;
 import com.dksys.biz.util.ExceptionThrower;
+import com.dksys.biz.util.SenderNameResolver;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.reflect.TypeToken;
@@ -57,6 +58,9 @@ public class WB20SvcImpl implements WB20Svc {
 
 	@Autowired
 	CM25Mapper cm25Mapper;
+
+	@Autowired
+	SenderNameResolver senderNameResolver;
 
     @Autowired
     IM01Mapper im01Mapper;
@@ -999,24 +1003,7 @@ public class WB20SvcImpl implements WB20Svc {
 
 					// 결재 대상자에게 표출할 알림 상세 정보 구성
 					Map<String, Object> notiInfo = new HashMap<>();
-					String senderNm = paramMap.get("userNm");
-					if (senderNm == null || senderNm.isEmpty() || senderNm.equals(drafterId)) {
-						senderNm = paramMap.get("creatNm");
-					}
-					// 이름이 누락되었거나 ID로만 넘어온 경우 TB_CM06M01에서 사용자명 조회
-					if ((senderNm == null || senderNm.isEmpty() || senderNm.equals(drafterId)) && drafterId != null) {
-						try {
-							Map<String, String> userQry = new HashMap<>();
-							userQry.put("userId", drafterId);
-							Map<String, String> uInfo = cm06Mapper.selectUserInfo(userQry);
-							if (uInfo != null && uInfo.get("name") != null && !uInfo.get("name").isEmpty()) {
-								senderNm = uInfo.get("name");
-							}
-						} catch (Exception ignored) {}
-					}
-					if (senderNm == null || senderNm.isEmpty()) {
-						senderNm = drafterId != null ? drafterId : "신청자";
-					}
+					String senderNm = senderNameResolver.resolveSenderNm(paramMap.get("userNm"), paramMap.get("creatNm"), drafterId);
 
 					String workNm = paramMap.get("todoDiv2CodeNm");
 					if (workNm == null || workNm.isEmpty()) {

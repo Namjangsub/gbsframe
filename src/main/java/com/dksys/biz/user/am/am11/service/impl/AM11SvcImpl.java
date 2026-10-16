@@ -20,6 +20,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.dksys.biz.user.am.am11.mapper.AM11Mapper;
 import com.dksys.biz.user.am.am11.service.AM11Svc;
+import com.dksys.biz.util.SenderNameResolver;
 import com.dksys.biz.user.am.event.ApprovalEvent;
 import com.dksys.biz.user.am.postprocessor.ApprovalPostProcessorRegistry;
 import com.dksys.biz.user.am.queue.service.ApprovalQueueSvc;
@@ -52,6 +53,9 @@ public class AM11SvcImpl implements AM11Svc {
 
     @Autowired(required = false)
     private com.dksys.biz.user.wb.wb20.service.SseNotificationService sseNotificationService;
+
+    @Autowired
+    private SenderNameResolver senderNameResolver;
 
     @Autowired(required = false)
     private com.dksys.biz.user.pm.pm07.service.PM07Svc pm07Svc;
@@ -369,7 +373,7 @@ public class AM11SvcImpl implements AM11Svc {
 
                 if (firstApproverId != null && !firstApproverId.isEmpty()) {
                     Map<String, Object> notiInfo = new HashMap<>();
-                    notiInfo.put("senderNm", paramMap.get("draUserNm") != null ? paramMap.get("draUserNm") : draUserId);
+                    notiInfo.put("senderNm", senderNameResolver.resolveSenderNm((String) paramMap.get("draUserNm"), null, draUserId));
                     notiInfo.put("senderId", draUserId);
                     notiInfo.put("todoTitl", paramMap.get("docTitle"));
                     notiInfo.put("todoDiv2Nm", paramMap.get("docNm") != null ? paramMap.get("docNm") : "전자결재");
@@ -933,8 +937,9 @@ public class AM11SvcImpl implements AM11Svc {
 
                 if (nextApproverId != null) {
                     Map<String, Object> notiInfo = new HashMap<>();
-                    notiInfo.put("senderNm", docInfo != null && docInfo.get("draUserNm") != null ? docInfo.get("draUserNm") : userNm);
-                    notiInfo.put("senderId", docLock.get("draUserId") != null ? docLock.get("draUserId") : userId);
+                    String senderId = docLock.get("draUserId") != null ? String.valueOf(docLock.get("draUserId")) : userId;
+                    notiInfo.put("senderNm", senderNameResolver.resolveSenderNm(docInfo != null ? (String) docInfo.get("draUserNm") : null, null, senderId));
+                    notiInfo.put("senderId", senderId);
                     notiInfo.put("todoTitl", paramMap.get("docTitle"));
                     notiInfo.put("todoDiv2Nm", docInfo != null && docInfo.get("docNm") != null ? docInfo.get("docNm") : "전자결재");
                     notiInfo.put("todoDiv2CodeId", paramMap.get("todoDiv2CodeId"));

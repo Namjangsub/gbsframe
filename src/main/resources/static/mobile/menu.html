@@ -17,6 +17,7 @@
 <script src="/static/js/jquery-3.5.1.min.js"></script>
 <script src="/static/bootstrap/js/bootstrap.min.js"></script>
 <script src="/static/js/global.js"></script>
+<script src="/static/js/sseTodoLeader.js"></script>
 </head>
 
 
@@ -200,51 +201,32 @@
 		}
 
 
-		var mSseSource = null;
-
 		function closeMobileSse() {
-			if (mSseSource) {
-				try { mSseSource.close(); } catch (e) {}
-				mSseSource = null;
-			}
+			SseTodoLeader.stop();
 		}
 
 		function initMobileSse() {
 			if (!window.EventSource || !jwt || !jwt.userId) return;
-			if (mSseSource && mSseSource.readyState !== EventSource.CLOSED) return;
 
-			try {
-				var sseUrl = "/user/wb/wb20/sseTodoCount?userId=" + encodeURIComponent(jwt.userId) + "&coCd=" + encodeURIComponent(jwt.coCd || "GUN");
-				mSseSource = new EventSource(sseUrl);
+			SseTodoLeader.start({
+				url: "/user/wb/wb20/sseTodoCount?userId=" + encodeURIComponent(jwt.userId) + "&coCd=" + encodeURIComponent(jwt.coCd || "GUN"),
+				userId: jwt.userId,
+				onTodoCount: function(countMap) {
+					var appCnt = Number(countMap.approvalCnt || 0);
+					var shareCnt = Number(countMap.shareCnt || 0);
 
-				mSseSource.addEventListener("todoCount", function(e) {
-					if (!e.data) return;
-					try {
-						var countMap = JSON.parse(e.data);
-						var appCnt = Number(countMap.approvalCnt || 0);
-						var shareCnt = Number(countMap.shareCnt || 0);
+					$('#mApprovalCount').text(appCnt);
+					$('#mShareCount').text(shareCnt);
 
-						$('#mApprovalCount').text(appCnt);
-						$('#mShareCount').text(shareCnt);
-
-						var cacheKey = "GBS:todoCnt:" + (jwt.coCd || "") + ":" + jwt.userId;
-						var cacheObj = {
-							approvalCnt: appCnt,
-							shareCnt: shareCnt,
-							at: Date.now()
-						};
-						localStorage.setItem(cacheKey, JSON.stringify(cacheObj));
-					} catch (err) {}
-				});
-
-				mSseSource.onerror = function() {
-					if (this && this.readyState === EventSource.CLOSED) {
-						closeMobileSse();
-					}
-				};
-			} catch (e) {
-				closeMobileSse();
-			}
+					var cacheKey = "GBS:todoCnt:" + (jwt.coCd || "") + ":" + jwt.userId;
+					var cacheObj = {
+						approvalCnt: appCnt,
+						shareCnt: shareCnt,
+						at: Date.now()
+					};
+					localStorage.setItem(cacheKey, JSON.stringify(cacheObj));
+				}
+			});
 		}
 
 		function loadMobileTodoCount() {
