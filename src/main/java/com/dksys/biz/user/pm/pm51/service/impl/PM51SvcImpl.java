@@ -333,6 +333,7 @@ public class PM51SvcImpl implements PM51Svc {
 						iSharng++;
 					} else {
 						approvalMap.put("sanCtnSn", Integer.toString(iApproval));
+						approvalMap.put("sanctnSn", approvalMap.get("sanCtnSn"));
 						approvalMap.put("pgParam", pgParam2);
 						insertWbsApprovalListSync(approvalMap);
 						iApproval++;
@@ -351,7 +352,7 @@ public class PM51SvcImpl implements PM51Svc {
 					}
 				}
 				for (Map<String, String> selfApprovalMap : selfApprovalList) {
-					wb20Svc.insertApprovalLine(selfApprovalMap);
+					approveSelfApprovalDirectly(selfApprovalMap);
 				}
 			}
 		}
@@ -446,7 +447,7 @@ public class PM51SvcImpl implements PM51Svc {
 
 		if (!hasCompletedApproval && !payMode) {
 			pm51Mapper.deleteTripReqApprovalLines(delParam);
-		} else if (accountingDept && !hasCompletedMngApproval) {
+		} else if (!payMode && accountingDept && !hasCompletedMngApproval) {
 			pm51Mapper.deleteTripReqMngApprovalLines(delParam);
 		}
 
@@ -534,6 +535,7 @@ public class PM51SvcImpl implements PM51Svc {
 						iSharng++;
 					} else {
 						approvalMap.put("sanCtnSn", Integer.toString(iApproval));
+						approvalMap.put("sanctnSn", approvalMap.get("sanCtnSn"));
 						approvalMap.put("pgParam", pgParam2);
 						insertWbsApprovalListSync(approvalMap);
 						iApproval++;
@@ -552,7 +554,7 @@ public class PM51SvcImpl implements PM51Svc {
 					}
 				}
 				for (Map<String, String> selfApprovalMap : selfApprovalList) {
-					wb20Svc.insertApprovalLine(selfApprovalMap);
+					approveSelfApprovalDirectly(selfApprovalMap);
 				}
 			}
 		}
@@ -562,6 +564,31 @@ public class PM51SvcImpl implements PM51Svc {
 		syncTripReqToAm(paramMap);
 
 		return result;
+	}
+
+	/**
+	 * 출장신청서 저장 중 재생성한 WB20 결재선의 자체승인을 직접 처리한다.
+	 * 수정 저장 시 기존 AM 문서가 남아 있으므로 일반 승인 경로를 사용하면
+	 * 이전 AM 결재 순번으로 위임되어 새 WB20 행이 미승인 상태로 남을 수 있다.
+	 */
+	private void approveSelfApprovalDirectly(Map<String, String> selfApprovalMap) {
+		selfApprovalMap.put("amLinkedApproval", "Y");
+		Map<String, String> approvalResult = wb20Svc.insertApprovalLine(selfApprovalMap);
+
+		String resultCount = approvalResult == null ? null : approvalResult.get("RESULT_COUNT");
+		if (!hasText(resultCount) && approvalResult != null) {
+			resultCount = approvalResult.get("resultCount");
+		}
+
+		int updatedCount = 0;
+		try {
+			updatedCount = Integer.parseInt(resultCount);
+		} catch (Exception ignored) {
+			// 아래 공통 실패 처리에서 저장 트랜잭션을 롤백한다.
+		}
+		if (updatedCount <= 0) {
+			throw new RuntimeException("자체승인 처리에 실패했습니다. 결재선을 확인해주세요.");
+		}
 	}
 
 	private boolean isCurrentManagementApproverPending(Map<String, String> paramMap) {
@@ -1034,26 +1061,7 @@ public class PM51SvcImpl implements PM51Svc {
 			throw new RuntimeException("이미 지급완료 처리된 출장신청서입니다.");
 		}
 		validateTripReqGeneralApprovalDone(paramMap.get("tripReqNo"));
-		approvePendingManagementLineForPayment(paramMap);
 		return pm51Mapper.updateTripReqPayDone(paramMap);
-	}
-
-	private void approvePendingManagementLineForPayment(Map<String, String> paramMap) {
-		if (!isCurrentManagementApproverPending(paramMap)) return;
-		Map<String, String> docParam = new HashMap<>();
-		docParam.put("tripReqNo", paramMap.get("tripReqNo"));
-		Map<String, String> amDoc = pm51Mapper.selectAmDocInfoByTripReqNo(docParam);
-		if (amDoc == null || !hasText(amDoc.get("docId"))) throw new RuntimeException("전자결재 문서를 찾을 수 없어 지급완료 처리할 수 없습니다.");
-		Map<String, Object> approvalParam = new HashMap<>();
-		approvalParam.put("docId", amDoc.get("docId"));
-		approvalParam.put("coCd", amDoc.get("coCd"));
-		approvalParam.put("userId", paramMap.get("userId"));
-		approvalParam.put("pgmId", hasText(paramMap.get("pgmId")) ? paramMap.get("pgmId") : "PM5101P01");
-		approvalParam.put("apprOpinion", paramMap.get("apprOpinion"));
-		Map<String, Object> result = am11Svc.approveDocument(approvalParam);
-		if (result == null || !"200".equals(String.valueOf(result.get("resultCode")))) {
-			throw new RuntimeException(result == null ? "관리 결재 자동 승인에 실패했습니다." : String.valueOf(result.get("resultMessage")));
-		}
 	}
 
 	// 지급완료 처리 전 신청부서(일반) 결재선(TODODIV2190)이 모두 승인되었는지 검증한다.
@@ -2432,6 +2440,10 @@ public class PM51SvcImpl implements PM51Svc {
 		html.append("<tr><th>출장지</th><td colspan=\"3\">").append(escapeHtml(tripPlace)).append("</td></tr>");
 		html.append("<tr><th>장비명</th><td colspan=\"3\">").append(escapeHtml(equipNm)).append("</td></tr>");
 		html.append("<tr><th>출장목적</th><td colspan=\"3\" style=\"white-space: pre-wrap;\">").append(escapeHtml(tripPurpose)).append("</td></tr>");
+		String custSprtTxt = paramMap.get("custSprtTxt");
+		if (hasText(custSprtTxt)) {
+			html.append("<tr><th>고객지원사항</th><td colspan=\"3\" style=\"white-space: pre-wrap;\">").append(escapeHtml(custSprtTxt)).append("</td></tr>");
+		}
 
 		// 출장자별 기간 조회 및 렌더
 		List<Map<String, String>> travelerList = null;
