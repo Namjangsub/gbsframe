@@ -368,7 +368,7 @@
 							</td>
 						</tr>
 						<tr>
-							<th style="font-family: inherit; font-size: 12px;">고객사 지원범위</th>
+							<th style="font-family: inherit; font-size: 12px; white-space: nowrap; word-break: keep-all;">고객사 지원범위</th>
 							<td colspan="2" style="font-family: inherit; font-size: 12px; text-align: left !important; padding: 8px;">
 								<div style="margin-bottom: 5px;">
 									<span style="font-weight: bold; margin-right: 2px; font-size: 11px;">교통비: (</span>
@@ -389,10 +389,17 @@
 									<label style="margin-right: 10px; font-size: 11px;"><input type="checkbox" name="sprtMealSub" value="저녁"> 저녁 )</label>
 								</div>
 								<div>
+									<label style="margin-right: 12px; font-size: 11px; font-weight: bold; color: #d9534f; cursor: pointer;"><input type="checkbox" id="sprtNoneChk" name="sprtNoneChk" value="Y"> 지원없음</label>
 									<label style="font-size: 11px; font-weight: bold;"><input type="checkbox" name="sprtChk" value="ETC" data-col="sprtEtcYn"> 기타</label>
 									<input type="text" id="sprtEtcTxt" name="sprtEtcTxt" class="form-control input-sm" placeholder="기타 내용" style="width: 100%; margin-top: 5px; display: none;">
 								</div>
 								<input type="hidden" id="sprtTrfcTxt" name="sprtTrfcTxt">
+							</td>
+						</tr>
+						<tr>
+							<th style="font-family: inherit; font-size: 12px;">고객지원사항</th>
+							<td colspan="2" style="padding: 6px 8px;">
+								<textarea id="custSprtTxt" name="custSprtTxt" class="form-control input-sm" rows="3" placeholder="고객지원사항 입력" style="width: 100%; resize: vertical;"></textarea>
 							</td>
 						</tr>
 					</table>
@@ -709,6 +716,13 @@
 	var originalTravelerSnapshot = [];
 	var originalProjectSnapshot = [];
 
+	// 동적 HTML 로딩 시 document.ready가 뒤쪽 함수 구현보다 먼저 실행되는 환경을 위한 안전 래퍼.
+	window.pm51DebugApprovalButtons = function(stage, pendingResult, force) {
+		if (typeof pm51DebugApprovalButtonsImpl === 'function') {
+			pm51DebugApprovalButtonsImpl(stage, pendingResult, force);
+		}
+	};
+
 	// 근태마감년월 (PM30 관리 값)
 	var pm51AttendanceCloseYm = null;
 
@@ -838,7 +852,7 @@
 		function pendingRowsAsc(rows, maxSn) {
 			var list = [];
 			$.each(rows || [], function(idx, row) {
-				if (row.sanctnSttus === 'Y') return;
+				if (String(row.sanctnSttus || '').trim().toUpperCase() === 'Y') return;
 				var sn = Number(row.sanctnSn || 0);
 				if (!sn) return;
 				if (maxSn && sn >= maxSn) return;
@@ -865,11 +879,12 @@
 
 		var myReqRow = null;
 		var myMngRow = null;
+		var loginUserId = String(jwt.userId || '').trim().toLowerCase();
 		$.each(reqRows, function(idx, row) {
-			if (row.todoId === jwt.userId) { myReqRow = row; return false; }
+			if (String(row.todoId || '').trim().toLowerCase() === loginUserId) { myReqRow = row; return false; }
 		});
 		$.each(mngRows, function(idx, row) {
-			if (row.todoId === jwt.userId) { myMngRow = row; return false; }
+			if (String(row.todoId || '').trim().toLowerCase() === loginUserId) { myMngRow = row; return false; }
 		});
 
 		var isRejected = false;
@@ -883,9 +898,9 @@
 
 		// 본인의 미결 결재행 기준으로 판정 (신청부서 우선)
 		var isMngApprover = false;
-		if (myReqRow && myReqRow.sanctnSttus !== 'Y') {
+		if (myReqRow && String(myReqRow.sanctnSttus || '').trim().toUpperCase() !== 'Y') {
 			isMngApprover = false;
-		} else if (myMngRow && myMngRow.sanctnSttus !== 'Y') {
+		} else if (myMngRow && String(myMngRow.sanctnSttus || '').trim().toUpperCase() !== 'Y') {
 			isMngApprover = true;
 		} else {
 			return;	// 결재 대상이 아니거나 본인 결재가 이미 완료된 경우
@@ -1071,22 +1086,44 @@
 		}
 		gridViewApprovalMng = createApprovalGrid('[data-ax5grid="approval_grid_mng_modal"]');
 
-		// SPECRTS15(회계담당자) 등록 아이디, 그리고 결재처리 전인 영업PM 본인은 공통 fileTree.js가 동적으로 추가하는
-		// 결재/공유 처리 버튼(callApprovalWorking)을 노출하지 않는다. 영업PM은 저장버튼(영업팀확인/출장조건/고객사지원범위
-		// 필수 입력 + saveTripReqSalesInfo)으로만 확인처리와 결재처리를 함께 진행해야 하기 때문.
-		// 공통모듈은 수정하지 않고, 버튼이 popup_bottom_btn에 추가되는 시점을 감지해 즉시 숨긴다.
+		// 전용 '결재'와 공통 '결재처리'가 동시에 표시되면 전용 버튼을 우선한다.
+		// 전용 버튼이 숨겨진 경우에는 공통 모듈이 권한 확인 후 생성한 '결재처리'를 다시 표시한다.
 		(function() {
 			var $popBottomBtn = $('#popForm').closest('.popup_area').find('.popup_bottom_btn');
 			if ($popBottomBtn.length && window.MutationObserver) {
-				var callApprovalBtnObserver = new MutationObserver(function() {
-					// 회계담당자는 '지급완료처리' 저장버튼으로 정산 확정과 결재처리를 함께 진행하므로 결재처리 버튼을 숨긴다.
-					// 단 이미 지급완료된 건은 지급완료처리 버튼이 없으므로, 회계팀장/부사장처럼 지급 이후에 결재해야 하는
-					// 관리부서 결재자가 결재를 진행할 수 없게 된다. 지급완료 이후에는 결재처리 버튼을 그대로 노출한다.
-					if ((checkUserAccountingAuth() && !isPayDtExist) || isSalesPmApprovalPending()) {
-						$popBottomBtn.find('.callApprovalWorking').hide();
+				function syncPm51ApprovalButtons() {
+					var $nativeApproveButton = $('#lineApproveBtn');
+					var nativeApproveVisible = $nativeApproveButton.length > 0
+						&& $nativeApproveButton.css('display') !== 'none';
+					var $commonApproveButtons = $popBottomBtn.find('.callApprovalWorking');
+
+					if (nativeApproveVisible) {
+						$commonApproveButtons.each(function() {
+							var $button = $(this);
+							if ($button.attr('data-pm51-hidden-by-native') !== 'Y') {
+								$button.attr('data-pm51-hidden-by-native', 'Y').hide();
+							}
+						});
+					} else {
+						// PM5101에서 중복 방지를 위해 숨겼던 버튼만 복원한다.
+						$commonApproveButtons.filter('[data-pm51-hidden-by-native="Y"]')
+							.removeAttr('data-pm51-hidden-by-native')
+							.show();
 					}
+					window.pm51DebugApprovalButtons('button-sync');
+				}
+
+				window.syncPm51ApprovalButtons = syncPm51ApprovalButtons;
+				syncPm51ApprovalButtons();
+				var callApprovalBtnObserver = new MutationObserver(function() {
+					syncPm51ApprovalButtons();
 				});
-				callApprovalBtnObserver.observe($popBottomBtn[0], { childList: true });
+				callApprovalBtnObserver.observe($popBottomBtn[0], {
+					childList: true,
+					subtree: true,
+					attributes: true,
+					attributeFilter: ['style']
+				});
 			}
 		})();
 
@@ -1114,13 +1151,22 @@
 			}
 		});
 
+		// 고객사 지원범위의 '지원없음' 선택 상태를 화면에 반영한다.
+		// DB에는 기존 컬럼과의 호환을 위해 기타(SPRT_ETC_YN) + '지원없음'(SPRT_ETC_TXT)으로 저장한다.
+		$('#sprtNoneChk').on('change', function () {
+			applySupportNoneState();
+		});
+
 		// 고객사 지원범위 기타 선택 시 입력란 표시
 		$('input[name="sprtChk"]').on('change', function () {
-			if (this.value === 'ETC' && this.checked) { //고객사 지원범위 기타
+			if (this.value === 'ETC') {
+				if (this.checked) {
 					$('#sprtEtcTxt').show();
-			} else if (this.value === 'ETC' && !this.checked) { //고객사 지원범위 기타 체크 해제
+				} else {
 					$('#sprtEtcTxt').hide().val('');
+					$('#sprtNoneChk').prop('checked', false);
 				}
+			}
 		});
 
 		// 출장지역구분(A/B/C) 변경 시 지급금액 자동 재계산 (미선택으로 되돌리는 경우는 재계산하지 않음)
@@ -2628,14 +2674,14 @@
 				});
 			}
 
-			if (master.sprtLdgYn === 'Y') $('input[data-col="sprtLdgYn"]').prop('checked', true);
-			if (master.sprtEtcYn === 'Y') {
-				$('input[data-col="sprtEtcYn"]').prop('checked', true);
-				$('#sprtEtcTxt').show();
-			} else {
-				$('#sprtEtcTxt').hide();
-			}
-			$('#sprtEtcTxt').val(master.sprtEtcTxt || '');
+			var etcTxtVal = master.sprtEtcTxt || '';
+			var isSprtNone = master.sprtEtcYn === 'Y' && etcTxtVal.trim() === '지원없음';
+			$('input[data-col="sprtLdgYn"]').prop('checked', master.sprtLdgYn === 'Y');
+			$('input[data-col="sprtEtcYn"]').prop('checked', master.sprtEtcYn === 'Y' && !isSprtNone);
+			$('#sprtEtcTxt').val(isSprtNone ? '' : etcTxtVal);
+			$('#sprtNoneChk').prop('checked', isSprtNone);
+			applySupportNoneState();
+			$('#custSprtTxt').val(master.custSprtTxt || master.CUST_SPRT_TXT || '');
 
 			// 출장자 그리드 데이터 매핑 (tripStDtm/tripEdDtm -> tripStDt, tripStTm, tripEdDt, tripEdTm)
 			mapTravelerDtmFields(travelerList);
@@ -3093,7 +3139,7 @@
 			formData.append('sprtTrfcYn', hasTrfc ? 'Y' : 'N');
 			formData.append('sprtLdgYn', $('input[data-col="sprtLdgYn"]').is(':checked') ? 'Y' : 'N');
 			formData.append('sprtMealYn', hasMeal ? 'Y' : 'N');
-			formData.append('sprtEtcYn', $('input[data-col="sprtEtcYn"]').is(':checked') ? 'Y' : 'N');
+			formData.append('sprtEtcYn', ($('#sprtNoneChk').is(':checked') || $('input[data-col="sprtEtcYn"]').is(':checked')) ? 'Y' : 'N');
 		}
 		// 일반 저장/지급처리 공통: 출장지역구분 저장
 		formData.append('tripAreaDiv', $popForm.find('#tripAreaDiv').val() || '');
@@ -3109,7 +3155,8 @@
 
 		formData.append('sprtTrfcTxt', trfcSubVals.join(','));
 		formData.append('sprtMealTxt', mealSubVals.join(','));
-		formData.append('sprtEtcTxt', $('#sprtEtcTxt').val() || '');
+		formData.append('sprtEtcTxt', $('#sprtNoneChk').is(':checked') ? '지원없음' : ($('#sprtEtcTxt').val() || ''));
+		formData.append('custSprtTxt', $('#custSprtTxt').val() || '');
 
 		formData.append('travelerArr', JSON.stringify(travelerList));
 
@@ -3241,6 +3288,17 @@
 			window.isSavingTripReq = false;
 			openProgress(false);
 			if (data.resultCode === 200) {
+				// 자금·일정 저장은 지급 전 임시저장이다.
+				// 결재 상태/알림톡/부모 콜백을 건드리거나 팝업을 닫지 않고, 저장된 자료만 다시 조회한다.
+				if (window.isFinanceSavingNow) {
+					window.isFinanceSavingNow = false;
+					alert(data.resultMessage || "자금·일정이 저장되었습니다.");
+					var savedTripReqNo = data.tripReqNo || $('#tripReqNo').val();
+					if (savedTripReqNo) {
+						loadTripReqDetail(savedTripReqNo);
+					}
+					return;
+				}
 				// 자체승인(1번 결재자=제출자)이 서버에서 처리됐을 수 있으므로, kakaoTodo()가 다음 결재자를 정확히 찾도록 로컬 갱신 후 호출
 				markSelfApprovedRowLocally(gridViewApproval);
 				markSelfApprovedRowLocally(gridViewApprovalMng);
@@ -3282,15 +3340,18 @@
 				alert(data.resultMessage);
 				window.isPayingNow = false;
 				window.isMngApproveNow = false;
+				window.isFinanceSavingNow = false;
 			} else {
 				alert("저장 중 오류 발생: " + data.resultMessage);
 				window.isPayingNow = false;
 				window.isMngApproveNow = false;
+				window.isFinanceSavingNow = false;
 			}
 		}, function (err) {
 			window.isSavingTripReq = false;
 			window.isPayingNow = false;
 			window.isMngApproveNow = false;
+			window.isFinanceSavingNow = false;
 			openProgress(false);
 			alert("서버 저장 처리 중 오류가 발생하였습니다.");
 		});
@@ -3332,7 +3393,7 @@
 		var todoDiv2CodeId = null;
 		if (gridViewApproval && gridViewApproval.target && gridViewApproval.target.getList) {
 			$.each(gridViewApproval.target.getList() || [], function(idx, row) {
-				if (row.todoId === jwt.userId && row.sanctnSttus === 'N' && row.gb === '결재') {
+				if (isPm51LoginUserApprovalRow(row) && isPm51PendingApprovalRow(row)) {
 					approvalRow = row;
 					todoDiv2CodeId = row.todoDiv2CodeId;
 					return false;
@@ -3340,10 +3401,8 @@
 			});
 		}
 		if (!approvalRow && gridViewApprovalMng && gridViewApprovalMng.target && gridViewApprovalMng.target.getList) {
-			var loginUserId = String(jwt.userId || '').trim().toLowerCase();
 			$.each(gridViewApprovalMng.target.getList() || [], function(idx, row) {
-				var targetId = String(row.todoId || row.usrNm || '').trim().toLowerCase();
-				if (targetId === loginUserId && row.sanctnSttus === 'N' && row.gb === '결재') {
+				if (isPm51LoginUserApprovalRow(row) && isPm51PendingApprovalRow(row)) {
 					approvalRow = row;
 					todoDiv2CodeId = row.todoDiv2CodeId;
 					return false;
@@ -3359,7 +3418,11 @@
 		var tripReqNo = $('#tripReqNo').val();
 		var paramMap = {
 			todoId: jwt.userId,
+			userId: jwt.userId,
+			usrId: jwt.userId,
+			userNm: jwt.userNm || jwt.user_name || '',
 			todoKey: approvalRow.todoKey,
+			todoDiv1CodeId: approvalRow.todoDiv1CodeId || 'TODODIV20',
 			todoDiv2CodeId: todoDiv2CodeId,
 			sanctnSn: approvalRow.sanctnSn,
 			coCd: approvalRow.coCd || jwt.coCd,
@@ -3395,13 +3458,13 @@
 				if (typeof myTodoStatusRtv === 'function') {
 					myTodoStatusRtv(true);
 				}
-				// 결재선 그리드 새로고침
-				var tripReqNo_reload = $('#tripReqNo').val();
-				if (tripReqNo_reload) {
-					loadApprovalLine(tripReqNo_reload, ['TODODIV2190', 'TODODIV2191']);
-					loadApprovalLineMng(tripReqNo_reload, ['TODODIV2191']);
-				}
 				alert("결재 처리되었습니다.");
+				// 결재 성공 후 팝업 내부 결재선을 다시 조립하면 일반/관리 결재선이 화면상 섞일 수 있다.
+				// 호출 화면의 목록만 갱신한 뒤 팝업을 닫는다.
+				if (modalStack.last() && typeof modalStack.last().callback === 'function') {
+					modalStack.last().callback(data);
+				}
+				modalStack.close();
 			} else {
 				customAlert(data.resultMessage || "결재 처리 중 오류가 발생했습니다.");
 			}
@@ -3449,7 +3512,7 @@
 			if (!confirm("지급금액없이 승인처리하시겠습니까?")) return;
 		}
 
-		if (!confirm("지급완료 처리하시겠습니까?\n(입력하신 지급비용 및 결재선이 저장된 후 지급완료 처리됩니다.)")) return;
+		if (!confirm("지급완료 처리하시겠습니까?\n(입력하신 지급비용을 저장하고 지급완료 처리합니다. 결재는 별도로 진행해야 합니다.)")) return;
 
 		window.isPayingNow = true;
 		saveTripReq();
@@ -3948,6 +4011,7 @@
 		var mealSubVals = [];
 		$('input[name="sprtMealSub"]:checked').each(function() { mealSubVals.push(this.value); });
 
+		var isSprtNone = $('#sprtNoneChk').is(':checked');
 		var param = {
 			tripReqNo: $('#tripReqNo').val() || (currentTripReqMaster && (currentTripReqMaster.tripReqNo || currentTripReqMaster.TRIP_REQ_NO)) || (popParam && popParam.tripReqNo) || '',
 			salesCnfrmYn: $('#salesCnfrmYn').is(':checked') ? 'Y' : 'N',
@@ -3959,8 +4023,9 @@
 			sprtLdgYn: $('input[data-col="sprtLdgYn"]').is(':checked') ? 'Y' : 'N',
 			sprtMealYn: mealSubVals.length > 0 ? 'Y' : 'N',
 			sprtMealTxt: mealSubVals.join(','),
-			sprtEtcYn: $('input[data-col="sprtEtcYn"]').is(':checked') ? 'Y' : 'N',
-			sprtEtcTxt: $('#sprtEtcTxt').val() || '',
+			sprtEtcYn: (isSprtNone || $('input[data-col="sprtEtcYn"]').is(':checked')) ? 'Y' : 'N',
+			sprtEtcTxt: isSprtNone ? '지원없음' : ($('#sprtEtcTxt').val() || ''),
+			custSprtTxt: $('#custSprtTxt').val() || '',
 			userId: jwt.userId,
 			pgmId: $('#pgmId').val()
 		};
@@ -4017,19 +4082,36 @@
 		var hasLdg = $('input[data-col="sprtLdgYn"]').is(':checked');
 		var hasMeal = $('input[name="sprtMealSub"]:checked').length > 0;
 		var hasEtc = $('input[data-col="sprtEtcYn"]').is(':checked');
-		if (!hasTrfc && !hasLdg && !hasMeal && !hasEtc) {
+		var hasNone = $('#sprtNoneChk').is(':checked');
+		if (!hasTrfc && !hasLdg && !hasMeal && !hasEtc && !hasNone) {
 			setErrorStyle($('input[name="sprtChk"], input[name="sprtTrfcSub"], input[name="sprtMealSub"]'));
 			alert("고객사지원범위를 선택해주세요.");
 			$('input[name="sprtTrfcSub"]').eq(0).focus();
 			return false;
 		}
-		if (hasEtc && !$.trim($('#sprtEtcTxt').val() || '')) {
+		if (hasEtc && !hasNone && !$.trim($('#sprtEtcTxt').val() || '')) {
 			setErrorStyle($('#sprtEtcTxt'));
 			alert("고객사지원범위 기타 내용을 입력해주세요.");
 			$('#sprtEtcTxt').focus();
 			return false;
 		}
 		return true;
+	}
+
+	function applySupportNoneState() {
+		var isNone = $('#sprtNoneChk').is(':checked');
+		var canEdit = !$('#sprtNoneChk').prop('disabled');
+		var $supportOptions = $('input[name="sprtTrfcSub"], input[data-col="sprtLdgYn"], input[name="sprtMealSub"], input[data-col="sprtEtcYn"]');
+
+		if (isNone) {
+			$supportOptions.prop('checked', false).prop('disabled', true).css('pointer-events', 'none');
+			$('#sprtEtcTxt').hide().val('').prop('disabled', true).css('pointer-events', 'none');
+		} else {
+			$supportOptions.prop('disabled', !canEdit).css('pointer-events', canEdit ? 'auto' : 'none');
+			var hasEtc = $('input[data-col="sprtEtcYn"]').is(':checked');
+			$('#sprtEtcTxt').toggle(hasEtc).prop('disabled', !canEdit).css('pointer-events', canEdit ? 'auto' : 'none');
+			if (!hasEtc) $('#sprtEtcTxt').val('');
+		}
 	}
 
 	function isApprovalEntryMode() {
@@ -4068,10 +4150,10 @@
 		updateTripAreaDiv();
 		// 순차결재상 본인 차례가 아니면(미결 안내가 뜬 상태) 결재로 이어지는 저장/지급완료 버튼은 노출하지 않는다.
 		applyPm51SequentialBlock();
-		// 순차결재 차단이 아니고 본인이 결재선상 미결 결재자이면 결재 버튼 표시 최종 보장
-		if (!pm51SequentialBlocked && isMyApprovalPending()) {
-			var $popArea = $('#popForm').closest('.popup_area');
-			$popArea.find('#lineApproveBtn').show();
+		// 호출한 부모 화면과 무관하게 팝업 자체의 결재선 상태로 저장/결재 버튼을 최종 정리한다.
+		applySaveApproveButtonPolicy(master);
+		if (typeof window.syncPm51ApprovalButtons === 'function') {
+			window.syncPm51ApprovalButtons();
 		}
 		// 자금담당자확인(PAY_RMK): SPECRTS15 권한자 전용, 지급완료처리 진입 시 수정 허용, 지급완료 후 수정 불가
 		applyCashierConfirmPolicy(master);
@@ -4103,6 +4185,60 @@
 
 	// 순차결재 차단 상태 여부 (alertPm51SequentialPending에서 판정)
 	var pm51SequentialBlocked = false;
+	var pm51ApprovalDebugLastSignature = '';
+
+	// 결재 버튼 미노출 원인 확인용 임시 진단 로그.
+	// 같은 상태가 반복되는 MutationObserver 호출에서는 한 번만 출력한다.
+	function pm51DebugApprovalButtonsImpl(stage, pendingResult, force) {
+		if (!window.console || typeof console.log !== 'function') return;
+		try {
+			function approvalDebugRows(grid, area) {
+				if (!(grid && grid.target && grid.target.getList)) return [];
+				return $.map(grid.target.getList() || [], function(row) {
+					return {
+						area: area,
+						sanctnSn: row.sanctnSn,
+						todoId: row.todoId,
+						usrNm: row.usrNm,
+						name: row.name,
+						gb: row.gb,
+						sanctnSttusRaw: row.sanctnSttus,
+						sanctnSttusNm: row.sanctnSttusNm,
+						todoCfDt: row.todoCfDt,
+						todoDiv2CodeId: row.todoDiv2CodeId,
+						todoKey: row.todoKey
+					};
+				});
+			}
+
+			var rows = approvalDebugRows(gridViewApproval, '일반')
+				.concat(approvalDebugRows(gridViewApprovalMng, '관리'));
+			var $footer = $('#popForm').closest('.popup_area').find('.popup_bottom_btn');
+			var debugData = {
+				stage: stage,
+				loginUserId: jwt.userId,
+				loginUserNm: jwt.userNm || jwt.user_name || '',
+				actionType: (typeof popParam !== 'undefined' && popParam) ? popParam.actionType : '',
+				tripReqNo: $('#tripReqNo').val() || '',
+				pendingResult: pendingResult,
+				pm51SequentialBlocked: pm51SequentialBlocked,
+				nativeButtonCount: $('#lineApproveBtn').length,
+				nativeButtonDisplay: $('#lineApproveBtn').css('display'),
+				commonButtonCount: $footer.find('.callApprovalWorking').length,
+				commonButtonDisplay: $footer.find('.callApprovalWorking').first().css('display') || '',
+				commonHiddenByNative: $footer.find('.callApprovalWorking').first().attr('data-pm51-hidden-by-native') || '',
+				rows: rows
+			};
+			var signature = JSON.stringify(debugData);
+			if (!force && signature === pm51ApprovalDebugLastSignature) return;
+			pm51ApprovalDebugLastSignature = signature;
+
+			// 동적 HTML eval 환경에서도 복사하기 쉽도록 접힌 그룹 대신 JSON 한 줄로 출력한다.
+			console.log('[PM5101][결재버튼 진단][' + stage + '] ' + JSON.stringify(debugData));
+		} catch (e) {
+			console.warn('[PM5101][결재버튼 진단] 로그 출력 실패', e);
+		}
+	}
 
 	// 공통 fileTree.js 확장점: 순차상 본인 차례가 아니면 '결재처리' 버튼을 아예 생성하지 않도록 거부한다.
 	// 이 함수를 정의하지 않은 화면은 공통 모듈이 항상 생성하므로 타 화면에는 영향이 없다.
@@ -4118,9 +4254,31 @@
 	function applyPm51SequentialBlock() {
 		if (!pm51SequentialBlocked) return;
 		var $popArea = $('#popForm').closest('.popup_area');
-		$popArea.find('#saveBtn, #lineApproveBtn, #payBtn').hide();
+		$popArea.find('#saveBtn, #payBtn').hide();
+		$('#lineApproveBtn').hide();
 		// 판정보다 먼저 생성된 버튼이 있으면 함께 정리한다(첨부파일 트리 로딩 순서에 따른 예외 대비).
 		$('.popup_bottom_btn').find('.callApprovalWorking').remove();
+	}
+
+	// 저장된 신청서에서 로그인 사용자가 미결 결재자이면 지급 여부와 관계없이 '결재'를 노출한다.
+	// 비용저장+지급완료와 결재는 서로 독립된 처리이므로 지급 전에도 본인 결재를 진행할 수 있다.
+	function applySaveApproveButtonPolicy(master) {
+		var $popArea = $('#popForm').closest('.popup_area');
+		var hasSavedDocument = !!(master || currentTripReqMaster) && !!$('#tripReqNo').val();
+		var isPendingApprover = hasSavedDocument && isMyApprovalPending();
+
+		if (pm51SequentialBlocked) {
+			$popArea.find('#saveBtn').hide();
+			$('#lineApproveBtn').hide();
+			return;
+		}
+
+		if (isPendingApprover) {
+			$popArea.find('#saveBtn').hide();
+			$('#lineApproveBtn').show();
+		} else {
+			$('#lineApproveBtn').hide();
+		}
 	}
 
 	function applyEditPolicyInner(master) {
@@ -4132,7 +4290,8 @@
 		if (popParam && popParam.actionType === 'CHG') {
 			setFormDisabled(false);
 			$popArea.find('#saveBtn').show();
-			$popArea.find('#lineApproveBtn, #financeSaveBtn, #payBtn, #deleteBtn, #fileSaveBtn').hide();
+			$('#lineApproveBtn').hide();
+			$popArea.find('#financeSaveBtn, #payBtn, #deleteBtn, #fileSaveBtn').hide();
 			$payAmtEditableFields().prop('readonly', true).prop('disabled', true); // currCd/currCd2/exrate/exrate2도 포함됨(통화단위 선택권은 회계팀 소유)
 			return;
 		}
@@ -4155,14 +4314,14 @@
 				$('#payRmk').val('');
 			}
 
-			var $salesFields = $popForm.find('#salesCnfrmYn, input[name="tripCondCd"], #tripCondEtc, input[name="sprtChk"], input[name="sprtTrfcSub"], input[name="sprtMealSub"], #sprtEtcTxt');
+			var $salesFields = $popForm.find('#salesCnfrmYn, input[name="tripCondCd"], #tripCondEtc, input[name="sprtChk"], input[name="sprtTrfcSub"], input[name="sprtMealSub"], #sprtEtcTxt, #sprtNoneChk, #custSprtTxt');
 			$salesFields.prop('disabled', true).css('pointer-events', 'none');
 			$salesFields.filter('input[type="checkbox"], input[type="radio"]').addClass('readonly-check');
 
 			if ($('#actionType').val() === 'C') return;
 		}
 		var $editButtons = $popForm.find('#autoCalcBtn, .add_btn_small a, #salesCdBtn, #reqNmBtn, #pmNmBtn');
-		var $actionButtons = $popArea.find('#saveBtn, #lineApproveBtn, #financeSaveBtn, #payBtn, #deleteBtn, #fileSaveBtn');
+		var $actionButtons = $popArea.find('#saveBtn, #financeSaveBtn, #payBtn, #deleteBtn, #fileSaveBtn').add($('#lineApproveBtn'));
 		var aprvStsCd = master ? (master.aprvStsCd || master.APRV_STS_CD || '') : '';
 		var paid = !!master.payDt;
 		var actionType = popParam.actionType;
@@ -4228,7 +4387,7 @@
 			// PAY 모드: 자금담당자(SPECRTS15)가 지급금액을 편집하고 버튼 노출 (후속 로직에서 처리)
 		}
 		// 결재 버튼: 모든 모드에서 본인이 미결 결재자면 노출
-		$popArea.find('#lineApproveBtn').toggle(isMyApprovalPending());
+		$('#lineApproveBtn').toggle(isMyApprovalPending());
 		var isCurrentAuthor = (function() {
 			var reqUserId = String($('#reqId').val() || (master ? (master.userId || master.reqId) : '') || '').trim().toLowerCase();
 			var creatId = String(master ? (master.creatId || master.CREAT_ID || '') : '').trim().toLowerCase();
@@ -4245,7 +4404,7 @@
 			if (!isMyApprovalPending()) {
 				setFormDisabled(true);
 				$actionButtons.filter(':not(#fileSaveBtn)').add($editButtons).hide();
-				$popArea.find('#lineApproveBtn').hide();
+				$('#lineApproveBtn').hide();
 				if (isFileChanged()) {
 					$popArea.find('#fileSaveBtn').show();
 				} else {
@@ -4283,7 +4442,7 @@
 			}
 			// 본인이 결재선상 미결 결재자이면 결재 버튼 노출
 			if (isMyApprovalPending()) {
-				$popArea.find('#lineApproveBtn').show();
+				$('#lineApproveBtn').show();
 			}
 			$('#popTitle').text('출장신청서 수정 [지급처리]');
 			return;
@@ -4318,7 +4477,7 @@
 			}
 			// 본인이 결재선상 미결 결재자이면 결재 버튼 노출
 			if (isMyApprovalPending()) {
-				$popArea.find('#lineApproveBtn').show();
+				$('#lineApproveBtn').show();
 			}
 			return;
 		}
@@ -4371,15 +4530,16 @@
 			// [특별 권한 정책] 이 신청서의 등록된 영업PM 본인이고 본인 결재가 아직 미결인 경우에만: 영업확인/출장조건/고객사지원범위 수정 + 저장 허용
 			// (영업PM이 이미 결재완료했다면 이 조건은 false가 되어 위 else 블록의 조회전용 상태가 그대로 유지됨)
 			if (isSalesPmApprovalPending()) {
-				$popForm.find('#salesCnfrmYn, input[name="tripCondCd"], #tripCondEtc, input[name="sprtChk"], input[name="sprtTrfcSub"], input[name="sprtMealSub"], #sprtEtcTxt')
+				$popForm.find('#salesCnfrmYn, input[name="tripCondCd"], #tripCondEtc, input[name="sprtChk"], input[name="sprtTrfcSub"], input[name="sprtMealSub"], #sprtEtcTxt, #sprtNoneChk, #custSprtTxt')
 					.prop('disabled', false).css('pointer-events', 'auto').removeClass('readonly-check');
+				applySupportNoneState();
 				$popArea.find('#saveBtn').show();
 				$('#popTitle').text('출장신청서 수정 [영업PM]');
 			}
 
 			// 본인이 결재선상 미결 결재자이면 결재 버튼 노출
 			if (isMyApprovalPending()) {
-				$popArea.find('#lineApproveBtn').show();
+				$('#lineApproveBtn').show();
 			}
 
 			return;
@@ -4394,7 +4554,8 @@
 			var isCurrentPm = ($('#pmId').val() && $('#pmId').val() === jwt.userId) || (master && master.pmId === jwt.userId);
 			if ((isCurrentPm || isSalesPmApprovalPending()) && aprvStsCd !== 'APRVSTS03') {
 				if (actionType !== 'PAY') $popArea.find('#saveBtn').show();
-				$popForm.find('#salesCnfrmYn, input[name="tripCondCd"], #tripCondEtc, input[name="sprtChk"], input[name="sprtTrfcSub"], input[name="sprtMealSub"], #sprtEtcTxt').prop('disabled', false).css('pointer-events', 'auto');
+				$popForm.find('#salesCnfrmYn, input[name="tripCondCd"], #tripCondEtc, input[name="sprtChk"], input[name="sprtTrfcSub"], input[name="sprtMealSub"], #sprtEtcTxt, #sprtNoneChk, #custSprtTxt').prop('disabled', false).css('pointer-events', 'auto');
+				applySupportNoneState();
 			} else if (actionType === 'PAY' && checkUserAccountingAuth() && aprvStsCd === 'APRVSTS03') {
 				$popArea.find('#saveBtn').hide();
 				$popArea.find('#payBtn').show();
@@ -4436,7 +4597,7 @@
 		// 영업 PM 본인 여부에 따른 영업 확인 영역 필드 제어 (그림 표시 영역)
 		var isCurrentPm = ($('#pmId').val() && $('#pmId').val() === jwt.userId) || (master && master.pmId === jwt.userId);
 		var isSalesFormReadOnly = !isCurrentPm || aprvStsCd === 'APRVSTS03' || paid;
-		var $salesFields = $popForm.find('#salesCnfrmYn, input[name="tripCondCd"], #tripCondEtc, input[name="sprtChk"], input[name="sprtTrfcSub"], input[name="sprtMealSub"], #sprtEtcTxt');
+		var $salesFields = $popForm.find('#salesCnfrmYn, input[name="tripCondCd"], #tripCondEtc, input[name="sprtChk"], input[name="sprtTrfcSub"], input[name="sprtMealSub"], #sprtEtcTxt, #sprtNoneChk, #custSprtTxt');
 		if (isSalesFormReadOnly) {
 			$salesFields.prop('disabled', true).css('pointer-events', 'none');
 			$salesFields.filter('input[type="checkbox"], input[type="radio"]').addClass('readonly-check');
@@ -4444,6 +4605,7 @@
 			if (!isApprovalMode || isSalesPmApprovalPending()) {
 				$salesFields.prop('disabled', false).css('pointer-events', 'auto');
 				$salesFields.filter('input[type="checkbox"], input[type="radio"]').removeClass('readonly-check');
+				applySupportNoneState();
 			}
 		}
 
@@ -4512,9 +4674,11 @@
 				gridViewApproval.setData2(mappedList);
 				gridResize(gridViewApproval, mappedList.length);
 				reapplyEditPolicyAfterApprovalLoad();
+				window.pm51DebugApprovalButtons('일반 결재선 조회 완료', undefined, true);
 			} else {
 				gridViewApproval.setData3(0);
 				reapplyEditPolicyAfterApprovalLoad();
+				window.pm51DebugApprovalButtons('일반 결재선 없음', undefined, true);
 			}
 		});
 	}
@@ -4566,10 +4730,12 @@
 				gridResize(gridViewApprovalMng, mappedList.length);
 				ensurePayMngApprovalUsers();
 				reapplyEditPolicyAfterApprovalLoad();
+				window.pm51DebugApprovalButtons('관리 결재선 조회 완료', undefined, true);
 			} else {
 				setApplicantDefaultApprovalLineMng(function() {
 					ensurePayMngApprovalUsers();
 					reapplyEditPolicyAfterApprovalLoad();
+					window.pm51DebugApprovalButtons('관리 결재선 기본값 적용', undefined, true);
 				});
 			}
 			// 결재선까지 화면에 조회된 뒤에 순차결재 안내를 띄운다(그리드 렌더링 후 실행되도록 지연).
@@ -5907,26 +6073,39 @@
 		return auth;
 	}
 
+	function isPm51LoginUserApprovalRow(elem) {
+		if (!elem) return false;
+		var loginUserId = String(jwt.userId || '').trim().toLowerCase();
+		var targetUserId = String(elem.todoId || elem.usrNm || '').trim().toLowerCase();
+		return !!loginUserId && targetUserId === loginUserId;
+	}
+
+	function isPm51PendingApprovalRow(elem) {
+		if (!elem || elem.gb !== '결재') return false;
+		var status = String(elem.sanctnSttus || '').trim().toUpperCase();
+		var statusNm = String(elem.sanctnSttusNm || '').trim();
+		return status === 'N' || statusNm === '미승인';
+	}
+
 	function isMyApprovalPending() {
 		var pending = false;
 		if (gridViewApproval && gridViewApproval.target && gridViewApproval.target.getList) {
 			$.each(gridViewApproval.target.getList(), function(idx, elem) {
-				if (elem.todoId === jwt.userId && elem.sanctnSttus === 'N' && elem.gb === '결재') {
+				if (isPm51LoginUserApprovalRow(elem) && isPm51PendingApprovalRow(elem)) {
 					pending = true;
 					return false;
 				}
 			});
 		}
 		if (!pending && gridViewApprovalMng && gridViewApprovalMng.target && gridViewApprovalMng.target.getList) {
-			var loginUserId = String(jwt.userId || '').trim().toLowerCase();
 			$.each(gridViewApprovalMng.target.getList(), function(idx, elem) {
-				var targetId = String(elem.todoId || elem.usrNm || '').trim().toLowerCase();
-				if (targetId && targetId === loginUserId && elem.sanctnSttus === 'N' && elem.gb === '결재') {
+				if (isPm51LoginUserApprovalRow(elem) && isPm51PendingApprovalRow(elem)) {
 					pending = true;
 					return false;
 				}
 			});
 		}
+		window.pm51DebugApprovalButtons('isMyApprovalPending', pending);
 		return pending;
 	}
 
@@ -5934,11 +6113,8 @@
 	function isMngApprovalPending() {
 		if (!(gridViewApprovalMng && gridViewApprovalMng.target && gridViewApprovalMng.target.getList)) return false;
 		var pending = false;
-		var loginUserId = String(jwt.userId || '').trim().toLowerCase();
-		if (!loginUserId) return false;
 		$.each(gridViewApprovalMng.target.getList() || [], function(idx, elem) {
-			var targetId = String(elem.todoId || elem.usrNm || '').trim().toLowerCase();
-			if (targetId === loginUserId && elem.sanctnSttus === 'N' && elem.gb === '결재') {
+			if (isPm51LoginUserApprovalRow(elem) && isPm51PendingApprovalRow(elem)) {
 				pending = true;
 				return false;
 			}
