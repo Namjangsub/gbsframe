@@ -259,6 +259,7 @@
 </div>
 
 
+<script src="/static/js/sseTodoLeader.js"></script>
 <script type="text/javascript">
 	$(document).ready(function() {
 		//일정현황 간트차트의 스크립트 오류로 메뉴 숨김 처리
@@ -298,9 +299,7 @@
 		// 탭 활성화 복귀 시 연결 점검 및 최신화
 		document.addEventListener("visibilitychange", function() {
 			if (!document.hidden) {
-				if (!sseTodoSource || sseTodoSource.readyState === EventSource.CLOSED) {
-					initSseTodo();
-				}
+				initSseTodo();
 				// 탭 복귀 시 캐시가 비었거나 오래되었으면 1회 갱신
 				myTodoStatusRtv(false);
 			}
@@ -316,8 +315,6 @@
 		initSseTodo();
 
 	});
-
-	var sseTodoSource = null;
 
 	function getTodoCacheKey() {
 		if (!jwt || !jwt.userId) {
@@ -370,54 +367,35 @@
 			return;
 		}
 
-		if (sseTodoSource && sseTodoSource.readyState !== EventSource.CLOSED) {
-			return;
+		// 리더 탭만 EventSource 연결, 나머지 탭은 BroadcastChannel 로 동일 데이터 수신
+		SseTodoLeader.start({
+			url: "/user/wb/wb20/sseTodoCount?userId=" + encodeURIComponent(jwt.userId) + "&coCd=" + encodeURIComponent(jwt.coCd || "GUN"),
+			userId: jwt.userId,
+			onTodoCount: onSseTodoCount
+		});
+	}
+
+	function onSseTodoCount(countMap) {
+		var appCnt = Number(countMap.approvalCnt || 0);
+		var shareCnt = Number(countMap.shareCnt || 0);
+
+		renderMyTodoCount(appCnt, shareCnt);
+
+		var cacheKey = getTodoCacheKey();
+		if (cacheKey) {
+			var cacheObj = {
+				approvalCnt: appCnt,
+				shareCnt: shareCnt,
+				at: Date.now()
+			};
+			localStorage.setItem(cacheKey, JSON.stringify(cacheObj));
 		}
 
-		try {
-			var sseUrl = "/user/wb/wb20/sseTodoCount?userId=" + encodeURIComponent(jwt.userId) + "&coCd=" + encodeURIComponent(jwt.coCd || "GUN");
-			sseTodoSource = new EventSource(sseUrl);
-
-			// 서버 푸시 실시간 수신
-			sseTodoSource.addEventListener("todoCount", function(e) {
-				if (!e.data) return;
-				try {
-					var countMap = JSON.parse(e.data);
-					var appCnt = Number(countMap.approvalCnt || 0);
-					var shareCnt = Number(countMap.shareCnt || 0);
-
-					renderMyTodoCount(appCnt, shareCnt);
-
-					var cacheKey = getTodoCacheKey();
-					if (cacheKey) {
-						var cacheObj = {
-							approvalCnt: appCnt,
-							shareCnt: shareCnt,
-							at: Date.now()
-						};
-						localStorage.setItem(cacheKey, JSON.stringify(cacheObj));
-					}
-
-					// 실시간 신규 결재 요청 알림(noti)이 포함되어 있는 경우 좌측상단 툴팁 팝업 표출
-					// (서버에서 이미 해당 순번의 다음 결재자에게만 타겟팅하여 noti를 전송함)
-					if (countMap.noti && countMap.noti.actionType === "NEW_APPROVAL") {
-						var noti = countMap.noti;
-						showTodoToast(noti);
-					}
-				} catch (err) {
-					console.warn("[SSE] parse error:", err);
-				}
-			});
-
-			sseTodoSource.onerror = function() {
-				// 에러 또는 서버 재시작 시 자동 재연결 지원되므로 로그만 남김
-				if (this && this.readyState === EventSource.CLOSED) {
-					closeSseTodo();
-				}
-			};
-		} catch (e) {
-			console.warn("[SSE] init error:", e);
-			myTodoStatusRtv(true);
+		// 실시간 신규 결재 요청 알림(noti)이 포함되어 있는 경우 좌측상단 툴팁 팝업 표출 (보이는 탭에서만)
+		// (서버에서 이미 해당 순번의 다음 결재자에게만 타겟팅하여 noti를 전송함)
+		if (countMap.noti && countMap.noti.actionType === "NEW_APPROVAL" && !document.hidden) {
+			var noti = countMap.noti;
+			showTodoToast(noti);
 		}
 	}
 
@@ -488,10 +466,7 @@
 	}
 
 	function closeSseTodo() {
-		if (sseTodoSource) {
-			try { sseTodoSource.close(); } catch (e) {}
-			sseTodoSource = null;
-		}
+		SseTodoLeader.stop();
 	}
 
 	// Fallback용 HTTP 조회 함수 (초기 로드 또는 강제 갱신 시만 사용, 무차별 polling 제거)
