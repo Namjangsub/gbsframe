@@ -567,7 +567,7 @@ public class PM51SvcImpl implements PM51Svc {
 	}
 
 	/**
-	 * 출장신청서 저장 중 재생성한 WB20 결재선의 자체승인을 직접 처리한다.
+	 * 출장신청서/복명서 저장 중 재생성한 WB20 결재선의 자체승인을 직접 처리한다.
 	 * 수정 저장 시 기존 AM 문서가 남아 있으므로 일반 승인 경로를 사용하면
 	 * 이전 AM 결재 순번으로 위임되어 새 WB20 행이 미승인 상태로 남을 수 있다.
 	 */
@@ -654,7 +654,8 @@ public class PM51SvcImpl implements PM51Svc {
 			approvalMap.put("fileTrgtKey", paramMap.get("fileTrgtKey"));
 			approvalMap.put("salesCd", approvalSalesCd(paramMap));
 			fillApprovalBaseParam(approvalMap, paramMap);
-			String actingUserId = approvalMap.get("userId");
+			String actingUserId = hasText(paramMap.get("tripRptNo"))
+					? tripRptWriterId(paramMap) : approvalMap.get("userId");
 			if (hasText(originalReqId)) {
 				approvalMap.put("userId", originalReqId); // CREAT_ID를 최초 신청자로 고정
 			}
@@ -794,9 +795,7 @@ public class PM51SvcImpl implements PM51Svc {
 
 	private List<Map<String, String>> reorderRptGeneralApprovalArr(Map<String, String> paramMap,
 			List<Map<String, String>> approvalArr) {
-		if (approvalArr == null || approvalArr.isEmpty()) {
-			return new ArrayList<>();
-		}
+		if (approvalArr == null) approvalArr = new ArrayList<>();
 		List<Map<String, String>> approvalRows = new ArrayList<>();
 		List<Map<String, String>> shareRows = new ArrayList<>();
 		for (Map<String, String> row : approvalArr) {
@@ -807,15 +806,22 @@ public class PM51SvcImpl implements PM51Svc {
 			}
 		}
 
-		String callerId = paramMap.get("userId");
-		if (!hasText(callerId)) callerId = paramMap.get("reqId");
-		callerId = callerId == null ? "" : callerId.trim();
+		String callerId = tripRptWriterId(paramMap);
 
 		List<Map<String, String>> remaining = new ArrayList<>(approvalRows);
 		List<Map<String, String>> ordered = new ArrayList<>();
 
 		// 1순위: 기안자 본인 -> 무조건 1번
 		Map<String, String> authorRow = extractApprovalRowById(remaining, callerId);
+		if (authorRow == null && hasText(callerId)) {
+			authorRow = new HashMap<>();
+			authorRow.put("gb", "결재");
+			authorRow.put("usrNm", callerId);
+			authorRow.put("todoId", callerId);
+			authorRow.put("name", hasText(paramMap.get("loginUserNm")) ? paramMap.get("loginUserNm") : callerId);
+			authorRow.put("todoDiv2CodeId", "TODODIV2200");
+			authorRow.put("flag", "I");
+		}
 		if (authorRow != null) {
 			ordered.add(authorRow);
 		}
@@ -823,6 +829,13 @@ public class PM51SvcImpl implements PM51Svc {
 		shareRows = filterDuplicateShareRows(ordered, shareRows);
 		ordered.addAll(shareRows);
 		return ordered;
+	}
+
+	// 신청인(userId)과 실제 복명서 작성자(loginUserId)를 구분한다.
+	private String tripRptWriterId(Map<String, String> paramMap) {
+		String writerId = paramMap.get("loginUserId");
+		if (!hasText(writerId)) writerId = paramMap.get("userId");
+		return writerId == null ? "" : writerId.trim();
 	}
 
 	private List<Map<String, String>> filterDuplicateShareRows(List<Map<String, String>> approvalRows,
@@ -1357,12 +1370,13 @@ public class PM51SvcImpl implements PM51Svc {
 				int iApproval = 1;
 				// 타인(대리 등록자)이 복명서를 등록/수정하는 경우에도 CREAT_ID는 등록자가 아니라 출장 신청인을 가리켜야 한다.
 				String originalReqId = resolveOriginalRequesterId(paramMap);
+				List<Map<String, String>> selfApprovalList = new ArrayList<>();
 				for (Map<String, String> approvalMap : approvalArr) {
 					approvalMap.put("reqNo", paramMap.get("reqNo"));
 					approvalMap.put("fileTrgtKey", paramMap.get("fileTrgtKey"));
 					approvalMap.put("salesCd", approvalSalesCd(paramMap));
 					fillApprovalBaseParam(approvalMap, paramMap);
-					String actingUserId = approvalMap.get("userId");
+					String actingUserId = tripRptWriterId(paramMap);
 					if (hasText(originalReqId)) {
 						approvalMap.put("userId", originalReqId); // CREAT_ID를 출장 신청인으로 고정
 					}
@@ -1378,7 +1392,7 @@ public class PM51SvcImpl implements PM51Svc {
 						insertWbsApprovalListSync(approvalMap);
 						iApproval++;
 						approvalMap.put("userId", actingUserId); // 자동승인 판정/UDT_ID는 실제 행위자 기준으로 복원
-						if (approvalMap.get("userId").equals(approvalMap.get("usrNm"))) {
+						if ("1".equals(approvalMap.get("sanCtnSn")) && actingUserId.equals(getApproverId(approvalMap))) {
 							approvalMap.put("todoCfOpn", "자체승인");
 							approvalMap.put("todoNo", approvalMap.get("reqNo"));
 							approvalMap.put("sanctnSn", approvalMap.get("sanCtnSn"));
@@ -1388,9 +1402,12 @@ public class PM51SvcImpl implements PM51Svc {
 								approvalMap.put("todoKey", value.toString());
 							}
 
-							wb20Svc.insertApprovalLine(approvalMap);
+							selfApprovalList.add(approvalMap);
 						}
 					}
+				}
+				for (Map<String, String> selfApprovalMap : selfApprovalList) {
+					approveSelfApprovalDirectly(selfApprovalMap);
 				}
 			}
 		}
@@ -1538,12 +1555,13 @@ public class PM51SvcImpl implements PM51Svc {
 				int iApproval = 1;
 				// 타인(대리 등록자)이 복명서를 등록/수정하는 경우에도 CREAT_ID는 등록자가 아니라 출장 신청인을 가리켜야 한다.
 				String originalReqId = resolveOriginalRequesterId(paramMap);
+				List<Map<String, String>> selfApprovalList = new ArrayList<>();
 				for (Map<String, String> approvalMap : approvalArr) {
 					approvalMap.put("reqNo", paramMap.get("reqNo"));
 					approvalMap.put("fileTrgtKey", paramMap.get("fileTrgtKey"));
 					approvalMap.put("salesCd", approvalSalesCd(paramMap));
 					fillApprovalBaseParam(approvalMap, paramMap);
-					String actingUserId = approvalMap.get("userId");
+					String actingUserId = tripRptWriterId(paramMap);
 					if (hasText(originalReqId)) {
 						approvalMap.put("userId", originalReqId); // CREAT_ID를 출장 신청인으로 고정
 					}
@@ -1559,7 +1577,7 @@ public class PM51SvcImpl implements PM51Svc {
 						insertWbsApprovalListSync(approvalMap);
 						iApproval++;
 						approvalMap.put("userId", actingUserId); // 자동승인 판정/UDT_ID는 실제 행위자 기준으로 복원
-						if (approvalMap.get("userId").equals(approvalMap.get("usrNm"))) {
+						if ("1".equals(approvalMap.get("sanCtnSn")) && actingUserId.equals(getApproverId(approvalMap))) {
 							approvalMap.put("todoCfOpn", "자체승인");
 							approvalMap.put("todoNo", approvalMap.get("reqNo"));
 							approvalMap.put("sanctnSn", approvalMap.get("sanCtnSn"));
@@ -1569,9 +1587,12 @@ public class PM51SvcImpl implements PM51Svc {
 								approvalMap.put("todoKey", value.toString());
 							}
 
-							wb20Svc.insertApprovalLine(approvalMap);
+							selfApprovalList.add(approvalMap);
 						}
 					}
+				}
+				for (Map<String, String> selfApprovalMap : selfApprovalList) {
+					approveSelfApprovalDirectly(selfApprovalMap);
 				}
 			}
 		}
@@ -1866,29 +1887,8 @@ public class PM51SvcImpl implements PM51Svc {
 			List<Map<String, String>> approvalArr) {
 		List<Map<String, String>> sourceArr = approvalArr == null ? new ArrayList<>() : approvalArr;
 
-		// 화면에서 온 결재선 자체의 중복 아이디 제거 (결재/공유 각각 첫 행만 유지)
-		List<Map<String, String>> mergedApprovalArr = new ArrayList<>();
-		Set<String> registeredUserIds = new HashSet<>();
-		Set<String> sharedUserIds = new HashSet<>();
-		for (Map<String, String> approvalMap : sourceArr) {
-			String userId = approvalMap.get("usrNm");
-			if (!hasText(userId)) {
-				userId = approvalMap.get("todoId");
-			}
-			Set<String> idSet = "공유".equals(approvalMap.get("gb")) ? sharedUserIds : registeredUserIds;
-			if (hasText(userId) && !idSet.add(userId)) {
-				continue;
-			}
-			mergedApprovalArr.add(approvalMap);
-		}
-
-		List<Map<String, String>> leaderArr = pm51Mapper.selectTripRptTravelerApprovalLines(paramMap);
-		if (leaderArr == null || leaderArr.isEmpty()) {
-			return mergedApprovalArr;
-		}
-
 		// [예외] sms가 GUN60(생산팀) 소속 팀원을 대신해 입력하는 경우, 출장자 본인결재는 자동추가하지 않음
-		String callerId = paramMap.get("userId");
+		String callerId = tripRptWriterId(paramMap);
 		String skipSelfApprovalUserId = null;
 		if ("sms".equals(callerId)) {
 			Map<String, String> reqParam = new HashMap<>();
@@ -1904,6 +1904,28 @@ public class PM51SvcImpl implements PM51Svc {
 					skipSelfApprovalUserId = applicantId;
 				}
 			}
+		}
+
+		// 화면에서 온 결재선 자체의 중복 아이디 제거 (결재/공유 각각 첫 행만 유지)
+		List<Map<String, String>> mergedApprovalArr = new ArrayList<>();
+		Set<String> registeredUserIds = new HashSet<>();
+		Set<String> sharedUserIds = new HashSet<>();
+		for (Map<String, String> approvalMap : sourceArr) {
+			String userId = approvalMap.get("usrNm");
+			if (!hasText(userId)) {
+				userId = approvalMap.get("todoId");
+			}
+			if (!isShareApproval(approvalMap) && userId != null && userId.equals(skipSelfApprovalUserId)) continue;
+			Set<String> idSet = "공유".equals(approvalMap.get("gb")) ? sharedUserIds : registeredUserIds;
+			if (hasText(userId) && !idSet.add(userId)) {
+				continue;
+			}
+			mergedApprovalArr.add(approvalMap);
+		}
+
+		List<Map<String, String>> leaderArr = pm51Mapper.selectTripRptTravelerApprovalLines(paramMap);
+		if (leaderArr == null || leaderArr.isEmpty()) {
+			return mergedApprovalArr;
 		}
 
 		for (Map<String, String> leaderRow : leaderArr) {

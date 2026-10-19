@@ -2605,7 +2605,7 @@
 		gridResize(rptProjectGridView, rptProjectGridView.target.getList().length);
 	}
 
-	// 복명서 일반결재선을 "신청인 → 담당팀장" 순서로 재구성 (영업PM 제외)
+	// 복명서 일반결재선은 실제 로그인 작성자를 1번에 배치한다 (영업PM 제외).
 	// 순번(sanctnSn)을 1부터 다시 부여한다. 결재 행만 순서를 재구성하며, 공유 행은 기존 순서를 유지한다.
 	// 부사장 결재는 관리부서(회계) 결재선(SPECRTS14) 쪽에서 최종 1회만 처리하므로 여기서는 다루지 않는다.
 	function reorderRptGeneralApprovalLine(rows, applicantId) {
@@ -2642,12 +2642,14 @@
 		var applicantRow = extractById(remaining, applicantId);
 		var teamMgrRow = pm52ApplicantIsTeamMgr ? null : extractById(remaining, pm52TeamMgrId);
 
-		// 결재 순서: 신청인 → 담당팀장
+		// 결재 순서: 실제 작성자 → 신청인/담당팀장 → 나머지 결재자
 		var ordered = [];
 		if (applicantRow) ordered.push(applicantRow);
 		if (teamMgrRow) ordered.push(teamMgrRow);
 		// 위 2가지 역할에 매칭되지 않은 나머지 결재 행은 뒤에 그대로 유지
 		ordered = ordered.concat(remaining);
+		var writerRow = extractById(ordered, jwt.userId);
+		if (writerRow) ordered.unshift(writerRow);
 
 		var sn = 1;
 		$.each(ordered, function(idx, row) { row.sanctnSn = sn++; });
@@ -2741,10 +2743,20 @@
 			}
 		});
 
+		// 신청인과 다른 사람이 작성하는 경우에도 실제 작성자를 결재선에 포함한다.
+		if (!autoList.some(function(row) { return (row.usrNm || row.todoId) === jwt.userId; })) {
+			autoList.unshift({
+				gb: '결재', usrNm: jwt.userId, todoId: jwt.userId, name: jwt.userNm || jwt.userId,
+				jik: jwt.levelNm, dtNm: jwt.deptNm, todoDiv2CodeId: 'TODODIV2200',
+				sanctnSttus: 'N', sanctnSttusNm: '미승인', flag: 'I', autoApplicantApproval: 'Y', coCd: jwt.coCd
+			});
+		}
+
 		// DB에서 재로드된 행에는 autoApplicantApproval 표시가 없으므로, 자동 행과 같은 ID의 기존 행도 제거 (중복 누적 방지)
 		var autoIds = $.map(autoList, function(r) { return r.usrNm; });
 		var preservedList = $.grep(gridViewApproval.target.getList() || [], function(row) {
 			var rowId = row.usrNm || row.todoId;
+			if (skipApplicantSelfApproval && row.gb === '결재' && rowId === reqId) return false;
 			return row.autoApplicantApproval !== 'Y' && $.inArray(rowId, autoIds) === -1;
 		});
 		var newList = autoList.concat(preservedList);
@@ -4524,8 +4536,8 @@
 				try { kakaoTodo(tripRptNo); } catch(e) {}
 				if (typeof myTodoStatusRtv === 'function') { myTodoStatusRtv(true); }
 				if (tripRptNo) {
-					loadApprovalLine(tripRptNo, ['TODODIV2200', 'TODODIV2201']);
-					loadApprovalLineMng(tripRptNo, ['TODODIV2201']);
+					// 발행부서 결재/공유만 조회한다. 관리부서는 이 함수 내부에서 별도로 조회한다.
+					loadApprovalLine(tripRptNo, ['TODODIV2200', 'TODODIV1200']);
 				}
 				alert("결재 처리되었습니다.");
 				applyRptEditPolicy();
