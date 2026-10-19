@@ -208,7 +208,11 @@
                     {key: "pid",             label: "상위코드",          hidden:true},
                     {key: "id",             label: "하위코드",          hidden:true},
                     {key: "lvl",                 label: "lvl",            hidden:true},
-                    {key: "wbsPlanCodeNm",       label: "TASK명",         width: 180,   align: "left", hidden:false, treeControl: true},
+                    {key: "wbsPlanCodeNm",       label: "TASK명",         width: 180,   align: "left", hidden:false, treeControl: true,
+                        formatter: function () {
+                            return this.item.isIssueRow ? (this.item.issSj || this.item.issNo) : this.value;
+                        }
+                    },
                     {key: "wbsPlansDt",          label: "시작일",          width: 80,   align: "center"},
                     {key: "wbsPlaneDt",          label: "종료일",          width: 80,   align: "center"},
                     {label: "등록여부",
@@ -259,6 +263,51 @@
                     {key: "impactCd",            label: "영향도", 		hidden:true},
     ];
 
+    // 조회된 세부 TASK를 부모로 만들고, 해당 TASK의 문제를 한 단계 아래에 배치
+    function buildWbsIssueTree(list) {
+        var treeList = [];
+        var taskGroups = new Map();
+        var taskFields = [
+            'coCd', 'clntCd', 'clntNm', 'clntPjt', 'clntPjtNm', 'sjNm', 'salesCd', 'ordrsNo', 'verNo',
+            'wbsPlanCodeKind', 'wbsPlanCodeId', 'wbsPlanCodeNm', 'wbsMngNm', 'wbsPlansDt', 'wbsPlaneDt',
+            'wbsRsltssDt', 'wbsRsltseDt', 'planYn', 'rsltsYn', 'pPlanNo', 'pRsltsNo',
+            'pPlanTrgtKey', 'pRsltsTrgtKey', 'path'
+        ];
+        function nodeId(row, id) {
+            return JSON.stringify(['wbs', row.coCd, row.salesCd, id]);
+        }
+
+        list.forEach(function (row, index) {
+            if (Number(row.lvl) < 3) {
+                treeList.push(Object.assign({}, row, {
+                    id: nodeId(row, row.id),
+                    pid: Number(row.lvl) === 1 ? 'top' : nodeId(row, row.pid)
+                }));
+                return;
+            }
+
+            var taskId = JSON.stringify(['task', row.coCd, row.salesCd, row.wbsPlanCodeKind, row.wbsPlanCodeId]);
+            if (!taskGroups.has(taskId)) {
+                var taskRow = {};
+                taskFields.forEach(function (key) { taskRow[key] = row[key]; });
+                Object.assign(taskRow, {
+                    id: taskId, pid: nodeId(row, row.pid), lvl: 3, isTaskGroup: true
+                });
+                taskGroups.set(taskId, taskRow);
+                treeList.push(taskRow);
+            }
+
+            // 문제가 없는 TASK도 등록 대상으로 남기되 빈 문제 자식은 만들지 않는다.
+            if (row.issNo) {
+                treeList.push(Object.assign({}, row, {
+                    id: JSON.stringify(['issue', taskId, row.issNo, index]),
+                    pid: taskId, lvl: 4, isIssueRow: true
+                }));
+            }
+        });
+        return treeList;
+    }
+
     var salesGridView = {
         initView : function() {
             this.target = new ax5.ui.grid();
@@ -288,6 +337,7 @@
                             salesGridView.target.select(obj.__origin_index__, {selected: false});
                         })
                         this.self.select(this.dindex);
+                        if (this.item.isTaskGroup) return;
   		  	           if(this.column.key == "reqNo"){    //reqNo = 발주요청번호 필드 선택시
 							if (this.item.issStsNm === "완료") {
 								customAlert("문제조치가 완료된 건입니다.");
@@ -359,7 +409,7 @@
                         list[i].actAmt = gPasFloatChk(list[i].actAmt);
                     }
                     targetObj.setData({
-                        list : list,
+                        list : buildWbsIssueTree(list),
                         page : {
                             currentPage   : _pageNo,
                             pageSize      : data.paginationInfo.pageSize,
