@@ -63,37 +63,74 @@
 	<script src="/static/js/common/GridColumnConfig.js"></script>
 
 	<style>
-		/* 툴팁을 포함할 부모 요소 스타일 */
-		.tooltip {
-			position: relative;
+		/* 마우스 호버 시 표시되는 문제/발주/결과 상세 팝오버 툴팁 레이어 */
+		.bm19-info-popover {
+			position: fixed;
+			z-index: 999999;
+			display: none;
+			background: #ffffff;
+			border: 1px solid #3b62b1;
+			border-radius: 6px;
+			box-shadow: 0 4px 18px rgba(0, 0, 0, 0.22);
+			padding: 10px 14px;
+			min-width: 280px;
+			max-width: 440px;
+			max-height: 420px;
+			overflow-y: auto;
+			font-size: 12px;
+			color: #333333;
+			pointer-events: none;
+			line-height: 1.45;
+		}
+		.bm19-info-popover .popover-title {
+			font-weight: bold;
+			border-bottom: 2px solid #3b62b1;
+			padding-bottom: 6px;
+			margin-bottom: 8px;
+			font-size: 13px;
+			display: flex;
+			justify-content: space-between;
+			align-items: center;
+		}
+		.bm19-info-popover .popover-badge {
+			font-size: 11px;
+			font-weight: bold;
+			color: #ffffff;
+			padding: 2px 7px;
+			border-radius: 3px;
+			white-space: nowrap;
+			margin-left: 8px;
+		}
+		.bm19-info-popover .popover-item {
+			padding: 2.5px 0;
+			color: #444444;
+			word-break: break-all;
+		}
+		.bm19-info-popover .popover-item b {
+			color: #222222;
 			display: inline-block;
-			cursor: pointer;
+			min-width: 72px;
+			font-weight: 600;
 		}
-
-		/* 툴팁 텍스트 스타일 */
-		.tooltip .tooltiptext {
-			visibility: hidden;
-			width: 150px;
-			background-color: black;
-			color: #fff;
-			text-align: center;
-			border-radius: 5px;
-			padding: 5px;
-			position: absolute;
-			z-index: 1;
-			bottom: 125%; /* 텍스트를 부모 요소 위에 배치 */
-			left: 50%;
-			margin-left: 0px; /* 텍스트를 가운데 정렬 */
-			opacity: 0;
-			transition: opacity 0.3s;
+		.bm19-info-popover .popover-box {
+			margin-top: 5px;
+			margin-bottom: 5px;
+			padding: 6px 9px;
+			background: #f8f9fa;
+			border-radius: 4px;
+			border-left: 3px solid #3b62b1;
+			white-space: pre-wrap;
+			word-break: break-all;
+			max-height: 130px;
+			overflow-y: auto;
+			color: #333333;
+			font-size: 11.5px;
+			line-height: 1.4;
 		}
-
-		/* 마우스를 올리면 툴팁 텍스트 보이기 */
-		.tooltip:hover .tooltiptext {
-			visibility: visible;
-			opacity: 1;
+		.bm19-info-popover .popover-divider {
+			margin: 6px 0;
+			border-top: 1px dashed #dadce0;
 		}
-		
 	</style>
 </head>
 
@@ -425,6 +462,7 @@ var defaultColumns = [
 		openFile: function (grid, dindex, doindex, item, $cell, colKey, evt) {
 //				console.log("openFile:", item);// 파일 열기/다운로드 등 공통 처리
 	        if (!item) return;
+	        hideBm19RowPopover();
 	        this.target.select((doindex==undefined)?dindex:doindex);
 			if (colKey == "reqNo" ){    //reqNo = 발주요청번호 필드 선택시
 				if (item.issSts == 'ISSSTS03') {	//문제에서 완료처리된것
@@ -453,6 +491,7 @@ var defaultColumns = [
         },
 		setData : function(_pageNo) {
 			if (isFirst) return;
+			hideBm19RowPopover();
 
 			var targetObj = this.target;
 			var formData = {
@@ -584,6 +623,7 @@ var defaultColumns = [
 		isFirst = false;
 
 		gridView.initView().setData(0);
+		bindGridRowPopover();
 		//권한체크
 
 		authChk();
@@ -854,4 +894,293 @@ var defaultColumns = [
 		});
 	}
 
+
+	/* =========================================================================
+	 * BM1901M01 그리드 행 마우스 호버 툴팁 팝오버 함수
+	 *  - 문제만 등록된 경우: 문제등록 내용 간략히 표시
+	 *  - 발주요청서까지 등록된 경우: 발주요청 내용 간략히 표시
+	 *  - 결과까지 등록된 상태: 문제결과 또는 발주요청결과 표시
+	 * ========================================================================= */
+	function bindGridRowPopover() {
+		$(document).on("mouseenter", "[data-ax5grid='first-grid'] [data-ax5grid-panel*='body'] tr[data-ax5grid-tr-data-index]", function(e) {
+			var dindex = $(this).attr("data-ax5grid-tr-data-index");
+			showBm19RowPopover(e, dindex);
+		});
+		$(document).on("mousemove", "[data-ax5grid='first-grid'] [data-ax5grid-panel*='body'] tr[data-ax5grid-tr-data-index]", function(e) {
+			moveBm19RowPopover(e);
+		});
+		$(document).on("mouseleave", "[data-ax5grid='first-grid'] [data-ax5grid-panel*='body'] tr[data-ax5grid-tr-data-index]", function(e) {
+			hideBm19RowPopover();
+		});
+		$(document).on("mouseleave", "[data-ax5grid='first-grid']", function() {
+			hideBm19RowPopover();
+		});
+		$(window).on("scroll", function() {
+			hideBm19RowPopover();
+		});
+		$("[data-ax5grid='first-grid']").on("wheel mousewheel", function() {
+			hideBm19RowPopover();
+		});
+	}
+
+	function showBm19RowPopover(e, dindex) {
+		if (dindex === undefined || dindex === null || dindex === "") return;
+		if (!gridView.target || !gridView.target.list) return;
+		var item = gridView.target.list[dindex];
+		if (!item) return;
+
+		var $pop = $("#bm19InfoPopover");
+		if ($pop.length === 0) {
+			$pop = $('<div id="bm19InfoPopover" class="bm19-info-popover"></div>');
+			$("body").append($pop);
+		}
+
+		var hasReqNo = Boolean(item.reqNo && String(item.reqNo).trim());
+		var hasResult = Boolean(
+			(item.acteDt && String(item.acteDt).trim()) ||
+			item.issSts === "ISSSTS03" ||
+			item.issSts === "REQST03" ||
+			(item.actCnts && String(item.actCnts).trim())
+		);
+
+		var html = "";
+
+		if (hasResult) {
+			// 1) 결과까지 등록된 상태: 발주요청결과 또는 문제결과
+			if (hasReqNo) {
+				html += '<div class="popover-title" style="color: #1a73e8; border-bottom: 2px solid #1a73e8;">'
+				      + '  <span><i class="fas fa-clipboard-check" style="margin-right: 5px;"></i>'
+				      +    escapeHtml(item.issueTitle || "발주요청 결과") + '</span>'
+				      + '  <span class="popover-badge" style="background: #1a73e8;">발주요청 완료</span>'
+				      + '</div>';
+
+				if (item.salesCd) {
+					html += '<div class="popover-item"><b>Sales Code:</b> ' + escapeHtml(item.salesCd) + '</div>';
+				}
+				html += '<div class="popover-item"><b>발주번호:</b> <span style="font-weight:600; color:#1a73e8;">' + escapeHtml(item.reqNo) + '</span></div>';
+				html += '<div class="popover-item"><b>완료일자:</b> ' + escapeHtml(item.acteDt || item.reqDt || "-") + '</div>';
+				if (item.actIdNm) {
+					html += '<div class="popover-item"><b>조치담당자:</b> ' + escapeHtml(item.actIdNm + (item.actDeptNm ? " (" + item.actDeptNm + ")" : "")) + '</div>';
+				}
+				if (item.vendCdNm) {
+					html += '<div class="popover-item"><b>외주업체:</b> ' + escapeHtml(item.vendCdNm) + '</div>';
+				}
+
+				if (item.measRst) {
+					html += '<div class="popover-divider"></div>';
+					html += '<div class="popover-item"><b>조치원인:</b></div>';
+					html += '<div class="popover-box" style="border-left-color: #6c757d;">' + escapeHtml(item.measRst) + '</div>';
+				}
+
+				if (item.actCnts) {
+					html += '<div class="popover-item"><b>조치결과:</b></div>';
+					html += '<div class="popover-box" style="border-left-color: #1a73e8; color: #1a73e8; font-weight: 500;">' + escapeHtml(item.actCnts) + '</div>';
+				}
+
+				if (item.actFdmtSolutNm || item.actFdmtSolutCnt) {
+					html += '<div class="popover-divider"></div>';
+					if (item.actFdmtSolutNm) {
+						html += '<div class="popover-item"><b>근본원인:</b> ' + escapeHtml(item.actFdmtSolutNm) + '</div>';
+					}
+					if (item.actFdmtSolutCnt) {
+						html += '<div class="popover-item"><b>예방대책:</b></div>';
+						html += '<div class="popover-box" style="border-left-color: #f2994a;">' + escapeHtml(item.actFdmtSolutCnt) + '</div>';
+					}
+				}
+
+				if (item.actMh || item.reqAmt) {
+					html += '<div class="popover-divider"></div>';
+					var costMh = [];
+					if (item.actMh) costMh.push("공수: " + escapeHtml(item.actMh) + " M/H");
+					if (item.reqAmt) costMh.push("비용: " + Number(item.reqAmt).toLocaleString() + "원");
+					html += '<div class="popover-item"><b>투입실적:</b> ' + costMh.join(" / ") + '</div>';
+				}
+
+			} else {
+				html += '<div class="popover-title" style="color: #1a73e8; border-bottom: 2px solid #1a73e8;">'
+				      + '  <span><i class="fas fa-check-circle" style="margin-right: 5px;"></i>'
+				      +    escapeHtml(item.issueTitle || "문제 조치결과") + '</span>'
+				      + '  <span class="popover-badge" style="background: #1a73e8;">문제조치 완료</span>'
+				      + '</div>';
+
+				if (item.salesCd) {
+					html += '<div class="popover-item"><b>Sales Code:</b> ' + escapeHtml(item.salesCd) + '</div>';
+				}
+				if (item.workRptNo) {
+					html += '<div class="popover-item"><b>문제번호:</b> ' + escapeHtml(item.workRptNo) + '</div>';
+				}
+				html += '<div class="popover-item"><b>완료일자:</b> ' + escapeHtml(item.acteDt || "-") + '</div>';
+				if (item.workRptIdNm) {
+					html += '<div class="popover-item"><b>작성자:</b> ' + escapeHtml(item.workRptIdNm + (item.workRptDeptNm ? " (" + item.workRptDeptNm + ")" : "")) + '</div>';
+				}
+				if (item.actIdNm) {
+					html += '<div class="popover-item"><b>조치담당자:</b> ' + escapeHtml(item.actIdNm + (item.actDeptNm ? " (" + item.actDeptNm + ")" : "")) + '</div>';
+				}
+
+				if (item.measRst) {
+					html += '<div class="popover-divider"></div>';
+					html += '<div class="popover-item"><b>조치원인:</b></div>';
+					html += '<div class="popover-box" style="border-left-color: #6c757d;">' + escapeHtml(item.measRst) + '</div>';
+				}
+
+				if (item.actCnts) {
+					html += '<div class="popover-item"><b>조치결과:</b></div>';
+					html += '<div class="popover-box" style="border-left-color: #1a73e8; color: #1a73e8; font-weight: 500;">' + escapeHtml(item.actCnts) + '</div>';
+				}
+
+				if (item.actFdmtSolutNm || item.actFdmtSolutCnt) {
+					html += '<div class="popover-divider"></div>';
+					if (item.actFdmtSolutNm) {
+						html += '<div class="popover-item"><b>근본원인:</b> ' + escapeHtml(item.actFdmtSolutNm) + '</div>';
+					}
+					if (item.actFdmtSolutCnt) {
+						html += '<div class="popover-item"><b>예방대책:</b></div>';
+						html += '<div class="popover-box" style="border-left-color: #f2994a;">' + escapeHtml(item.actFdmtSolutCnt) + '</div>';
+					}
+				}
+
+				if (item.actMh) {
+					html += '<div class="popover-divider"></div>';
+					html += '<div class="popover-item"><b>투입공수:</b> ' + escapeHtml(item.actMh) + ' M/H</div>';
+				}
+			}
+
+		} else if (hasReqNo) {
+			// 2) 발주요청서까지 등록된 상태: 발주요청 내용 간략히 표시
+			html += '<div class="popover-title" style="color: #28a745; border-bottom: 2px solid #28a745;">'
+			      + '  <span><i class="fas fa-file-invoice" style="margin-right: 5px;"></i>'
+			      +    escapeHtml(item.issueTitle || "발주요청 진행중") + '</span>'
+			      + '  <span class="popover-badge" style="background: #28a745;">발주요청 진행중</span>'
+			      + '</div>';
+
+			if (item.salesCd) {
+				html += '<div class="popover-item"><b>Sales Code:</b> ' + escapeHtml(item.salesCd) + '</div>';
+			}
+			html += '<div class="popover-item"><b>발주번호:</b> <span style="font-weight:600; color:#28a745;">' + escapeHtml(item.reqNo) + '</span></div>';
+			
+			var reqDtStr = item.reqDt || "-";
+			if (item.custReqDt) reqDtStr += " (고객요구: " + item.custReqDt + ")";
+			html += '<div class="popover-item"><b>사내완료일:</b> ' + escapeHtml(reqDtStr) + '</div>';
+
+			if (item.workRptIdNm) {
+				html += '<div class="popover-item"><b>작성자:</b> ' + escapeHtml(item.workRptIdNm + (item.workRptDeptNm ? " (" + item.workRptDeptNm + ")" : "")) + '</div>';
+			}
+			if (item.actIdNm) {
+				html += '<div class="popover-item"><b>조치담당자:</b> ' + escapeHtml(item.actIdNm + (item.actDeptNm ? " (" + item.actDeptNm + ")" : "")) + '</div>';
+			}
+			if (item.vendCdNm) {
+				html += '<div class="popover-item"><b>외주업체:</b> ' + escapeHtml(item.vendCdNm) + '</div>';
+			}
+			if (item.subCdNm) {
+				html += '<div class="popover-item"><b>장애유형:</b> ' + escapeHtml(item.subCdNm) + '</div>';
+			}
+
+			if (item.workRptRmk) {
+				html += '<div class="popover-divider"></div>';
+				html += '<div class="popover-item"><b>발주요청 내용:</b></div>';
+				html += '<div class="popover-box" style="border-left-color: #28a745;">' + escapeHtml(item.workRptRmk) + '</div>';
+			}
+
+			var signParts = [];
+			if (item.labSts) signParts.push("연구소:" + (item.labSts === "Y" ? '<span style="color:#1a73e8;font-weight:600;">승인</span>' : (item.labSts === "N" ? '<span style="color:#d93025;font-weight:600;">반려</span>' : '<span style="color:#888;">진행</span>')));
+			if (item.purSts) signParts.push("구매:" + (item.purSts === "Y" ? '<span style="color:#1a73e8;font-weight:600;">승인</span>' : (item.purSts === "N" ? '<span style="color:#d93025;font-weight:600;">반려</span>' : '<span style="color:#888;">진행</span>')));
+			if (item.prdSts) signParts.push("생산:" + (item.prdSts === "Y" ? '<span style="color:#1a73e8;font-weight:600;">승인</span>' : (item.prdSts === "N" ? '<span style="color:#d93025;font-weight:600;">반려</span>' : '<span style="color:#888;">진행</span>')));
+			if (item.outSts) signParts.push("직접:" + (item.outSts === "Y" ? '<span style="color:#1a73e8;font-weight:600;">승인</span>' : (item.outSts === "N" ? '<span style="color:#d93025;font-weight:600;">반려</span>' : '<span style="color:#888;">진행</span>')));
+			if (signParts.length > 0) {
+				html += '<div class="popover-divider"></div>';
+				html += '<div class="popover-item"><b>결재현황:</b> ' + signParts.join("&nbsp;&nbsp;") + '</div>';
+			}
+
+		} else {
+			// 3) 문제만 등록된 경우: 문제등록 내용 간략히 표시
+			var isProgress = (item.issSts === "ISSSTS02");
+			var badgeBg = isProgress ? "#6c757d" : "#d93025";
+			var badgeText = isProgress ? "문제처리 진행" : "접수";
+
+			html += '<div class="popover-title" style="color: #d93025; border-bottom: 2px solid #d93025;">'
+			      + '  <span><i class="fas fa-exclamation-triangle" style="margin-right: 5px;"></i>'
+			      +    escapeHtml(item.issueTitle || "문제등록") + '</span>'
+			      + '  <span class="popover-badge" style="background: ' + badgeBg + ';">' + badgeText + '</span>'
+			      + '</div>';
+
+			if (item.salesCd) {
+				html += '<div class="popover-item"><b>Sales Code:</b> ' + escapeHtml(item.salesCd) + '</div>';
+			}
+			if (item.workRptNo) {
+				html += '<div class="popover-item"><b>문제번호:</b> ' + escapeHtml(item.workRptNo) + '</div>';
+			}
+			html += '<div class="popover-item"><b>발생일자:</b> ' + escapeHtml(item.workRptDt || "-") + '</div>';
+			if (item.workRptIdNm) {
+				html += '<div class="popover-item"><b>작성자:</b> ' + escapeHtml(item.workRptIdNm + (item.workRptDeptNm ? " (" + item.workRptDeptNm + ")" : "")) + '</div>';
+			}
+			if (item.actIdNm) {
+				html += '<div class="popover-item"><b>조치담당자:</b> ' + escapeHtml(item.actIdNm + (item.actDeptNm ? " (" + item.actDeptNm + ")" : "")) + '</div>';
+			}
+			if (item.subCdNm || item.issDivNm) {
+				html += '<div class="popover-item"><b>장애유형:</b> ' + escapeHtml(item.subCdNm || item.issDivNm) + '</div>';
+			}
+			if (item.clntNm || item.clntPjtNm || item.eqpNm) {
+				var pjtEqp = (item.clntNm || "") + (item.clntPjtNm ? " [" + item.clntPjtNm + "]" : "") + (item.eqpNm ? " / " + item.eqpNm : "");
+				html += '<div class="popover-item"><b>고객/설비:</b> ' + escapeHtml(pjtEqp) + '</div>';
+			}
+
+			if (item.workRptRmk) {
+				html += '<div class="popover-divider"></div>';
+				html += '<div class="popover-item"><b>문제등록 내용:</b></div>';
+				html += '<div class="popover-box" style="border-left-color: #d93025;">' + escapeHtml(item.workRptRmk) + '</div>';
+			}
+		}
+
+		$pop.html(html);
+		$pop.show();
+		positionBm19Popover(e);
+	}
+
+	function moveBm19RowPopover(e) {
+		positionBm19Popover(e);
+	}
+
+	function positionBm19Popover(e) {
+		var $pop = $("#bm19InfoPopover");
+		if (!$pop.is(":visible")) return;
+
+		var mouseX = e.clientX || (e.originalEvent ? e.originalEvent.clientX : 0);
+		var mouseY = e.clientY || (e.originalEvent ? e.originalEvent.clientY : 0);
+
+		var popW = $pop.outerWidth() || 300;
+		var popH = $pop.outerHeight() || 200;
+		var winW = $(window).width();
+		var winH = $(window).height();
+
+		var posX = mouseX + 15;
+		var posY = mouseY + 15;
+
+		if (posX + popW > winW - 10) {
+			posX = mouseX - popW - 15;
+		}
+		if (posY + popH > winH - 10) {
+			posY = mouseY - popH - 15;
+		}
+		if (posX < 10) posX = 10;
+		if (posY < 10) posY = 10;
+
+		$pop.css({
+			"top": posY + "px",
+			"left": posX + "px"
+		});
+	}
+
+	function hideBm19RowPopover() {
+		$("#bm19InfoPopover").hide();
+	}
+
+	function escapeHtml(text) {
+		if (text === null || text === undefined) return "";
+		return String(text)
+			.replace(/&/g, "&amp;")
+			.replace(/</g, "&lt;")
+			.replace(/>/g, "&gt;")
+			.replace(/"/g, "&quot;")
+			.replace(/'/g, "&#039;");
+	}
 </script>
