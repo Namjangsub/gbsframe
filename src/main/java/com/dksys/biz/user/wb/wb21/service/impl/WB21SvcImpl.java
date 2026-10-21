@@ -353,6 +353,20 @@ public class WB21SvcImpl implements WB21Svc {
 		
 		int result = wb21Mapper.sjInsert(paramMap);
 		if(result != 0) {
+			String verUpReason = paramMap.get("verUpReason");
+			if ("MANUAL_YN".equals(paramMap.get("verUpReasonType")) && verUpReason != null && !verUpReason.trim().isEmpty()) {
+				String baseRmk = paramMap.get("sjRmk");
+				if (baseRmk == null) {
+					baseRmk = "";
+				}
+				String histRmk = "[매뉴얼대상 Y→N 변경] 사유: " + verUpReason.trim() + " / 변경자: " + paramMap.get("userId");
+				String sjRmk = baseRmk.isEmpty() ? histRmk : baseRmk + "\n" + histRmk;
+				if (sjRmk.length() > 1000) {
+					sjRmk = sjRmk.substring(0, 1000);
+				}
+				paramMap.put("sjRmk", sjRmk);
+				wb21Mapper.updateSjRmk(paramMap);
+			}
 			return fileTrgtKey;
 		}else {
 			return result;

@@ -47,6 +47,8 @@ public interface WB21Mapper {
     int sjInsert(Map<String, String> paramMap);
     
     int sjUpdate(Map<String, String> paramMap);
+
+	int updateSjRmk(Map<String, String> paramMap);
 	
 	List<Map<String, String>> selectSjDtlList(Map<String, String> paramMap);
 	
