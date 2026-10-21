@@ -325,6 +325,7 @@
 	var kakaoCnt = 0;
 	var kakaoErr = [];
 	var lastPlanExcept = "";
+	var lastManualYn = "";
 	
 	var manualFileArr = []; //매뉴얼 첨부파일 정보 임시저장
 	var manualFileDeleteArr = []; //매뉴얼 첨부파일 삭제 임시저장
@@ -1251,6 +1252,14 @@
 			} else {
 				$('.popup_area .manualButton').hide();
 			}
+			if (actionType != 'C'
+				&& $('#wb21_popForm #closeYn').val() == 'Y'
+				&& $('#wb21_popForm #endYn').val() != 'Y'
+				&& parseInt($('#wb21_popForm #verNo').val()) == parseInt($('#wb21_popForm #maxVerNo').val())
+				&& lastManualYn == 'Y'
+				&& $('#wb21_popForm #manualYn').val() == 'N') {
+				changeManualYnToN();
+			}
 		});
 
 		// 출고일 변경에 따른 일정관리에 등록된 과제정보 체크
@@ -1499,6 +1508,9 @@
 						}
 						if (key === 'planExcept') {
 							lastPlanExcept = value;
+						}
+						if (key === 'manualYn') {
+							lastManualYn = value;
 						}
 					}
 				});
@@ -2137,6 +2149,81 @@
 				if (callback) callback();
 			} else {
 				alert("예외사항 변경 작업 실패했습니다." + data.resultMessage );
+			}
+		});
+	}
+
+	// 매뉴얼대상 Y→N 변경: 설계완료/전기완료 담당자만 가능, 사유 입력 후 과제 Ver.Up
+	function changeManualYnToN() {
+		var $manualYn = $('#wb21_popForm #manualYn');
+		var revertManualYn = function() {
+			$manualYn.val(lastManualYn);
+			$('.popup_area .manualButton').show();
+		};
+
+		var isOwner = gridView1.target.getList().some(function(row) {
+			return (row.wbsPlanCodeId == 'WBSCODE03' || row.wbsPlanCodeId == 'WBSCODE06') && row.wbsPlanMngId == jwt.userId;
+		});
+		if (!isOwner) {
+			alert("설계완료/전기완료 담당자만 변경할 수 있습니다.");
+			revertManualYn();
+			return;
+		}
+
+		var reason = prompt("매뉴얼대상 변경 사유를 입력하세요. (200자 이내)");
+		if (reason === null) {
+			revertManualYn();
+			return;
+		}
+		var reasonValue = String(reason).trim();
+		if (!reasonValue) {
+			alert("변경 사유를 입력하세요.");
+			revertManualYn();
+			return;
+		}
+		if (reasonValue.length > 200) {
+			alert("변경 사유는 200자를 초과할 수 없습니다.");
+			revertManualYn();
+			return;
+		}
+
+		if (!confirm("매뉴얼대상을 N으로 변경하면 과제가 버전업(Ver.Up)됩니다. 계속하시겠습니까?")) {
+			revertManualYn();
+			return;
+		}
+
+		var planData = {
+			"coCd" : $("#wb21_popForm #coCd").val(),
+			"sjNo" : $("#wb21_popForm #sjNo").val(),
+			"salesCd" : $("#wb21_popForm #salesCd").val(),
+		};
+		var newVerNo;
+		postAjaxSync("/user/wb/wb21/selectSjVerNoNext", planData, null, function(data) {
+			newVerNo = data.result[0].verNo;
+		});
+		if (!newVerNo) {
+			alert("버전 정보를 가져오는데 실패했습니다.");
+			revertManualYn();
+			return;
+		}
+
+		var oldVerNo = $("#wb21_popForm #verNo").val();
+		$("#wb21_popForm #verNo").val(newVerNo);
+		var formData = sjVerUpMakeFromData();
+		formData.set("manualYn", "N");
+		formData.append("wb22Flag", "Y");
+		formData.append("verUpReason", reasonValue);
+		formData.append("verUpReasonType", "MANUAL_YN");
+		filePostAjax("/user/wb/wb21/sjVerUpInsert", formData, function(data) {
+			if (data.resultCode == 200) {
+				fileTrgtKey = data.fileTrgtKey;
+				lastManualYn = 'N';
+				gridView.setData(0);
+				sjDBSearchinfo();
+			} else {
+				alert("매뉴얼대상 변경(Ver.Up) 실패했습니다." + data.resultMessage);
+				$("#wb21_popForm #verNo").val(oldVerNo);
+				revertManualYn();
 			}
 		});
 	}
