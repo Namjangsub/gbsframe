@@ -1,0 +1,157 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.dksys.biz.user.wb.wb30.mapper.WB30Mapper">
+
+	<!-- ========================================================================= -->
+	<!-- [WBS 기준 템플릿 관리 (TB_WB30M01 / TB_WB30D01)] -->
+	<!-- ========================================================================= -->
+
+	<!-- 템플릿 마스터 목록 조회 -->
+	<select id="selectWbsTmplatList" parameterType="Map" resultType="camelMap">
+		SELECT M.CO_CD
+		     , M.TMPLAT_ID
+		     , M.TMPLAT_NM
+		     , M.TMPLAT_DIV
+		     , NVL(M.DLV_DAYCNT, 0) AS DLV_DAYCNT
+		     , NVL(M.RTN_DAYCNT, 0) AS RTN_DAYCNT
+		     , M.RMK
+		     , NVL(M.USE_YN, 'Y') AS USE_YN
+		     , NVL(M.SORT_ORD, 1) AS SORT_ORD
+		     , M.CREAT_ID
+		     , TO_CHAR(M.CREAT_DTTM, 'YYYY-MM-DD') AS CREAT_DTTM
+		     , (SELECT COUNT(*) FROM TB_WB30D01 D WHERE D.CO_CD = M.CO_CD AND D.TMPLAT_ID = M.TMPLAT_ID AND NVL(D.USE_YN, 'Y') = 'Y') AS TASK_CNT
+		FROM   TB_WB30M01 M
+		WHERE  1 = 1
+		<if test="coCd != null and !coCd.equals('')">
+		AND    M.CO_CD = #{coCd}
+		</if>
+		<if test="useYn != null and !useYn.equals('')">
+		AND    M.USE_YN = #{useYn}
+		</if>
+		<if test="searchValue != null and !searchValue.equals('')">
+		AND    (M.TMPLAT_ID LIKE '%' || #{searchValue} || '%' OR M.TMPLAT_NM LIKE '%' || #{searchValue} || '%')
+		</if>
+		ORDER BY NVL(M.SORT_ORD, 999), M.TMPLAT_ID
+	</select>
+
+	<!-- 템플릿 단계 상세 목록 조회 -->
+	<select id="selectWbsTmplatDetailList" parameterType="Map" resultType="camelMap">
+		SELECT D.CO_CD
+		     , D.TMPLAT_ID
+		     , D.WBS_PLAN_CODE_ID
+		     , D.WBS_PLAN_CODE_NM
+		     , D.START_OFFSET
+		     , D.END_OFFSET
+		     , NVL(D.DAYCNT, 0) AS DAYCNT
+		     , NVL(D.PLAN_MH, 0) AS PLAN_MH
+		     , NVL(D.OUT_YN, 'N') AS OUT_YN
+		     , NVL(D.USE_YN, 'Y') AS USE_YN
+		     , NVL(D.SORT_ORD, 1) AS SORT_ORD
+		     , D.RMK
+		FROM   TB_WB30D01 D
+		WHERE  D.CO_CD = #{coCd}
+		AND    D.TMPLAT_ID = #{tmplatId}
+		ORDER BY NVL(D.SORT_ORD, 999), D.WBS_PLAN_CODE_ID
+	</select>
+
+	<!-- 템플릿 마스터 등록 -->
+	<insert id="insertWbsTmplatMaster" parameterType="Map">
+		INSERT INTO TB_WB30M01 (
+		    CO_CD
+		  , TMPLAT_ID
+		  , TMPLAT_NM
+		  , TMPLAT_DIV
+		  , DLV_DAYCNT
+		  , RTN_DAYCNT
+		  , RMK
+		  , USE_YN
+		  , SORT_ORD
+		  , CREAT_ID
+		  , CREAT_PGM
+		  , CREAT_DTTM
+		) VALUES (
+		    #{coCd}
+		  , #{tmplatId}
+		  , #{tmplatNm}
+		  , #{tmplatDiv, jdbcType=VARCHAR}
+		  , #{dlvDaycnt, jdbcType=NUMERIC}
+		  , #{rtnDaycnt, jdbcType=NUMERIC}
+		  , #{rmk, jdbcType=VARCHAR}
+		  , NVL(#{useYn}, 'Y')
+		  , #{sortOrd, jdbcType=NUMERIC}
+		  , #{userId}
+		  , #{pgmId}
+		  , SYSDATE
+		)
+	</insert>
+
+	<!-- 템플릿 마스터 수정 -->
+	<update id="updateWbsTmplatMaster" parameterType="Map">
+		UPDATE TB_WB30M01
+		SET    TMPLAT_NM  = #{tmplatNm}
+		     , TMPLAT_DIV = #{tmplatDiv, jdbcType=VARCHAR}
+		     , DLV_DAYCNT = #{dlvDaycnt, jdbcType=NUMERIC}
+		     , RTN_DAYCNT = #{rtnDaycnt, jdbcType=NUMERIC}
+		     , RMK        = #{rmk, jdbcType=VARCHAR}
+		     , USE_YN     = NVL(#{useYn}, 'Y')
+		     , SORT_ORD   = #{sortOrd, jdbcType=NUMERIC}
+		     , UDT_ID     = #{userId}
+		     , UDT_PGM    = #{pgmId}
+		     , UDT_DTTM   = SYSDATE
+		WHERE  CO_CD      = #{coCd}
+		AND    TMPLAT_ID  = #{tmplatId}
+	</update>
+
+	<!-- 템플릿 마스터 삭제 -->
+	<delete id="deleteWbsTmplatMaster" parameterType="Map">
+		DELETE FROM TB_WB30M01
+		WHERE  CO_CD     = #{coCd}
+		AND    TMPLAT_ID = #{tmplatId}
+	</delete>
+
+	<!-- 템플릿 단계 상세 등록 -->
+	<insert id="insertWbsTmplatDetail" parameterType="Map">
+		INSERT INTO TB_WB30D01 (
+		    CO_CD
+		  , TMPLAT_ID
+		  , WBS_PLAN_CODE_ID
+		  , WBS_PLAN_CODE_NM
+		  , START_OFFSET
+		  , END_OFFSET
+		  , DAYCNT
+		  , PLAN_MH
+		  , OUT_YN
+		  , USE_YN
+		  , SORT_ORD
+		  , RMK
+		  , CREAT_ID
+		  , CREAT_PGM
+		  , CREAT_DTTM
+		) VALUES (
+		    #{coCd}
+		  , #{tmplatId}
+		  , #{wbsPlanCodeId}
+		  , #{wbsPlanCodeNm, jdbcType=VARCHAR}
+		  , #{startOffset, jdbcType=NUMERIC}
+		  , #{endOffset, jdbcType=NUMERIC}
+		  , #{daycnt, jdbcType=NUMERIC}
+		  , #{planMh, jdbcType=NUMERIC}
+		  , NVL(#{outYn}, 'N')
+		  , NVL(#{useYn}, 'Y')
+		  , #{sortOrd, jdbcType=NUMERIC}
+		  , #{rmk, jdbcType=VARCHAR}
+		  , #{userId}
+		  , #{pgmId}
+		  , SYSDATE
+		)
+	</insert>
+
+	<!-- 템플릿 단계 상세 일괄 삭제 (템플릿 단위) -->
+	<delete id="deleteWbsTmplatDetail" parameterType="Map">
+		DELETE FROM TB_WB30D01
+		WHERE  CO_CD     = #{coCd}
+		AND    TMPLAT_ID = #{tmplatId}
+	</delete>
+
+</mapper>
