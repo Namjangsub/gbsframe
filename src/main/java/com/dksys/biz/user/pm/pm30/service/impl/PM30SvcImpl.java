@@ -26,6 +26,11 @@ public class PM30SvcImpl implements PM30Svc {
 	}
 
 	@Override
+	public List<Map<String, String>> selectTeamDeptList() {
+		return pm30Mapper.selectTeamDeptList();
+	}
+
+	@Override
 	public Map<String, Object> saveAttendanceList(Map<String, Object> paramMap) throws Exception {
 		Map<String, Object> result = new HashMap<>();
 

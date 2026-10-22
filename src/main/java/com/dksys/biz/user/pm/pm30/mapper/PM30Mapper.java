@@ -10,6 +10,8 @@ public interface PM30Mapper {
 
 	List<Map<String, String>> selectAttendanceList(Map<String, String> paramMap);
 
+	List<Map<String, String>> selectTeamDeptList();
+
 	int mergeAttendance(Map<String, Object> paramMap);
 
 	int mergeAttendanceRaw(Map<String, Object> paramMap);

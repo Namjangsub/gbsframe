@@ -33,6 +33,20 @@ public class PM30Ctr {
 		return "jsonView";
 	}
 
+	@PostMapping(value = "/selectTeamDeptList")
+	public String selectTeamDeptList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		try {
+			List<Map<String, String>> resultList = pm30Svc.selectTeamDeptList();
+			model.addAttribute("resultCode", "0000");
+			model.addAttribute("resultMessage", "성공");
+			model.addAttribute("resultList", resultList);
+		} catch (Exception e) {
+			model.addAttribute("resultCode", "9999");
+			model.addAttribute("resultMessage", "조회 실패: " + e.getMessage());
+		}
+		return "jsonView";
+	}
+
 	@PostMapping(value = "/saveAttendanceList")
 	public String saveAttendanceList(@RequestBody Map<String, Object> paramMap, ModelMap model) {
 		try {

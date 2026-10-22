@@ -7,6 +7,8 @@ public interface PM30Svc {
 
 	List<Map<String, String>> selectAttendanceList(Map<String, String> paramMap);
 
+	List<Map<String, String>> selectTeamDeptList();
+
 	Map<String, Object> saveAttendanceList(Map<String, Object> paramMap) throws Exception;
 
 	Map<String, Object> selectRelatedApplications(Map<String, Object> paramMap);
