@@ -581,7 +581,8 @@ function recalcRowAttendanceObject(row) {
 	// 1. 출장 유형(설치시운전, 설치장애, A/S(무상), 기타출장) 또는 출장신청서/복명서 확인된 건:
 	// 수정출근일시 ~ 수정퇴근일시 자동 설정 (단, 반차가 결합된 경우 반차 근무시간과 합치되도록 정밀 산출)
 	// [우선순위 원칙]: 담당자가 최종 수정한 값(isUserEditedInDttm/isUserEditedOutDttm) > DB에서 불러온 저장값(savedInDttm/savedOutDttm) > 자동 설정 기준
-	if ((isTripType || isTrip) && dtFormatted) {
+	// '정보없음'은 출장 연동 잔여값(tripWorkPlace 등)이 있어도 출장 기본값을 채우지 않는다 (공백/DB저장값 처리는 호출 화면에서)
+	if ((isTripType || (isTrip && wt !== '정보없음')) && dtFormatted) {
 		var halfType = (typeof getHalfVacationType === 'function') ? getHalfVacationType(row) : null;
 		var defaultIn = dtFormatted + (halfType === 'AM' ? ' 13:30' : ' 08:30');
 		var defaultOut = dtFormatted + (halfType === 'PM' ? ' 12:30' : ' 17:30');
@@ -658,6 +659,11 @@ function recalcRowAttendanceObject(row) {
 		row.totWorkTm = fmtMinutesToHHmm(totalMinutes);
 		row.otTm = fmtMinutesToHHmm(otMinutes);
 		row.nghtTm = fmtMinutesToHHmm(nightMinutes);
+	} else if (row.isUserEditedInDttm || row.isUserEditedOutDttm) {
+		// 담당자가 수정출퇴근일시를 바꿔 유효한 시간 구간이 없어진 경우 — 이전 값이 남지 않도록 비움
+		row.totWorkTm = '';
+		row.otTm = '';
+		row.nghtTm = '';
 	}
 
 	// 3. 근태 판정 (출장건 및 일반건 단일 표준 판정 함수 호출 — Single Source of Truth)

@@ -554,10 +554,18 @@
 		function isNetWorkTmShortfall(item, netWorkTmVal) {
 			if (!item) return false;
 			var val = netWorkTmVal !== undefined ? netWorkTmVal : item.netWorkTm;
+			var isHoliday = String(item.holidayYn || '').trim() === '휴일';
+			var wtNm = String(item.workTypeNm || '').trim();
+
+			// 평일인데 근무시간이 전혀 없는 경우(0)도 시간미달 — 제외/휴가/휴일 근무형태는 근무시간이 없는 것이 정상이므로 대상 아님
+			if (!isHoliday && val !== undefined && val !== null && String(val).trim() !== '' && Number(val) === 0
+				&& wtNm !== '' && wtNm !== '제외' && wtNm !== '휴가' && wtNm !== '휴일') {
+				return true;
+			}
+
 			var num = Number(val);
 			if (isNaN(num) || num <= 0 || num >= 8) return false;
 
-			var isHoliday = String(item.holidayYn || '').trim() === '휴일';
 			if (isHoliday) {
 				// 휴일: 기술연구소 또는 생산팀/생산직(근무시간/타각 존재)인 경우만 시간미달 표시 대상, 그 외 팀은 제외
 				if (isTechLabRow(item)) return true;
@@ -570,8 +578,8 @@
 		// ─ AX5-Grid 포맷터: 실제근무시간(netWorkTm) 시간미달 표시 포맷터 ─
 		function formatNetWorkTmWithShortfallMark() {
 			var base = blankIfZeroTime.call(this);
-			if (base && isNetWorkTmShortfall(this.item, this.value)) {
-				return base + ' (시간미달)';
+			if (isNetWorkTmShortfall(this.item, this.value)) {
+				return base ? (base + ' (시간미달)') : '(시간미달)';
 			}
 			return base;
 		}
@@ -670,6 +678,24 @@
 				return num === 0 ? '' : num.toFixed(2);
 			}
 			return formatTimeToDecimalString(strVal);
+		}
+
+		// ─ 수정출근/퇴근일시(inDttm/outDttm) 변경 시 시각 연동값(지각·조퇴 + 출근/퇴근 판정)을 자동 재판정 대상으로 풀어주는 공용 함수 ─
+		// 조회 시점 DB 저장값(saved*)과 담당자 직접입력 고정값(isUserEdited*/user*)이 재계산 결과를 덮어쓰므로,
+		// 시각이 바뀌면 해당 고정을 해제하여 applyAttendanceJudgment 결과가 그대로 반영되게 한다.
+		function releaseTimeDerivedPins(item, key) {
+			if (!item) return;
+			if (key === 'inDttm') {
+				item.isUserEditedLateTxt = false;
+				item.userLateTxt = undefined;
+				item.savedLateTxt = undefined;
+				item.savedInJdgNm = '';
+			} else if (key === 'outDttm') {
+				item.isUserEditedEarlyLeave = false;
+				item.userEarlyLeaveTxt = undefined;
+				item.savedEarlyLeaveTxt = undefined;
+				item.savedOutJdgNm = '';
+			}
 		}
 
 		// ─ 수정출근/퇴근일시(inDttm/outDttm) 핑크(수정 필요) 판정 공용 함수 ─
@@ -1245,8 +1271,8 @@
 						// 셀 데이터 변경 시(식대 지원, 근무형태 등) 에디터 소멸 후 비동기 안전 재계산 및 리렌더링
 						// 재계산(_isSyncing) 중 들어온 편집도 "사용자 수정" 플래그는 반드시 세팅 (값만 바뀌고 플래그가 없으면 자동채움이 덮어씀)
 						if (this.item && this.key === 'spclMtr') this.item.isUserEditedSpclMtr = true;
-						if (this.item && this.key === 'inDttm') this.item.isUserEditedInDttm = true;
-						if (this.item && this.key === 'outDttm') this.item.isUserEditedOutDttm = true;
+						if (this.item && this.key === 'inDttm') { this.item.isUserEditedInDttm = true; releaseTimeDerivedPins(this.item, 'inDttm'); }
+						if (this.item && this.key === 'outDttm') { this.item.isUserEditedOutDttm = true; releaseTimeDerivedPins(this.item, 'outDttm'); }
 						if (this.item && this.key === 'substWorkYn') {
 							this.item.isUserEditedSubstWork = true;
 							this.item.userSubstWorkYn = (this.item.substWorkYn !== undefined && this.item.substWorkYn !== null) ? String(this.item.substWorkYn).trim() : '';
@@ -1294,6 +1320,17 @@
 							} else {
 								item.isUserEditedWorkType = true;
 								item.workTypeNmChanged = true;
+							}
+
+							// 근무형태 변경으로 수정출퇴근일시가 바뀔 수 있으므로 DB 저장 판정/지각·조퇴 고정을 풀어 판정기준대로 재판정
+							releaseTimeDerivedPins(item, 'inDttm');
+							releaseTimeDerivedPins(item, 'outDttm');
+							// '정보없음' 선택 시 수정출퇴근일시는 공백 (이전 수정 플래그 해제 → recalc에서 공백 처리)
+							if (currentVal === '정보없음') {
+								item.isUserEditedInDttm = false;
+								item.isUserEditedOutDttm = false;
+								item.inDttm = '';
+								item.outDttm = '';
 							}
 
 							var isNewTrip = (currentVal === '설치시운전' || currentVal === '설치장애' || currentVal === 'A/S(무상)' || currentVal === '기타출장');
@@ -1966,8 +2003,8 @@
 				for (var k = 0; k < targetKeys.length; k++) {
 					var key = targetKeys[k];
 					row[key] = ''; // 데이터 직접 지우기
-					if (key === 'inDttm') row.isUserEditedInDttm = true;
-					if (key === 'outDttm') row.isUserEditedOutDttm = true;
+					if (key === 'inDttm') { row.isUserEditedInDttm = true; releaseTimeDerivedPins(row, 'inDttm'); }
+					if (key === 'outDttm') { row.isUserEditedOutDttm = true; releaseTimeDerivedPins(row, 'outDttm'); }
 					if (key === 'spclMtr') row.isUserEditedSpclMtr = true;
 					if (key === 'workTypeNm') row.isUserEditedWorkType = true;
 					if (key === 'substWorkYn') { row.isUserEditedSubstWork = true; row.userSubstWorkYn = ''; }
@@ -1977,12 +2014,10 @@
 					attendanceGrid.setValue(i, key, '');
 				}
 				recalcExcelDetailColumns(row);
+				// setData는 스크롤이 맨 위로 초기화되므로, 변경된 행만 updateRow로 갱신해 현재 화면 위치를 유지한다
+				attendanceGrid.updateRow(row, i);
 			}
 
-			attendanceGrid.setData({
-				list: list,
-				page: { totalElements: list.length }
-			});
 			attendanceGrid.repaint();
 			endBulkEdit();
 		}
@@ -3535,6 +3570,22 @@
 						row.outDttm = defaultOut;
 					}
 				}
+			} else {
+				// 출장 외 근무형태: 수정출퇴근일시는 [담당자 수정값 > DB 저장값 > 자동산정(현행 유지)] 순
+				// '정보없음'은 담당자가 새로 선택한 경우 공백 처리, DB에 '정보없음'으로 저장된 행은 저장값 그대로 표시
+				var noneByUser = (wt === '정보없음' && row.isUserEditedWorkType);
+				var hasSavedIn = row.savedInDttm !== undefined && row.savedInDttm !== null && String(row.savedInDttm).trim() !== '';
+				var hasSavedOut = row.savedOutDttm !== undefined && row.savedOutDttm !== null && String(row.savedOutDttm).trim() !== '';
+				if (!row.isUserEditedInDttm) {
+					if (noneByUser) row.inDttm = '';
+					else if (hasSavedIn) row.inDttm = row.savedInDttm;
+					else if (wt === '정보없음') row.inDttm = '';
+				}
+				if (!row.isUserEditedOutDttm) {
+					if (noneByUser) row.outDttm = '';
+					else if (hasSavedOut) row.outDttm = row.savedOutDttm;
+					else if (wt === '정보없음') row.outDttm = '';
+				}
 			}
 
 			var effectiveInStr = row.inDttm ? String(row.inDttm).trim() : (row.inTm ? String(row.inTm).trim() : '');
@@ -3849,6 +3900,7 @@
 						if (rowItem) {
 							rowItem.inDttm = fullInDttm;
 							rowItem.isUserEditedInDttm = true;
+							releaseTimeDerivedPins(rowItem, 'inDttm');
 						}
 					}
 					if (applyOut) {
@@ -3857,6 +3909,7 @@
 						if (rowItem) {
 							rowItem.outDttm = fullOutDttm;
 							rowItem.isUserEditedOutDttm = true;
+							releaseTimeDerivedPins(rowItem, 'outDttm');
 						}
 					}
 					recalcOtNightTotal(dindex);
@@ -3947,6 +4000,7 @@
 					if (rowItem) {
 						rowItem.inDttm = '';
 						rowItem.isUserEditedInDttm = true;
+						releaseTimeDerivedPins(rowItem, 'inDttm');
 					}
 				}
 				if (applyOut) {
@@ -3954,6 +4008,7 @@
 					if (rowItem) {
 						rowItem.outDttm = '';
 						rowItem.isUserEditedOutDttm = true;
+						releaseTimeDerivedPins(rowItem, 'outDttm');
 					}
 				}
 				recalcOtNightTotal(dindex);
