@@ -664,6 +664,50 @@
 </div>
 
 <script type="text/javascript">
+	// 출장신청서/복명서 공통 출력 조건: 신청인 담당팀장 결재 완료.
+	var pm51ReqPrint = (function () {
+		var managerIds = {};
+
+		function getManagerId(applicantId) {
+			if (Object.prototype.hasOwnProperty.call(managerIds, applicantId)) return managerIds[applicantId];
+			var managerId = '';
+			postAjaxSync('/admin/cm/cm06/selectUserInfo', { userId: applicantId }, null, function (data) {
+				var user = data && data.userInfo;
+				if (!user) return;
+				// 신청인이 팀장이면 본인 결재를 기준으로 한다.
+				managerId = user.teamManager === 'TEAM01' ? applicantId : (user.mngId || '');
+				// 조직도에 담당팀장이 없는 생산팀의 기존 팀장 대행 정책.
+				if (!managerId && String(user.deptId || '').indexOf('GUN60') === 0) managerId = 'sms';
+				managerIds[applicantId] = managerId;
+			});
+			return managerId;
+		}
+
+		function canPrint(applicantId, todoNo, approvalCode, rows) {
+			if (!applicantId || !todoNo) return false;
+			var managerId = getManagerId(applicantId);
+			if (!managerId) return false;
+			// 목록 화면과 출력 직전에는 DB의 최신 결재선을 조회한다.
+			if (!rows) {
+				rows = [];
+				postAjaxSync('/user/wb/wb20/selectGetApprovalList', {
+					todoNo: todoNo, todoDiv2CodeId: approvalCode
+				}, null, function (data) {
+					rows = (data && data.resultList) || [];
+				});
+			}
+			return rows.some(function (row) {
+				var isApproval = row.gb === '결재' || row.todoDiv1CodeId === 'TODODIV20';
+				return isApproval && row.todoDiv2CodeId === approvalCode
+					&& String(row.usrNm || row.todoId || '') === String(managerId)
+					&& row.apprRejectYn !== 'Y' && row.sanctnSttusNm !== '반려'
+					&& (row.sanctnSttus === 'Y' || !!String(row.todoCfDt || '').trim());
+			});
+		}
+
+		return { canPrint: canPrint };
+	}());
+
 
 	// fileTree.js의 selectedNodeId ReferenceError 방어
 	window.selectedNodeId = window.selectedNodeId || "";
@@ -2711,9 +2755,8 @@
 			// 편집정책 적용 과정의 자동계산 덮어쓰기 방지: DB 경비값을 최종 반영
 			bindExpenseTableData(expenseList);
 
-			// 결재완료(APRVSTS03) 시 출력 버튼 노출
-			var currentAprvStsCd = master.aprvStsCd || master.APRV_STS_CD || '';
-			if (currentAprvStsCd === 'APRVSTS03') {
+			// 신청인 담당팀장 결재 완료 시 출력 버튼 노출
+			if (canPrintTripReq()) {
 				$('#printBtn').show();
 			} else {
 				$('#printBtn').hide();
@@ -3937,32 +3980,13 @@
 		return hasCompletedApproval() || hasCompletedApprovalMng();
 	}
 
-	// 출장신청서 결재 완료(파란색 신호등: appTotCnt > 0 && appDoneCnt === appTotCnt) 여부 확인
-	function isTripReqApproved() {
-		var tripReqNo = $('#tripReqNo').val();
-		if (!tripReqNo || (popParam && popParam.actionType === 'C')) {
-			return false;
-		}
-		if (popParam && popParam.appTotCnt != null && popParam.appDoneCnt != null) {
-			var pTot = Number(popParam.appTotCnt || 0);
-			var pDone = Number(popParam.appDoneCnt || 0);
-			if (pTot > 0 && pTot === pDone) return true;
-		}
-		if (gridViewApproval && gridViewApproval.target && gridViewApproval.target.getList) {
-			var list = gridViewApproval.target.getList() || [];
-			var tot = 0;
-			var done = 0;
-			$.each(list, function(idx, elem) {
-				if (elem.gb === '결재') {
-					tot++;
-					if ($.trim(elem.todoCfDt || '') || elem.sanctnSttus === 'Y') {
-						done++;
-					}
-				}
-			});
-			if (tot > 0 && tot === done) return true;
-		}
-		return !!(currentTripReqMaster && currentTripReqMaster.aprvStsCd === 'APRVSTS03');
+	// 출력은 신청인 담당팀장 결재 완료부터 허용한다.
+	function canPrintTripReq(refresh) {
+		if (popParam && popParam.actionType === 'C') return false;
+		var rows = !refresh && gridViewApproval && gridViewApproval.target
+			? gridViewApproval.target.getList() || [] : null;
+		var applicantId = currentTripReqMaster && (currentTripReqMaster.reqId || currentTripReqMaster.userId);
+		return pm51ReqPrint.canPrint(applicantId, $('#tripReqNo').val(), 'TODODIV2190', rows);
 	}
 
 	// 출장신청서 출력 (팝업)
@@ -3973,8 +3997,8 @@
 			return;
 		}
 
-		if (!isTripReqApproved()) {
-			alert("결재 완료 후 출력할 수 있습니다.");
+		if (!canPrintTripReq(true)) {
+			alert("신청인의 팀장 결재 완료 후 출력할 수 있습니다.");
 			return;
 		}
 
@@ -4317,8 +4341,8 @@
 		var paid = !!master.payDt;
 		var actionType = popParam.actionType;
 
-		// 결재완료(APRVSTS03) 시 출력 버튼 노출
-		if ($('#tripReqNo').val() && aprvStsCd === 'APRVSTS03') {
+		// 신청인 담당팀장 결재 완료 시 출력 버튼 노출
+		if (canPrintTripReq()) {
 			$('#printBtn').show();
 		} else {
 			$('#printBtn').hide();
@@ -4610,8 +4634,8 @@
 			$('#popTitle').text('출장신청서 수정 [반려]');
 		}
 
-		// 결재 완료(APRVSTS03) 시 출력 버튼 노출
-		if ($('#tripReqNo').val() && isTripReqApproved()) {
+		// 신청인 담당팀장 결재 완료 시 출력 버튼 노출
+		if (canPrintTripReq()) {
 			$popArea.find('#printBtn').show();
 		} else {
 			$popArea.find('#printBtn').hide();
