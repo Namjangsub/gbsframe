@@ -987,6 +987,64 @@
 			pasteRptCardGrid(clipboard.getData('text'));
 		});
 
+		// 그리드 셀 드래그 선택 후 Ctrl+C 복사:
+		// 모달 내 다중 그리드(9개) 로드로 인해 기본 click 이벤트에서 그리드 간 focus가 해제되는 문제를 방지하고,
+		// 셀 영역을 마우스로 드래그 선택(selectedColumn 보유)한 그리드를 즉시 찾아 클립보드(TSV)로 복사합니다.
+		$(document).off('keydown.pm51GridCopy').on('keydown.pm51GridCopy', function(e) {
+			if (!$('#popForm').length) {
+				$(document).off('keydown.pm51GridCopy');
+				return;
+			}
+			if ((e.ctrlKey || e.metaKey) && (e.which === 67 || e.keyCode === 67)) {
+				if ($(e.target).is('input:visible, textarea:visible, select:visible')) return;
+
+				var allViews = [
+					tripReqTravelerGridView, rptTravelerGridView, rptProjectGridView,
+					tripExpenseStatusGridView, rptCardGridView, dailySettlementGridView,
+					actualSettlementGridView, gridViewApproval, gridViewApprovalMng
+				];
+
+				var targetGrid = null;
+				for (var i = 0; i < allViews.length; i++) {
+					var g = allViews[i] && allViews[i].target;
+					if (g && g.selectedColumn && Object.keys(g.selectedColumn).length > 0) {
+						targetGrid = g;
+						break;
+					}
+				}
+
+				if (targetGrid) {
+					// AX5-Grid copySelect()(숨은 disabled textarea 방식)는 이 화면에서 복사되지 않아 화면 표시 텍스트로 직접 TSV 구성
+					var tsvRows = [], lastD, lastR, rIdx = 0;
+					$.each(targetGrid.selectedColumn, function(key, d) {
+						if (!d) return;
+						if (lastD !== undefined && !(lastD === d.dindex && lastR === d.rowIndex)) rIdx++;
+						lastD = d.dindex;
+						lastR = d.rowIndex;
+						var $cell = targetGrid.$.panel[d.panelName].find('[data-ax5grid-tr-data-index="' + d.dindex + '"]')
+							.find('[data-ax5grid-column-rowindex="' + d.rowIndex + '"][data-ax5grid-column-colindex="' + d.colIndex + '"]');
+						(tsvRows[rIdx] = tsvRows[rIdx] || []).push($.trim($cell.text()));
+					});
+					if (tsvRows.length) {
+						var tsv = $.map(tsvRows, function(cols) { return (cols || []).join('\t'); }).join('\n') + '\n';
+						var prevEl = document.activeElement;
+						var tmpTa = document.createElement('textarea');
+						tmpTa.value = tsv;
+						tmpTa.style.cssText = 'position:fixed;left:-9999px;top:0;opacity:0;';
+						document.body.appendChild(tmpTa);
+						tmpTa.select();
+						var copied = false;
+						try { copied = document.execCommand('copy'); } catch (err) { copied = false; }
+						document.body.removeChild(tmpTa);
+						if (prevEl && prevEl.focus) { try { prevEl.focus(); } catch (err2) { } }
+						if (!copied && navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(tsv);
+						e.preventDefault();
+						e.stopPropagation();
+					}
+				}
+			}
+		});
+
 		// 프로젝트명, 영업PM명, 장비명, 출장지 마우스 오버 시 SalesCode 미선택 시 툴팁 표시
 		$('#reqViewClntPjtNm, #reqViewPmNm, #reqViewEquipNm, #reqViewTripPlace').on('mouseenter', function() {
 			if (!$('#reqViewSalesCd').val()) {
@@ -1691,7 +1749,7 @@
 		return rows;
 	}
 
-	// pastedText가 없으면 클립보드에서 직접 읽는다(버튼/우클릭 메뉴). 붙여넣기는 setData로 전체 교체한다.
+	// pastedText가 없으면 클립보드에서 직접 읽는다(버튼/우클릭 메뉴). 붙여넣기는 기존 행 뒤에 추가한다.
 	async function pasteRptCardGrid(pastedText) {
 		if (isRptCardGridEditBlocked()) return;
 		var text = pastedText;
@@ -1704,7 +1762,9 @@
 			alert('붙여넣을 카드사 명세를 인식하지 못했습니다.\n일자 / 카드번호 / 통화 / 금액 순서의 4개 열을 복사해 주세요.');
 			return;
 		}
-		bindRptCardGrid(rows);
+		// 기존 행은 유지하고 붙여넣은 행을 뒤에 추가
+		var existing = (rptCardGridView && rptCardGridView.target) ? (rptCardGridView.target.getList() || []) : [];
+		bindRptCardGrid(existing.concat(rows));
 	}
 
 	function clearRptCardGrid() {
@@ -2396,9 +2456,8 @@
 
 	// 출장 경비 신청 현황 자동 구분: 숙박비/식비는 일반, 그 외 항목은 예비비
 	function getAutoTripRptRsvDiv(row) {
-		var expenseType = String(row.tripRptTypNm || row.tripRptTyp || '').trim();
-		var isGeneral = expenseType.indexOf('숙박비') > -1 || expenseType.indexOf('식비') > -1 || expenseType.indexOf('식대') > -1;
-		var targetName = isGeneral ? '일반' : '예비비';
+		// 기본값은 항상 '일반', 예비비는 담당자가 필요 시 직접 변경
+		var targetName = '일반';
 		var target = $.grep(comboTripRptRsvDiv || [], function(item) {
 			return String(item.NM || '').indexOf(targetName) > -1;
 		})[0];
