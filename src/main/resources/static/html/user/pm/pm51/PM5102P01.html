@@ -894,6 +894,7 @@
 	var manualDailyRows = [];
 	var suppressedDailyKeys = {};
 	var savedDailyByKey = {};
+	var dailyDbOnlyMode = false; // 저장된 복명서 수정 시 true: 일비정산 자동행 생성 없이 DB 저장행만 표시 (추가는 수동행으로)
 
 	// 근태마감년월 (PM30 관리 값)
 	var pm51AttendanceCloseYm = null;
@@ -2017,32 +2018,36 @@
 			var userNm = row.userNm || row.userId || '';
 			var savedDailyAmt = (row.dailyAmt !== undefined && row.dailyAmt !== null && row.dailyAmt !== '' && Number(row.dailyAmt) > 0) ? Number(row.dailyAmt) : null;
 			var krwKey = userNm + '|CURR01';
-			if (!suppressedDailyKeys[krwKey] && (reqAdvKrw || finalKrw || (savedDailyAmt !== null && isKrwCurrency('CURR01')))) {
+			// 수정(저장된 D05 존재) 시에는 DB 저장값(선지급분/최종확정)을 그대로 표시, 저장값 없는 행만 자동계산
+			if (!suppressedDailyKeys[krwKey] && (dailyDbOnlyMode ? !!savedDailyByKey[krwKey] : (reqAdvKrw || finalKrw || savedDailyByKey[krwKey] || (savedDailyAmt !== null && isKrwCurrency('CURR01'))))) {
 				var savedKrw = savedDailyByKey[krwKey];
 				var curFinal = (savedKrw && savedKrw._userEditedFinal) ? savedKrw.dailyFinal : (savedDailyAmt !== null ? savedDailyAmt : finalKrw);
-				var curDiff = reqAdvKrw - curFinal;
-				dailyRows.push({ userNm: userNm, firstSchedule: firstSchedule, actualSchedule: actualSchedule, currNm: 'CURR01', dailyAdvance: reqAdvKrw, dailyFinal: curFinal, dailyDiff: curDiff, _userEditedFinal: !!(savedKrw && savedKrw._userEditedFinal) || savedDailyAmt !== null });
+				var curAdvKrw = savedKrw ? savedKrw.dailyAdvance : reqAdvKrw;
+				var curDiff = curAdvKrw - curFinal;
+				dailyRows.push({ userNm: userNm, firstSchedule: firstSchedule, actualSchedule: actualSchedule, currNm: 'CURR01', dailyAdvance: curAdvKrw, dailyFinal: curFinal, dailyDiff: curDiff, _userEditedFinal: !!(savedKrw && savedKrw._userEditedFinal) || savedDailyAmt !== null });
 			}
 			// 외화1: 신청서에서 실제 외화(원화 아님)를 선택한 경우에만 통화별 행 생성 (통화가 원화면 달러 행을 만들지 않음)
 			var reqCurr = (currentTripReqMaster && currentTripReqMaster.currCd) ? currentTripReqMaster.currCd : ($('#tripRptCurr').val() || '');
 			if (reqCurr && !isKrwCurrency(reqCurr)) {
 				var usdKey = userNm + '|' + reqCurr;
-				if (!suppressedDailyKeys[usdKey] && (reqAdvUsd || finalUsd || savedDailyByKey[usdKey])) {
+				if (!suppressedDailyKeys[usdKey] && (dailyDbOnlyMode ? !!savedDailyByKey[usdKey] : (reqAdvUsd || finalUsd || savedDailyByKey[usdKey]))) {
 					var savedUsd = savedDailyByKey[usdKey];
 					var curFinalUsd = (savedUsd && savedUsd._userEditedFinal) ? savedUsd.dailyFinal : finalUsd;
-					var curDiffUsd = reqAdvUsd - curFinalUsd;
-					dailyRows.push({ userNm: userNm, firstSchedule: firstSchedule, actualSchedule: actualSchedule, currNm: reqCurr, dailyAdvance: reqAdvUsd, dailyFinal: curFinalUsd, dailyDiff: curDiffUsd, _userEditedFinal: !!(savedUsd && savedUsd._userEditedFinal) });
+					var curAdvUsd = savedUsd ? savedUsd.dailyAdvance : reqAdvUsd;
+					var curDiffUsd = curAdvUsd - curFinalUsd;
+					dailyRows.push({ userNm: userNm, firstSchedule: firstSchedule, actualSchedule: actualSchedule, currNm: reqCurr, dailyAdvance: curAdvUsd, dailyFinal: curFinalUsd, dailyDiff: curDiffUsd, _userEditedFinal: !!(savedUsd && savedUsd._userEditedFinal) });
 				}
 			}
 			// 외화2(통화단위2): 신청서에 원화도 아니고 외화1과도 다른 별도 통화가 지정된 경우에만 통화별 행 자동 추가
 			var settleCurr2 = getSettleCurrCd2();
 			if (settleCurr2) {
 				var usd2Key = userNm + '|' + settleCurr2;
-				if (!suppressedDailyKeys[usd2Key]) {
+				if (!suppressedDailyKeys[usd2Key] && (!dailyDbOnlyMode || savedDailyByKey[usd2Key])) {
 					var savedUsd2 = savedDailyByKey[usd2Key];
 					var curFinalUsd2 = (savedUsd2 && savedUsd2._userEditedFinal) ? savedUsd2.dailyFinal : reqAdvUsd2;
-					var curDiffUsd2 = reqAdvUsd2 - curFinalUsd2;
-					dailyRows.push({ userNm: userNm, firstSchedule: firstSchedule, actualSchedule: actualSchedule, currNm: settleCurr2, dailyAdvance: reqAdvUsd2, dailyFinal: curFinalUsd2, dailyDiff: curDiffUsd2, _userEditedFinal: !!(savedUsd2 && savedUsd2._userEditedFinal) });
+					var curAdvUsd2 = savedUsd2 ? savedUsd2.dailyAdvance : reqAdvUsd2;
+					var curDiffUsd2 = curAdvUsd2 - curFinalUsd2;
+					dailyRows.push({ userNm: userNm, firstSchedule: firstSchedule, actualSchedule: actualSchedule, currNm: settleCurr2, dailyAdvance: curAdvUsd2, dailyFinal: curFinalUsd2, dailyDiff: curDiffUsd2, _userEditedFinal: !!(savedUsd2 && savedUsd2._userEditedFinal) });
 				}
 			}
 		});
@@ -3279,6 +3284,7 @@
 			manualDailyRows = [];
 			suppressedDailyKeys = {};
 			savedDailyByKey = {};
+			dailyDbOnlyMode = true;
 			var rptDailyList = data.result.rptDailyList || [];
 			$.each(rptDailyList, function(idx, item) {
 				var key = (item.userNm || '') + '|' + (item.currCd || '');
