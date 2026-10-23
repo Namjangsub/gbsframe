@@ -165,6 +165,50 @@
 </html>
 
 <script type="text/javascript">
+	// 출장신청서/복명서 공통 출력 조건: 신청인 담당팀장 결재 완료.
+	var pm51ListPrint = (function () {
+		var managerIds = {};
+
+		function getManagerId(applicantId) {
+			if (Object.prototype.hasOwnProperty.call(managerIds, applicantId)) return managerIds[applicantId];
+			var managerId = '';
+			postAjaxSync('/admin/cm/cm06/selectUserInfo', { userId: applicantId }, null, function (data) {
+				var user = data && data.userInfo;
+				if (!user) return;
+				// 신청인이 팀장이면 본인 결재를 기준으로 한다.
+				managerId = user.teamManager === 'TEAM01' ? applicantId : (user.mngId || '');
+				// 조직도에 담당팀장이 없는 생산팀의 기존 팀장 대행 정책.
+				if (!managerId && String(user.deptId || '').indexOf('GUN60') === 0) managerId = 'sms';
+				managerIds[applicantId] = managerId;
+			});
+			return managerId;
+		}
+
+		function canPrint(applicantId, todoNo, approvalCode, rows) {
+			if (!applicantId || !todoNo) return false;
+			var managerId = getManagerId(applicantId);
+			if (!managerId) return false;
+			// 목록 화면과 출력 직전에는 DB의 최신 결재선을 조회한다.
+			if (!rows) {
+				rows = [];
+				postAjaxSync('/user/wb/wb20/selectGetApprovalList', {
+					todoNo: todoNo, todoDiv2CodeId: approvalCode
+				}, null, function (data) {
+					rows = (data && data.resultList) || [];
+				});
+			}
+			return rows.some(function (row) {
+				var isApproval = row.gb === '결재' || row.todoDiv1CodeId === 'TODODIV20';
+				return isApproval && row.todoDiv2CodeId === approvalCode
+					&& String(row.usrNm || row.todoId || '') === String(managerId)
+					&& row.apprRejectYn !== 'Y' && row.sanctnSttusNm !== '반려'
+					&& (row.sanctnSttus === 'Y' || !!String(row.todoCfDt || '').trim());
+			});
+		}
+
+		return { canPrint: canPrint };
+	}());
+
 
 	var gridView = {
 		initView: function () {
@@ -277,17 +321,17 @@
 						$.each(list, function(i, row1) {
 							row1.isOverlapped = false;
 							if (!row1.tripPeriod || !row1.travelerList) return true;
-							
+
 							var t1 = String(row1.travelerList).split(',').map(function(s){return s.trim();});
 							var p1 = String(row1.tripPeriod).split('~');
 							var st1 = p1[0] ? p1[0].replace(/[^0-9]/g, "").substring(0,8) : "99999999";
 							var ed1 = p1[1] ? p1[1].replace(/[^0-9]/g, "").substring(0,8) : "00000000";
-							
+
 							for (var j = 0; j < list.length; j++) {
 								if (i === j) continue;
 								var row2 = list[j];
 								if (!row2.tripPeriod || !row2.travelerList) continue;
-								
+
 								var t2 = String(row2.travelerList).split(',').map(function(s){return s.trim();});
 								var hasSameTraveler = false;
 								for (var k = 0; k < t1.length; k++) {
@@ -297,11 +341,11 @@
 									}
 								}
 								if (!hasSameTraveler) continue;
-								
+
 								var p2 = String(row2.tripPeriod).split('~');
 								var st2 = p2[0] ? p2[0].replace(/[^0-9]/g, "").substring(0,8) : "99999999";
 								var ed2 = p2[1] ? p2[1].replace(/[^0-9]/g, "").substring(0,8) : "00000000";
-								
+
 								if (st1 <= ed2 && ed1 >= st2) {
 									row1.isOverlapped = true;
 									break;
@@ -611,10 +655,8 @@
 		}
 
 		var row = selectedRows[0];
-		var appTotCnt = Number(row.appTotCnt || 0);
-		var appDoneCnt = Number(row.appDoneCnt || 0);
-		if (appTotCnt === 0 || appTotCnt !== appDoneCnt) {
-			alert("결재 완료 후 출력할 수 있습니다.");
+		if (!pm51ListPrint.canPrint(row.reqId || row.userId, row.tripReqNo, 'TODODIV2190')) {
+			alert("신청인의 팀장 결재 완료 후 출력할 수 있습니다.");
 			return;
 		}
 
