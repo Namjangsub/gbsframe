@@ -56,6 +56,8 @@ public interface PM07Mapper {
 
 	String selectUserEnterDt(Map<String, String> paramMap);
 
+	String selectUserCoCd(Map<String, String> paramMap);
+
 	int selectVacationApprovalChk(Map<String, String> paramMap);
 
 	int selectApprovalCount(Map<String, String> paramMap);

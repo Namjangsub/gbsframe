@@ -397,10 +397,26 @@ public class PM07SvcImpl implements PM07Svc {
 		return String.format("%.1f", value);
 	}
 
+	private String resolveUserCoCd(String userId, String defaultCoCd) {
+		if (userId != null && !userId.trim().isEmpty()) {
+			Map<String, String> q = new HashMap<String, String>();
+			q.put("userId", userId);
+			String userCoCd = pm07Mapper.selectUserCoCd(q);
+			if (userCoCd != null && !userCoCd.trim().isEmpty()) {
+				return userCoCd;
+			}
+		}
+		return (defaultCoCd != null && !defaultCoCd.trim().isEmpty()) ? defaultCoCd : "GUN";
+	}
+
 	@Override
 	@Transactional(rollbackFor = Exception.class)
 	public Map<String, String> insertVacation(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
 		Map<String, String> result = new HashMap<String, String>();
+
+		// 신청자(REQ_ID) 사원마스터(TB_CM06M01) 기준 CO_CD 동기화 (작업일보, 결재선, 휴가일자 등 후속처리 일관 반영)
+		String actualCoCd = resolveUserCoCd(paramMap.get("reqId"), paramMap.get("coCd"));
+		paramMap.put("coCd", actualCoCd);
 
 		// 마감 검증: stDt, edDt
 		String stDt = paramMap.get("stDt");
@@ -649,6 +665,10 @@ public class PM07SvcImpl implements PM07Svc {
 	@Transactional(rollbackFor = Exception.class)
 	public Map<String, String> updateVacation(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
 		Map<String, String> result = new HashMap<String, String>();
+
+		// 신청자(REQ_ID) 사원마스터(TB_CM06M01) 기준 CO_CD 동기화 (작업일보, 결재선, 휴가일자 등 후속처리 일관 반영)
+		String actualCoCd = resolveUserCoCd(paramMap.get("reqId"), paramMap.get("coCd"));
+		paramMap.put("coCd", actualCoCd);
 
 		// 마감 검증: stDt, edDt
 		String stDt = paramMap.get("stDt");
