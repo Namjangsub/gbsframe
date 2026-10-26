@@ -3559,6 +3559,16 @@
 						row.outDttm = defaultOut;
 					}
 				}
+
+				// 출장 + 퇴근 타각(outTm) 있음: 기본값(17:30/12:30)·저장된 기본값 대신 실제 타각 시각을 분 단위로 기록
+				// (담당자가 직접 수정했거나 기본값이 아닌 다른 값이 저장된 경우는 그대로 유지)
+				var punchOutHm = row.outTm ? normalizeHHmm(String(row.outTm).trim()) : '';
+				if (!row.isUserEditedOutDttm && /^\d{2}:\d{2}$/.test(punchOutHm)) {
+					var curOutHm = row.outDttm ? normalizeHHmm(String(row.outDttm).trim()) : '';
+					if (!curOutHm || curOutHm === normalizeHHmm(defaultOut)) {
+						row.outDttm = dtFormatted + ' ' + punchOutHm;
+					}
+				}
 			} else {
 				// 출장 외 근무형태: 수정출퇴근일시는 [담당자 수정값 > DB 저장값 > 자동산정(현행 유지)] 순
 				// '정보없음'은 담당자가 새로 선택한 경우 공백 처리, DB에 '정보없음'으로 저장된 행은 저장값 그대로 표시
@@ -3609,6 +3619,17 @@
 			var grossWorkTm = roundTo3(bk > bi ? (bk - bi) : 0);
 			var netWorkTm = roundTo3(grossWorkTm - dedTotal);
 
+			// 출장 + 퇴근 타각 행: 분 단위 시각 기반이므로 근무시간 집계는 소수 둘째자리에서 반올림(소수 첫째자리)
+			// (그 외 행은 기존 30분 단위 절사(floorToStep) 유지)
+			var tripPunchRound = isTripType && !!row.outDttm && /^\d{2}:\d{2}$/.test(punchOutHm || '') && normalizeHHmm(String(row.outDttm).trim()) === punchOutHm;
+			var stepHrs = tripPunchRound
+				? function(v) { return v > 0 ? Math.round(v * 10) / 10 : 0; }
+				: floorToStep;
+			if (tripPunchRound) {
+				grossWorkTm = Math.round(grossWorkTm * 10) / 10;
+				netWorkTm = Math.round(netWorkTm * 10) / 10;
+			}
+
 			row.dedEarly = roundTo3(dedEarly);
 			row.dedLunch = roundTo3(dedLunch);
 			row.dedDinner = roundTo3(dedDinner);
@@ -3622,22 +3643,22 @@
 			var detMorning = 0, detAfternoon = 0, detOt = 0, detNight = 0;
 			if (bi > 0) {
 				if (bi < 13.5) {
-					detMorning = bk < 13.5 ? roundTo3(floorToStep(bk - bi - dedEarly - dedLunch, 0.4999)) : roundTo3(floorToStep(13.5 - bi - dedEarly - dedLunch, 0.4999));
+					detMorning = bk < 13.5 ? roundTo3(stepHrs(bk - bi - dedEarly - dedLunch, 0.4999)) : roundTo3(stepHrs(13.5 - bi - dedEarly - dedLunch, 0.4999));
 				}
 				if (bi < 13.5) {
-					detAfternoon = bk < 13.5 ? 0 : (bk < 18 ? roundTo3(floorToStep(bk - 13.5 - dedDinner, 0.4999)) : roundTo3(floorToStep(18 - 13.5 - dedDinner, 0.4999)));
+					detAfternoon = bk < 13.5 ? 0 : (bk < 18 ? roundTo3(stepHrs(bk - 13.5 - dedDinner, 0.4999)) : roundTo3(stepHrs(18 - 13.5 - dedDinner, 0.4999)));
 				} else if (bi < 18) {
-					detAfternoon = bk < 18 ? roundTo3(floorToStep(bk - bi - dedDinner, 0.4999)) : roundTo3(floorToStep(18 - bi - dedDinner, 0.4999));
+					detAfternoon = bk < 18 ? roundTo3(stepHrs(bk - bi - dedDinner, 0.4999)) : roundTo3(stepHrs(18 - bi - dedDinner, 0.4999));
 				}
 				if (bi < 18) {
-					detOt = bk < 18 ? 0 : (bk < 22 ? roundTo3(floorToStep(bk - 18, 0.4999)) : roundTo3(floorToStep(4, 0.4999)));
+					detOt = bk < 18 ? 0 : (bk < 22 ? roundTo3(stepHrs(bk - 18, 0.4999)) : roundTo3(stepHrs(4, 0.4999)));
 				} else if (bi < 22) {
-					detOt = bk < 22 ? roundTo3(floorToStep(bk - bi, 0.4999)) : roundTo3(floorToStep(22 - bi, 0.4999));
+					detOt = bk < 22 ? roundTo3(stepHrs(bk - bi, 0.4999)) : roundTo3(stepHrs(22 - bi, 0.4999));
 				}
 				if (bi < 22) {
-					detNight = bk < 22 ? 0 : roundTo3(floorToStep(bk - 22 - dedNight, 0.4999));
+					detNight = bk < 22 ? 0 : roundTo3(stepHrs(bk - 22 - dedNight, 0.4999));
 				} else {
-					detNight = roundTo3(floorToStep(bk - bi - dedNight, 0.4999));
+					detNight = roundTo3(stepHrs(bk - bi - dedNight, 0.4999));
 				}
 			}
 			if (row.detOtExtra === undefined || row.detOtExtra === null || row.detOtExtra === '') row.detOtExtra = 0;
@@ -3787,6 +3808,18 @@
 			return html;
 		}
 
+		// 1분 단위 분 선택 옵션 (수정퇴근일시용 — 기존 값은 반올림 없이 그대로 선택)
+		function build1MinuteSelectOptions(selectedMin) {
+			var html = '';
+			var sm = parseInt(selectedMin, 10);
+			if (isNaN(sm) || sm < 0 || sm > 59) sm = 0;
+			for (var i = 0; i < 60; i++) {
+				var mStr = (i < 10 ? '0' : '') + i;
+				html += '<option value="' + mStr + '"' + (i === sm ? ' selected' : '') + '>' + mStr + '분</option>';
+			}
+			return html;
+		}
+
 		function build10MinuteSelectOptions(selectedMin) {
 			var html = '';
 			var minutes = ['00', '10', '20', '30', '40', '50'];
@@ -3915,13 +3948,13 @@
 				'  <div style="display:inline-flex;align-items:center;gap:4px;">' +
 				'    <label style="margin-bottom:0;font-weight:bold;cursor:pointer;color:#2d3748;"><input type="checkbox" id="modDttmApplyIn"' + (inNeeded ? ' checked' : '') + ' style="vertical-align:middle;margin-right:2px;"> 출근</label>' +
 				'    <select id="modDttmStartHour" class="form-control input-sm"' + (!inNeeded ? ' disabled' : '') + ' style="width:64px;height:28px;padding:2px 4px;font-size:12px;display:inline-block;background:' + (!inNeeded ? '#edf2f7' : '#fff') + ';">' + buildHourSelectOptions(startHour) + '</select>' +
-				'    <select id="modDttmStartMin" class="form-control input-sm"' + (!inNeeded ? ' disabled' : '') + ' style="width:64px;height:28px;padding:2px 4px;font-size:12px;display:inline-block;background:' + (!inNeeded ? '#edf2f7' : '#fff') + ';">' + build10MinuteSelectOptions(startMin) + '</select>' +
+				'    <select id="modDttmStartMin" class="form-control input-sm"' + (!inNeeded ? ' disabled' : '') + ' style="width:64px;height:28px;padding:2px 4px;font-size:12px;display:inline-block;background:' + (!inNeeded ? '#edf2f7' : '#fff') + ';">' + build1MinuteSelectOptions(startMin) + '</select>' +
 				'  </div>' +
 				'  <div style="width:1px;height:24px;background:#cbd5e0;"></div>' +
 				'  <div style="display:inline-flex;align-items:center;gap:4px;">' +
 				'    <label style="margin-bottom:0;font-weight:bold;cursor:pointer;color:#2d3748;"><input type="checkbox" id="modDttmApplyOut"' + (outNeeded ? ' checked' : '') + ' style="vertical-align:middle;margin-right:2px;"> 퇴근</label>' +
 				'    <select id="modDttmEndHour" class="form-control input-sm"' + (!outNeeded ? ' disabled' : '') + ' style="width:64px;height:28px;padding:2px 4px;font-size:12px;display:inline-block;background:' + (!outNeeded ? '#edf2f7' : '#fff') + ';">' + buildHourSelectOptions(endHour) + '</select>' +
-				'    <select id="modDttmEndMin" class="form-control input-sm"' + (!outNeeded ? ' disabled' : '') + ' style="width:64px;height:28px;padding:2px 4px;font-size:12px;display:inline-block;background:' + (!outNeeded ? '#edf2f7' : '#fff') + ';">' + build10MinuteSelectOptions(endMin) + '</select>' +
+				'    <select id="modDttmEndMin" class="form-control input-sm"' + (!outNeeded ? ' disabled' : '') + ' style="width:64px;height:28px;padding:2px 4px;font-size:12px;display:inline-block;background:' + (!outNeeded ? '#edf2f7' : '#fff') + ';">' + build1MinuteSelectOptions(endMin) + '</select>' +
 				'  </div>' +
 				'</div>'
 			);
