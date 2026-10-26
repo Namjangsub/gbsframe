@@ -117,6 +117,36 @@
 
 <script type="text/javascript">
 
+    // 조회 결과 -> 트리 목록 가공 (검증메뉴 입력 시 해당 메뉴와 하위 전체만 표시)
+    function buildAuthList(src) {
+        var list = (src || []).slice();
+        var menuId = $('#menuId_S').val();
+        list.forEach(function(item) {
+            item.id  = (item.menuType == "HTML") ? item.menuId + item.saveYn : item.menuId;
+            item.pid = item.upMenuId;
+        });
+        if (menuId) {
+            var keep = {};
+            keep[menuId] = true;
+            var added = true;
+            while (added) {
+                added = false;
+                list.forEach(function(item) {
+                    if (!keep[item.menuId] && keep[item.upMenuId]) {
+                        keep[item.menuId] = true;
+                        added = true;
+                    }
+                });
+            }
+            list = list.filter(function(item) { return keep[item.menuId]; });
+            list.forEach(function(item) {
+                if (item.menuId == menuId) { item.pid = 'ROOT'; }
+            });
+        }
+        list.push({id : 'ROOT', pid : '', menuId : 'ROOT', upMenuId : '', saveYn : 'Y', menuNm : '전체메뉴'});
+        return list;
+    }
+
     var authGridView = {
         initView : function() {
             this.target = new ax5.ui.grid();
@@ -148,7 +178,7 @@
                     {key: "menuId",             label: "화면ID",        width: 140,  align: "center"},
                     {key: "menuNm",           	label: "화면명",   	   width: 300,   align: "left", hidden: false, treeControl: true},
                     {key: "saveYn",             label: "쓰기(CUD)",     width: 100,   align: "center", formatter: function () { return (this.value=="Y") ? 'Y' : '' ;}},
-                    {key: "saveYn",             label: "일기전용(R)",    width: 100,   align: "center", formatter: function () { return (this.value=="Y") ? '' : this.value;}},
+                    {key: "saveYn",             label: "읽기전용(R)",    width: 100,   align: "center", formatter: function () { return (this.value=="Y") ? '' : this.value;}},
                     {key: "menuType",         	label: "Type",       align: "center"},
                     {key: "menuUrl",            label: "접근경로",       width: "*",   align: "left" },
                     {key: "useYn",         		label: "사용유무",       align: "center"},
@@ -197,26 +227,7 @@
             };
             postAjaxSync("/selectCheckAuthority", paramObj, null, function(data) {
 				try {
-					var list = data.accessList;
-            		const menuId = $('#menuId_S').val();
-            		for (let i = list.length - 1; i >= 0; i--) {
-						if (menuId) {
-	                        if (list[i].upMenuId != menuId) {
-	                        	list.splice(i, 1);
-	                        }
-						} else{
-							const ynFlag = list[i].saveYn == 'U' ? '' :  list[i].saveYn;
-							if (list[i].menuType == "HTML") {
-								list[i].id = list[i].menuId + list[i].saveYn;
-								list[i].pid = list[i].upMenuId;
-							} else {
-								list[i].id = list[i].menuId;
-								list[i].pid = list[i].upMenuId;
-							}
-							
-						}
-
-                    }
+                    var list = buildAuthList(data.accessList);
             		
 //             		const selectList = list.filter(item => (
 //             												item.upMenuId === 'MENU100' || item.menuId === 'MENU100' 
@@ -230,11 +241,6 @@
 //                 										 ||  item.upMenuId === 'U00'
 //             											 )
 //             										);
-            		list.push(
-            					{id : 'ROOT', 		pid : '', 		menuId : 'ROOT', upMenuId : '', saveYn : 'Y', menuNm : '전체메뉴'},
-//             					{id : 'U10', 		pid : 'ROOT', 	menuId : 'U10', upMenuId : 'ROOT', saveYn : 'Y'},
-//             					{id : 'U99Y', 		pid : 'ROOTY', 	menuId : 'U99Y', upMenuId : 'ROOTY', saveYn : 'Y'},
-            				);
 //             		const seen = new Set();
 //             		const uniqueList = list.filter(item => {
 //             		    const key = `${item.id}-${item.pid}-${item.saveYn}`;
@@ -269,7 +275,7 @@
                  {key: "menuId",             label: "화면ID",        width: 140,  align: "center"},
                  {key: "menuNm",           	label: "화면명",   	   width: 300,   align: "left", hidden: false, treeControl: true},
                  {key: "saveYn",             label: "쓰기(CUD)",     width: 100,   align: "center", formatter: function () { return (this.value=="Y") ? 'Y' : '' ;}},
-                 {key: "saveYn",             label: "일기전용(R)",    width: 100,   align: "center", formatter: function () { return (this.value=="Y") ? '' : this.value;}},
+                 {key: "saveYn",             label: "읽기전용(R)",    width: 100,   align: "center", formatter: function () { return (this.value=="Y") ? '' : this.value;}},
                  {key: "menuType",         	label: "Type",       align: "center"},
                  {key: "menuUrl",            label: "접근경로",       width: "*",   align: "left" },
                  {key: "useYn",         		label: "사용유무",       align: "center"},
@@ -301,7 +307,6 @@
 
     // 초기화 버튼용
     function initSearch() {
-        $('[data-search]').off("change");   //바인딩기능 오프
         $('.contents.search select, .contents.search input').val("");
         $("#userId_S").val(jwt.userId);
         $("#userNm_S").val(jwt.userNm);
@@ -333,31 +338,8 @@
                 "userId"	: $('#userId_S').val(),
         };
         postAjax("/selectCheckAuthority", paramObj, null, function(data) {
-debugger;
-			var list = data.accessList;
-    		const menuId = $('#menuId_S').val();
-    		for (let i = list.length - 1; i >= 0; i--) {
-				if (menuId) {
-                    if (list[i].upMenuId != menuId) {
-                    	list.splice(i, 1);
-                    }
-				} else{
-					const ynFlag = list[i].saveYn == 'U' ? '' :  list[i].saveYn;
-					if (list[i].menuType == "HTML") {
-						list[i].id = list[i].menuId + list[i].saveYn;
-						list[i].pid = list[i].upMenuId;
-					} else {
-						list[i].id = list[i].menuId;
-						list[i].pid = list[i].upMenuId;
-					}
-					
-				}
-            }
+			var list = buildAuthList(data.accessList);
 
-    		list.push(
-    					{id : 'ROOT', 		pid : '', 		menuId : 'ROOT', upMenuId : '', saveYn : 'Y', menuNm : '전체메뉴'},
-    				);
-            
             excelView.target.setData({
                 list : list,
                 page : {

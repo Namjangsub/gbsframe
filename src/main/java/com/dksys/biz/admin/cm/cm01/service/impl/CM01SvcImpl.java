@@ -1,5 +1,6 @@
 package com.dksys.biz.admin.cm.cm01.service.impl;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -163,11 +164,17 @@ public class CM01SvcImpl implements CM01Svc {
 	{
 
 //		authArray = param.get("authInfo") != null ? param.get("authInfo").toString().split(",") : authArray;
+		if (param == null || param.get("userId") == null || param.get("userId").toString().isEmpty()) {
+			return new ArrayList<>();
+		}
 		Map<String, String> paramMap = new HashMap<>();
 		paramMap.put("userId", param.get("userId").toString());
 		Map<String, String> UserInfo = cm06Mapper.selectUserInfo(paramMap);
+		if (UserInfo == null || UserInfo.get("authInfo") == null || UserInfo.get("authInfo").toString().isEmpty()) {
+			return new ArrayList<>();
+		}
 
-		String[] authArray = UserInfo.get("authInfo") != null ? UserInfo.get("authInfo").toString().split(",") : null;
+		String[] authArray = UserInfo.get("authInfo").toString().split(",");
 		// auth에 해당하는 role 조회
 		List<Map<String, Object>> result = cm01Mapper.selectCheckAuthority(authArray);
 
