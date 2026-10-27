@@ -78,15 +78,15 @@
 								<input type="text" class="input_calendar" id="expendDtTo_S" name="expendDtTo_S" data-search="expendDtTo" autocomplete="off" onkeyup="dateMask(this);" onchange="gridView.setData(0);">
 							</div>
 						</td>
-
 						<th>발의자</th>
 						<td>
 							<div class="search_form">
 								<input type="hidden" id="reqId_S" name="reqId_S" data-search="reqId">
-								<input type="text" id="reqNm_S" name="reqNm_S" readonly onkeyup="if(event.keyCode==8||event.keyCode==46){$('#reqId_S').val('');$('#reqNm_S').val('');}else if(event.keyCode==13){gridView.setData(0);}">
+								<input type="text"	id="reqNm_S" name="reqNm_S" data-search="reqNm" onkeyup="(event.keyCode == 8 || event.keyCode == 46) ? $('#reqId_S').val('') : event.keyCode == 13 ? gridView.setData(0) : '' ">
 								<a onclick="openReqUserSearch();"><i class="i_search_w"></i></a>
 							</div>
 						</td>
+
 
 						<th>지급방법</th>
 						<td>
@@ -276,16 +276,6 @@
 		authChk();
 	});
 
-	// 선택 행 반환
-	function selectedRow() {
-		var row = gridView.target.getList("selected")[0];
-		if (!row) {
-			alert("대상을 선택해 주세요.");
-			return null;
-		}
-		return row;
-	}
-
 	// 검색조건 초기화
 	function initSearch() {
 		$("#coCd_S").val(jwt.coCd);
@@ -298,16 +288,16 @@
 
 	// 지출결의서 등록/수정 모달 오픈
 	function openExpendModal(type) {
-		var row = null;
-		if (type === "U") {
-			row = selectedRow();
-			if (!row) return;
+		var row = gridView.target.getList("selected")[0] || {};
+		if (type === "U" && !row.expendNo) {
+			alert("대상을 선택해 주세요.");
+			return;
 		}
 
 		var paramObj = {
 			actionType: type,
-			coCd: row ? row.coCd : jwt.coCd,
-			expendNo: row ? row.expendNo : ""
+			coCd: type === "U" ? row.coCd : jwt.coCd,
+			expendNo: type === "U" ? row.expendNo : ""
 		};
 
 		openModal("/static/html/admin/cm/cm25/CM2501P01.html", 1100, 850, "", paramObj, function() {
@@ -317,8 +307,11 @@
 
 	// 지출결의서 삭제
 	function deleteExpend() {
-		var row = selectedRow();
-		if (!row) return;
+		var row = gridView.target.getList("selected")[0];
+		if (!row) {
+			alert("대상을 선택해 주세요.");
+			return;
+		}
 
 		if (row.reqId !== jwt.userId) {
 			alert("발의자만 삭제할 수 있습니다.");
@@ -345,8 +338,11 @@
 
 	// 지출결의서 출력
 	function printExpend() {
-		var row = selectedRow();
-		if (!row) return;
+		var row = gridView.target.getList("selected")[0];
+		if (!row) {
+			alert("대상을 선택해 주세요.");
+			return;
+		}
 
 		var arg = "coCd#" + row.coCd + "#expendNo#" + row.expendNo + "#";
 		callReport("CM2501R01.jrf", arg, 1150, 720, "지출결의서");
@@ -389,10 +385,10 @@
 	function openGridColumnEdit() {
 		GridColumnConfig.openEditor("CM2501M01", "first-grid", defaultColumns, function() {
 			if (gridView.target) {
-				var cols = GridColumnConfig.apply("CM2501M01", "first-grid", defaultColumns);
-				gridView.target.config.columns = cols;
-				gridView.target.rePlot();
+				try { gridView.target.destroy(); } catch(e) {}
 			}
+			$('[data-ax5grid="first-grid"]').empty();
+			gridView.initView().setData(0);
 		});
 	}
 </script>
