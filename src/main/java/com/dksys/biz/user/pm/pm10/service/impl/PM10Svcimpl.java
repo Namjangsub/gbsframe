@@ -54,6 +54,7 @@ public class PM10Svcimpl implements PM10Svc {
 			rawDate = paramMap.get("mnDate").replace("-", "");
 		}
 
+		String fileTrgtTyp = "PM1002M11".equals(paramMap.get("pgmId")) ? "PM1002M11" : "PM1002M01";
 		// 모든 부서코드로 파일 조회하여 allFiles 에 모으기
 		List<Map<String, String>> allFiles = new ArrayList<>();
 		for (String deptCode : deptCodes) {
@@ -61,7 +62,7 @@ public class PM10Svcimpl implements PM10Svc {
 			Map<String, String> fileMap = new HashMap<>(paramMap);
 			fileMap.put("comonCd",     "FITR9901");
 			fileMap.put("coCd",       "GUN");
-			fileMap.put("fileTrgtTyp", "PM1002M01");
+			fileMap.put("fileTrgtTyp", fileTrgtTyp);
 			fileMap.put("fileTrgtKey", fileTrgtKey);
 			fileMap.put("jobType",     "fileList");
 
@@ -302,7 +303,7 @@ public class PM10Svcimpl implements PM10Svc {
 			paramMap.put("comonCd",        "FITR05");
 			paramMap.put("coCd",           "GUN");
 			paramMap.put("jobType",        "fileUp");
-			paramMap.put("fileTrgtTyp",    "PM1002M01");
+			paramMap.put("fileTrgtTyp", "PM1002M11".equals(paramMap.get("pgmId")) ? "PM1002M11" : "PM1002M01");
 			paramMap.put("fileTrgtKey",    mRequest.getParameter("fileTrgtKey"));
 			cm15Svc.selectFileAuthCheck(paramMap);
 
