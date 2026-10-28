@@ -3,6 +3,7 @@ package com.dksys.biz.user.am.event;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.net.URLEncoder;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
@@ -19,6 +20,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
 
+import com.dksys.biz.rest.url.service.UrlService;
 import com.dksys.biz.user.am.util.ApprovalSecurityUtil;
 import com.dksys.biz.user.am.queue.service.ApprovalQueueSvc;
 import com.dksys.biz.user.bm.bm18.service.BM18Svc;
@@ -52,6 +54,12 @@ public class ApprovalNotificationEventListener {
     @Autowired(required = false)
     private WB24Svc wb24Svc;
 
+    @Autowired(required = false)
+    private UrlService urlService;
+
+    @Value("${gbs.mobile.base-url:https://gbs.gunyangitt.co.kr}")
+    private String mobileBaseUrl;
+
     /**
      * DB 트랜잭션이 성공적으로 COMMIT된 이후에만 안전하게 비동기 알림을 전송합니다.
      * 알림 발송 중 실패(네트워크 단절 등)가 발생해도 결재 트랜잭션은 롤백되지 않습니다.
@@ -79,9 +87,13 @@ public class ApprovalNotificationEventListener {
                                     event.getDocId(), approvalTodoNo(event), approvalTodoDiv2CodeId(event));
                         }
                     } else {
+                        String plainMessage = "[" + event.getDocNo() + "] 결재 대기 문서가 도착했습니다: " + event.getDocTitle();
+                        if ("PM52".equals(erpBizType)) {
+                            plainMessage = appendPlainShortLink(plainMessage, "PM5102", extraValue(event, "erpBizKey"));
+                        }
                         sendNotification(event.getNextApproverId(), event.getNextApproverNm(),
                                 "[" + event.getDocNo() + "] 결재 대기 문서가 도착했습니다",
-                                "[" + event.getDocNo() + "] 결재 대기 문서가 도착했습니다: " + event.getDocTitle(),
+                                plainMessage,
                                 event.getDocId(), approvalTodoNo(event), approvalTodoDiv2CodeId(event));
                     }
                     sendApplicantOpinionNotification(event, "결재 처리", false);
@@ -350,6 +362,14 @@ public class ApprovalNotificationEventListener {
                 }
             }
 
+            if ("PM07".equals(erpBizType)) {
+                finalMessage = appendApprovalShortLink(finalMessage, "PM07", erpBizKey);
+            } else if ("PM51".equals(erpBizType)) {
+                finalMessage = appendApprovalShortLink(finalMessage, "PM5101", erpBizKey);
+            } else if ("PM08".equals(erpBizType)) {
+                finalMessage = appendApprovalShortLink(finalMessage, "PM08", erpBizKey);
+            }
+
             Map<String, String> logParam = new HashMap<>();
             logParam.put("mssageId", maxMessageId);
             logParam.put("rcvId", event.getNextApproverId());
@@ -425,6 +445,66 @@ public class ApprovalNotificationEventListener {
         } catch (Exception e) {
             logger.warn("[ApprovalNotification] PM07/PM08/CR02 리치 발송 중 예외로 발송하지 않습니다: {}", e.getMessage());
             return false;
+        }
+    }
+
+    /** 알림 본문의 '요청업무 :' 줄 끝에 모바일 결재 단축URL을 덧붙인다. go는 approvalLink.html 업무 키. 실패 시 본문은 그대로 둔다. */
+    private String appendApprovalShortLink(String message, String go, String reqNo) {
+        int requestWorkIndex = message.indexOf("요청업무 :");
+        if (requestWorkIndex < 0) {
+            logger.warn("[ApprovalNotification] {} 알림 본문에 '요청업무 :' 줄이 없어 단축URL을 붙이지 않습니다: reqNo={}", go, reqNo);
+            return message;
+        }
+        String shortUrl = createApprovalShortUrl(go, reqNo);
+        if (shortUrl == null) {
+            return message;
+        }
+        int lineEnd = message.indexOf('\n', requestWorkIndex);
+        if (lineEnd < 0) lineEnd = message.length();
+        if (lineEnd > requestWorkIndex && message.charAt(lineEnd - 1) == '\r') lineEnd--;
+        return message.substring(0, lineEnd) + " / " + shortUrl + message.substring(lineEnd);
+    }
+
+    /** 요청업무 줄이 없는 평문 알림(PM52 복명서 generic 경로)용: 줄이 있으면 그 줄 끝, 없으면 맨 끝 줄바꿈 후 URL을 붙인다. */
+    private String appendPlainShortLink(String message, String go, String reqNo) {
+        if (message.indexOf("요청업무 :") >= 0) {
+            return appendApprovalShortLink(message, go, reqNo);
+        }
+        String shortUrl = createApprovalShortUrl(go, reqNo);
+        if (shortUrl == null) {
+            return message;
+        }
+        return message + "\n" + shortUrl;
+    }
+
+    private String extraValue(ApprovalEvent event, String key) {
+        Object value = event.getExtraInfo() == null ? null : event.getExtraInfo().get(key);
+        return value == null ? "" : String.valueOf(value).trim();
+    }
+
+    private String createApprovalShortUrl(String go, String reqNo) {
+        if (urlService == null || reqNo == null || reqNo.trim().isEmpty()) {
+            return null;
+        }
+        try {
+            String longUrl = mobileBaseUrl + "/static/mobile/index.html?go=" + go + "&reqNo="
+                    + URLEncoder.encode(reqNo, "UTF-8");
+            Map<String, String> urlParam = new HashMap<>();
+            urlParam.put("longUrl", longUrl);
+            urlParam.put("hostAddress", mobileBaseUrl);
+            String shortUrl = urlService.generateShortUrl(urlParam).get("shortUrl");
+            if (shortUrl == null || shortUrl.isEmpty()) {
+                return null;
+            }
+            // 마스킹 규칙(휴대폰/주민번호 형태)에 걸려 단축 코드가 훼손되면 링크를 붙이지 않는다.
+            if (!shortUrl.equals(ApprovalSecurityUtil.maskSensitiveData(shortUrl))) {
+                logger.warn("[ApprovalNotification] 단축URL이 마스킹 규칙에 걸려 링크를 생략합니다: go={}, reqNo={}", go, reqNo);
+                return null;
+            }
+            return shortUrl;
+        } catch (Exception e) {
+            logger.warn("[ApprovalNotification] 단축URL 생성 실패(링크 없이 발송): go={}, reqNo={}, err={}", go, reqNo, e.getMessage());
+            return null;
         }
     }
 

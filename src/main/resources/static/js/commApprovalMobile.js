@@ -241,6 +241,7 @@ function Approval(htmlParam, param, popParam) {
 				var confrmActDngEval = '';
 				//결재라인 read
 				var sameTimeResultChk = this.param.sameTimeResultChk;	// 발주요청서 결재시 해당 건 동시등록여부 체크
+				var viewOnlyMode = this.param.viewOnly === 'Y';	// 완료/반려 건 조회 모드: 결재 행 readonly 유지, 결재 버튼 미노출
 				postAjaxSync("/user/wb/wb20/selectGetApprovalList", this.param, null
 					, function(data){
 						var list = data.resultList;
@@ -295,7 +296,7 @@ function Approval(htmlParam, param, popParam) {
 										if( data.nextSttus=="N") applyBtn = true;
 									}
 									//만족시 버튼 show
-									if( applyBtn == true ) {
+									if( applyBtn == true && !viewOnlyMode ) {
 										approvalParam.todoKey = data.todoKey;
 										approvalParam.sanctnSn = data.sanctnSn;
 										approvalParam.coCd = data.coCd;
@@ -385,7 +386,7 @@ function Approval(htmlParam, param, popParam) {
 				});		//end ajax
 			}
 			this.todoId = todoId;
-			this.applyBtn = applyBtn;
+			this.applyBtn = applyBtn && this.param.viewOnly !== 'Y';
 			//btn control
 			this.applyBtnCtrl();
 			if( this.applyBtn ) {
