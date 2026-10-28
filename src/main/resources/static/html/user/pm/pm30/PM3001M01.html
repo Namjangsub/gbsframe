@@ -3619,16 +3619,12 @@
 			var grossWorkTm = roundTo3(bk > bi ? (bk - bi) : 0);
 			var netWorkTm = roundTo3(grossWorkTm - dedTotal);
 
-			// 출장 + 퇴근 타각 행: 분 단위 시각 기반이므로 근무시간 집계는 소수 둘째자리에서 반올림(소수 첫째자리)
-			// (그 외 행은 기존 30분 단위 절사(floorToStep) 유지)
-			var tripPunchRound = isTripType && !!row.outDttm && /^\d{2}:\d{2}$/.test(punchOutHm || '') && normalizeHHmm(String(row.outDttm).trim()) === punchOutHm;
-			var stepHrs = tripPunchRound
+			// 출장자(설치시운전, 설치장애, A/S(무상), 기타출장):
+			// 근무시간 상세계산(det*)시 분 단위를 반영하여 소수 둘째자리에서 반올림(소수 첫째자리)
+			// 그 외 사내근무인 경우: 기존 30분 단위 절사(floorToStep)로 엄격 계산
+			var stepHrs = isTripType
 				? function(v) { return v > 0 ? Math.round(v * 10) / 10 : 0; }
 				: floorToStep;
-			if (tripPunchRound) {
-				grossWorkTm = Math.round(grossWorkTm * 10) / 10;
-				netWorkTm = Math.round(netWorkTm * 10) / 10;
-			}
 
 			row.dedEarly = roundTo3(dedEarly);
 			row.dedLunch = roundTo3(dedLunch);
@@ -3692,9 +3688,11 @@
 			var cats = { inhouse: {dayCnt:0,normal:0,ot:0,night:0}, install: {dayCnt:0,normal:0,ot:0,night:0}, fault: {dayCnt:0,normal:0,ot:0,night:0}, asFree: {dayCnt:0,normal:0,ot:0,night:0}, etcTrip: {dayCnt:0,normal:0,ot:0,night:0} };
 			if (category && cats[category]) {
 				cats[category].dayCnt = detDayCnt;
-				cats[category].normal = clsNormal;
-				cats[category].ot = clsOt;
-				cats[category].night = clsNight;
+				// 출장 계열(설치시운전/설치장애/A/S(무상)/기타출장) 집계는 소수 둘째자리에서 반올림(소수 첫째자리)
+				var tripCatRound = (category !== 'inhouse') ? function(v) { return Math.round(v * 10) / 10; } : function(v) { return v; };
+				cats[category].normal = tripCatRound(clsNormal);
+				cats[category].ot = tripCatRound(clsOt);
+				cats[category].night = tripCatRound(clsNight);
 			}
 			row.inhouseDayCnt = cats.inhouse.dayCnt; row.inhouseNormal = roundTo3(cats.inhouse.normal); row.inhouseOt = roundTo3(cats.inhouse.ot); row.inhouseNight = roundTo3(cats.inhouse.night);
 			row.installDayCnt = cats.install.dayCnt; row.installNormal = roundTo3(cats.install.normal); row.installOt = roundTo3(cats.install.ot); row.installNight = roundTo3(cats.install.night);
