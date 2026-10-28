@@ -164,7 +164,6 @@
 	</div>
 </div>
 
-<script src="/static/js/jquery.blockUI.js"></script>
 <script src="/static/js/fileTree.js"></script>
 <script src="/static/js/commApproval.js"></script>
 
@@ -172,19 +171,6 @@
 	var actionType = "";
 	var expendNo = "";
 	var fileParam = {};
-	var saving = false;
-
-	// 결재선 그리드 공통 컬럼 설정
-	var approvalColumns = [
-		{key: "gb",          label: "구분",     align: "center", width: 50},
-		{key: "sanctnSn",    label: "순번",     align: "center", width: 45},
-		{key: "usrNm",       label: "ID",       hidden: true},
-		{key: "name",        label: "성명",     align: "center", width: 75},
-		{key: "jik",         label: "직위",     align: "center", width: 65},
-		{key: "todoCfDt",    label: "확인일자", align: "center", width: 85},
-		{key: "todoCfOpn",   label: "확인의견", align: "left",   width: "*"},
-		{key: "sanctnSttus", label: "상태",     hidden: true}
-	];
 
 	// 발의부서 결재 그리드
 	var gridViewPop = {
@@ -204,7 +190,16 @@
 						this.self.select(this.dindex);
 					}
 				},
-				columns: approvalColumns
+				columns: [
+					{key: "gb",          label: "구분",     align: "center", width: 50},
+					{key: "sanctnSn",    label: "순번",     align: "center", width: 45},
+					{key: "usrNm",       label: "ID",       hidden: true},
+					{key: "name",        label: "성명",     align: "center", width: 75},
+					{key: "jik",         label: "직위",     align: "center", width: 65},
+					{key: "todoCfDt",    label: "확인일자", align: "center", width: 85},
+					{key: "todoCfOpn",   label: "확인의견", align: "left",   width: "*"},
+					{key: "sanctnSttus", label: "상태",     hidden: true}
+				]
 			});
 			return this;
 		},
@@ -232,7 +227,16 @@
 						this.self.select(this.dindex);
 					}
 				},
-				columns: approvalColumns
+				columns: [
+					{key: "gb",          label: "구분",     align: "center", width: 50},
+					{key: "sanctnSn",    label: "순번",     align: "center", width: 45},
+					{key: "usrNm",       label: "ID",       hidden: true},
+					{key: "name",        label: "성명",     align: "center", width: 75},
+					{key: "jik",         label: "직위",     align: "center", width: 65},
+					{key: "todoCfDt",    label: "확인일자", align: "center", width: 85},
+					{key: "todoCfOpn",   label: "확인의견", align: "left",   width: "*"},
+					{key: "sanctnSttus", label: "상태",     hidden: true}
+				]
 			});
 			return this;
 		},
@@ -276,11 +280,11 @@
 		// 등록 / 수정 모드 분기
 		if (actionType === "C") {
 			initCreate();
-			$("#actionBtn").text("등록").on("click", saveExpend);
+			$("#actionBtn").text("등록").on("click", insertExpend);
 		} else {
 			$('.tit').text('지출결의서 수정')
 			selectExpendInfo();
-			$("#actionBtn").text("수정").on("click", saveExpend);
+			$("#actionBtn").text("수정").on("click", updateExpend);
 			$("#reportBtn").show();
 			if (actionType === "S" || actionType === "T") {
 				setReadOnly();
@@ -607,53 +611,67 @@
 	function addApprovalUser(which) {
 		var holder = (which === 1) ? gridViewPop : gridViewPop2;
 		var list = holder.target.getList() || [];
+		var approvalGrid = [];
+		var shareGrid = [];
+
+		$.each(list, function(i, item) {
+			var row = {
+				gb: item.gb,
+				id: item.usrNm,
+				text: item.name,
+				parent: item.jik,
+				deptNm: item.dtNm,
+				telNo: item.telNo,
+				email: item.email
+			};
+			if (item.gb === "공유") {
+				shareGrid.push(row);
+			} else {
+				approvalGrid.push(row);
+			}
+		});
 
 		var paramObj = {
 			coCd: $("#coCd").val(),
 			useYn: "Y",
 			userId: jwt.userId,
 			userNm: jwt.userNm,
-			approvalGrid: $.grep(list, function(x) { return x.gb === "결재"; }).map(userModalRow),
-			shareGrid: $.grep(list, function(x) { return x.gb === "공유"; }).map(userModalRow)
+			approvalGrid: approvalGrid,
+			shareGrid: shareGrid
 		};
 
 		openSecondModal("/static/html/cmn/modal/userLstSearch.html", 900, 500, "결재 및 공유 대상자 검색", paramObj, function(app, share) {
 			var rows = [];
 			$.each(app.target.list || [], function(i, x) {
-				rows.push(fromUserModal(x, "결재", rows.length + 1));
+				rows.push({
+					gb: "결재",
+					sanctnSn: rows.length + 1,
+					usrNm: x.id,
+					name: x.text,
+					jik: x.parent,
+					dtNm: x.deptNm,
+					telNo: x.telNo,
+					email: x.email,
+					coCd: $("#coCd").val(),
+					creatDttm: moment().format("YYYY-MM-DD")
+				});
 			});
 			$.each(share.target.list || [], function(i, x) {
-				rows.push(fromUserModal(x, "공유", i + 1));
+				rows.push({
+					gb: "공유",
+					sanctnSn: i + 1,
+					usrNm: x.id,
+					name: x.text,
+					jik: x.parent,
+					dtNm: x.deptNm,
+					telNo: x.telNo,
+					email: x.email,
+					coCd: $("#coCd").val(),
+					creatDttm: moment().format("YYYY-MM-DD")
+				});
 			});
 			holder.setData2(rows);
 		});
-	}
-
-	function userModalRow(x) {
-		return {
-			gb: x.gb,
-			id: x.usrNm,
-			text: x.name,
-			parent: x.jik,
-			deptNm: x.dtNm,
-			telNo: x.telNo,
-			email: x.email
-		};
-	}
-
-	function fromUserModal(x, gb, sn) {
-		return {
-			gb: gb,
-			sanctnSn: sn,
-			usrNm: x.id,
-			name: x.text,
-			jik: x.parent,
-			dtNm: x.deptNm,
-			telNo: x.telNo,
-			email: x.email,
-			coCd: $("#coCd").val(),
-			creatDttm: moment().format("YYYY-MM-DD")
-		};
 	}
 
 	// 결재자/공유자 행 삭제
@@ -669,6 +687,10 @@
 
 	// 저장용 FormData 생성 및 유효성 검증
 	function makeFormData() {
+		if (!inputValidation($('.popup_area [required]'))) {
+			return false;
+		}
+
 		var pmntDivs = [];
 		$('input[name="pmntDivChk"]:checked').each(function() {
 			pmntDivs.push(this.value);
@@ -678,10 +700,6 @@
 			return false;
 		}
 		$("#pmntDiv").val(pmntDivs.join(","));
-
-		if (!inputValidation($(".popup_area [required]"))) {
-			return false;
-		}
 
 		var firstRows = gridViewPop.target.getList() || [];
 		var firstApproval = $.grep(firstRows, function(x) { return x.gb === "결재"; });
@@ -716,9 +734,73 @@
 		fd.set("atchDocDiv", docs.join(","));
 		fd.set("atchDocEtc", $("#atchDocDivEtc").is(":checked") ? $.trim($("#atchDocEtc").val()) : "");
 
-		// 결재선 데이터 추가
-		appendApproval(fd, firstRows, "rowSharngListArr", "rowApprovalListArr");
-		appendApproval(fd, gridViewPop2.target.getList() || [], "rowSharngListArr2", "rowApprovalListArr2");
+		// 발의부서 결재 및 공유
+		var approvalArr = [];
+		var shareSn = 0;
+		var approvalSn = 0;
+		$.each(firstRows, function(i, item) {
+			var row = $.extend({}, item);
+			var isShare = (row.gb === "공유");
+			var todoId = row.usrNm || row.todoId;
+			row.coCd = row.coCd || $("#coCd").val();
+			row.todoCoCd = $("#coCd").val();
+			row.todoId = todoId;
+			row.usrNm = todoId;
+			row.sanctnSn = isShare ? ++shareSn : ++approvalSn;
+			row.todoDiv1CodeId = isShare ? "TODODIV10" : "TODODIV20";
+			row.todoDiv2CodeId = isShare ? "TODODIV1202" : "TODODIV2202";
+			row.sanctnSttus = row.sanctnSttus || "N";
+			row.salesCd = $("#expendNo").val();
+			row.todoNo = $("#expendNo").val();
+			row.todoFileTrgtKey = $("#expendNo").val();
+			row.pgmId = "CM2501P01";
+			row.pgPath = "admin/cm/cm25/CM2501P01.html";
+			row.userId = jwt.userId;
+			row.todoTitl = "지출결의 발의부서 " + (isShare ? "공유" : "결재");
+			row.todoTitle = row.todoTitl;
+			row.todoCodeKind = row.todoCodeKind || "";
+			row.todoCodeId = row.todoCodeId || "";
+			row.pgParam = JSON.stringify({
+				actionType: isShare ? "T" : "S",
+				coCd: $("#coCd").val(),
+				expendNo: $("#expendNo").val()
+			});
+			approvalArr.push(row);
+		});
+
+		// 관리부서 결재 및 공유
+		shareSn = 0;
+		approvalSn = 0;
+		$.each(gridViewPop2.target.getList() || [], function(i, item) {
+			var row = $.extend({}, item);
+			var isShare = (row.gb === "공유");
+			var todoId = row.usrNm || row.todoId;
+			row.coCd = row.coCd || $("#coCd").val();
+			row.todoCoCd = $("#coCd").val();
+			row.todoId = todoId;
+			row.usrNm = todoId;
+			row.sanctnSn = isShare ? ++shareSn : ++approvalSn;
+			row.todoDiv1CodeId = isShare ? "TODODIV10" : "TODODIV20";
+			row.todoDiv2CodeId = isShare ? "TODODIV1203" : "TODODIV2204";
+			row.sanctnSttus = row.sanctnSttus || "N";
+			row.salesCd = $("#expendNo").val();
+			row.todoNo = $("#expendNo").val();
+			row.todoFileTrgtKey = $("#expendNo").val();
+			row.pgmId = "CM2501P01";
+			row.pgPath = "admin/cm/cm25/CM2501P01.html";
+			row.userId = jwt.userId;
+			row.todoTitl = "지출결의 관리부서 " + (isShare ? "공유" : "결재");
+			row.todoTitle = row.todoTitl;
+			row.todoCodeKind = row.todoCodeKind || "";
+			row.todoCodeId = row.todoCodeId || "";
+			row.pgParam = JSON.stringify({
+				actionType: isShare ? "T" : "S",
+				coCd: $("#coCd").val(),
+				expendNo: $("#expendNo").val()
+			});
+			approvalArr.push(row);
+		});
+		fd.set("approvalArr", JSON.stringify(approvalArr));
 
 		// 첨부파일 데이터 추가
 		var arr = [];
@@ -745,44 +827,34 @@
 		return fd;
 	}
 
-	// 결재 및 공유 리스트 분리 추가
-	function appendApproval(fd, list, shareKey, approvalKey) {
-		var s = [];
-		var a = [];
-		$.each(list, function(i, x) {
-			var r = $.extend({}, x);
-			r.todoId = r.usrNm;
-			if (r.gb === "공유") {
-				s.push(r);
-			} else {
-				a.push(r);
+	// 등록
+	function insertExpend() {
+		if (inputValidation($('.popup_area [required]'))) {
+			var formData = makeFormData();
+			if (formData) {
+				filePostAjax("/admin/cm/cm25/insertExpend", formData, function(data) {
+					if (data.resultCode == 200) {
+						modalStack.last().callback("1");
+						modalStack.close();
+					}
+				});
 			}
-		});
-		fd.set(shareKey, JSON.stringify(s));
-		fd.set(approvalKey, JSON.stringify(a));
+		}
 	}
 
-	// 지출결의서 저장 처리
-	function saveExpend() {
-		if (saving) return;
-
-		var fd = makeFormData();
-		if (!fd) return;
-
-		saving = true;
-		$.blockUI({message: "<h4>저장 중입니다.</h4>"});
-
-		var url = (actionType === "C") ? "/admin/cm/cm25/insertExpend" : "/admin/cm/cm25/updateExpend";
-
-		filePostAjax(url, fd, function(data) {
-			alert(data.resultMessage);
-			if (data.resultCode === 200) {
-				modalStack.last().callback("1");
-				modalStack.close();
+	// 수정
+	function updateExpend() {
+		if (inputValidation($('.popup_area [required]'))) {
+			var formData = makeFormData();
+			if (formData) {
+				filePostAjax("/admin/cm/cm25/updateExpend", formData, function(data) {
+					if (data.resultCode == 200) {
+						modalStack.last().callback("1");
+						modalStack.close();
+					}
+				});
 			}
-			saving = false;
-			$.unblockUI();
-		});
+		}
 	}
 
 	// 지출결의서 출력

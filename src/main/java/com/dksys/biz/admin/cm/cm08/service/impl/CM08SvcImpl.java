@@ -790,7 +790,7 @@ public class CM08SvcImpl implements CM08Svc {
         
         // 즉시 반환 그룹 1: coCd만 관리 → coCd 외 나머지 공란
         if (anyEqualsIgnoreCase(typ,
-                "BM0501P01","TB_BM99P01","TB_CM09M01","TB_CM14M01","PM1002M01","CM1601M01")) {
+                 "BM0501P01","TB_BM99P01","TB_CM09M01","TB_CM14M01","PM1002M01","PM1002M11","CM1601M01","CM2501P01")) {
             Map<String, String> out = outMap();
             fillOut(out,
                     nz(paramMap,"coCd"), null, null,
