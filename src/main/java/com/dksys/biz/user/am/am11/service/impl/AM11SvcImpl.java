@@ -309,20 +309,7 @@ public class AM11SvcImpl implements AM11Svc {
         am11Mapper.insertApprovalHist(paramMap);
         writeAudit(paramMap, paramMap, "SUBMIT", "결재 상신");
 
-        // 1차 결재자 알림 큐(TB_AM91M01) 영속 적재
-        try {
-            Map<String, Object> notifParam = new HashMap<>();
-            notifParam.put("docId", docId);
-            notifParam.put("eventType", "SUBMIT");
-            notifParam.put("receiverId", paramMap.get("currApproverId"));
-            notifParam.put("receiverNm", paramMap.get("currApproverNm"));
-            notifParam.put("notifChannel", "KAKAO");
-            notifParam.put("notifTitle", "[" + paramMap.get("docNo") + "] 결재 대기 문서가 도착했습니다");
-            notifParam.put("notifMsg", paramMap.get("draUserNm") + "님이 결재를 상신하였습니다: " + paramMap.get("docTitle"));
-            enqueueApprovalNotification(notifParam, paramMap);
-        } catch (Exception ne) {
-            logger.warn("상신 알림 큐 적재 경고: docId={}", docId, ne);
-        }
+        // 1차 결재자 알림은 ApprovalNotificationEventListener(SUBMIT, 템플릿 10009)가 발송하므로 평문 중복 적재 제외
 
         // 협조(COOP) 대상자 알림 큐 적재: 협조는 비구속 병렬이라 상신 즉시 PENDING으로 개방되므로
         // 1차 결재자와 별도로 협조 요청 알림톡을 함께 발송한다. (completedBySource면 개방 대상 없음)
@@ -667,9 +654,25 @@ public class AM11SvcImpl implements AM11Svc {
                 }
             }
 
+            // 안전장치: 메모리 판정은 미승인인데 DB 에는 미처리(READY/PENDING) 구속 라인이 하나도 없으면
+            // 실제로는 모든 라인이 승인된 것이다(메모리 라인 상태 불일치). 이 경우 완료 판정을 이어서 진행한다.
+            // (아래 L729 의 '미승인 구속 라인 여부 확인' 과 같은 기준을 사용한다.)
+            if (!allApproved && am11Mapper.selectPendingBindingLineCount(paramMap) == 0) {
+                logger.warn("결재 단계 메모리 판정과 DB 불일치(DB 미처리 구속 라인 0건) - 완료 판정으로 보정: docId={}, actingSeq={}, stepHeadSeq={}", docId, actingSeq, stepHeadSeq);
+                allApproved = true;
+            }
+
             if (!allApproved) {
                 // 미승인 라인 남음: PROGRESS 유지, 단계 헤드로 currLineSeq 보존
                 nextDocStatus = "PROGRESS";
+                if (logger.isInfoEnabled()) {
+                    StringBuilder stepInfo = new StringBuilder();
+                    for (Map<String, Object> member : stepMembers) {
+                        stepInfo.append("[seq=").append(member.get("lineSeq")).append(",type=").append(lineTypeOf(member))
+                                .append(",status=").append(member.get("lineStatus")).append(",approver=").append(member.get("approverId")).append("]");
+                    }
+                    logger.info("결재 단계 잔여 대기 판정: docId={}, actingSeq={}, stepHeadSeq={}, members={}", docId, actingSeq, stepHeadSeq, stepInfo);
+                }
                 resultMap.put("resultMessage", "처리되었습니다. 잔여 결재/합의자 대기 중입니다.");
                 Map<String, Object> docStatusParam = new HashMap<>(paramMap);
                 docStatusParam.put("nextStatus", nextDocStatus);
@@ -856,8 +859,13 @@ public class AM11SvcImpl implements AM11Svc {
             }
 
             try {
+                Object firstApproverId = openedLines.get(0).get("approverId");
                 for (Map<String, Object> line : openedLines) {
                     boolean isCoopLine = "COOP".equals(lineTypeOf(line));
+                    // 리스너 APPROVE_NEXT 이벤트가 firstLine 에게 10009 로 발송하므로 평문 중복 적재 제외
+                    if (!isCoopLine && firstApproverId != null && firstApproverId.equals(line.get("approverId"))) {
+                        continue;
+                    }
                     Map<String, Object> notifParam = new HashMap<>();
                     notifParam.put("docId", docId);
                     notifParam.put("eventType", "APPROVE_NEXT");
@@ -2026,8 +2034,13 @@ public class AM11SvcImpl implements AM11Svc {
             source.put("docTitle", docTitle);
 
             try {
+                Object firstApproverId = newlyOpened.get(0).get("approverId");
                 for (Map<String, Object> line : newlyOpened) {
                     boolean isCoopLine = "COOP".equals(lineTypeOf(line));
+                    // 리스너 APPROVE_NEXT 이벤트가 first 에게 10009 로 발송하므로 평문 중복 적재 제외
+                    if (!isCoopLine && firstApproverId != null && firstApproverId.equals(line.get("approverId"))) {
+                        continue;
+                    }
                     Map<String, Object> notifParam = new HashMap<>();
                     notifParam.put("docId", docId);
                     notifParam.put("eventType", "APPROVE_NEXT");

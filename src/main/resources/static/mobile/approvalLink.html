@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<link rel="icon" href="/static/favicon.ico" type="image/x-icon">
+	<script src="/static/js/jquery-3.5.1.min.js"></script>
+	<script src="/static/js/global.js"></script>
+</head>
+<body>
+<script type="text/javascript">
+	// go: 알림 단축URL의 업무 키. div2Codes: 대상 결재구분. isMyTurn: 미결 행이 '지금 내 차례'인지.
+	// overrideParam: PM07만 M08 휴가 분기의 paramObj 보정을 적용한다(PM51은 M08 base paramObj 그대로).
+	// generalDiv2Of: 관리부서 결재구분 -> 선행 신청부서 결재구분(선행 전원 승인 후에만 미결 진입).
+	function isPm51MyTurn(row) {
+		// 관리부서 1·2번은 병행(2번은 1번 미승인이어도 가능), 3번 이상은 앞 순번 전원 승인 필요
+		if ((row.todoDiv2CodeId === "TODODIV2191" || row.todoDiv2CodeId === "TODODIV2201") && Number(row.sanctnSn) <= 2) return true;
+		return Number(row.beforeNotConfirm || 0) === 0;
+	}
+
+	var APPROVAL_LINK_ROUTES = {
+		"PM07": {
+			detailUrl: "/static/mobile/html/user/pm/pm07/PM0701P01_M.html",
+			div2Codes: ["TODODIV2300", "TODODIV1300"],
+			overrideParam: true,
+			isMyTurn: function (row) { return Number(row.beforeNotConfirm || 0) === 0; }
+		},
+		"PM5101": {
+			detailUrl: "/static/mobile/html/user/pm/pm51/PM5101P01_M.html",
+			div2Codes: ["TODODIV2190", "TODODIV2191"],
+			generalDiv2Of: { "TODODIV2191": "TODODIV2190" },
+			isMyTurn: isPm51MyTurn
+		},
+		// PM08: 신청(2410)·결과(2420)가 같은 reqNo를 쓰며, 결과 결재는 신청 결재 완료 후에만 진입(WB20 validate와 동일 순서)
+		"PM08": {
+			detailUrl: "/static/mobile/html/user/pm/pm08/PM0801P01_M.html",
+			div2Codes: ["TODODIV2410", "TODODIV2420"],
+			generalDiv2Of: { "TODODIV2420": "TODODIV2410" },
+			overrideParam: true,
+			isMyTurn: function (row) { return Number(row.beforeNotConfirm || 0) === 0; }
+		},
+		"PM5102": {
+			detailUrl: "/static/mobile/html/user/pm/pm51/PM5102P01_M.html",
+			div2Codes: ["TODODIV2200", "TODODIV2201"],
+			generalDiv2Of: { "TODODIV2201": "TODODIV2200" },
+			isMyTurn: isPm51MyTurn
+		}
+	};
+	var APPROVAL_LIST_URL = "/static/mobile/admin/cm/cm11/M08.html";
+	var LOGIN_URL = "/static/mobile/index.html";
+	var MSG_NOT_FOUND = "존재하지 않거나 삭제된 문서이거나 내 결재 문서가 아닙니다.";
+	var MSG_NOT_MY_TURN = "아직 결재 차례가 아닙니다. 이전 결재자의 결재가 완료된 후 결재할 수 있습니다.";
+
+	$(function () {
+		var pending = readPendingLink();
+		if (!localStorage.getItem("access_token")) {
+			if (pending) {
+				sessionStorage.setItem("pendingLink", JSON.stringify(pending));
+			}
+			location.replace(LOGIN_URL);
+			return;
+		}
+		if (!pending) {
+			location.replace(APPROVAL_LIST_URL);
+			return;
+		}
+		sessionStorage.setItem("pendingLink", JSON.stringify(pending));
+		selectApprovalByLink(pending);
+	});
+
+	function readPendingLink() {
+		var qs = new URLSearchParams(location.search);
+		var link = null;
+		if (qs.get("go") && qs.get("reqNo")) {
+			link = { go: qs.get("go"), reqNo: qs.get("reqNo") };
+		} else {
+			try {
+				link = JSON.parse(sessionStorage.getItem("pendingLink"));
+			} catch (e) {
+				link = null;
+			}
+		}
+		if (!link || !link.reqNo || !APPROVAL_LINK_ROUTES[link.go]) {
+			return null;
+		}
+		return link;
+	}
+
+	// 호출 2회: ① 결재선 전체(selectGetApprovalList: 반려 여부·관리부서 선행 판정)
+	//          ② 내 목록 전체(M08selectToDoList, 상태 조건 없음: 상세 paramObj 원천·beforeNotConfirm)
+	// 판정 순서:
+	//   a) 결재선 중 하나라도 APPR_REJECT_YN='Y'면 반려 문서 → 내가 결재선에 있으면 조회 모드, 없으면 안내
+	//   b) 내 미결 행이 지금 내 차례(+선행 단계 완료)면 결재 모드
+	//   c) 내 완료(Y) 행이면 조회 모드
+	//   d) 내 미결 행이 있으나 차례 아님 → 안내 후 결재함
+	//   e) 그 외 → 존재하지 않음/내 문서 아님 안내 후 결재함
+	function selectApprovalByLink(pending) {
+		var route = APPROVAL_LINK_ROUTES[pending.go];
+		var lineParam = { todoNo: pending.reqNo, todoDiv2CodeIds: route.div2Codes.join(",") };
+		postAjax("/user/wb/wb20/selectGetApprovalList", lineParam, null, function (lineData) {
+			var lines = $.grep(lineData.resultList || [], function (r) {
+				return r.todoDiv1CodeId === "TODODIV20" && route.div2Codes.indexOf(r.todoDiv2CodeId) > -1;
+			});
+			postAjax("/user/wb/wb20/M08selectToDoList", buildListParam(pending.reqNo), null, function (listData) {
+				sessionStorage.removeItem("pendingLink");
+				decideApproval(pending, route, lines, listData.resultList || []);
+			});
+		});
+	}
+
+	function decideApproval(pending, route, lines, myAllRows) {
+		var mine = $.grep(myAllRows, function (r) {
+			return String(r.todoNo) === String(pending.reqNo)
+				&& r.todoDiv1CodeId === "TODODIV20"
+				&& route.div2Codes.indexOf(r.todoDiv2CodeId) > -1;
+		});
+
+		// a) 반려 문서: 내가 결재선에 있으면 조회 모드로 연다(승인 버튼 노출 여부는 상세화면 확인 결과를 보고 참고)
+		if (hasRejectedLine(lines)) {
+			if (mine.length > 0) {
+				openApprovalDetail(mine[0], route, true);
+				return;
+			}
+			alertAndBack(MSG_NOT_FOUND);
+			return;
+		}
+
+		// b) 지금 내 차례 미결 건 → 결재 모드 (관리부서는 선행 신청부서 전원 승인 필요)
+		var turnRow = $.grep(mine, function (r) { return r.sanctnSttus === "N" && route.isMyTurn(r); })[0];
+		if (turnRow && isGeneralDone(turnRow, route, lines)) {
+			openApprovalDetail(turnRow, route);
+			return;
+		}
+
+		// c) 내가 이미 처리한 완료 건 → 조회 모드
+		var doneRow = $.grep(mine, function (r) { return r.sanctnSttus === "Y"; })[0];
+		if (doneRow) {
+			openApprovalDetail(doneRow, route, true);
+			return;
+		}
+
+		// d) 미결이지만 차례 아님
+		if ($.grep(mine, function (r) { return r.sanctnSttus === "N"; }).length > 0) {
+			alertAndBack(MSG_NOT_MY_TURN);
+			return;
+		}
+
+		// e) 내 결재선에 없음
+		alertAndBack(MSG_NOT_FOUND);
+	}
+
+	function alertAndBack(message) {
+		alert(message);
+		location.replace(APPROVAL_LIST_URL);
+	}
+
+	function hasRejectedLine(lines) {
+		for (var i = 0; i < lines.length; i++) {
+			if (lines[i].apprRejectYn === "Y") return true;
+		}
+		return false;
+	}
+
+	// 관리부서 행이면 선행 신청부서 결재선(결재선 조회 결과 재사용) 전원 승인 여부. 신청부서 행은 항상 true.
+	function isGeneralDone(row, route, lines) {
+		var generalDiv2 = route.generalDiv2Of ? route.generalDiv2Of[row.todoDiv2CodeId] : null;
+		if (!generalDiv2) return true;
+		return isAllApproved($.grep(lines, function (r) { return r.todoDiv2CodeId === generalDiv2; }));
+	}
+
+	function buildListParam(reqNo) {
+		return {
+			"salesMngId"  : jwt.userId,
+			"boardParam"  : "",
+			"sanctnSttus" : "",
+			"todoNo"      : reqNo,
+			"pageNo"      : 1,
+			"recordCnt"   : 999999999
+		};
+	}
+
+	// viewOnly: 완료(Y)·반려 건 조회 모드. 결재 모드(내 차례) 진입에서는 넘기지 않는다.
+	function openApprovalDetail(row, route, viewOnly) {
+		var paramObj = buildApprovalParam(row, route);
+		if (viewOnly) paramObj.viewOnly = "Y";
+		paramObj.fromLink = "Y";
+		sessionStorage.removeItem("pendingLink");
+		sessionStorage.setItem("paramObj", JSON.stringify(paramObj));
+		insertPgmHistory(route.detailUrl);
+		location.replace(route.detailUrl);
+	}
+
+	function isAllApproved(rows) {
+		if (rows.length === 0) return false;
+		for (var i = 0; i < rows.length; i++) {
+			if (!(rows[i].sanctnSttus === "Y" || $.trim(rows[i].todoCfDt || ""))) return false;
+		}
+		return true;
+	}
+
+	// M08.html openSecondModal과 동일한 base paramObj 구성 (go별 보정은 route.overrideParam일 때만 적용)
+	function buildApprovalParam(row, route) {
+		var paramObj = {
+			"fileTrgtKey" : row.todoFileTrgtKey,
+			"coCd"        : jwt.coCd,
+			"userId"      : jwt.userId,
+			"rsltNo"      : row.todoNo,
+			"pgmId"       : row.creatPgm
+		};
+		if (row.todoFileTrgtKey > 0 || row.todoFileTrgtKey != '') {
+			$.each(row, function (key, val) {
+				if (typeof (val) == "undefined") val = "";
+				paramObj[key] = val;
+			});
+		}
+		if (route.overrideParam) {
+			paramObj.actionType = "A";
+			paramObj.reqNo = row.todoNo || row.todoFileTrgtKey;
+			paramObj.pgmId = "M08";
+			paramObj.todoDiv1CodeId = row.todoDiv1CodeId || "TODODIV20";
+			paramObj.todoDiv2CodeId = row.todoDiv2CodeId || "TODODIV2300";
+			paramObj.sanctnSn = row.sanctnSn;
+		}
+		return paramObj;
+	}
+</script>
+</body>
+</html>

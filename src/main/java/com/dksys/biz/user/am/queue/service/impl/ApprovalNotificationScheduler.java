@@ -19,10 +19,9 @@ public class ApprovalNotificationScheduler {
 
     @Scheduled(fixedDelayString = "${approval.notification.queue.fixed-delay-ms:30000}")
     public void processNotificationQueue() {
-        // EVENT 모드에서는 스케줄러 폴링을 비활성화한다(이벤트 커밋 후 리스너가 즉시 큐를 드레인).
-        if (!"SCHEDULER".equalsIgnoreCase(dispatchMode)) {
-            return;
-        }
+        // 신규 알림은 결재 이벤트 발생 즉시 리스너가 직접 발송한다(dispatch-mode 와 무관).
+        // 큐에는 일시 오류로 실패한 재시도 건만 쌓이므로, 다음 결재 이벤트를 기다리지 않고 재시도 시각이 되면 모든 모드에서 폴링해 재발송한다.
+        // (kakaoSend=false 이면 큐 적재 자체가 없고, 남은 행은 실행기가 SKIPPED 로 종료한다.)
         approvalQueueSvc.retryPendingNotifications();
     }
 }

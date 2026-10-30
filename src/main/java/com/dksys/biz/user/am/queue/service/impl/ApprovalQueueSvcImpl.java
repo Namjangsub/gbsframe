@@ -7,10 +7,12 @@ import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.dksys.biz.user.am.am11.mapper.AM11Mapper;
+import com.dksys.biz.user.am.notification.Kakao10009MessageBuilder;
 import com.dksys.biz.user.am.queue.service.ApprovalQueueSvc;
 import com.dksys.biz.user.am.queue.service.impl.ApprovalQueueItemExecutor.ExecutionResult;
 import com.dksys.biz.user.am.util.ApprovalSecurityUtil;
@@ -27,18 +29,43 @@ public class ApprovalQueueSvcImpl implements ApprovalQueueSvc {
     @Autowired
     private ApprovalQueueItemExecutor itemExecutor;
 
+    // 알림톡 실발송 사용 여부(application.yml kakaoSend). false 면 알림을 큐에 적재하지 않는다.
+    @Value("${kakaoSend:false}")
+    private boolean kakaoSend;
+
     @Override
     public Map<String, Object> enqueueNotification(Map<String, Object> paramMap) {
         Map<String, Object> resultMap = new HashMap<>();
+        if (!kakaoSend) {
+            // 발송 비활성 환경: READY 로 쌓아 두면 나중에 kakaoSend=true 로 바꿀 때 밀린 알림이 한꺼번에 발송되므로 적재 자체를 하지 않는다(발송 대상 제외).
+            logger.info("알림 큐 적재 제외(kakaoSend=false): docId={}, receiverId={}, eventType={}",
+                    paramMap.get("docId"), paramMap.get("receiverId"), paramMap.get("eventType"));
+            resultMap.put("resultCode", "200");
+            resultMap.put("skipped", true);
+            resultMap.put("resultMessage", "kakaoSend=false: 발송 대상에서 제외되어 적재하지 않았습니다.");
+            return resultMap;
+        }
         try {
-            // 민감정보 사전 마스킹
-            if (paramMap.containsKey("notifTitle") && paramMap.get("notifTitle") != null) {
-                paramMap.put("notifTitle", ApprovalSecurityUtil.maskSensitiveData(String.valueOf(paramMap.get("notifTitle"))));
-            }
-            if (paramMap.containsKey("notifMsg") && paramMap.get("notifMsg") != null) {
-                paramMap.put("notifMsg", ApprovalSecurityUtil.maskSensitiveData(String.valueOf(paramMap.get("notifMsg"))));
+            // 민감정보 사전 마스킹 (10009 는 변수 값이 Kakao10009MessageBuilder.safe() 에서 이미 마스킹되므로 원문 유지)
+            if (!Kakao10009MessageBuilder.TMPLAT_DIV.equals(paramMap.get("tmplatDiv"))) {
+                if (paramMap.containsKey("notifTitle") && paramMap.get("notifTitle") != null) {
+                    paramMap.put("notifTitle", ApprovalSecurityUtil.maskSensitiveData(String.valueOf(paramMap.get("notifTitle"))));
+                }
+                if (paramMap.containsKey("notifMsg") && paramMap.get("notifMsg") != null) {
+                    paramMap.put("notifMsg", ApprovalSecurityUtil.maskSensitiveData(String.valueOf(paramMap.get("notifMsg"))));
+                }
             }
             am11Mapper.insertNotificationQueue(paramMap);
+            Object retryCnt = paramMap.get("retryCnt");
+            if (retryCnt != null && Integer.parseInt(String.valueOf(retryCnt).trim()) >= 1) {
+                // 일시 오류 재시도 적재는 READY 로 두면 같은 드레인에서 즉시 재발송된다. FAIL 로 바꿔 지수 백오프(NEXT_TRY_DTTM)를 건다.
+                Map<String, Object> backoffParam = new HashMap<>();
+                backoffParam.put("notifId", paramMap.get("notifId"));
+                backoffParam.put("notifStatus", "FAIL");
+                backoffParam.put("retryCnt", retryCnt);
+                backoffParam.put("errMsg", "일시 오류 재시도 대기");
+                am11Mapper.updateNotificationQueueStatus(backoffParam);
+            }
             resultMap.put("resultCode", "200");
             resultMap.put("notifId", paramMap.get("notifId"));
             resultMap.put("resultMessage", "알림이 큐에 성공적으로 적재되었습니다.");

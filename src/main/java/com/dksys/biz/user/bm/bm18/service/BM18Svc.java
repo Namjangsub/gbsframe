@@ -12,7 +12,10 @@ public interface BM18Svc {
 	//알림톡수신 조회
 	List<Map<String, String>> selectReceptionMessageList(Map<String, String> paramMap);
 	
-	List<Map<String, String>> selectMaxMessageId(Map<String, String> paramMap);	
+	List<Map<String, String>> selectMaxMessageId(Map<String, String> paramMap);
+
+	//알림톡 messageId 채번(KKO+연도2자리+시퀀스6자리). 서버 큐 발송이 결재요청 직접 발송과 같은 형식의 messageId 를 쓰기 위함
+	String selectKakaoSeqNext(Map<String, String> paramMap);
 	
 	List<Map<String, String>> selectMaxMessageIdTodo(Map<String, String> paramMap);
 	

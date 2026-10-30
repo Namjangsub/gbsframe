@@ -16,6 +16,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.dksys.biz.user.am.am11.mapper.AM11Mapper;
 import com.dksys.biz.user.am.postprocessor.ApprovalPostProcessorRegistry;
+import com.dksys.biz.user.am.notification.Kakao10009MessageBuilder;
+import com.dksys.biz.user.am.notification.Kakao10009Sender;
 import com.dksys.biz.user.am.util.ApprovalSecurityUtil;
 import com.dksys.biz.user.bm.bm18.service.BM18Svc;
 import com.dksys.biz.user.wb.wb24.service.WB24Svc;
@@ -39,6 +41,9 @@ public class ApprovalQueueItemExecutor {
     @Value("${GBS_TALK_SERVER_NAME:}") private String talkServerName;
     @Value("${GBS_TALK_PAYMENT_TYPE:}") private String talkPaymentType;
     @Value("${GBS_TALK_SERVICE:}") private String talkService;
+
+    @Autowired
+    private Kakao10009Sender kakao10009Sender;
 
     @Autowired
     private AM11Mapper am11Mapper;
@@ -85,8 +90,8 @@ public class ApprovalQueueItemExecutor {
             return ExecutionResult.SKIPPED;
         }
 
-        int retryCnt = item.get("retryCnt") != null ? Integer.parseInt(String.valueOf(item.get("retryCnt"))) : 0;
-        int maxRetry = item.get("maxRetry") != null ? Integer.parseInt(String.valueOf(item.get("maxRetry"))) : 3;
+        int retryCnt = intOf(item.get("retryCnt"), 0);
+        int maxRetry = intOf(item.get("maxRetry"), 3);
 
         try {
             // 2. 실제 알림 발송 (카카오/알림톡 인프라)
@@ -100,11 +105,26 @@ public class ApprovalQueueItemExecutor {
                 am11Mapper.updateNotificationQueueStatus(updateParam);
                 return ExecutionResult.SUCCESS;
             } else {
+                // 재시도 횟수 검증: 발송 시도 1회마다 retryCnt 를 정확히 1 증가시키고, maxRetry(기본 3) 번째 실패에서 종료(EXHAUSTED)한다.
+                // 최초 발송 포함 총 maxRetry 회 시도한다(예: 3 → 최초 1회 + 재시도 2회). 선점 조회 조건(RETRY_CNT < MAX_RETRY)과 동일한 기준이다.
                 retryCnt++;
+                // 업체가 HTTP 200 으로 오류 status(!= OK, 예: 템플릿 불일치)를 돌려준 경우는 같은 내용을 다시 보내도 같은 사유로 거부되므로
+                // 남은 재시도를 하지 않고 즉시 종료(EXHAUSTED)한다. HTTP 비200·네트워크 예외 등 일시 오류만 maxRetry 까지 재시도한다.
+                boolean vendorRejected = Boolean.TRUE.equals(item.get("sendVendorRejected"));
+                boolean exhausted = vendorRejected || retryCnt >= maxRetry;
+                String detail = item.get("sendErrDetail") == null ? "" : String.valueOf(item.get("sendErrDetail"));
                 updateParam.put("retryCnt", retryCnt);
-                updateParam.put("notifStatus", retryCnt >= maxRetry ? "EXHAUSTED" : "FAIL");
-                updateParam.put("errMsg", ApprovalSecurityUtil.maskSensitiveData("발송 인프라 응답 오류 또는 실패 (회차: " + retryCnt + ")"));
+                updateParam.put("notifStatus", exhausted ? "EXHAUSTED" : "FAIL");
+                String errMsg = "발송 실패 (회차: " + retryCnt + "/" + maxRetry + (vendorRejected ? ", 재시도 불가로 즉시 종료" : "") + ")"
+                        + (detail.isEmpty() ? "" : " - " + detail);
+                errMsg = ApprovalSecurityUtil.maskSensitiveData(errMsg);
+                updateParam.put("errMsg", errMsg.length() > 300 ? errMsg.substring(0, 300) : errMsg);
                 am11Mapper.updateNotificationQueueStatus(updateParam);
+                if (exhausted) {
+                    logger.error("[Notification Worker] 재시도 한도 소진(EXHAUSTED): notifId={}, 시도={}/{}, 사유={}", notifId, retryCnt, maxRetry, detail);
+                } else {
+                    logger.warn("[Notification Worker] 발송 실패 - 재시도 예정: notifId={}, 시도={}/{}, 사유={}", notifId, retryCnt, maxRetry, detail);
+                }
                 return ExecutionResult.FAIL;
             }
         } catch (Exception e) {
@@ -121,20 +141,21 @@ public class ApprovalQueueItemExecutor {
     }
 
     private boolean attemptNotificationSend(Map<String, Object> notif) {
-        String channel = (String) notif.get("notifChannel");
+        String channel = String.valueOf(notif.get("notifChannel"));
         logger.info("[Notification Worker] 발송 실행: notifId={}, channel={}, receiverId={}",
                 notif.get("notifId"), channel, notif.get("receiverId"));
 
         if (bm18Svc != null && ("KAKAO".equalsIgnoreCase(channel) || "TALK".equalsIgnoreCase(channel) || "MSG".equalsIgnoreCase(channel))) {
             try {
+                boolean tmpl10009 = Kakao10009MessageBuilder.TMPLAT_DIV.equals(valueOrDefault(notif.get("tmplatDiv"), ""));
                 Map<String, String> kakaoParam = new HashMap<>();
-                kakaoParam.put("mssageId", "AM_" + notif.get("notifId"));
                 kakaoParam.put("rcvId", String.valueOf(notif.get("receiverId")));
                 kakaoParam.put("rcvNm", String.valueOf(notif.get("receiverNm")));
                 kakaoParam.put("clntCd", "1");
                 kakaoParam.put("tmplatDiv", valueOrDefault(notif.get("tmplatDiv"), "TMPLATDIV02"));
-                kakaoParam.put("title", ApprovalSecurityUtil.maskSensitiveData(String.valueOf(notif.get("notifTitle"))));
-                kakaoParam.put("mssage", ApprovalSecurityUtil.maskSensitiveData(String.valueOf(notif.get("notifMsg"))));
+                // 10009 는 원문을 보낸다. 변수 값은 Kakao10009MessageBuilder.safe() 에서 이미 마스킹된다.
+                kakaoParam.put("title", tmpl10009 ? String.valueOf(notif.get("notifTitle")) : ApprovalSecurityUtil.maskSensitiveData(String.valueOf(notif.get("notifTitle"))));
+                kakaoParam.put("mssage", tmpl10009 ? String.valueOf(notif.get("notifMsg")) : ApprovalSecurityUtil.maskSensitiveData(String.valueOf(notif.get("notifMsg"))));
                 String receiverMobile = notif.get("receiverMobile") == null
                         ? "" : String.valueOf(notif.get("receiverMobile"));
                 if (isBlank(receiverMobile) && wb24Svc != null) {
@@ -153,19 +174,39 @@ public class ApprovalQueueItemExecutor {
                 String todoDiv2CodeId = valueOrDefault(notif.get("todoDiv2CodeId"), "");
                 if (isBlank(todoNo) || isBlank(todoDiv2CodeId)) {
                     logger.warn("[Notification Worker] ERP 원자료 식별값 누락으로 카카오 발송 생략: notifId={}", notif.get("notifId"));
+                    notif.put("sendErrDetail", "ERP 원자료 식별값(todoNo/todoDiv2CodeId) 누락");
                     return false;
                 }
                 kakaoParam.put("todoNo", todoNo);
                 kakaoParam.put("todoDiv2CodeId", todoDiv2CodeId);
 
+                if (tmpl10009) {
+                    return sendTalk10009(notif, kakaoParam);
+                }
+
+                // 10003(레거시 템플릿) 직접 HTTP 경로: 기존 동작 유지.
                 if (isBlank(talkApiUrl) || isBlank(talkAuthToken) || isBlank(talkServerName)
                         || isBlank(talkPaymentType) || isBlank(talkService) || isBlank(kakaoParam.get("mobile"))) {
+                    notif.put("sendErrDetail", isBlank(kakaoParam.get("mobile")) ? "수신 휴대전화번호 없음" : "알림톡 접속 설정(GBS_TALK_*) 누락");
                     return false;
                 }
 
-                Map<String, String> talkBody = new HashMap<>();
+                // 재시도 회차: 2회차 이후에는 messageId 끝에 _회차 를 붙인다(1회차는 기존 값 그대로).
+                int attemptNo = intOf(notif.get("retryCnt"), 0) + 1;
+                String attemptSuffix = attemptNo > 1 ? "_" + attemptNo : "";
+                String sendMsgId = null;
+                try {
+                    sendMsgId = bm18Svc.selectKakaoSeqNext(new HashMap<String, String>());
+                } catch (Exception seqEx) {
+                    logger.warn("[Notification Worker] messageId 채번 실패(AM_ 형식으로 대체): notifId={}, err={}", notif.get("notifId"), seqEx.getMessage());
+                }
+                if (isBlank(sendMsgId)) {
+                    sendMsgId = valueOrDefault(notif.get("messageId"), "AM_" + notif.get("notifId")) + attemptSuffix;
+                }
+                kakaoParam.put("mssageId", sendMsgId);
+                Map<String, Object> talkBody = new HashMap<>();
                 talkBody.put("service", talkService);
-                talkBody.put("messageId", valueOrDefault(notif.get("messageId"), "AM_" + notif.get("notifId")));
+                talkBody.put("messageId", sendMsgId);
                 talkBody.put("title", kakaoParam.get("title"));
                 talkBody.put("message", kakaoParam.get("mssage"));
                 talkBody.put("mobile", kakaoParam.get("mobile"));
@@ -177,22 +218,75 @@ public class ApprovalQueueItemExecutor {
                 conn.setRequestProperty("authToken", talkAuthToken);
                 conn.setRequestProperty("serverName", talkServerName);
                 conn.setRequestProperty("paymentType", talkPaymentType);
-                conn.setRequestProperty("Content-Type", "application/json; charset=UTF-8");
+                conn.setRequestProperty("Content-Type", "application/json; charset=utf-8");
                 conn.setDoOutput(true);
                 byte[] body = new Gson().toJson(talkBody).getBytes("UTF-8");
                 try (OutputStream os = conn.getOutputStream()) {
                     os.write(body);
                 }
                 int responseCode = conn.getResponseCode();
-                kakaoParam.put("sendgStatus", responseCode == 200 ? "OK" : "FAIL");
-                int result = bm18Svc.insertKakaoMessage(kakaoParam);
-                return responseCode == 200 && result >= 0;
+                boolean sendOk = responseCode == 200;
+                kakaoParam.put("sendgStatus", sendOk ? "OK" : "FAIL");
+                if (!sendOk) {
+                    notif.put("sendErrDetail", "HTTP" + responseCode);
+                    logger.warn("[Notification Worker] 알림톡 거부 요청 본문: notifId={}, request={}",
+                            notif.get("notifId"), ApprovalSecurityUtil.maskSensitiveData(new Gson().toJson(talkBody)));
+                }
+                // 발송 결과(sendOk)와 이력 적재는 분리한다: 발송이 성공했는데 이력 INSERT 만 실패해 재시도되면 알림톡이 중복 발송된다.
+                try {
+                    bm18Svc.insertKakaoMessage(kakaoParam);
+                } catch (Exception historyEx) {
+                    logger.warn("[Notification Worker] 발송 이력 적재 실패(발송 결과는 유지): notifId={}, sendOk={}, err={}",
+                            notif.get("notifId"), sendOk, historyEx.getMessage());
+                }
+                return sendOk;
             } catch (Exception e) {
-                logger.warn("[Notification Worker] 카카오 발송 테이블 연동 실패: notifId={}, err={}", notif.get("notifId"), e.getMessage());
+                logger.warn("[Notification Worker] 카카오 발송 처리 중 예외: notifId={}", notif.get("notifId"), e);
+                notif.put("sendErrDetail", e.getClass().getSimpleName() + ": " + e.getMessage());
                 return false;
             }
         }
         return true;
+    }
+
+    /**
+     * 10009 알림 발송. 결재요청 직접 발송과 같은 Kakao10009Sender 를 쓴다.
+     * 결과는 큐 후처리(sendErrDetail/sendVendorRejected)와 발송 이력에 반영하고, 반환값으로 성공 여부를 돌려준다.
+     */
+    private boolean sendTalk10009(Map<String, Object> notif, Map<String, String> kakaoParam) {
+        Kakao10009Sender.Result result = kakao10009Sender.send(kakaoParam.get("mobile"), kakaoParam.get("title"),
+                kakaoParam.get("mssage"), kakaoParam.get("todoNo"), kakaoParam.get("todoDiv2CodeId"));
+        if (!result.isOk()) {
+            notif.put("sendErrDetail", result.getDetail());
+        }
+        // 재시도 불가(업체 거부, 설정·수신번호 누락 등)는 같은 입력이면 같은 결과이므로 즉시 종료(EXHAUSTED)하도록 표시한다.
+        if (!result.isOk() && !result.isRetryable()) {
+            notif.put("sendVendorRejected", Boolean.TRUE);
+        }
+        // 업체 호출이 없었으면(messageId=null) 이력도 남기지 않는다. 이력 INSERT 실패는 발송 결과에 영향을 주지 않는다.
+        if (result.getMessageId() != null) {
+            kakaoParam.put("mssageId", result.getMessageId());
+            kakaoParam.put("sendgStatus", result.getStatus());
+            try {
+                bm18Svc.insertKakaoMessage(kakaoParam);
+            } catch (Exception historyEx) {
+                logger.warn("[Notification Worker] 발송 이력 적재 실패(발송 결과는 유지): notifId={}, sendOk={}, err={}",
+                        notif.get("notifId"), result.isOk(), historyEx.getMessage());
+            }
+        }
+        return result.isOk();
+    }
+
+    /** 큐 행의 숫자 값(DB 가 BigDecimal 등으로 줄 수 있음). 비어 있거나 숫자가 아니면 기본값. */
+    private static int intOf(Object value, int defaultValue) {
+        if (value == null) {
+            return defaultValue;
+        }
+        try {
+            return Integer.parseInt(String.valueOf(value).trim());
+        } catch (NumberFormatException e) {
+            return defaultValue;
+        }
     }
 
     private String valueOrDefault(Object value, String defaultValue) {

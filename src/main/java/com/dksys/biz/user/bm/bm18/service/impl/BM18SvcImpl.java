@@ -44,7 +44,13 @@ public class BM18SvcImpl implements BM18Svc {
 		List<Map<String, String>> list = new ArrayList<Map<String,String>>();
 		list = bm18Mapper.selectMaxMessageId(paramMap);
 		return list;
-	}	
+	}
+
+	//알림톡 messageId 채번(KKO+연도2자리+시퀀스6자리)
+	@Override
+	public String selectKakaoSeqNext(Map<String, String> paramMap) {
+		return bm18Mapper.selectKakaoSeqNext(paramMap);
+	}
 	
 	//todo 수신번호 메시지 내용 채번	
     @Override

@@ -3897,6 +3897,163 @@ function kakaoSendReal(talkJson, talkParam, param) {
 	}
 }
 
+// 결재완료/보완요청 알림톡(템플릿 10009 '업무확인요청Ver0.2') 공용 발송.
+// 호출: sendTodoFinal (commApproval.js, commApprovalMobile.js) → PC/모바일 WB2001P01 과 동일 함수를 사용한다.
+// 제목·본문 변수는 buildKakaoTodoTexts, 앱/웹 링크 값은 buildKakaoApprovalLink, 버튼 payload 는 buildKakaoTodoButtons 에서만 만든다.
+
+// 알림톡 웹링크 호스트(https:// 제외). 운영(jwt.serverType == 'prod')은 gbs, 그 외(테스트)는 ai.
+// 서버 설정 gbs.mobile.base-url(application.yml=ai, application-prod.yml=gbs)과 같은 기준이다. 변경 시 이 함수만 고친다.
+function kakaoApprovalHost() {
+	return (typeof jwt !== 'undefined' && jwt && jwt.serverType == 'prod') ? "gbs.gunyangitt.co.kr" : "ai.gunyangitt.co.kr";
+}
+// 10009 전용 발송 본문 템플릿 구분(TB_BM17M01.TMPLAT_DIV, 공통코드 TMPLATDIV). 기존 TMPLATDIV05(구 결재완료 본문)는 다른 화면이 계속 쓰므로 건드리지 않는다.
+// 공통코드 관리에 이 코드를 등록하고, 알림톡템플릿관리(BM1701)에 10009 본문(카카오 템플릿 원문과 동일)을 등록해야 한다.
+var KAKAO_TODO_TMPLAT_DIV = "TMPLATDIV06";
+// 결재구분(todoDiv2CodeId) → approvalLink.html 업무 키. 서버 approvalLink 화이트리스트와 동일해야 한다.
+var KAKAO_APPROVAL_GO_BY_DIV2 = {
+	TODODIV2300: "PM07",
+	TODODIV2410: "PM08",
+	TODODIV2420: "PM08",
+	TODODIV2190: "PM5101",
+	TODODIV2191: "PM5101",
+	TODODIV2200: "PM5102",
+	TODODIV2201: "PM5102"
+};
+
+function buildKakaoTodoTexts(param, sendObj, userNm) {
+	let title = "[" + param.todoDiv2CodeNm + " " + param.todoNo + "]";
+	if (title.length > 50) {
+		title = title.substring(0, 49);
+	}
+	title += " " + param.sanctnDiv2;
+
+	const bigo = (param?.bigo ?? '').trim();
+	let confirmCnts;
+	let titleSuffix;
+	if (sendObj.todoCfOpn) {
+		if (bigo) {
+			confirmCnts = `[${userNm} 보완요청 결재보류 코멘트: ${sendObj.todoCfOpn}]\n보류 확인`;
+			titleSuffix = " 보류 보완";
+		} else {
+			confirmCnts = `[${userNm} 완료 코멘트: ${sendObj.todoCfOpn}]\n결재 확인`;
+			titleSuffix = " 확인";
+		}
+	} else {
+		confirmCnts = `[${userNm} ${param.sanctnDiv2} 완료 확인`;
+		titleSuffix = "";
+	}
+	// 템플릿 타이틀은 '#{title} 요청' 이므로 title 변수에는 ' 요청' 을 뺀 값을 넣고, 발송 제목은 최종 문자열을 쓴다.
+	const titleVar = title + titleSuffix;
+	const talkTitle = titleVar + " 요청";
+	const bussinessCnts = `${(sendObj?.todoTitl ?? '').toString().trim()} ${(param?.cnts ?? '').toString().trim()}`.trim();
+	return {
+		talkTitle: talkTitle,
+		vars: {
+			title: titleVar,
+			cnts: talkTitle,
+			todoCodeNm: bussinessCnts,
+			bussinessCnts: bussinessCnts,
+			ordrgMngNm: sendObj.name,
+			rcvNm: sendObj.name,
+			sanctnDiv2: confirmCnts,
+			confirmCnts: confirmCnts,
+			sendDt: sendObj.sendDt
+		}
+	};
+}
+
+// 문서별 링크 값 생성(서버 호출 없음). 반환: go(앱링크 값), webUrl(웹링크 값, https:// 제외)
+// - 매핑·번호 검증 통과: go = "업무&reqNo=문서번호", webUrl = host/static/mobile/index.html?go=업무&reqNo=문서번호
+// - 매핑 불가 또는 번호 형식 불량: go = "HOME"(앱은 무시하고 앱만 열림), webUrl = host/static/mobile/index.html(폴백)
+function buildKakaoApprovalLink(todoDiv2CodeId, todoNo) {
+	const go = KAKAO_APPROVAL_GO_BY_DIV2[todoDiv2CodeId];
+	if (go && /^[A-Za-z0-9_-]+$/.test(todoNo || '')) {
+		return {
+			go: go + "&reqNo=" + todoNo,
+			webUrl: kakaoApprovalHost() + "/static/mobile/index.html?go=" + go + "&reqNo=" + todoNo
+		};
+	}
+	return {
+		go: "HOME",
+		webUrl: kakaoApprovalHost() + "/static/mobile/index.html"
+	};
+}
+
+// 버튼 payload 조립. 업체(LG CNS talkapi) 규격은 미확인: 주석 예시 구조(name/type/url_pc/url_mobile)를 따르고, AL 은 scheme_android/scheme_ios 사용.
+function buildKakaoTodoButtons(link) {
+	return [
+		{ name: "통합시스템 바로가기", type: "WL", url_mobile: "https://" + link.webUrl, url_pc: "https://" + link.webUrl },
+		{ name: "건양ERP 결재하기", type: "AL", scheme_android: "gbserp://approval?go=" + link.go, scheme_ios: "gbserp://approval?go=" + link.go }
+	];
+}
+
+function commKaKaoSendTodo(param) {
+	//알림톡 API헤더 정보
+	let talkParam = {
+		authToken: "e/eDfZOFCsrBqadaECQ0+g==",
+		serverName: "gyitt2400",
+		paymentType: "P",
+	};
+	let talkBody = {
+		service: "2310086157",		//서비스번호
+		template: "10009",			//템플릿관리화면 템플릿ID
+	};
+	let sendCnt = 0;
+
+	// 호출자(sendTodoFinal)는 구 구분(TMPLATDIV05)을 넘기지만, 10009 는 전용 본문 템플릿을 읽는다(발송 이력에도 새 구분이 남도록 param 에 반영).
+	param.tmplatDiv = KAKAO_TODO_TMPLAT_DIV;
+	postAjaxSync("/user/bm/bm18/selectMaxMessageIdTodoCompleted", param, null, function (data) {
+		if (!(data && data.resultList && data.resultList.length == 1)) {
+			return;
+		}
+		if (data.resultList[0].maxMessageId == "") {
+			alert("알림톡 발송을 위한 messageId 생성에 실패 했습니다.");
+			return;
+		}
+		let sendObj = data.resultList[0];	//결재완료 통보대상자 정보
+
+		let mobile = sendObj.telNo;			//수신인 휴대전화번호
+		if (mobile == "" || mobile == null) {
+			return;
+		}
+		let message = sendObj.messageDesc;	//발송될 내용 template (DB TB_BM17M01, TMPLAT_DIV = KAKAO_TODO_TMPLAT_DIV)
+		if (message == "" || message == null) {
+			console.warn("알림톡 발송 본문 템플릿이 없습니다: TMPLAT_DIV=" + KAKAO_TODO_TMPLAT_DIV + " (공통코드 TMPLATDIV 등록, 알림톡템플릿관리 BM1701 등록 확인)");
+			return;
+		}
+
+		// 제목·변수는 원래 param.cnts(업무 원문)를 읽은 뒤 조립해야 하므로 param 변경보다 먼저 호출한다.
+		let texts = buildKakaoTodoTexts(param, sendObj, jwt.userNm);
+		param.rcvId = sendObj.todoId;
+		param.rcvNm = sendObj.name;
+		param.nameTo = sendObj.name;
+		param.sendDt = sendObj.sendDt;
+		param.mobile = sendObj.telNo;
+		param.bussinessCnts = texts.vars.bussinessCnts;
+		param.cnts = texts.vars.cnts;
+		param.confirmCnts = texts.vars.confirmCnts;
+		param.endDt = new Date().format('yyyy-MM-dd HH:mm');
+
+		// 신/구 변수명을 함께 채워 DB 템플릿이 어느 쪽을 써도 치환되게 한다. sanctnDiv2 는 param 이 아닌 복사본에만 덮어쓴다.
+		let vars = Object.assign({}, param, texts.vars);
+		Array.from(message.matchAll(/\{(.*?)\}/g), match => match[1]).forEach(compKey => {
+			if (compKey && vars[compKey] !== undefined) {
+				message = message.replaceAll(`#{${compKey}}`, vars[compKey]);
+			}
+		});
+
+		talkBody.messageId = sendObj.maxMessageId;	//고객사에서 관리하는 메시지No
+		talkBody.mobile = mobile;
+		talkBody.title = texts.talkTitle;
+		talkBody.message = message;
+		talkBody.buttons = buildKakaoTodoButtons(buildKakaoApprovalLink(param.todoDiv2CodeId, param.todoNo));
+
+		let talkJson = JSON.stringify(talkBody);
+		sendCnt = kakaoSendReal(talkJson, talkParam, param);
+	});
+	return sendCnt;
+}
+
 //알림톡전송로크
 function insertKakaoMessage(dStatus, talkDeJson, param){
 	var formData = {
