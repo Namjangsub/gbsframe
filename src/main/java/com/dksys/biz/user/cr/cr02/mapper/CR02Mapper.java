@@ -25,6 +25,8 @@ public interface CR02Mapper {
 
     List<Map<String, Object>> selectOrdrsDetails(Map<String, String> paramMap);
 
+    List<Map<String, Object>> selectOrdrsUnconfirmedDetails(Map<String, String> paramMap);
+
 
     List<Map<String, Object>> selectPmntPlan(Map<String, String> paramMap);
 

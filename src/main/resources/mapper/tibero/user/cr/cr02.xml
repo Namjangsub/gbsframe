@@ -35,6 +35,23 @@
                  <if test="mngNm != null and !mngNm.equals('')">
                  AND    U.NAME like '%' || #{mngNm} || '%'
                  </if>
+                   <if test="cnfmYn != null and !cnfmYn.equals('')">
+                   <choose>
+                     <when test="cnfmYn == 'N'.toString()">
+                   AND    EXISTS (SELECT 1 FROM TB_CR02D02 X
+                                  WHERE  X.CO_CD = M.CO_CD AND X.ORDRS_NO = M.ORDRS_NO
+                                    AND  X.CNFM_YN = 'N')
+                     </when>
+                     <when test="cnfmYn == 'Y'.toString()">
+                   AND    NOT EXISTS (SELECT 1 FROM TB_CR02D02 X
+                                      WHERE  X.CO_CD = M.CO_CD AND X.ORDRS_NO = M.ORDRS_NO
+                                        AND  X.CNFM_YN = 'N')
+                     </when>
+                     <otherwise>
+                   AND    1 = 0
+                     </otherwise>
+                   </choose>
+                   </if>
     </select>
 
     <select id="selectOrdrsList" resultType="CamelMap">
@@ -88,6 +105,23 @@
 			                  <if test="mngNm != null and !mngNm.equals('')">
 			                  AND    U.NAME like '%' || #{mngNm} || '%'
 			                  </if>
+                   <if test="cnfmYn != null and !cnfmYn.equals('')">
+                   <choose>
+                     <when test="cnfmYn == 'N'.toString()">
+                   AND    EXISTS (SELECT 1 FROM TB_CR02D02 X
+                                  WHERE  X.CO_CD = M.CO_CD AND X.ORDRS_NO = M.ORDRS_NO
+                                    AND  X.CNFM_YN = 'N')
+                     </when>
+                     <when test="cnfmYn == 'Y'.toString()">
+                   AND    NOT EXISTS (SELECT 1 FROM TB_CR02D02 X
+                                      WHERE  X.CO_CD = M.CO_CD AND X.ORDRS_NO = M.ORDRS_NO
+                                        AND  X.CNFM_YN = 'N')
+                     </when>
+                     <otherwise>
+                   AND    1 = 0
+                     </otherwise>
+                   </choose>
+                   </if>
 						<if test="listFormat =='orderNo'">
 				             ORDER BY CO_CD,
 										CASE
@@ -134,6 +168,7 @@
 		       , ROUND(SUM(A.EST_TRGT_COST) / 1000, 1)                  AS EST_TRGT_COST                  --수주목표원가
 		       , ROUND(SUM(A.UNSETTLED_AMT) / 1000, 1)                  AS UNSETTLED_AMT                  --추후정산금액
 		       , ROUND(SUM(A.SETTLEMENT_AMT) / 1000, 1)                 AS SETTLEMENT_AMT                 --정산상계금액
+		       , ROUND(SUM(A.CNFM_YN_AMT) / 1000, 1)                    AS CNFM_YN_AMT                    --미확정금액
 		  FROM   (
 		          SELECT CO_CD
 				       , ORDRS_NO
@@ -163,6 +198,7 @@
 				       , NVL(EST_TRGT_COST, 0)                                                 AS EST_TRGT_COST                  --수주목표원가
 				       , CASE WHEN D.ORDRS_DTL_DIV10 = 'ORDRSDTLDIV1040' THEN NVL(D.ORDRS_PRC, 0)*(-1) ELSE 0 END AS UNSETTLED_AMT --추후정산금액
 				       , CASE WHEN D.ORDRS_DTL_DIV10 = 'ORDRSDTLDIV1050' THEN NVL(D.ORDRS_PRC, 0)      ELSE 0 END AS SETTLEMENT_AMT --정산상계금액
+			       , CASE WHEN NVL(D.CNFM_YN, 'Y') = 'N' THEN NVL(D.ORDRS_PRC, 0) ELSE 0 END AS CNFM_YN_AMT --미확정금액
 		          FROM   TB_CR02D02 D
 				  WHERE  1 = 1
 				    AND EXISTS (SELECT 1 FROM SJT WHERE SJT.ORDRS_NO = D.ORDRS_NO)
@@ -195,6 +231,7 @@
 							   , SDS.EST_TRGT_COST                  --수주목표원가
 							   , SDS.UNSETTLED_AMT                  --추후정산금액
 							   , SDS.SETTLEMENT_AMT                 --정산상계금액
+								   , SDS.CNFM_YN_AMT                    --미확정금액
 							   , U.NAME AS MNG_NM					--담당자명
 /*							   , (SELECT CASE WHEN ( COUNT(A.TODO_KEY) = SUM(DECODE(NVL(A.SANCTN_STTUS, 'N'), 'N', 0, 'Y', 1) ) )
 											  THEN 'Y'
@@ -280,6 +317,7 @@
 		       , SM.APP_STATUS
 		       , SM.CURR_CD
 		       , SM.EXRATE
+		       , CASE WHEN NVL(SD.CNFM_YN, 'Y') = 'N' THEN ROUND(NVL(SD.ORDRS_PRC, 0) / 1000, 1) ELSE 0 END AS CNFM_YN_AMT --미확정금액
 		  FROM   SJM AS SM --수주마스터
 		         LEFT OUTER JOIN TB_CR02D02 AS SD  ON SM.CO_CD    = SD.CO_CD
 		                                          AND SM.ORDRS_NO = SD.ORDRS_NO
@@ -389,6 +427,7 @@
 		     , 1 AS LVL
 		     , CURR_CD
 		     , EXRATE
+		     , NVL(CNFM_YN_AMT, 0)              AS CNFM_YN_AMT    --미확정금액
 		FROM   SJM
 		UNION ALL
 		SELECT CO_CD                           AS CO_CD        --회사코드
@@ -491,6 +530,7 @@
 		     , 2		 AS LVL
 		     , CURR_CD
 		     , EXRATE
+		     , CNFM_YN_AMT                      AS CNFM_YN_AMT    --미확정금액
 		FROM   SJD
 		)
 		SELECT SJALL.*
@@ -779,6 +819,7 @@
 				, T.UNSETTLED_ORDRS_NO
 				, T.UNSETTLED_ORDRS_SEQ
 				, T.SORT_NO
+				, NVL(T.CNFM_YN, 'Y') AS CNFM_YN
 				, '' AS CUD_CHECK
 				, A.FILE_TRGT_KEY		AS WB21_FILE_TRGT_KEY
 				, A.SJ_NO
@@ -795,6 +836,65 @@
         WHERE T.CO_CD = #{coCd}
           AND T.ORDRS_NO = #{ordrsNo}
         ORDER BY NVL(T.SORT_NO, 999999), T.ORDRS_DTL_DIV10, T.SALES_CD, T.ORDRS_SEQ
+    </select>
+
+    <select id="selectOrdrsUnconfirmedDetails" parameterType="map" resultType="CamelMap">
+        SELECT
+                  D.CO_CD
+                , D.ORDRS_NO
+                , D.ORDRS_SEQ
+                , M.ORDRS_CLNT_CD
+                , C.CLNT_NM                       AS CLNT_NM
+                , M.ORDRS_DIV
+                , FN_CM05M01_CD_TO_NM(M.ORDRS_DIV) AS ORDRS_DIV_NM
+                , FN_CM05M01_CD_TO_NM(M.CLNT_PJT) AS CLNT_PJT_NM
+                , D.ORDRS_DTL_DIV10
+                , FN_CM05M01_CD_TO_NM(D.ORDRS_DTL_DIV10) AS ORDRS_DTL_DIV10_NM
+                , NVL(D.CNFM_YN, 'Y')                    AS CNFM_YN
+                , D.SALES_CD
+                , D.EQP_NM
+                , D.PRDT_CD
+                , D.EST_TRGT_COST
+                , D.ORDRS_PRC
+                , D.EST_EPCT_MAT_PRC
+                , D.DTL_RMK AS REMARK
+                , M.MNG_ID
+                , U.NAME AS MNG_NM
+                , CASE WHEN WB.SALES_CD IS NOT NULL
+                       THEN WB.MKER_CLNT_NM
+                       ELSE D.OUTTK_CLNT_NM
+                  END AS OUTTK_CLNT_NM
+        FROM TB_CR02D02 D
+             INNER JOIN TB_CR02M01 M ON M.CO_CD = D.CO_CD AND M.ORDRS_NO = D.ORDRS_NO
+             LEFT OUTER JOIN TB_BM02M01 C ON C.CLNT_CD = M.ORDRS_CLNT_CD
+             LEFT OUTER JOIN TB_CM06M01 U ON U.ID = M.MNG_ID
+             LEFT OUTER JOIN (
+                    SELECT T.SALES_CD, B.CLNT_NM AS MKER_CLNT_NM
+                    FROM (
+                          SELECT W.SALES_CD, W.MKER_CD
+                               , ROW_NUMBER() OVER (PARTITION BY W.SALES_CD
+                                                    ORDER BY TO_NUMBER(W.VER_NO) DESC, W.VER_NO DESC, ROWID DESC) AS RN
+                          FROM TB_WB21M01 W
+                          WHERE W.SALES_CD IN (SELECT D2.SALES_CD FROM TB_CR02D02 D2
+                                               WHERE D2.CO_CD = #{coCd, jdbcType=VARCHAR} AND D2.CNFM_YN = 'N')
+                         ) T
+                         LEFT OUTER JOIN TB_BM02M01 B ON B.CLNT_CD = T.MKER_CD
+                    WHERE T.RN = 1
+             ) WB ON WB.SALES_CD = D.SALES_CD
+        WHERE D.CO_CD = #{coCd, jdbcType=VARCHAR}
+          <choose>
+            <when test="ordrsClntCd != null and !ordrsClntCd.equals('')">
+              AND M.ORDRS_CLNT_CD = #{ordrsClntCd, jdbcType=VARCHAR}
+            </when>
+            <when test="ordrsClntNm != null and !ordrsClntNm.equals('')">
+              AND C.CLNT_NM LIKE '%' || #{ordrsClntNm, jdbcType=VARCHAR} || '%'
+            </when>
+          </choose>
+          AND D.CNFM_YN = 'N'
+          <if test="ordrsDiv != null and !ordrsDiv.equals('')">
+              AND M.ORDRS_DIV = #{ordrsDiv, jdbcType=VARCHAR}
+          </if>
+        ORDER BY M.ORDRS_CLNT_CD, M.CLNT_PJT, D.ORDRS_NO, D.ORDRS_SEQ
     </select>
 
     <select id="selectPmntPlan" parameterType="map" resultType="CamelMap">
@@ -1211,7 +1311,8 @@
                 UNSETTLED_ORDRS_SEQ,
 				TRGT_MCH_MNR,
 				TRGT_ELC_MNR,
-				SORT_NO
+				SORT_NO,
+				CNFM_YN
             )
         VALUES (
                    -- 1. 회사 코드
@@ -1279,7 +1380,8 @@
 					#{unsettledOrdrsSeq, jdbcType=VARCHAR, jdbcType=VARCHAR},
 					#{trgtMchMnr, jdbcType=VARCHAR},	-- 기계공수
 					#{trgtElcMnr, jdbcType=VARCHAR},		-- 전기공수
-					#{sortNo, jdbcType=NUMERIC}
+					#{sortNo, jdbcType=NUMERIC},
+					NVL(#{cnfmYn, jdbcType=VARCHAR}, 'Y')
                )
     </insert>
     <update id="updateOrdrsDetail" parameterType="map">
@@ -1323,7 +1425,8 @@
 			UNSETTLED_ORDRS_SEQ	  		   = #{unsettledOrdrsSeq, jdbcType=VARCHAR},	--추후정산상계 수주순번
 			TRGT_MCH_MNR				   = #{trgtMchMnr, jdbcType=VARCHAR},	-- 기계공수
 			TRGT_ELC_MNR				   = #{trgtElcMnr, jdbcType=VARCHAR},	-- 전기공수
-			SORT_NO					   = #{sortNo, jdbcType=NUMERIC}
+			SORT_NO					   = #{sortNo, jdbcType=NUMERIC},
+			CNFM_YN = NVL(#{cnfmYn, jdbcType=VARCHAR}, 'Y')
         WHERE CO_CD = #{coCd}
           AND ORDRS_NO =  #{ordrsNo}
           AND ORDRS_SEQ = #{ordrsSeq}

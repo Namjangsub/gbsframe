@@ -61,6 +61,8 @@ public interface CR02Svc {
 
 	List<Map<String, Object>> selectOrdrsDetails(Map<String, String> param);
 
+	List<Map<String, Object>> selectOrdrsUnconfirmedDetails(Map<String, String> param);
+
     void updateOrdrsPmntPlanProcess(Map<String, String> param, MultipartHttpServletRequest mRequest) throws Exception;
 
 	Map<String, String> salesCdSearchOrderInfo(Map<String, String> paramMap);

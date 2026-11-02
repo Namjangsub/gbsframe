@@ -222,6 +222,14 @@ public class CR02Ctr {
 		return "jsonView";
 	}
 
+	// 미확정(CNFM_YN=N) 설비원가 조회 (고객사 기준)
+	@PostMapping(value = "/selectOrdrsUnconfirmedDetails")
+	public String selectOrdrsUnconfirmedDetails(@RequestBody Map<String, String> param, ModelMap model) {
+		List<Map<String, Object>> result = cr02Svc.selectOrdrsUnconfirmedDetails(param);
+		model.addAttribute("result", result);
+		return "jsonView";
+	}
+
 	// salesCd 정보 조회
 	@PostMapping(value = "/salesCdSearchOrderInfo")
 	public String salesCdSearchOrderInfo(@RequestBody Map<String, String> paramMap, ModelMap model) {

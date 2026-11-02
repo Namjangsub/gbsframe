@@ -1429,6 +1429,11 @@ public class CR02Svcmpl implements CR02Svc {
         }
 
         @Override
+        public List<Map<String, Object>> selectOrdrsUnconfirmedDetails(Map<String, String> param) {
+            return cr02Mapper.selectOrdrsUnconfirmedDetails(param);
+        }
+
+        @Override
         public Map<String, String> salesCdSearchOrderInfo(Map<String, String> paramMap) {
             return cr02Mapper.salesCdSearchOrderInfo(paramMap);
         }
