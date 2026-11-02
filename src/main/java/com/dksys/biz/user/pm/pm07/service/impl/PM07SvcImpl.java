@@ -414,7 +414,7 @@ public class PM07SvcImpl implements PM07Svc {
 	public Map<String, String> insertVacation(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
 		Map<String, String> result = new HashMap<String, String>();
 
-		// 신청자(REQ_ID) 사원마스터(TB_CM06M01) 기준 CO_CD 동기화 (작업일보, 결재선, 휴가일자 등 후속처리 일관 반영)
+		// 신청자(REQ_ID)의 인사 회사구분(HR_CO_CD) 기준 CO_CD 동기화 (미설정 시 사원마스터 CO_CD 사용)
 		String actualCoCd = resolveUserCoCd(paramMap.get("reqId"), paramMap.get("coCd"));
 		paramMap.put("coCd", actualCoCd);
 
@@ -666,7 +666,7 @@ public class PM07SvcImpl implements PM07Svc {
 	public Map<String, String> updateVacation(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
 		Map<String, String> result = new HashMap<String, String>();
 
-		// 신청자(REQ_ID) 사원마스터(TB_CM06M01) 기준 CO_CD 동기화 (작업일보, 결재선, 휴가일자 등 후속처리 일관 반영)
+		// 신청자(REQ_ID)의 인사 회사구분(HR_CO_CD) 기준 CO_CD 동기화 (미설정 시 사원마스터 CO_CD 사용)
 		String actualCoCd = resolveUserCoCd(paramMap.get("reqId"), paramMap.get("coCd"));
 		paramMap.put("coCd", actualCoCd);
 
