@@ -1,0 +1,212 @@
+<div id="cr0202p04Form" class="popup_area of_a" style="width: 100%; height: 100%;">
+	<div class="tit_contents">
+		<h4 class="tit">미확정 설비원가 조회</h4>
+	</div>
+
+	<table>
+		<colgroup>
+			<col width="10%">
+			<col width="30%">
+			<col width="10%">
+			<col width="25%">
+			<col width="25%">
+		</colgroup>
+		<tr style="height:28px;">
+			<th>고객사</th>
+			<td style="white-space:nowrap;">
+				<input type="hidden" id="coCd_S" name="coCd_S" data-search="coCd">
+				<input type="hidden" id="ordrsClntCd_S" name="ordrsClntCd_S" data-search="ordrsClntCd">
+				<div class="search_form">
+					<input type="text" id="ordrsClntNm_S" name="ordrsClntNm_S" data-search="ordrsClntNm" placeholder="전체고객사" oninput="cr0202p04OnClntNmInput();" onkeydown="if (event.keyCode == 13) cr0202p04Load();">
+					<a onclick="cr0202p04OpenClntSearch();"><i class="i_search_w"></i></a>
+				</div>
+			</td>
+			<th>수주구분</th>
+			<td>
+				<select id="ordrsDiv_S" name="ordrsDiv_S" data-kind="ORDRSDIV" data-search="ordrsDiv" onchange="cr0202p04Load();">
+					<option value="">전체</option>
+				</select>
+			</td>
+			<td style="text-align:right; white-space:nowrap;">
+				<button type="button" class="bg_gray" style="margin-right:4px;" onclick="cr0202p04ClearClnt();">전체고객사</button>
+				<button type="button" class="bg_gray" onclick="cr0202p04Load();">조회</button>
+			</td>
+		</tr>
+	</table>
+
+
+	<table style="margin: 8px 0;">
+		<colgroup>
+			<col width="14%">
+			<col width="11%">
+			<col width="14%">
+			<col width="11%">
+			<col width="14%">
+			<col width="11%">
+			<col width="14%">
+			<col width="11%">
+		</colgroup>
+		<tr style="height:28px;">
+			<th>미확정 건수</th>
+			<td><span id="cr0202p04CntSum">0</span> 건</td>
+			<th>수주목표가 합계</th>
+			<td style="text-align:right;"><span id="cr0202p04EstTrgtCostSum">0</span></td>
+			<th>수주가 합계</th>
+			<td style="text-align:right;"><span id="cr0202p04OrdrsPrcSum">0</span></td>
+			<th>견적 예상 재료비 합계</th>
+			<td style="text-align:right;"><span id="cr0202p04EstEpctMatPrcSum">0</span></td>
+		</tr>
+	</table>
+
+	<div class="contents">
+		<div class="ax5_grid">
+				<div data-ax5grid="cr0202p04Grid" data-ax5grid-config="{}" style="height: 480px; min-height:200px;"></div>
+				<div style="text-align:right; margin-top:4px;">전체 <span id="cr0202p04TotalCnt">0</span>건</div>
+			</div>
+	</div>
+</div>
+
+<!-- 하단 버튼 -->
+<div class="popup_bottom_btn">
+	<button type="button" class="close_btn" onclick="modalStack.close();">닫기</button>
+</div>
+
+<script type="text/javascript">
+	var cr0202p04Grid = null;
+
+	function cr0202p04CnfmName(value) {
+		var v = String(value || "").trim();
+		return (v == "N" || v == "미확정") ? "미확정" : "확정";
+	}
+
+	// 수주금액 노출 권한 (CR0202P01 의 조회 제한 조건과 동일하게 유지)
+	function cr0202p04CanViewAmt(coCd) {
+		var deptId = jwt.deptId || "";
+		if (coCd == 'GUN') {
+			return deptId.includes('GUN00') || deptId.includes('GUN30') || deptId.includes('GUN20') || deptId.includes('GUN80');
+		}
+		if (coCd == 'TRN') {
+			return deptId.includes('GUN00') || deptId.includes('TRN') || deptId.includes('GUN20') || deptId.includes('GUN80');
+		}
+		return false;
+	}
+
+	function cr0202p04InitGrid() {
+		cr0202p04Grid = new ax5.ui.grid();
+		cr0202p04Grid.setConfig({
+			target: $('#cr0202p04Form [data-ax5grid="cr0202p04Grid"]'),
+			showLineNumber: false,
+			showRowSelector: false,
+			multipleSelect: false,
+			sortable: false,
+			header: {
+				align: "center",
+				selector: false
+			},
+			body: {
+				mergeCells: ["clntNm", "clntPjtNm", "ordrsNo", "ordrsDivNm"]
+			},
+			columns: [
+				{key: "seq", label: "No", align: "center", width: 40, formatter: function () { return this.item.__index + 1; }},
+				{key: "clntNm", label: "고객사", align: "left", width: 150},
+				{key: "clntPjtNm", label: "고객사PJT", align: "left", width: 80},
+				{key: "ordrsNo", label: "수주번호", align: "center", width: 60},
+				{key: "ordrsDivNm", label: "수주구분", align: "center", width: 120, styleClass: function () {return this.item.ordrsDiv == 'ORDRSDIV9' ? 'grid-font-blue-bold' : '';}},
+				{key: "ordrsSeq", label: "순번", align: "center", width: 40},
+				{key: "ordrsDtlDiv10Nm", label: "입력구분", align: "center", width: 60},
+				{key: "cnfmYn", label: "확정구분", align: "center", width: 60, formatter: function () { return cr0202p04CnfmName(this.value); }},
+				{key: "salesCd", label: "SALES CODE", align: "center", width: 110},
+				{key: "eqpNm", label: "설비명", align: "left", width: 280},
+				// {key: "prdtCd", label: "제품구분", align: "center", width: 60},
+				{key: "estTrgtCost", label: "수주목표가", align: "right", width: 100, formatter: function () { return addCommaStr(this.value); }},
+				{key: "ordrsPrc", label: "수주가", align: "right", width: 100, formatter: function () { return addCommaStr(this.value); }},
+				{key: "estEpctMatPrc", label: "견적 예상 재료비", align: "right", width: 100, formatter: function () { return addCommaStr(this.value); }},
+				{key: "outtkClntNm", label: "외주턴키", align: "left", width: 120},
+				{key: "remark", label: "비고", align: "left", width: 140},
+				{key: "mngNm", label: "수주담당자", align: "center", width: 80}
+			],
+			footSum: [
+				[
+					{label: "합계", colspan: 2, align: "center"},
+					{}, {}, {}, {}, {}, {}, {}, {},
+					{key: "estTrgtCost", collector: "sum", formatter: "money", align: "right"},
+					{key: "ordrsPrc", collector: "sum", formatter: "money", align: "right"},
+					{key: "estEpctMatPrc", collector: "sum", formatter: "money", align: "right"},
+					{}, {}
+				]
+			],
+			page: {
+				display: false
+			}
+		});
+		$('#cr0202p04Form [data-ax5grid="cr0202p04Grid"]').css('height', '480px');
+		cr0202p04Grid.setHeight(480);
+	}
+
+	function cr0202p04OpenClntSearch() {
+		var paramObj = {
+			"searchValue" : $("#cr0202p04Form #ordrsClntNm_S").val(),
+			"clntDivCd"   : "CLNTDIV12"
+		};
+		openAutoModal("/static/html/cmn/modal/clntSearch.html", 650, 650, "거래처 검색", paramObj, function (grid) {
+			var row = grid.target.getList("selected")[0];
+			$("#cr0202p04Form #ordrsClntCd_S").val(row.clntCd);
+			$("#cr0202p04Form #ordrsClntNm_S").val(row.clntNm);
+			cr0202p04Load();
+		});
+	}
+
+	function cr0202p04ClearClnt() {
+		$("#cr0202p04Form #ordrsClntCd_S").val("");
+		$("#cr0202p04Form #ordrsClntNm_S").val("");
+		cr0202p04Load();
+	}
+
+	function cr0202p04OnClntNmInput() {
+		$("#cr0202p04Form #ordrsClntCd_S").val("");
+	}
+
+	function cr0202p04Load() {
+		var formData = {};
+		$.each($('#cr0202p04Form [data-search]'), function (idx, elem) {
+			formData[$(elem).data("search")] = $(elem).val();
+		});
+
+		postAjax("/user/cr/cr02/selectOrdrsUnconfirmedDetails", formData, null, function (data) {
+			var canViewAmt = cr0202p04CanViewAmt(formData.coCd);
+			var deptId = jwt.deptId || "";
+			var maskMatPrc = !canViewAmt && (deptId == "GUN70" || deptId.startsWith("GUN60"));
+
+			var list = (data.result || []).filter(function (row) {
+				return cr0202p04CnfmName(row.cnfmYn) == "미확정";
+			});
+
+			var sumEstTrgtCost = 0, sumOrdrsPrc = 0, sumEstEpctMatPrc = 0;
+			list.forEach(function (row) {
+				row.estTrgtCost = canViewAmt ? gPasFloatChk(row.estTrgtCost) : 0;
+				row.ordrsPrc = canViewAmt ? gPasFloatChk(row.ordrsPrc) : 0;
+				row.estEpctMatPrc = maskMatPrc ? 0 : gPasFloatChk(row.estEpctMatPrc);
+				sumEstTrgtCost += row.estTrgtCost;
+				sumOrdrsPrc += row.ordrsPrc;
+				sumEstEpctMatPrc += row.estEpctMatPrc;
+			});
+
+			cr0202p04Grid.setData({ list: list, page: { totalElements: list.length } });
+			$("#cr0202p04CntSum").text(addCommaStr(list.length));
+			$("#cr0202p04TotalCnt").text(addCommaStr(list.length));
+			$("#cr0202p04EstTrgtCostSum").text(addCommaStr(sumEstTrgtCost));
+			$("#cr0202p04OrdrsPrcSum").text(addCommaStr(sumOrdrsPrc));
+			$("#cr0202p04EstEpctMatPrcSum").text(addCommaStr(sumEstEpctMatPrc));
+		});
+	}
+
+	$(document.body).ready(function () {
+		var cr0202p04Param = modalStack.last().paramObj;
+		$("#cr0202p04Form #coCd_S").val(cr0202p04Param.coCd);
+		$("#cr0202p04Form #ordrsClntCd_S").val(cr0202p04Param.ordrsClntCd);
+		$("#cr0202p04Form #ordrsClntNm_S").val(cr0202p04Param.ordrsClntNm);
+		setCommonSelect($("#cr0202p04Form select[data-kind]"));
+		cr0202p04InitGrid();
+		cr0202p04Load();
+	});
+</script>
