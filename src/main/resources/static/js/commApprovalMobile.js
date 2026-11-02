@@ -654,6 +654,8 @@ function Approval(htmlParam, param, popParam) {
 
 	//최종결재시 결재완료 최초작성자(1번)에게 전송
 	function sendTodoFinal(param) {
+        // 출장 결재 알림은 AM 백엔드에서 처리한다.
+        if (/^TODODIV(219[01]|220[01])$/.test(param.todoDiv2CodeId)) return;
         //message load
         if (kakaoErr.length == 0) {
 	        var paramObj = {
@@ -706,6 +708,7 @@ function Approval(htmlParam, param, popParam) {
 	// "결재 요청" 알림톡을 발송한다. 대상이 없으면(=해당 구분 결재가 모두 완료) false, 발송했으면 true를 반환한다.
 	// (PM51/PM07/PM08/... 공용) customMessage: 선택 인자. 있으면 해당 본문으로 발송, 없으면 기존 템플릿 사용.
 	function notifyPm51NextApprover(todoNo, todoDiv2CodeId, pgmId, customMessage) {
+        if (/^TODODIV(219[01]|220[01])$/.test(todoDiv2CodeId)) return false;
 		if (!todoNo || !todoDiv2CodeId) return false;
 		var rows = [];
 		postAjaxSync("/user/wb/wb20/selectGetApprovalList", { todoNo: todoNo, todoDiv2CodeId: todoDiv2CodeId }, null, function(data) {

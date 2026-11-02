@@ -811,6 +811,44 @@
          WHERE NOTIF_ID      = #{notifId}
     </update>
 
+    <!-- 발송 롤백 후 별도 트랜잭션에서 실패 횟수 누적. 다른 워커가 처리한 행은 제외한다. -->
+    <update id="updateRolledBackNotificationFailure" parameterType="Map">
+        UPDATE TB_AM91M01
+           SET RETRY_CNT = RETRY_CNT + 1,
+               NOTIF_STATUS = CASE WHEN RETRY_CNT + 1 &gt;= MAX_RETRY THEN 'EXHAUSTED' ELSE 'FAIL' END,
+               NEXT_TRY_DTTM = SYSDATE + (POWER(2, LEAST(RETRY_CNT + 1, 8)) * 60) / 86400,
+               ERR_MSG = #{errMsg, jdbcType=VARCHAR},
+               UDT_DTTM = SYSTIMESTAMP
+         WHERE NOTIF_ID = #{notifId}
+           AND NOTIF_STATUS IN ('READY', 'FAIL')
+           AND RETRY_CNT = #{retryCnt}
+           AND RETRY_CNT &lt; MAX_RETRY
+    </update>
+
+    <!-- 큐 재시도는 동일 메시지 ID를 유지하고 발송 이력의 최신 결과만 갱신한다. -->
+    <update id="mergeNotificationSendLog" parameterType="Map">
+        MERGE INTO TB_BM18M01 T
+        USING (SELECT #{mssageId} AS MESSAGE_ID FROM DUAL) S
+           ON (T.MESSAGE_ID = S.MESSAGE_ID)
+        WHEN MATCHED THEN UPDATE SET
+            T.SENDG_STATUS = #{sendgStatus, jdbcType=VARCHAR},
+            T.MOBILE = #{mobile, jdbcType=VARCHAR},
+            T.CREAT_ID = #{creatId, jdbcType=VARCHAR},
+            T.CREAT_PGM = #{creatPgm, jdbcType=VARCHAR},
+            T.SEND_DT = SYSDATE
+        WHEN NOT MATCHED THEN INSERT (
+            MESSAGE_ID, RCV_ID, RCV_NM, CLNT_CD, TMPLAT_DIV, SENDG_STATUS,
+            TITLE, MESSAGE, MOBILE, NAME_TO, SEND_DT, CREAT_ID, CREAT_PGM,
+            CREAT_DTTM, TODO_NO, TODO_DIV2_CODE_ID
+        ) VALUES (
+            #{mssageId}, #{rcvId, jdbcType=VARCHAR}, #{rcvNm, jdbcType=VARCHAR},
+            #{clntCd, jdbcType=VARCHAR}, #{tmplatDiv, jdbcType=VARCHAR}, #{sendgStatus, jdbcType=VARCHAR},
+            #{title, jdbcType=VARCHAR}, #{mssage, jdbcType=VARCHAR}, #{mobile, jdbcType=VARCHAR},
+            #{nameTo, jdbcType=VARCHAR}, SYSDATE, #{creatId, jdbcType=VARCHAR}, #{creatPgm, jdbcType=VARCHAR},
+            SYSDATE, #{todoNo, jdbcType=VARCHAR}, #{todoDiv2CodeId, jdbcType=VARCHAR}
+        )
+    </update>
+
     <select id="selectPendingNotificationList" parameterType="Map" resultType="CamelMap">
         SELECT NOTIF_ID,
                DOC_ID,

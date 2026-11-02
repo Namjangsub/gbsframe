@@ -247,7 +247,7 @@ public class Kakao10009MessageBuilder {
     private static String safe(String text, int max) {
         // 변수 값 안의 줄바꿈은 공백으로 바꾼다: 카카오 템플릿 검증은 변수 자리를 한 줄 값으로 보고 비교하므로
         // 값에 줄바꿈이 있으면(예: 결재의견 여러 줄) 템플릿 불일치로 거부될 수 있다.
-        String value = text == null ? "" : ApprovalSecurityUtil.maskSensitiveData(text.replaceAll("[\\r\\n]+", " ").trim());
+        String value = text == null ? "" : ApprovalSecurityUtil.maskNotificationContent(text.replaceAll("[\\r\\n]+", " ").trim());
         return value.length() > max ? value.substring(0, max) : value;
     }
 }

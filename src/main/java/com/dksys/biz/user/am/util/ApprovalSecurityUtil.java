@@ -27,6 +27,15 @@ public class ApprovalSecurityUtil {
      * @return 마스킹된 문자열
      */
     public static String maskSensitiveData(String text) {
+        return maskSensitiveData(text, true);
+    }
+
+    /** 알림 수신자가 연락할 수 있도록 발송 콘텐츠의 전화번호는 유지한다. */
+    public static String maskNotificationContent(String text) {
+        return maskSensitiveData(text, false);
+    }
+
+    private static String maskSensitiveData(String text, boolean maskMobile) {
         if (text == null || text.trim().isEmpty()) {
             return text;
         }
@@ -35,7 +44,9 @@ public class ApprovalSecurityUtil {
         // 1. 주민등록번호 마스킹 (앞 6자리만 남기고 뒷자리 마스킹)
         masked = RRN_PATTERN.matcher(masked).replaceAll("$1-*******");
         // 2. 휴대폰 번호 마스킹 (가운데 자리 마스킹)
-        masked = MOBILE_PATTERN.matcher(masked).replaceAll("$1-****-$3");
+        if (maskMobile) {
+            masked = MOBILE_PATTERN.matcher(masked).replaceAll("$1-****-$3");
+        }
         // 3. 이메일 마스킹 (앞 2글자 제외 마스킹)
         masked = EMAIL_PATTERN.matcher(masked).replaceAll("$1***$2");
         // 4. JSON 비밀정보 마스킹

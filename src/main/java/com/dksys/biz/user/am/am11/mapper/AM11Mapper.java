@@ -81,6 +81,10 @@ public interface AM11Mapper {
 
     int updateNotificationQueueStatus(Map<String, Object> paramMap);
 
+    int updateRolledBackNotificationFailure(Map<String, Object> paramMap);
+
+    int mergeNotificationSendLog(Map<String, String> paramMap);
+
     List<Map<String, Object>> selectPendingNotificationList(Map<String, Object> paramMap);
 
     // 4. ERP 보상처리 큐

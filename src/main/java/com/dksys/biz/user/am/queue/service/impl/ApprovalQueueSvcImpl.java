@@ -10,6 +10,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.annotation.Propagation;
 
 import com.dksys.biz.user.am.am11.mapper.AM11Mapper;
 import com.dksys.biz.user.am.notification.Kakao10009MessageBuilder;
@@ -49,10 +50,10 @@ public class ApprovalQueueSvcImpl implements ApprovalQueueSvc {
             // 민감정보 사전 마스킹 (10009 는 변수 값이 Kakao10009MessageBuilder.safe() 에서 이미 마스킹되므로 원문 유지)
             if (!Kakao10009MessageBuilder.TMPLAT_DIV.equals(paramMap.get("tmplatDiv"))) {
                 if (paramMap.containsKey("notifTitle") && paramMap.get("notifTitle") != null) {
-                    paramMap.put("notifTitle", ApprovalSecurityUtil.maskSensitiveData(String.valueOf(paramMap.get("notifTitle"))));
+                    paramMap.put("notifTitle", ApprovalSecurityUtil.maskNotificationContent(String.valueOf(paramMap.get("notifTitle"))));
                 }
                 if (paramMap.containsKey("notifMsg") && paramMap.get("notifMsg") != null) {
-                    paramMap.put("notifMsg", ApprovalSecurityUtil.maskSensitiveData(String.valueOf(paramMap.get("notifMsg"))));
+                    paramMap.put("notifMsg", ApprovalSecurityUtil.maskNotificationContent(String.valueOf(paramMap.get("notifMsg"))));
                 }
             }
             am11Mapper.insertNotificationQueue(paramMap);
@@ -77,6 +78,12 @@ public class ApprovalQueueSvcImpl implements ApprovalQueueSvc {
     }
 
     @Override
+    @Transactional(propagation = Propagation.REQUIRES_NEW, rollbackFor = Exception.class)
+    public Map<String, Object> enqueueCommittedNotification(Map<String, Object> paramMap) {
+        return enqueueNotification(paramMap);
+    }
+
+    @Override
     @Transactional(readOnly = true)
     public Map<String, Object> retryPendingNotifications() {
         Map<String, Object> resultMap = new HashMap<>();
@@ -87,7 +94,19 @@ public class ApprovalQueueSvcImpl implements ApprovalQueueSvc {
 
         for (Map<String, Object> item : pendingList) {
             // 독립 트랜잭션(REQUIRES_NEW)으로 단건 CAS 선점 및 실제 발송 위임
-            ExecutionResult result = itemExecutor.acquireAndExecuteNotification(item);
+            ExecutionResult result;
+            try {
+                result = itemExecutor.acquireAndExecuteNotification(item);
+            } catch (Exception e) {
+                logger.error("알림 단건 처리 롤백: notifId={}", item.get("notifId"), e);
+                try {
+                    itemExecutor.recordRolledBackNotificationFailure(item, e);
+                } catch (Exception recordError) {
+                    logger.error("알림 롤백 실패 기록 저장 오류: notifId={}", item.get("notifId"), recordError);
+                }
+                failCnt++;
+                continue;
+            }
             if (result == ExecutionResult.SUCCESS) {
                 successCnt++;
             } else if (result == ExecutionResult.FAIL) {

@@ -883,6 +883,8 @@ function notifyPm51NextApprover(todoNo, todoDiv2CodeId, pgmId, customMessage) {
 // 특정 순번(sanctnSn) 한 명에게만 발송한다.
 // customMessage: 선택 인자. 있으면 해당 본문으로 발송, 없으면 DB 템플릿(messageDesc) 사용.
 function sendPm51ApprovalRequestKakao(todoNo, todoDiv2CodeId, sanctnSn, pgmId, customMessage) {
+	// 출장신청/복명서의 결재 알림은 AM 백엔드 큐에서만 발송한다.
+	if (/^TODODIV(219[01]|220[01])$/.test(todoDiv2CodeId)) return;
 	var clntNm = (jwt.coCd == "GUN") ? "(주)건양ITT" : "트루넷";
 	var teleNo = "051-312-2400";
 	postAjaxSync("/user/wb/wb24/selectMemberTelNo", { coCd: jwt.coCd, userId: jwt.userId }, null, function(data) {
@@ -935,6 +937,7 @@ function sendPm51ApprovalRequestKakao(todoNo, todoDiv2CodeId, sanctnSn, pgmId, c
 var kakaoErr = [];
 //최종결재시 결재완료 최초작성자(1번)에게 전송
 function sendTodoFinal(param) {
+	if (/^TODODIV(219[01]|220[01])$/.test(param.todoDiv2CodeId)) return;
 	//message load
 	if (kakaoErr.length == 0) {
 		var paramObj = {

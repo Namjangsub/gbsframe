@@ -456,7 +456,12 @@ public class AM11SvcImpl implements AM11Svc {
         paramMap.put("coCd", docLock.get("coCd"));
 
         // 2. 현재 결재선 목록 확인
-        List<Map<String, Object>> lineList = am11Mapper.selectApprovalLineList(paramMap);
+        // CamelMap.put은 camelCase 키를 변형하므로 상태를 수정할 목록은 일반 Map으로 복사한다.
+        docLock = new HashMap<>(docLock);
+        List<Map<String, Object>> lineList = new ArrayList<>();
+        for (Map<String, Object> line : am11Mapper.selectApprovalLineList(paramMap)) {
+            lineList.add(new HashMap<>(line));
+        }
         int currLineSeq = Integer.parseInt(String.valueOf(docLock.get("currLineSeq")));
 
         // 현재자 판정: userId(또는 대결)이 소유한 PENDING 라인 찾기 (병렬 AGREE 지원)
@@ -528,6 +533,10 @@ public class AM11SvcImpl implements AM11Svc {
                 return resultMap;
             }
         }
+
+        paramMap.put("notificationSenderId", userId);
+        paramMap.put("notificationSenderNm", userNm == null || userNm.trim().isEmpty()
+                ? valueOf(actingLine.get("approverNm")) : userNm);
 
         // 3. 현재 결재선 승인 처리
         Map<String, Object> updateLineParam = new HashMap<>(paramMap);
@@ -2907,9 +2916,75 @@ public class AM11SvcImpl implements AM11Svc {
         return am11Mapper.updateDocRenderHtmlById(paramMap);
     }
 
+    @Override
+    public int updateApprovalDocContent(Map<String, Object> paramMap) {
+        return am11Mapper.updateApprovalDocContent(paramMap);
+    }
+
     private void enqueueApprovalNotification(Map<String, Object> notifParam, Map<String, Object> source) {
         if (source == null || approvalQueueSvc == null) {
             return;
+        }
+        String erpBizType = valueOf(source.get("erpBizType"));
+        String eventType = valueOf(notifParam.get("eventType"));
+        if (("PM51".equals(erpBizType) || "PM52".equals(erpBizType)) && "COMPLETE".equals(eventType)) {
+            // 커밋 후 COMPLETE 리스너가 등록 템플릿으로 한 번만 적재한다.
+            return;
+        }
+        if (("PM51".equals(erpBizType) || "PM52".equals(erpBizType))
+                && ("SUBMIT".equals(eventType) || "APPROVE_NEXT".equals(eventType))) {
+            // 출장 결재요청은 AM에서 개방한 수신자별로 상세 템플릿을 생성하여 큐에 적재한다.
+            // 일반 문구 큐와 기존 첫 결재자 이벤트가 같은 요청을 다시 발송하지 않게 분리한다.
+            if (valueOf(notifParam.get("receiverId")).isEmpty()) return;
+            Map<String, Object> query = new HashMap<>(source);
+            query.put("docId", notifParam.get("docId"));
+            query.put("userId", notifParam.get("receiverId"));
+            Map<String, Object> docInfo = am11Mapper.selectApprovalDocInfo(query);
+            if (docInfo == null) {
+                throw new IllegalStateException("출장 결재 알림의 원본 결재문서를 찾을 수 없습니다.");
+            }
+            Map<String, Object> extraInfo = new HashMap<>(source);
+            extraInfo.putAll(docInfo);
+            List<Map<String, Object>> notificationLines = am11Mapper.selectApprovalLineList(query);
+            for (Map<String, Object> line : notificationLines) {
+                if ("PENDING".equals(line.get("lineStatus"))
+                        && valueOf(notifParam.get("receiverId")).equals(valueOf(line.get("approverId")))) {
+                    // 최초 요청은 신청인, 이후 요청은 직전 결재자(대결이면 실제 처리자)가 발신자다.
+                    String senderId = valueOf(docInfo.get("draUserId"));
+                    String senderNm = valueOf(docInfo.get("draUserNm"));
+                    int previousSeq = 0;
+                    if (!"SUBMIT".equals(eventType)) {
+                        int receiverSeq = Integer.parseInt(valueOf(line.get("lineSeq")));
+                        for (Map<String, Object> previous : notificationLines) {
+                            int seq = Integer.parseInt(valueOf(previous.get("lineSeq")));
+                            if (seq < receiverSeq && seq > previousSeq && "APPROVED".equals(previous.get("lineStatus"))
+                                    && ("APPR".equals(lineTypeOf(previous)) || "AGREE".equals(lineTypeOf(previous)))) {
+                                previousSeq = seq;
+                                senderId = valueOf(previous.get("actualUserId"));
+                                senderNm = valueOf(previous.get("actualUserNm"));
+                                if (senderId.isEmpty()) {
+                                    senderId = valueOf(previous.get("approverId"));
+                                    senderNm = valueOf(previous.get("approverNm"));
+                                }
+                            }
+                        }
+                    }
+                    extraInfo.put("notificationSenderId", senderId);
+                    extraInfo.put("notificationSenderNm", senderNm);
+                    extraInfo.put("initialTripNotification", "SUBMIT".equals(eventType));
+                    extraInfo.put("wb20TodoNo", line.get("wb20TodoNo"));
+                    extraInfo.put("todoDiv2CodeId", line.get("wb20Div2CodeId"));
+                    extraInfo.put("rcvTodoDiv2CodeId", line.get("wb20Div2CodeId"));
+                    extraInfo.put("rcvSanctnSn", line.get("wb20SanctnSn"));
+                    eventPublisher.publishEvent(new ApprovalEvent(
+                            "TRIP_APPROVAL_REQUEST", valueOf(notifParam.get("docId")),
+                            valueOf(docInfo.get("docNo")), valueOf(docInfo.get("docTitle")),
+                            valueOf(docInfo.get("draUserId")), valueOf(docInfo.get("draUserNm")),
+                            valueOf(notifParam.get("receiverId")), valueOf(line.get("approverNm")), extraInfo));
+                    return;
+                }
+            }
+            throw new IllegalStateException("출장 결재 알림의 현재 대기 결재선을 찾을 수 없습니다.");
         }
         String todoNo = valueOf(source.get("todoNo"));
         if (todoNo.isEmpty()) todoNo = valueOf(source.get("wb20TodoNo"));

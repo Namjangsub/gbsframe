@@ -18,6 +18,7 @@ import com.dksys.biz.user.am.am11.mapper.AM11Mapper;
 import com.dksys.biz.user.am.postprocessor.ApprovalPostProcessorRegistry;
 import com.dksys.biz.user.am.notification.Kakao10009MessageBuilder;
 import com.dksys.biz.user.am.notification.Kakao10009Sender;
+import com.dksys.biz.user.am.notification.ApprovalNotificationHistorySvc;
 import com.dksys.biz.user.am.util.ApprovalSecurityUtil;
 import com.dksys.biz.user.bm.bm18.service.BM18Svc;
 import com.dksys.biz.user.wb.wb24.service.WB24Svc;
@@ -46,6 +47,9 @@ public class ApprovalQueueItemExecutor {
     private Kakao10009Sender kakao10009Sender;
 
     @Autowired
+    private ApprovalNotificationHistorySvc notificationHistory;
+
+    @Autowired
     private AM11Mapper am11Mapper;
 
     @Autowired
@@ -66,6 +70,8 @@ public class ApprovalQueueItemExecutor {
      */
     @Transactional(propagation = Propagation.REQUIRES_NEW, rollbackFor = Exception.class)
     public ExecutionResult acquireAndExecuteNotification(Map<String, Object> item) {
+        // 조회 결과가 CamelMap이어도 발송 오류 플래그를 같은 키로 읽고 쓸 수 있게 한다.
+        item = new HashMap<>(item);
         String notifId = String.valueOf(item.get("notifId"));
 
         if (!kakaoSend) {
@@ -94,6 +100,26 @@ public class ApprovalQueueItemExecutor {
         int maxRetry = intOf(item.get("maxRetry"), 3);
 
         try {
+            if (isTripRequest(item)) {
+                // 큐 대기 중 이미 승인/반려/회수된 요청은 이전 결재자에게 뒤늦게 보내지 않는다.
+                boolean pending = false;
+                for (Map<String, Object> line : am11Mapper.selectApprovalLineList(item)) {
+                    if ("PENDING".equals(line.get("lineStatus"))
+                            && String.valueOf(item.get("receiverId")).equals(String.valueOf(line.get("approverId")))
+                            && String.valueOf(item.get("todoDiv2CodeId")).equals(String.valueOf(line.get("wb20Div2CodeId")))) {
+                        pending = true;
+                        break;
+                    }
+                }
+                if (!pending) {
+                    Map<String, Object> skipParam = new HashMap<>();
+                    skipParam.put("notifId", notifId);
+                    skipParam.put("notifStatus", "SKIPPED");
+                    skipParam.put("errMsg", "현재 대기 결재선이 아니므로 발송 생략");
+                    am11Mapper.updateNotificationQueueStatus(skipParam);
+                    return ExecutionResult.SKIPPED;
+                }
+            }
             // 2. 실제 알림 발송 (카카오/알림톡 인프라)
             boolean sendSuccess = attemptNotificationSend(item);
             Map<String, Object> updateParam = new HashMap<>();
@@ -154,8 +180,8 @@ public class ApprovalQueueItemExecutor {
                 kakaoParam.put("clntCd", "1");
                 kakaoParam.put("tmplatDiv", valueOrDefault(notif.get("tmplatDiv"), "TMPLATDIV02"));
                 // 10009 는 원문을 보낸다. 변수 값은 Kakao10009MessageBuilder.safe() 에서 이미 마스킹된다.
-                kakaoParam.put("title", tmpl10009 ? String.valueOf(notif.get("notifTitle")) : ApprovalSecurityUtil.maskSensitiveData(String.valueOf(notif.get("notifTitle"))));
-                kakaoParam.put("mssage", tmpl10009 ? String.valueOf(notif.get("notifMsg")) : ApprovalSecurityUtil.maskSensitiveData(String.valueOf(notif.get("notifMsg"))));
+                kakaoParam.put("title", tmpl10009 ? String.valueOf(notif.get("notifTitle")) : ApprovalSecurityUtil.maskNotificationContent(String.valueOf(notif.get("notifTitle"))));
+                kakaoParam.put("mssage", tmpl10009 ? String.valueOf(notif.get("notifMsg")) : ApprovalSecurityUtil.maskNotificationContent(String.valueOf(notif.get("notifMsg"))));
                 String receiverMobile = notif.get("receiverMobile") == null
                         ? "" : String.valueOf(notif.get("receiverMobile"));
                 if (isBlank(receiverMobile) && wb24Svc != null) {
@@ -170,6 +196,58 @@ public class ApprovalQueueItemExecutor {
                 kakaoParam.put("nameTo", String.valueOf(notif.get("receiverNm")));
                 kakaoParam.put("creatId", "SYSTEM");
                 kakaoParam.put("creatPgm", "AM_QUEUE");
+                if ("TRIP_COMPLETE".equals(notif.get("eventType"))) {
+                    // 완료 통지 발신자는 최종 승인자다. 대결 시 실제 처리자를 우선한다.
+                    int finalSeq = -1;
+                    String finalApproverId = "";
+                    for (Map<String, Object> line : am11Mapper.selectApprovalLineList(notif)) {
+                        int seq = Integer.parseInt(valueOrDefault(line.get("lineSeq"), "0"));
+                        if (seq > finalSeq && "APPROVED".equals(line.get("lineStatus"))
+                                && ("APPR".equals(line.get("lineType")) || "AGREE".equals(line.get("lineType"))
+                                        || "POST".equals(line.get("lineType")))) {
+                            finalSeq = seq;
+                            finalApproverId = valueOrDefault(line.get("actualUserId"), valueOrDefault(line.get("approverId"), ""));
+                        }
+                    }
+                    if (isBlank(finalApproverId)) {
+                        throw new IllegalStateException("출장 완료 알림의 최종 승인자를 찾을 수 없습니다.");
+                    }
+                    kakaoParam.put("creatId", finalApproverId);
+                    kakaoParam.put("creatPgm", valueOrDefault(notif.get("creatPgm"), "AM_QUEUE"));
+                }
+                if (isTripRequest(notif)) {
+                    Map<String, Object> docQuery = new HashMap<>();
+                    docQuery.put("docId", notif.get("docId"));
+                    docQuery.put("userId", notif.get("receiverId"));
+                    Map<String, Object> docInfo = am11Mapper.selectApprovalDocInfo(docQuery);
+                    if (docInfo == null || isBlank(valueOrDefault(docInfo.get("draUserId"), ""))) {
+                        throw new IllegalStateException("출장 결재 알림의 기안자 정보를 찾을 수 없습니다.");
+                    }
+                    String senderId = String.valueOf(docInfo.get("draUserId"));
+                    if (!"TRIP_SUBMIT".equals(notif.get("eventType"))) {
+                        java.util.List<Map<String, Object>> lines = am11Mapper.selectApprovalLineList(docQuery);
+                        int receiverSeq = 0;
+                        for (Map<String, Object> line : lines) {
+                            if (String.valueOf(notif.get("receiverId")).equals(String.valueOf(line.get("approverId")))
+                                    && String.valueOf(notif.get("todoDiv2CodeId")).equals(String.valueOf(line.get("wb20Div2CodeId")))
+                                    && "PENDING".equals(line.get("lineStatus"))) {
+                                receiverSeq = Integer.parseInt(valueOrDefault(line.get("lineSeq"), "0"));
+                                break;
+                            }
+                        }
+                        int previousSeq = 0;
+                        for (Map<String, Object> line : lines) {
+                            int seq = Integer.parseInt(valueOrDefault(line.get("lineSeq"), "0"));
+                            if (seq < receiverSeq && seq > previousSeq && "APPROVED".equals(line.get("lineStatus"))
+                                    && ("APPR".equals(line.get("lineType")) || "AGREE".equals(line.get("lineType")))) {
+                                previousSeq = seq;
+                                senderId = valueOrDefault(line.get("actualUserId"), String.valueOf(line.get("approverId")));
+                            }
+                        }
+                    }
+                    kakaoParam.put("creatId", senderId);
+                    kakaoParam.put("creatPgm", valueOrDefault(notif.get("creatPgm"), "AM_QUEUE"));
+                }
                 String todoNo = valueOrDefault(notif.get("todoNo"), "");
                 String todoDiv2CodeId = valueOrDefault(notif.get("todoDiv2CodeId"), "");
                 if (isBlank(todoNo) || isBlank(todoDiv2CodeId)) {
@@ -225,16 +303,19 @@ public class ApprovalQueueItemExecutor {
                     os.write(body);
                 }
                 int responseCode = conn.getResponseCode();
-                boolean sendOk = responseCode == 200;
-                kakaoParam.put("sendgStatus", sendOk ? "OK" : "FAIL");
+                String responseBody = Kakao10009MessageBuilder.readResponse(conn, responseCode);
+                String apiStatus = Kakao10009MessageBuilder.parseStatus(responseBody);
+                boolean sendOk = responseCode == 200 && "OK".equals(apiStatus);
+                kakaoParam.put("sendgStatus", valueOrDefault(apiStatus, "HTTP_" + responseCode));
                 if (!sendOk) {
-                    notif.put("sendErrDetail", "HTTP" + responseCode);
+                    notif.put("sendErrDetail", "HTTP" + responseCode + ": " + valueOrDefault(apiStatus, "응답 status 없음"));
+                    if (responseCode == 200 && !isBlank(apiStatus)) notif.put("sendVendorRejected", Boolean.TRUE);
                     logger.warn("[Notification Worker] 알림톡 거부 요청 본문: notifId={}, request={}",
                             notif.get("notifId"), ApprovalSecurityUtil.maskSensitiveData(new Gson().toJson(talkBody)));
                 }
                 // 발송 결과(sendOk)와 이력 적재는 분리한다: 발송이 성공했는데 이력 INSERT 만 실패해 재시도되면 알림톡이 중복 발송된다.
                 try {
-                    bm18Svc.insertKakaoMessage(kakaoParam);
+                    notificationHistory.save(kakaoParam);
                 } catch (Exception historyEx) {
                     logger.warn("[Notification Worker] 발송 이력 적재 실패(발송 결과는 유지): notifId={}, sendOk={}, err={}",
                             notif.get("notifId"), sendOk, historyEx.getMessage());
@@ -268,7 +349,7 @@ public class ApprovalQueueItemExecutor {
             kakaoParam.put("mssageId", result.getMessageId());
             kakaoParam.put("sendgStatus", result.getStatus());
             try {
-                bm18Svc.insertKakaoMessage(kakaoParam);
+                notificationHistory.save(kakaoParam);
             } catch (Exception historyEx) {
                 logger.warn("[Notification Worker] 발송 이력 적재 실패(발송 결과는 유지): notifId={}, sendOk={}, err={}",
                         notif.get("notifId"), result.isOk(), historyEx.getMessage());
@@ -292,6 +373,23 @@ public class ApprovalQueueItemExecutor {
     private String valueOrDefault(Object value, String defaultValue) {
         return value == null || String.valueOf(value).trim().isEmpty() ? defaultValue : String.valueOf(value);
     }
+
+    /** 발송 트랜잭션 롤백이 끝난 뒤 별도 트랜잭션으로 실패 횟수를 확정한다. */
+    @Transactional(propagation = Propagation.REQUIRES_NEW, rollbackFor = Exception.class)
+    public void recordRolledBackNotificationFailure(Map<String, Object> item, Exception error) {
+        Map<String, Object> param = new HashMap<>();
+        param.put("notifId", item.get("notifId"));
+        param.put("retryCnt", item.get("retryCnt") == null ? 0 : item.get("retryCnt"));
+        param.put("errMsg", ApprovalSecurityUtil.maskSensitiveData("발송 트랜잭션 롤백: " + error.getClass().getSimpleName()));
+        // 조회 당시 횟수와 일치하는 대기 건만 갱신하여 다른 워커의 처리 결과를 덮어쓰지 않는다.
+        am11Mapper.updateRolledBackNotificationFailure(param);
+    }
+
+
+    private boolean isTripRequest(Map<String, Object> item) {
+        return "TRIP_APPROVAL_REQUEST".equals(item.get("eventType")) || "TRIP_SUBMIT".equals(item.get("eventType"));
+    }
+
 
     private boolean isBlank(String value) {
         return value == null || value.trim().isEmpty();

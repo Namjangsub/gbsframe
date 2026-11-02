@@ -667,11 +667,9 @@ public class PM51SvcImpl implements PM51Svc {
 				iSharng++;
 			} else {
 				approvalMap.put("sanCtnSn", Integer.toString(iApproval));
-				// 관리부서 결재선 1·2번은 병렬(합의) 결재다. 2번을 AGREE로 생성하면
-				// AM 엔진이 1번(APPR 헤드)+2번(AGREE)을 한 병렬 단계로 열어 순서 무관하게
-				// 두 명 모두 승인(AND)해야 다음(3번)으로 전진한다. 1번/3번은 APPR 순차 유지.
-				if ("mngApprovalArr".equals(arrKey) && iApproval == 2) {
-					approvalMap.put("lineType", "AGREE");
+				// 출장신청/복명서 관리부서도 등록된 순번대로 한 명씩 결재한다.
+				if ("mngApprovalArr".equals(arrKey)) {
+					approvalMap.put("lineType", "APPR");
 				}
 				approvalMap.put("pgParam", pgParam2);
 				insertWbsApprovalListSync(approvalMap);
@@ -2355,6 +2353,14 @@ public class PM51SvcImpl implements PM51Svc {
 			amParam.put("todoDiv2CodeId", amLineList.get(0).get("wb20Div2CodeId"));
 			amParam.put("lineList", amLineList);
 			amParam.put("autoApprovedCount", autoApprovedCount);
+
+			if ("Y".equals(paramMap.get("payMode"))) {
+				// 지급/경비 저장은 결재선 변경이나 재상신이 아니다. 순번·승인상태·알림을 유지한다.
+				if (hasText(existingDocId)) {
+					am11Svc.updateApprovalDocContent(amParam);
+				}
+				return;
+			}
 
 			Map<String, Object> amResult = am11Svc.submitApproval(amParam);
 			if (!"200".equals(String.valueOf(amResult.get("resultCode")))) {

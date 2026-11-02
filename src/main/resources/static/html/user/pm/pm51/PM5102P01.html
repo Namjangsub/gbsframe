@@ -2001,7 +2001,7 @@
 				mealKrw += eatCnt * PM51_RATE.domestic.mealUnit;
 			} else if (['A', 'B', 'C'].indexOf(areaDiv) > -1) {
 				lodgingUsd += nightCnt * PM51_RATE.overseas.lodging[areaDiv];
-				mealUsd += eatCnt * PM51_RATE.overseas.daily[{ A: 0, B: 1, C: 2 }[areaDiv]];
+				mealUsd += nightCnt * PM51_RATE.overseas.daily[{ A: 0, B: 1, C: 2 }[areaDiv]];
 			}
 		});
 		// 잡비(일비): 국내/해외 nightCnt(박수) 기준(10,000원/15,000원)으로 계산
@@ -3603,11 +3603,18 @@
 		return auth;
 	}
 
-	// 현재 사용자가 출장신청인(작성자)인지 판정
+	// 출장신청서의 신청인 본인인지 판정한다.
 	function isRptApplicant() {
-		var reqId = String($('#reqViewReqId').val() || $('#userId').val() || (currentTripRptMaster ? (currentTripRptMaster.userId || currentTripRptMaster.creatId) : '') || '').trim().toLowerCase();
+		var reqId = String($('#reqViewReqId').val() || (currentTripReqMaster ? (currentTripReqMaster.userId || currentTripReqMaster.reqId) : '') || '').trim();
 		var loginId = String(jwt.userId || '').trim().toLowerCase();
-		return !!(reqId && loginId && reqId === loginId);
+		return !!(reqId && loginId && reqId.toLowerCase() === loginId);
+	}
+
+	// 신청인 작성 영역은 신청인 또는 본인 결재 전인 신청인의 팀장이 편집할 수 있다.
+	function canEditRptApplicantArea() {
+		if (isRptApplicant()) return true;
+		var reqId = $('#reqViewReqId').val() || (currentTripReqMaster && (currentTripReqMaster.userId || currentTripReqMaster.reqId)) || '';
+		return isCurrentApproverTeamManager(reqId) && !hasOwnGeneralApprovalCompleted();
 	}
 
 	function checkFormValidation() {
@@ -4457,13 +4464,13 @@
 		filePostAjax(url, formData, function (data) {
 			openProgress(false);
 			if (data.resultCode === 200) {
-				// 자체승인(1번 결재자=제출자)이 서버에서 처리됐을 수 있으므로, kakaoTodo()가 다음 결재자를 정확히 찾도록 로컬 갱신 후 호출
+				// 자체승인(1번 결재자=제출자)이 서버에서 처리됐을 수 있으므로, 공유 알림의 결재 완료 여부 판단을 위해 로컬 갱신 후 호출
 				markSelfApprovedRowLocally(gridViewApproval);
 				markSelfApprovedRowLocally(gridViewApprovalMng);
 				try {
-					kakaoTodo(data.tripRptNo || $('#tripRptNo').val());
+					kakaoShareTodo(data.tripRptNo || $('#tripRptNo').val());
 				} catch (e) {
-					console.error("kakaoTodo error:", e);
+					console.error("kakaoShareTodo error:", e);
 				}
 				if (typeof myTodoStatusRtv === 'function') { myTodoStatusRtv(); }
 				alert(data.resultMessage);
@@ -4510,7 +4517,7 @@
 			if (data.resultCode === 200) {
 				isSuccess = true;
 				// 결재처리(승인완료)와 1 set: 남은 결재자에게 결재요청 알림톡 재발송(기발송자는 자동 제외됨)
-				try { kakaoTodo(param.tripRptNo); } catch(e) {}
+				try { kakaoShareTodo(param.tripRptNo); } catch(e) {}
 				if (typeof myTodoStatusRtv === 'function') { myTodoStatusRtv(); }
 				alert("부서장 평가 및 결재 처리가 완료되었습니다.");
 				if (modalStack.last() && typeof modalStack.last().callback === 'function') {
@@ -4650,7 +4657,7 @@
 
 		postAjaxSync("/user/pm/pm51/approveTripRptApprovalLine", paramMap, null, function(data) {
 			if (data.resultCode === 200) {
-				try { kakaoTodo(tripRptNo); } catch(e) {}
+				try { kakaoShareTodo(tripRptNo); } catch(e) {}
 				if (typeof myTodoStatusRtv === 'function') { myTodoStatusRtv(true); }
 				if (tripRptNo) {
 					// 발행부서 결재/공유만 조회한다. 관리부서는 이 함수 내부에서 별도로 조회한다.
@@ -4789,13 +4796,13 @@
 		}
 
 		if (isPay) {
-			try { kakaoTodo(tripRptNo); } catch(e) {}
+			try { kakaoShareTodo(tripRptNo); } catch(e) {}
 			if (typeof myTodoStatusRtv === 'function') { myTodoStatusRtv(); }
 			alert(saveCount === 0 ? "경비 처리 없이 지급완료 처리되었습니다." : (saveCount + "건의 경비정보가 반영되어 지급완료 처리되었습니다."));
-			if (modalStack.last() && typeof modalStack.last().callback === 'function') {
-				modalStack.last().callback({ tripRptNo: tripRptNo });
-			}
-			modalStack.close();
+			// 지급 상태를 다시 반영하고 같은 팝업에서 별도 결재를 이어간다.
+			loadTripRptDetail(tripRptNo, function() {
+				loadTripExpenseStatusGrid();
+			});
 		} else {
 			alert(saveCount === 0 ? "정산정보가 저장되었습니다." : (saveCount + "건의 경비정보와 정산정보가 저장되었습니다."));
 			loadTripRptDetail(tripRptNo, function() {
@@ -5057,7 +5064,7 @@
 	function isApplicantBeforeAnyApproval() {
 		if (!popParam) return false;
 		if (popParam.actionType === 'V' && !popParam.todoFileTrgtKey && !popParam.sanctnSn && !popParam.todoDiv1CodeId) return false;
-		return isRptApplicant() && !hasCompletedRptApproval() && !isRptPaid();
+		return canEditRptApplicantArea() && !hasCompletedRptApproval() && !isRptPaid();
 	}
 
 	function isRptProjectGridEditBlocked() {
@@ -5069,7 +5076,7 @@
 		var completed = false;
 		if (gridViewApproval && gridViewApproval.target && gridViewApproval.target.getList) {
 			$.each(gridViewApproval.target.getList(), function(idx, elem) {
-				if (elem.gb === '결재' && String(elem.usrNm || elem.todoId || '') === jwt.userId) {
+				if (elem.gb === '결재' && String(elem.usrNm || elem.todoId || '').trim().toLowerCase() === String(jwt.userId || '').trim().toLowerCase()) {
 					if ($.trim(elem.todoCfDt || '') || elem.sanctnSttus === 'Y') {
 						completed = true;
 					}
@@ -5235,6 +5242,7 @@
 		var isApproverTeamManager = isCurrentApproverTeamManager(applicantId); // 결재자 팀장 여부
 		var isAccounting = isAccountingUser(); // 회계 담당자 여부
 		var applicant = isRptApplicant(); // 신청인 여부
+		var canEditApplicantArea = canEditRptApplicantArea();
 		// 회계담당자가 실제로 정산 확정(=지급완료 처리)을 진행할 수 있는 상태인지
 		var isAccountingActive = isAccounting && !isRptPaid();
 
@@ -5274,7 +5282,7 @@
 			$('input[name="aprvEvalCd"]').prop('disabled', true).addClass('readonly-check').css('pointer-events', 'none');
 
 			// [영역 1 제어] 신청인이 아니면 영역 1 비활성화
-			if (!applicant) {
+			if (!canEditApplicantArea) {
 				setArea1Disabled(true);
 			}
 
@@ -5353,8 +5361,8 @@
 				$('input[name="aprvEvalCd"]').closest('td').prev('th').addClass('hit');
 				$('input[name="aprvEvalCd"]').removeClass('readonly-check').prop('disabled', false).css('pointer-events', 'auto');
 
-				// 팀장이 결재 진행 시에는 저장 버튼을 숨기고 '결재처리' 버튼으로 일원화
-				$popArea.find('#saveBtn').hide();
+				// 본문도 편집 가능한 팀장은 본문/평가를 함께 저장하고 결재는 별도로 진행한다.
+				if (locked || !canEditApplicantArea) $popArea.find('#saveBtn').hide();
 			}
 		}
 
@@ -5686,7 +5694,7 @@
 	var kakaoErr = [];
 
 	// 저장(insertTripRpt/updateTripRpt) 시 서버가 1번 결재자=제출자 본인이면 자동으로 자체승인 처리하는데,
-	// 화면에 남아있는 결재선 데이터는 이 처리 결과를 아직 반영하지 못한다. kakaoTodo()가 다음 결재자를 정확히 찾을 수 있도록
+	// 화면에 남아있는 결재선 데이터는 이 처리 결과를 아직 반영하지 못한다. 공유 알림이 결재 완료 여부를 정확히 판단할 수 있도록
 	// 서버의 자체승인 조건(1번 && 본인)과 동일한 기준으로 로컬 행을 완료 처리해둔다.
 	function markSelfApprovedRowLocally(gridView) {
 		if (!gridView || !gridView.target || !gridView.target.getList) return;
@@ -5748,7 +5756,7 @@
 		return allDone;
 	}
 
-	function kakaoTodo(docNo) {
+	function kakaoShareTodo(docNo) {
 		if (!docNo) return;
 		//message load
 		if (kakaoErr.length == 0) {
@@ -5778,19 +5786,11 @@
 			}
 		});
 
-		// 순차결재: 신청부서(TODODIV2200) 결재는 DB 기준 현재 차례(첫 미결 순번)인 사람에게만 발송
-		var reqActiveSn = getPm51ActivePendingSnFromDb(docNo, 'TODODIV2200');
-		if (reqActiveSn) {
-			kakaoSendBody(docNo, 'TODODIV20', 'TODODIV2200', '결재', clntNm, teleNo, reqActiveSn);	// 복명서 결재
-		}
+		// 결재요청은 AM 백엔드 큐가 담당하며, 이 화면에서는 기존 공유 알림만 처리한다.
 		kakaoSendBody(docNo, 'TODODIV10', 'TODODIV1200', '공유', clntNm, teleNo);	// 복명서 공유
 
 		// 관리부서 결재/공유는 신청부서 결재가 모두 완료된 이후에만 시작 (관리부서 내에서도 순차결재)
 		if (isPm51ApprovalFullyCompletedFromDb(docNo, 'TODODIV2200')) {
-			var mngActiveSn = getPm51ActivePendingSnFromDb(docNo, 'TODODIV2201');
-			if (mngActiveSn) {
-				kakaoSendBody(docNo, 'TODODIV20', 'TODODIV2201', '결재', clntNm, teleNo, mngActiveSn);	// 관리부서 결재
-			}
 			kakaoSendBody(docNo, 'TODODIV10', 'TODODIV1201', '공유', clntNm, teleNo);	// 관리부서 공유
 		}
 

@@ -37,4 +37,7 @@ public interface AM11Svc {
     java.util.List<Map<String, Object>> selectCr02DocsForRerender();
 
     int updateDocRenderHtmlById(Map<String, Object> paramMap);
+
+    // 지급/경비 저장 시 결재선과 현재 순번을 변경하지 않고 원본문서 내용만 갱신한다.
+    int updateApprovalDocContent(Map<String, Object> paramMap);
 }

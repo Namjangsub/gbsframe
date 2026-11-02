@@ -484,7 +484,7 @@
 							<tr>
 								<td style="text-align: center; font-weight: bold; border: 1px solid #ddd; font-family: inherit; font-size: 12px;">숙박비</td>
 								<td style="text-align: center; font-size: 11px; border: 1px solid #ddd; background: #fafafa; font-family: inherit;">1박</td>
-								<td style="text-align: center; font-size: 11px; border: 1px solid #ddd; font-family: inherit;">주중(6만원)<br>주말(7만원)</td>
+								<td style="text-align: center; font-size: 11px; border: 1px solid #ddd; font-family: inherit;">주중(4만원)<br>주말(5만원)</td>
 								<td style="text-align: center; font-size: 11px; border: 1px solid #ddd; font-family: inherit;">A:120, B:110, C:100</td>
 								<td style="border: 1px solid #ddd; padding: 5px; text-align: center; vertical-align: middle; font-family: inherit; font-size: 12px;">
 									<input type="text" id="payAmt_lodging" onkeyup="formatMoneyInput(this); calcTableTotal();" class="form-control input-sm pay-amount-input">
@@ -502,7 +502,7 @@
 							<!-- 식대/잡비 -->
 							<tr>
 								<td rowspan="2" style="text-align: center; font-weight: bold; border: 1px solid #ddd; font-family: inherit; font-size: 12px;">출장일비</td>
-								<td style="text-align: center; font-size: 11px; border: 1px solid #ddd; background: #fafafa; font-family: inherit;">식대<br><span style="font-size:10px; color:#888;">(국내:1일3식,해외:1일2식)</span></td>
+								<td style="text-align: center; font-size: 11px; border: 1px solid #ddd; background: #fafafa; font-family: inherit;">식대<br><span style="font-size:10px; color:#888;">(국내:식수 기준,해외:박수 기준)</span></td>
 								<td style="text-align: center; font-size: 11px; border: 1px solid #ddd; font-family: inherit;">3만6천원<br>(1식 12,000원)</td>
 								<td style="text-align: center; font-size: 11px; border: 1px solid #ddd; font-family: inherit;">A:50, B:40, C:30</td>
 								<td style="border: 1px solid #ddd; padding: 5px; text-align: center; vertical-align: middle; font-family: inherit; font-size: 12px;">
@@ -727,8 +727,8 @@
 	// 출장여비규정 GIM-050-02 기준 단가
 	const PM51_RATE = {
 		domestic: {
-			lodgingWeekday: 60000,
-			lodgingWeekend: 70000,
+			lodgingWeekday: 40000,
+			lodgingWeekend: 50000,
 			mealUnit: 12000,
 			special: 10000
 		},
@@ -3337,13 +3337,15 @@
 					}
 					return;
 				}
-				// 자체승인(1번 결재자=제출자)이 서버에서 처리됐을 수 있으므로, kakaoTodo()가 다음 결재자를 정확히 찾도록 로컬 갱신 후 호출
+				// 자체승인(1번 결재자=제출자)이 서버에서 처리됐을 수 있으므로, 공유 알림의 결재 완료 여부 판단을 위해 로컬 갱신 후 호출
 				markSelfApprovedRowLocally(gridViewApproval);
 				markSelfApprovedRowLocally(gridViewApprovalMng);
-				try {
-					kakaoTodo(data.tripReqNo || $('#tripReqNo').val());
-				} catch (e) {
-					console.error("kakaoTodo error:", e);
+				if (!window.isPayingNow) {
+					try {
+						kakaoShareTodo(data.tripReqNo || $('#tripReqNo').val());
+					} catch (e) {
+						console.error("kakaoShareTodo error:", e);
+					}
 				}
 				if (typeof myTodoStatusRtv === 'function') { myTodoStatusRtv(); }
 				if (window.isPayingNow) {
@@ -3355,15 +3357,12 @@
 						pgmId: "PM5101M01"
 					}, null, function (payData) {
 						alert(payData.resultMessage);
-						if (payData.resultCode === 200) {
-							// 팝업을 호출한 화면이 콜백을 넘기지 않은 경우(callback 미정의)에도 모달이 닫히도록 typeof 체크 후 호출
-							if (modalStack.last() && typeof modalStack.last().callback === 'function') {
-								modalStack.last().callback(data);
-							}
-							modalStack.close();
-						}
 						window.isPayingNow = false;
 						window.isMngApproveNow = false;
+						if (payData.resultCode === 200) {
+							// 지급 상태를 다시 반영하고 같은 팝업에서 별도 결재를 이어간다.
+							loadTripReqDetail(data.tripReqNo || $('#tripReqNo').val());
+						}
 					});
 				} else {
 					alert(data.resultMessage);
@@ -4053,7 +4052,7 @@
 			window.isSavingTripReq = false;
 			if (data.resultCode === 200) {
 				// 화면에 남아있는 결재선 데이터는 방금 서버에 반영된 본인(영업PM) 승인완료 상태를 아직 반영하지 못하므로,
-				// kakaoTodo()가 다음 차례 결재자를 정확히 찾을 수 있도록 본인 행만 완료 처리로 로컬 갱신한다.
+				// 공유 알림의 결재 완료 여부 판단을 위해 본인 행만 완료 처리로 로컬 갱신한다.
 				if (gridViewApproval && gridViewApproval.target && gridViewApproval.target.getList) {
 					$.each(gridViewApproval.target.getList() || [], function(idx, row) {
 						if (String(row.usrNm || row.todoId || '') === String(jwt.userId)) {
@@ -4063,7 +4062,7 @@
 					});
 				}
 				// 결재처리(승인완료)와 1 set: 남은 결재자에게 결재요청 알림톡 재발송(기발송자는 자동 제외됨)
-				kakaoTodo(param.tripReqNo);
+				kakaoShareTodo(param.tripReqNo);
 				if (typeof myTodoStatusRtv === 'function') { myTodoStatusRtv(); }
 				alert(data.resultMessage);
 				if (modalStack.last() && typeof modalStack.last().callback === 'function') {
@@ -4860,27 +4859,26 @@
 
 		$.each(validRows, function(_, row) {
 			var nightCnt = Number(row.nightCnt || 0);
-			var dayCnt = Number(row.dayCnt || 0);
 			var eatCnt = Number(row.eatCnt || 0);
 
 			if (isDomestic) {
-				// 국내 출장: 숙박비 (1박당 주중 6만 / 주말 7만)
+				// 국내 출장: 숙박비 (1박당 주중 4만 / 주말 5만)
 				var stDateStr = String(row.tripStDt || row.tripStDtm || '').replace(/[^0-9]/g, '').substring(0, 8);
 				var start = (stDateStr.length === 8) ? moment(stDateStr, 'YYYYMMDD') : null;
 				for (var night = 0; night < nightCnt; night++) {
 					var nightDate = (start && start.isValid()) ? start.clone().add(night, 'days') : null;
 					var isWeekend = nightDate && (nightDate.day() === 0 || nightDate.day() === 6);
-					lodgingKrw += isWeekend ? 70000 : 60000;
+					lodgingKrw += isWeekend ? PM51_RATE.domestic.lodgingWeekend : PM51_RATE.domestic.lodgingWeekday;
 				}
 				// 식대 (1식당 12,000원)
-				mealKrw += eatCnt * 12000;
-				// 잡비 (1일당 10,000원)
-				specialKrw += dayCnt * 10000;
+				mealKrw += eatCnt * PM51_RATE.domestic.mealUnit;
+				// 잡비 (1박당 10,000원)
+				specialKrw += nightCnt * PM51_RATE.domestic.special;
 			} else {
 				// 해외 출장
 				lodgingUsd += nightCnt * (PM51_RATE.overseas.lodging[areaDiv] || 0);
-				mealUsd += eatCnt * (PM51_RATE.overseas.daily[{ A: 0, B: 1, C: 2 }[areaDiv]] || 0);
-				specialKrw += dayCnt * 15000;
+				mealUsd += nightCnt * (PM51_RATE.overseas.daily[{ A: 0, B: 1, C: 2 }[areaDiv]] || 0);
+				specialKrw += nightCnt * 15000;
 			}
 		});
 
@@ -5706,7 +5704,7 @@
 	var kakaoErr = [];
 
 	// 저장(insertTripReq/insertTripReqChg/updateTripReq) 시 서버가 1번 결재자=제출자 본인이면 자동으로 자체승인 처리하는데,
-	// 화면에 남아있는 결재선 데이터는 이 처리 결과를 아직 반영하지 못한다. kakaoTodo()가 다음 결재자를 정확히 찾을 수 있도록
+	// 화면에 남아있는 결재선 데이터는 이 처리 결과를 아직 반영하지 못한다. 공유 알림이 결재 완료 여부를 정확히 판단할 수 있도록
 	// 서버의 자체승인 조건(1번 && 본인)과 동일한 기준으로 로컬 행을 완료 처리해둔다.
 	function markSelfApprovedRowLocally(gridView) {
 		if (!gridView || !gridView.target || !gridView.target.getList) return;
@@ -5784,7 +5782,7 @@
 		return allDone;
 	}
 
-	function kakaoTodo(docNo) {
+	function kakaoShareTodo(docNo) {
 		if (!docNo) return;
 		//message load
 		if (kakaoErr.length == 0) {
@@ -5814,19 +5812,11 @@
 			}
 		});
 
-		// 순차결재: 신청부서(TODODIV2190) 결재는 DB 기준 현재 차례(첫 미결 순번)인 사람에게만 발송
-		var reqActiveSn = getPm51ActivePendingSnFromDb(docNo, 'TODODIV2190');
-		if (reqActiveSn) {
-			kakaoSendBody(docNo, 'TODODIV20', 'TODODIV2190', '결재', clntNm, teleNo, reqActiveSn);	// 개인 결재
-		}
+		// 결재요청은 AM 백엔드 큐가 담당하며, 이 화면에서는 기존 공유 알림만 처리한다.
 		kakaoSendBody(docNo, 'TODODIV10', 'TODODIV1190', '공유', clntNm, teleNo);	// 개인 공유 (순서 무관, 전체 발송)
 
 		// 관리부서 결재/공유는 신청부서 결재가 모두 완료된 이후에만 시작 (관리부서 내에서도 SPECRTS14 등록순 순차결재)
 		if (isPm51ApprovalFullyCompletedFromDb(docNo, 'TODODIV2190')) {
-			var mngActiveSn = getPm51ActivePendingSnFromDb(docNo, 'TODODIV2191');
-			if (mngActiveSn) {
-				kakaoSendBody(docNo, 'TODODIV20', 'TODODIV2191', '결재', clntNm, teleNo, mngActiveSn);	// 관리부서 결재
-			}
 			kakaoSendBody(docNo, 'TODODIV10', 'TODODIV1191', '공유', clntNm, teleNo);	// 관리부서 공유
 		}
 

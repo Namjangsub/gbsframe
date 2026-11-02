@@ -8,6 +8,9 @@ public interface ApprovalQueueSvc {
     // 1. 알림 큐
     Map<String, Object> enqueueNotification(Map<String, Object> paramMap);
 
+    // 결재 COMMIT 이후의 이벤트 리스너에서는 독립 트랜잭션으로 큐를 확정한다.
+    Map<String, Object> enqueueCommittedNotification(Map<String, Object> paramMap);
+
     Map<String, Object> retryPendingNotifications();
 
     // 2. ERP 보상처리 큐

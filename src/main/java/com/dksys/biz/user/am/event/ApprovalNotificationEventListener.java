@@ -18,6 +18,7 @@ import org.springframework.transaction.event.TransactionalEventListener;
 
 import com.dksys.biz.user.am.notification.Kakao10009MessageBuilder;
 import com.dksys.biz.user.am.notification.Kakao10009Sender;
+import com.dksys.biz.user.am.notification.ApprovalNotificationHistorySvc;
 import com.dksys.biz.user.am.util.ApprovalSecurityUtil;
 import com.dksys.biz.user.am.queue.service.ApprovalQueueSvc;
 import com.dksys.biz.user.bm.bm18.service.BM18Svc;
@@ -56,6 +57,9 @@ public class ApprovalNotificationEventListener {
     @Autowired
     private Kakao10009Sender kakao10009Sender;
 
+    @Autowired
+    private ApprovalNotificationHistorySvc notificationHistory;
+
     /**
      * DB 트랜잭션이 성공적으로 COMMIT된 이후에만 안전하게 비동기 알림을 전송합니다.
      * 알림 발송 중 실패(네트워크 단절 등)가 발생해도 결재 트랜잭션은 롤백되지 않습니다.
@@ -72,6 +76,9 @@ public class ApprovalNotificationEventListener {
                 case "APPROVE_NEXT":
                     sendRequestNotification(event);
                     sendApplicantOpinionNotification(event, "결재 처리", false);
+                    break;
+                case "TRIP_APPROVAL_REQUEST":
+                    sendRequestNotification(event);
                     break;
                 case "ARBIT":
                     sendApplicantOpinionNotification(event, "전결 처리", true);
@@ -107,12 +114,12 @@ public class ApprovalNotificationEventListener {
 
     /** 결재 요청(상신/다음 결재자). 직접 발송 대상 업무(PM07/PM08/PM51/CR02)는 업무별 번호·결재구분 규칙을 쓰고, 그 외는 ERP 원자료 값을 쓴다. */
     private void sendRequestNotification(ApprovalEvent event) {
-        String docTitle = messageBuilder.docTitle(event.getDocTitle());
+        String docTitle = notificationDocTitle(event);
         Map<String, String> vars = messageBuilder.vars(
                 docTitle + " 건으로 결재",
                 docTitle + " 건으로 결재 요청",
                 todoCodeNameOf(event),
-                event.getDraUserNm(),
+                notificationSenderName(event),
                 "결재 처리");
         String erpBizType = extra(event, "erpBizType");
         String todoNo = approvalTodoNo(event);
@@ -129,10 +136,10 @@ public class ApprovalNotificationEventListener {
 
     /** 완료: 기안자에게 최종 승인 완료 알림. 결재의견이 있으면 추가. */
     private void sendCompleteNotification(ApprovalEvent event) {
-        String docTitle = messageBuilder.docTitle(event.getDocTitle());
+        String docTitle = notificationDocTitle(event);
         String cnts = docTitle + " 결재 완료" + opinionLine(event);
         Map<String, String> vars = messageBuilder.vars(docTitle + " 결재 완료", cnts,
-                todoCodeNameOf(event), event.getDraUserNm(), "결과 확인");
+                todoCodeNameOf(event), notificationSenderName(event), "결과 확인");
         sendTalk10009(event, event.getDraUserId(), event.getDraUserNm(), vars);
     }
 
@@ -156,6 +163,10 @@ public class ApprovalNotificationEventListener {
 
     /** 기안자에게 결재 의견 알림(결재 처리/전결). alwaysSend=false 면 의견이 없을 때 생략. */
     private void sendApplicantOpinionNotification(ApprovalEvent event, String action, boolean alwaysSend) {
+        // 출장 신청/복명은 중간 단계에서 다음 결재자에게만 알리고, 신청인 통지는 최종 완료/반려에서 처리한다.
+        if (isTrip(event)) {
+            return;
+        }
         String opinion = approvalOpinion(event);
         if (!alwaysSend && opinion.isEmpty()) {
             return;
@@ -169,7 +180,7 @@ public class ApprovalNotificationEventListener {
 
     private boolean isRichType(String erpBizType) {
         return "PM07".equals(erpBizType) || "PM08".equals(erpBizType)
-                || "PM51".equals(erpBizType) || "CR02".equals(erpBizType);
+                || "PM51".equals(erpBizType) || "PM52".equals(erpBizType) || "CR02".equals(erpBizType);
     }
 
     /** 업무명 + (PM51 이면 출장기간). */
@@ -194,7 +205,7 @@ public class ApprovalNotificationEventListener {
             String div2 = extra(event, "todoDiv2CodeId");
             return div2.isEmpty() ? "TODODIV2410" : div2;
         }
-        if ("PM51".equals(erpBizType)) {
+        if ("PM51".equals(erpBizType) || "PM52".equals(erpBizType)) {
             String div2 = extra(event, "todoDiv2CodeId");
             return div2.isEmpty() ? null : div2;
         }
@@ -268,11 +279,11 @@ public class ApprovalNotificationEventListener {
             logParam.put("mssage", message);
             logParam.put("mobile", mobile);
             logParam.put("nameTo", receiverNm);
-            logParam.put("creatId", event.getDraUserId());
+            logParam.put("creatId", notificationSenderId(event));
             logParam.put("creatPgm", creatPgmOf(extra(event, "erpBizType")));
             logParam.put("todoNo", todoNo);
             logParam.put("todoDiv2CodeId", todoDiv2CodeId);
-            bm18Svc.insertKakaoMessage(logParam);
+            notificationHistory.save(logParam);
         } catch (Exception e) {
             logger.warn("[ApprovalNotification] 발송 이력 적재 실패(발송 결과는 유지): receiverId={}, err={}", receiverId, e.getMessage());
         }
@@ -307,7 +318,13 @@ public class ApprovalNotificationEventListener {
         try {
             Map<String, Object> queueParam = new HashMap<>();
             queueParam.put("docId", event.getDocId());
-            queueParam.put("eventType", "APPROVAL_NOTIFICATION");
+            String eventType = "APPROVAL_NOTIFICATION";
+            if (isTrip(event)) {
+                if ("COMPLETE".equals(event.getEventType())) eventType = "TRIP_COMPLETE";
+                else if ("SUBMIT".equals(event.getEventType()) || Boolean.TRUE.equals(event.getExtraInfo().get("initialTripNotification"))) eventType = "TRIP_SUBMIT";
+                else if ("APPROVE_NEXT".equals(event.getEventType()) || "TRIP_APPROVAL_REQUEST".equals(event.getEventType())) eventType = "TRIP_APPROVAL_REQUEST";
+            }
+            queueParam.put("eventType", eventType);
             queueParam.put("receiverId", receiverId);
             queueParam.put("receiverNm", receiverNm);
             queueParam.put("receiverMobile", mobile);
@@ -320,7 +337,7 @@ public class ApprovalNotificationEventListener {
             queueParam.put("todoDiv2CodeId", todoDiv2CodeId);
             queueParam.put("creatPgm", "AM_ALIM");
             queueParam.put("retryCnt", 1);
-            approvalQueueSvc.enqueueNotification(queueParam);
+            approvalQueueSvc.enqueueCommittedNotification(queueParam);
         } catch (Exception e) {
             logger.warn("[ApprovalNotification] AM 알림 재시도 큐 적재 실패: receiverId={}, err={}", receiverId, e.getMessage());
         }
@@ -333,6 +350,34 @@ public class ApprovalNotificationEventListener {
 
     private boolean isBlank(String value) {
         return value == null || value.trim().isEmpty();
+    }
+
+    private boolean isTrip(ApprovalEvent event) {
+        return "PM51".equals(extra(event, "erpBizType")) || "PM52".equals(extra(event, "erpBizType"));
+    }
+
+    private String notificationDocTitle(ApprovalEvent event) {
+        String title = event.getDocTitle();
+        if (isTrip(event) && !isBlank(event.getDocNo())) title = "[" + event.getDocNo() + "] " + title;
+        return messageBuilder.docTitle(title);
+    }
+
+    private String notificationSenderId(ApprovalEvent event) {
+        if (isTrip(event) && !"SUBMIT".equals(event.getEventType())) {
+            String sender = extra(event, "notificationSenderId");
+            if (sender.isEmpty()) sender = extra(event, "userId");
+            if (!sender.isEmpty()) return sender;
+        }
+        return event.getDraUserId();
+    }
+
+    private String notificationSenderName(ApprovalEvent event) {
+        if (isTrip(event) && !"SUBMIT".equals(event.getEventType())) {
+            String sender = extra(event, "notificationSenderNm");
+            if (sender.isEmpty()) sender = extra(event, "userNm");
+            if (!sender.isEmpty()) return sender;
+        }
+        return event.getDraUserNm();
     }
 
     private String extra(ApprovalEvent event, String key) {
