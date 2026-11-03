@@ -739,11 +739,26 @@
 		}
 	};
 
-	// 국내는 1일 3식, 해외는 1일 2식 기준으로 총 식수 계산 (첫날/마지막날 이동으로 1식 차감)
-	function calcTravelerEatCnt(dayCnt) {
+	// 국내는 식사시간 전체가 출장기간에 포함된 경우만 1식. 해외 식수 계산은 기존 기준 유지.
+	function calcTravelerEatCnt(dayCnt, row) {
 		var isDomestic = ($('#tripDiv').val() || 'PM51DIV10') === 'PM51DIV10';
-		var mealsPerDay = isDomestic ? 3 : 2;
-		return Math.max(0, dayCnt * mealsPerDay - 1);
+		if (!isDomestic) return Math.max(0, dayCnt * 2 - 1);
+		if (!row) return 0;
+		var startDate = moment(row.tripStDt, ['YYYY-MM-DD', 'YYYYMMDD'], true);
+		var endDate = moment(row.tripEdDt, ['YYYY-MM-DD', 'YYYYMMDD'], true);
+		var start = moment(startDate.format('YYYY-MM-DD') + ' ' + normalizeTravelerGridTime(row.tripStTm, ''), 'YYYY-MM-DD HH:mm', true);
+		var end = moment(endDate.format('YYYY-MM-DD') + ' ' + normalizeTravelerGridTime(row.tripEdTm, ''), 'YYYY-MM-DD HH:mm', true);
+		if (!start.isValid() || !end.isValid() || end.isBefore(start)) return 0;
+		var mealTimes = [[7, 0, 7, 30], [12, 30, 13, 30], [17, 30, 18, 0]];
+		var count = 0;
+		for (var date = start.clone().startOf('day'); !date.isAfter(end, 'day'); date.add(1, 'day')) {
+			mealTimes.forEach(function(time) {
+				var mealStart = date.clone().hour(time[0]).minute(time[1]);
+				var mealEnd = date.clone().hour(time[2]).minute(time[3]);
+				if (!start.isAfter(mealStart) && !end.isBefore(mealEnd)) count++;
+			});
+		}
+		return count;
 	}
 
 	var travelerDeleteArr = [];
@@ -1490,6 +1505,10 @@
 						var item = this.item;
 						var dindex = this.dindex;
 						var colKey = this.key;
+						if (item && ['tripStDt', 'tripStTm', 'tripEdDt', 'tripEdTm'].indexOf(colKey) > -1) {
+							var meals = calcTravelerEatCnt(Number(item.dayCnt || 0), item);
+							if (Number(item.eatCnt || 0) !== meals) travelerGridView.target.setValue(dindex, 'eatCnt', meals);
+						}
 						if (item && (item.outSrcYn === '외주' || item.outSrcYn === 'Y' || item.deptNm === '외주')) {
 							if (colKey === 'tripStDt' || colKey === 'tripEdDt') {
 								var val = String(item[colKey] || '').replace(/-/g, '').trim();
@@ -1510,7 +1529,7 @@
 										var dCnt = nCnt + 1;
 										travelerGridView.target.setValue(dindex, 'nightCnt', Math.max(0, nCnt));
 										travelerGridView.target.setValue(dindex, 'dayCnt', Math.max(0, dCnt));
-										travelerGridView.target.setValue(dindex, 'eatCnt', calcTravelerEatCnt(dCnt));
+										travelerGridView.target.setValue(dindex, 'eatCnt', calcTravelerEatCnt(dCnt, item));
 									}
 								}
 							}
@@ -2198,7 +2217,7 @@
 			tripEdTm: defaultEdTm,
 			nightCnt: nightCnt,
 			dayCnt: dayCnt,
-			eatCnt: calcTravelerEatCnt(dayCnt),
+			eatCnt: calcTravelerEatCnt(dayCnt, { tripStDt: defaultStDt, tripStTm: defaultStTm, tripEdDt: defaultEdDt, tripEdTm: defaultEdTm }),
 			specialAmt: 0,
 			etc: ''
 		};
@@ -2463,7 +2482,7 @@
 				if (stDate.isValid() && edDate.isValid()) {
 					var nightCnt = edDate.diff(stDate, 'days');
 					var dayCnt = nightCnt + 1;
-					var eatCnt = calcTravelerEatCnt(dayCnt);
+					var eatCnt = calcTravelerEatCnt(dayCnt, rowData);
 					gridInstance.setValue(targetRowIdx, "nightCnt", Math.max(0, nightCnt));
 					gridInstance.setValue(targetRowIdx, "dayCnt", Math.max(0, dayCnt));
 					gridInstance.setValue(targetRowIdx, "eatCnt", Math.max(0, eatCnt));
@@ -4994,7 +5013,7 @@
 			var targetIndex = (row.__index !== undefined) ? row.__index : idx;
 			travelerGridView.target.setValue(targetIndex, 'nightCnt', night);
 			travelerGridView.target.setValue(targetIndex, 'dayCnt', day);
-			travelerGridView.target.setValue(targetIndex, 'eatCnt', calcTravelerEatCnt(day));
+			travelerGridView.target.setValue(targetIndex, 'eatCnt', calcTravelerEatCnt(day, row));
 		});
 		window.pm51TravelerExpenseSyncing = false;
 	}
@@ -5599,7 +5618,7 @@
 							var dayCnt = nightCnt + 1;
 							tRow.nightCnt = Math.max(0, nightCnt);
 							tRow.dayCnt = Math.max(0, dayCnt);
-							tRow.eatCnt = calcTravelerEatCnt(dayCnt);
+							tRow.eatCnt = calcTravelerEatCnt(dayCnt, tRow);
 
 							$('#nightCnt').val(Math.max(0, nightCnt));
 							$('#dayCnt').val(Math.max(0, dayCnt));
@@ -5634,7 +5653,7 @@
 						var dayCnt = nightCnt + 1;
 						gridInstance.setValue(dindex, 'nightCnt', Math.max(0, nightCnt));
 						gridInstance.setValue(dindex, 'dayCnt', Math.max(0, dayCnt));
-						gridInstance.setValue(dindex, 'eatCnt', calcTravelerEatCnt(dayCnt));
+						gridInstance.setValue(dindex, 'eatCnt', calcTravelerEatCnt(dayCnt, gridInstance.getList()[dindex]));
 					}
 					if (reason) {
 						var existingEtc = gridInstance.getList()[dindex].etc || '';

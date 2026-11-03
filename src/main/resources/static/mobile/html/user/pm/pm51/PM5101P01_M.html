@@ -492,11 +492,16 @@
                     <div style="display: flex; align-items: flex-start;">
                         <span style="font-weight: bold; color: #333; min-width: 55px; padding-top: 1px;">기타:</span>
                         <div style="flex: 1; display: flex; flex-wrap: wrap; gap: 4px;">
+                            <label style="font-weight: bold; color: #d9534f;"><input type="checkbox" id="sprtNoneChk" name="sprtNoneChk" value="Y" onchange="applySupportNoneStateMobile();"> 지원없음</label>
                             <label style="font-weight: bold; color: #333;"><input type="checkbox" name="sprtChk" value="ETC" data-col="sprtEtcYn" id="chkSprtEtc" onchange="$('#sprtEtcTxt').toggle(this.checked);"> 기타 지원</label>
                             <input type="text" id="sprtEtcTxt" name="sprtEtcTxt" class="form-control input-sm" placeholder="기타 지원 내용 입력" style="width: 100%; margin-top: 4px; display: none;">
                         </div>
                     </div>
                 </div>
+            </div>
+            <div style="margin-top: 10px;">
+                <div style="font-size: 12px; font-weight: bold; color: #333; margin-bottom: 4px;">고객지원사항</div>
+                <textarea id="custSprtTxt" name="custSprtTxt" class="form-control input-sm" rows="3" placeholder="고객지원사항 입력" style="width: 100%;"></textarea>
             </div>
         </div>
 
@@ -768,13 +773,17 @@
             });
         }
 
-        if (master.sprtEtcYn === 'Y' || master.sprtEtcTxt) {
+        var isSprtNone = master.sprtEtcYn === 'Y' && String(master.sprtEtcTxt || '').trim() === '지원없음';
+        $('#sprtNoneChk').prop('checked', isSprtNone);
+        if (!isSprtNone && (master.sprtEtcYn === 'Y' || master.sprtEtcTxt)) {
             $('input[name="sprtChk"][value="ETC"]').prop('checked', true);
             $('#sprtEtcTxt').val(master.sprtEtcTxt || '').show();
         } else {
             $('input[name="sprtChk"][value="ETC"]').prop('checked', false);
             $('#sprtEtcTxt').val('').hide();
         }
+        applySupportNoneStateMobile();
+        $('#custSprtTxt').val(master.custSprtTxt || '');
 
         // 출장자 목록 상세 표기 (출장자명 : 2026.01.01~2026.01.31 고객사명 (프로젝트명, 장비명))
         var travelerHtml = '-';
@@ -993,6 +1002,20 @@
         }
     }
 
+    // PC와 동일하게 지원없음은 SPRT_ETC_YN=Y, SPRT_ETC_TXT=지원없음으로 저장한다.
+    function applySupportNoneStateMobile() {
+        var isNone = $('#sprtNoneChk').is(':checked');
+        var canEdit = !$('#sprtNoneChk').prop('disabled');
+        var $options = $('input[name="sprtTrfcSub"], input[name="sprtMealSub"], input[name="sprtChk"]');
+        if (isNone) {
+            $options.prop('checked', false).prop('disabled', true);
+            $('#sprtEtcTxt').val('').hide().prop('disabled', true);
+        } else {
+            $options.prop('disabled', !canEdit);
+            $('#sprtEtcTxt').prop('disabled', !canEdit).toggle($('#chkSprtEtc').is(':checked'));
+        }
+    }
+
     // ==================== 영업PM 확인 처리 ====================
     function updateSalesConfirmButton() {
         var $btn = $('#salesConfirmBtn');
@@ -1011,7 +1034,7 @@
             // 이미 승인 완료한 경우: 이전 작성 내용 조회를 위해 섹션은 노출하되 비활성화
             if (isSalesPmAlreadyApproved()) {
                 $('#salesPmSection').show();
-                $('#salesPmSection input').prop('disabled', true);
+                $('#salesPmSection input, #salesPmSection textarea').prop('disabled', true);
             } else {
                 $('#salesPmSection').hide();
             }
@@ -1020,7 +1043,8 @@
 
         // 3. 영업담당자 본인이고 현재 본인 결재순서인 경우: 섹션 활성화 및 영업확인 버튼 표출
         $('#salesPmSection').show();
-        $('#salesPmSection input').prop('disabled', false);
+        $('#salesPmSection input, #salesPmSection textarea').prop('disabled', false);
+        applySupportNoneStateMobile();
         $('#approvalActionSection').hide();
         $btn.show().prop('disabled', false);
     }
@@ -1119,12 +1143,12 @@
             $('#tripCondEtc').focus();
             return false;
         }
-        if ($('input[name="sprtChk"]:checked').length === 0) {
+        if (!$('#sprtNoneChk').is(':checked') && $('input[name="sprtChk"]:checked, input[name="sprtTrfcSub"]:checked, input[name="sprtMealSub"]:checked').length === 0) {
             alert("고객사지원범위를 선택해주세요.");
             $('input[name="sprtChk"]').eq(0).focus();
             return false;
         }
-        if ($('input[name="sprtChk"][value="ETC"]').is(':checked') && !$.trim($('#sprtEtcTxt').val() || '')) {
+        if (!$('#sprtNoneChk').is(':checked') && $('input[name="sprtChk"][value="ETC"]').is(':checked') && !$.trim($('#sprtEtcTxt').val() || '')) {
             alert("고객사지원범위 기타 내용을 입력해주세요.");
             $('#sprtEtcTxt').focus();
             return false;
@@ -1165,8 +1189,10 @@
         });
 
         var sprtLdgYnVal = $('input[name="sprtChk"][value="숙박비"]').is(':checked') ? 'Y' : 'N';
-        var sprtEtcYnVal = $('input[name="sprtChk"][value="ETC"]').is(':checked') ? 'Y' : 'N';
-        var sprtEtcTxtVal = sprtEtcYnVal === 'Y' ? $('#sprtEtcTxt').val() : '';
+        var isSprtNone = $('#sprtNoneChk').is(':checked');
+        var sprtEtcYnVal = isSprtNone || $('input[name="sprtChk"][value="ETC"]').is(':checked') ? 'Y' : 'N';
+        var sprtEtcTxtVal = isSprtNone ? '지원없음' : (sprtEtcYnVal === 'Y' ? $('#sprtEtcTxt').val() : '');
+        if (isSprtNone) { trfcSubVals = []; mealSubVals = []; sprtLdgYnVal = 'N'; }
 
         var param = {
             tripReqNo: $('#tripReqNo').val(),
@@ -1181,6 +1207,7 @@
             sprtMealTxt: mealSubVals.join(','),
             sprtEtcYn: sprtEtcYnVal,
             sprtEtcTxt: sprtEtcTxtVal,
+            custSprtTxt: $('#custSprtTxt').val() || '',
             userId: jwt.userId,
             pgmId: $('#pgmId').val() || 'PM5101P01'
         };
