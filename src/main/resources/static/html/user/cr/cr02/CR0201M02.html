@@ -48,6 +48,64 @@
 			background-image: none !important;
 	}
 
+	.badge-issue {
+		display: inline-block;
+		padding: 1px 5px;
+		font-size: 10px;
+		font-weight: bold;
+		line-height: 1.3;
+		border-radius: 9px;
+		color: #fff;
+		margin-left: 4px;
+		vertical-align: middle;
+		cursor: default;
+	}
+	.badge-issue.badge-issue-has-unresolved {
+		background-color: #d9534f; /* 미완료 이슈 있음 (붉은색) */
+	}
+	.badge-issue.badge-issue-all-resolved {
+		background-color: #5cb85c; /* 전체 완료 (초록색) */
+	}
+	.badge-unconfirmed {
+		display: inline-block;
+		padding: 1px 5px;
+		font-size: 10px;
+		font-weight: bold;
+		line-height: 1.3;
+		border-radius: 9px;
+		color: #fff;
+		background-color: #e67e22; /* 미확정 주황/경고 */
+		margin-left: 4px;
+		vertical-align: middle;
+		cursor: default;
+	}
+	.badge-unsettled {
+		display: inline-block;
+		padding: 1px 5px;
+		font-size: 10px;
+		font-weight: bold;
+		line-height: 1.3;
+		border-radius: 9px;
+		color: #fff;
+		background-color: #9b59b6; /* 미정산(추후정산) 보라색 */
+		margin-left: 4px;
+		vertical-align: middle;
+		cursor: default;
+	}
+	.badge-settlement {
+		display: inline-block;
+		padding: 1px 5px;
+		font-size: 10px;
+		font-weight: bold;
+		line-height: 1.3;
+		border-radius: 9px;
+		color: #fff;
+		background-color: #3498db; /* 정산상계 파란색 */
+		margin-left: 4px;
+		vertical-align: middle;
+		cursor: default;
+	}
+
     ul.ul_list.type03-est li {
         width: calc(100% - 6px);
         float: left;
@@ -363,8 +421,57 @@
 
 
 
+	/**
+	 * 수주/SalesCd 그리드 뱃지 통합 생성 및 관리 함수
+	 * @param {Object} item 행 데이터
+	 * @returns {string} 뱃지 HTML 문자열
+	 */
+	function getSalesCdBadgesHtml(item) {
+		if (!item) return '';
+		var badges = '';
+
+		// 1) 이슈 뱃지 (미완료문제건수 / 발생건수)
+		var totIss = parseInt(item.issueTotCnt, 10);
+		var uncompIss = parseInt(item.issueUncompCnt, 10);
+		if (!isNaN(totIss) && totIss > 0) {
+			var uncomp = isNaN(uncompIss) ? 0 : uncompIss;
+			var cls = uncomp > 0 ? "badge-issue-has-unresolved" : "badge-issue-all-resolved";
+			badges += '<span class="badge-issue ' + cls + '" title="미완료문제 ' + uncomp + '건 / 발생 ' + totIss + '건">' + uncomp + '/' + totIss + '</span>';
+		}
+
+		// 2) 미확정 뱃지 (기준: 확정여부 미확정 cnfmYn === 'N' 인 경우)
+		if (item.cnfmYn === 'N') {
+			badges += '<span class="badge-unconfirmed" title="미확정 건 존재">미확정</span>';
+		}
+
+		// 3) 미정산 뱃지 (추후정산 항목이 있는 경우: unsettledAmt > 0 또는 ordrsDtlDiv10 === 'ORDRSDTLDIV1040')
+		var unsettledAmt = gPasFloatChk(item.unsettledAmt);
+		var isUnsettledItem = (item.ordrsDtlDiv10 === 'ORDRSDTLDIV1040');
+		if (unsettledAmt > 0 || isUnsettledItem) {
+			var unsettledTitle = "추후정산: " + (unsettledAmt > 0 ? unsettledAmt.toLocaleString() + "천원" : "항목존재");
+			badges += '<span class="badge-unsettled" title="' + unsettledTitle + '">미정산</span>';
+		}
+
+		// 4) 정산상계 뱃지 (정산상계 항목이 있는 경우: settlementAmt > 0 또는 ordrsDtlDiv10 === 'ORDRSDTLDIV1050')
+		var settlementAmt = gPasFloatChk(item.settlementAmt);
+		var isSettlementItem = (item.ordrsDtlDiv10 === 'ORDRSDTLDIV1050');
+		if (settlementAmt > 0 || isSettlementItem) {
+			var settlementTitle = "정산상계: " + (settlementAmt > 0 ? settlementAmt.toLocaleString() + "천원" : "항목존재");
+			badges += '<span class="badge-settlement" title="' + settlementTitle + '">정산상계</span>';
+		}
+
+		return badges;
+	}
+
+	ax5.ui.grid.formatter["salesCdBadge"] = function () {
+		var val = this.value || "";
+		var item = this.item;
+		if (!item) return val;
+		return '<span>' + val + '</span>' + getSalesCdBadgesHtml(item);
+	};
+
 	var defaultColumns = [
-					{key: "salesCd"			, label: "수주번호/salesCd", align: "left", width: 165 , hidden: false, treeControl: true, styleClass: function () {return gridColorSet(this.item);}},
+					{key: "salesCd"			, label: "수주번호/salesCd", align: "left", width: 200 , hidden: false, treeControl: true, formatter: "salesCdBadge", styleClass: function () {return gridColorSet(this.item);}},
 					{key: "clntNm"			, label: "고객사명"	, align: "left", width: 180, styleClass: function () {return gridColorSet(this.item);}},
 					{key: "mngNm"			, label: "영업담당자"	, align: "center", width: 70, styleClass: function () {return gridColorSet(this.item);}},
 					{key: "clntPjtNm"		, label: "고객사PJT"	, align: "left", width: 80, styleClass: function () {return gridColorSet(this.item);}, styleClass: function () {return this.item.ordrsDiv =='ORDRSDIV8'||this.item.ordrsDiv =='ORDRSDIV9'||this.item.ctrtDoc=='CONTRACT01'? 'grid-font-blue-bold':''}},
@@ -605,6 +712,10 @@
                                 list[i].cnfmYnAmt = 0;
 							}
 							list[i].exrate = gPasFloatChk(list[i].exrate);
+							// 확정구분(cnfmYn) 정규화: 값이 없을 경우 미확정금액(cnfmYnAmt > 0)에 따라 판별
+							if (list[i].cnfmYn === undefined || list[i].cnfmYn === null || list[i].cnfmYn === "") {
+								list[i].cnfmYn = (list[i].cnfmYnAmt > 0) ? "N" : "Y";
+							}
 							list[i].unsettledAmt = gPasFloatChk(list[i].unsettledAmt);
 							list[i].settlementAmt = gPasFloatChk(list[i].settlementAmt);
 							list[i].ordrsQty = gPasFloatChk(list[i].ordrsQty);
@@ -668,16 +779,124 @@
 							    list[i].sumMachineValueAfterDeduction = list[i].trgtPchsPcostMach - list[i].trgtPchsPcostInHousePrcsn;   		// 첫 등장 번호면 원래 금액
 							}
 						}
-						
-                        gridViewIn.setData({
-                            list: list,
-                            page: {
-                                currentPage: _pageNo,
-                                pageSize: data.paginationInfo.pageSize,
-                                totalElements: data.paginationInfo.totalRecordCount,
-                                totalPages: data.paginationInfo.totalPageCount
-                            }
-                        });
+
+						// 목록 salesCd / ordrsNo 대상 이슈 건수 조회 및 뱃지 데이터 매핑
+						var salesCdSet = new Set();
+						for (var k = 0; k < list.length; k++) {
+							var sc = String(list[k].salesCd || '').trim();
+							var on = String(list[k].ordrsNo || '').trim();
+							if (sc) salesCdSet.add(sc);
+							if (on) salesCdSet.add(on);
+						}
+						var salesCdArr = Array.from(salesCdSet);
+
+						function renderGrid() {
+							gridViewIn.setData({
+								list: list,
+								page: {
+									currentPage: _pageNo,
+									pageSize: data.paginationInfo.pageSize,
+									totalElements: data.paginationInfo.totalRecordCount,
+									totalPages: data.paginationInfo.totalPageCount
+								}
+							});
+						}
+
+						if (salesCdArr.length > 0) {
+							var reqCoCd = $("#coCd_S").val() || (list[0] && list[0].coCd) || jwt.coCd;
+							// ordrsIssueList 팝업 및 작업일보/WBS 이슈 전체 대상과 동일하게 조회
+							var issueParam = {
+								"coCd"      : reqCoCd,
+								"salesCd"   : "",
+								"reqDtFrom" : "20200101",
+								"reqDtTo"   : "20991231",
+								"workRptId" : "",
+								"prdtCd"    : "",
+								"itemDiv"   : "",
+								"prdtNm"    : "",
+								"actId"     : "",
+								"pageNo"    : 1,
+								"recordCnt" : 99999999,
+								"issSts"    : ""
+							};
+							postAjax("/user/pm/pm01/selectAllIssueWorkList", issueParam, null, function(issData) {
+								try {
+									var allIssues = issData.result || [];
+									// 현재 페이지의 수주번호 및 salesCd 목록 필터링 및 집계
+									var issMap = {};
+									for (var m = 0; m < allIssues.length; m++) {
+										var rowIss = allIssues[m];
+										var isSalesCd = String(rowIss.salesCd || '').trim();
+										var isOrdrsNo = String(rowIss.ordrsNo || '').trim();
+										if (!isSalesCd && !isOrdrsNo) continue;
+
+										// 상태 판별: ISSSTS03(완료) 또는 REQST03(완료)가 아니면 미완료
+										var isUncomp = (rowIss.issSts !== 'ISSSTS03' && rowIss.issSts !== 'REQST03' && rowIss.reqSt !== 'REQST03');
+
+										// salesCd 키 기준 누적
+										if (isSalesCd) {
+											if (!issMap[isSalesCd]) issMap[isSalesCd] = { totCnt: 0, uncompCnt: 0 };
+											issMap[isSalesCd].totCnt += 1;
+											if (isUncomp) issMap[isSalesCd].uncompCnt += 1;
+										}
+
+										// ordrsNo 키 기준 누적 (수주번호 접두사 또는 일치)
+										var targetOrdrsNo = isOrdrsNo;
+										if (!targetOrdrsNo && isSalesCd.indexOf('-') > 0) {
+											targetOrdrsNo = isSalesCd.split('-')[0];
+										}
+										if (targetOrdrsNo) {
+											if (!issMap[targetOrdrsNo]) issMap[targetOrdrsNo] = { totCnt: 0, uncompCnt: 0 };
+											issMap[targetOrdrsNo].totCnt += 1;
+											if (isUncomp) issMap[targetOrdrsNo].uncompCnt += 1;
+										}
+									}
+
+									// 자식(lvl 2) 행의 이슈 건수 합산하여 부모(lvl 1)에 반영
+									var parentIssueMap = {};
+									for (var p = 0; p < list.length; p++) {
+										var pSc = String(list[p].salesCd || '').trim();
+										var pOn = String(list[p].ordrsNo || '').trim();
+										var hit = issMap[pSc] || (pSc ? issMap[pSc.split('-')[0]] : null);
+										if (hit && list[p].lvl == '2') {
+											if (!parentIssueMap[pOn]) {
+												parentIssueMap[pOn] = { totCnt: 0, uncompCnt: 0 };
+											}
+											parentIssueMap[pOn].totCnt += hit.totCnt;
+											parentIssueMap[pOn].uncompCnt += hit.uncompCnt;
+										}
+									}
+
+									for (var n = 0; n < list.length; n++) {
+										var curSc = String(list[n].salesCd || '').trim();
+										var curOn = String(list[n].ordrsNo || '').trim();
+										var matched = null;
+
+										if (list[n].lvl == '1') {
+											// 마스터 수주번호 기준 매핑 (직접 매핑 또는 자식들 합산)
+											matched = issMap[curOn] || issMap[curSc] || parentIssueMap[curOn];
+										} else {
+											// 상세 행: salesCd 정확 매칭
+											matched = issMap[curSc];
+										}
+
+										if (matched && matched.totCnt > 0) {
+											list[n].issueTotCnt = matched.totCnt;
+											list[n].issueUncompCnt = matched.uncompCnt;
+										} else {
+											list[n].issueTotCnt = 0;
+											list[n].issueUncompCnt = 0;
+										}
+									}
+								} catch (e) {
+									console.error("이슈 집계 매핑 오류", e);
+								} finally {
+									renderGrid();
+								}
+							});
+						} else {
+							renderGrid();
+						}
                     } catch (error) {
                         alert("오류 발생!! 전산실 연락 바랍니다", error.message);
                         return null; // 오류 발생 시 null 반환
@@ -1205,14 +1424,32 @@
 
 
     function openIssueList() {
-        // let row = gridView.target.getList("selected")[0];
-        let row = gridView.target.getList()[select_index];
-        if (row == undefined) return false;
+        var row = null;
+        var selectedList = gridView.target.getList("selected");
+        if (selectedList && selectedList.length > 0) {
+            row = selectedList[0];
+        } else if (typeof select_index === "number" && select_index >= 0) {
+            row = gridView.target.getList()[select_index];
+        }
+
+        // 선택된 row가 없으면 그리드의 첫 번째 row를 기본 참조
+        if (!row) {
+            var allList = gridView.target.getList();
+            if (allList && allList.length > 0) {
+                row = allList[0];
+            }
+        }
+
+        var searchVal = (row && row.ordrsNo) ? row.ordrsNo : "";
+        var clntNm = (row && (row.clntNm || row.ordrsClntNm)) ? (row.clntNm || row.ordrsClntNm) : "";
+        var modalTitle = searchVal ? ("수주번호 검색 (" + searchVal + ")") : "미완료 이슈 전체 현황";
         var paramObj = {
-            "coCd" : $('#coCd_S').val(),
-            "searchValue" : row.ordrsNo,
+            "coCd"        : $('#coCd_S').val(),
+            "searchValue" : searchVal,
+            "ordrsNo"     : searchVal,
+            "clntNm"      : clntNm
         };
-        openThirdModal("/static/html/cmn/modal/ordrsIssueList.html", 1700, $('body').height()-40, "수주번호 검색", paramObj, function (grid) {
+        openModal("/static/html/cmn/modal/ordrsIssueList.html", 1700, $('body').height()-40, modalTitle, paramObj, function (grid) {
 //             var row = grid.target.getList("selected")[0];
 //             $('#ordrsNo_S').val(row.ordrsNo);
 //             gridView.setData(0);
