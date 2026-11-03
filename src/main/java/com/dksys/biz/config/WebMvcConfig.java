@@ -14,6 +14,7 @@ import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 import org.springframework.web.servlet.view.json.MappingJackson2JsonView;
 
+import com.dksys.biz.user.am.event.ApprovalNotificationWarningInterceptor;
 import com.dksys.biz.util.MessageUtils;
 import com.dksys.biz.util.WebClientUtil;
 
@@ -43,6 +44,7 @@ public class WebMvcConfig implements WebMvcConfigurer {
 	@Override
 	public void addInterceptors(InterceptorRegistry registry) {
 		registry.addInterceptor(new DeviceResolverHandlerInterceptor());
+		registry.addInterceptor(new ApprovalNotificationWarningInterceptor());
     }
 
 	@Override

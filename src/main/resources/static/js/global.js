@@ -949,6 +949,11 @@ const clientId = "frontend-app";
 const clientSecret = "gunyang";
 const basicAuth = btoa(`${clientId}:${clientSecret}`);
 
+// 결재 알림톡 발송 실패 경고(서버 jsonView 응답의 notifyWarning). 결재 결과와 별개이므로 콜백(화면 이동 포함) 전에 먼저 알린다.
+function notifyApprovalWarning(data) {
+	if (data && data.notifyWarning) alert(data.notifyWarning);
+}
+
 function postAjax(url, data, contentType, callback, blockProc=true, retryCount = 0) {
 	if (typeof $.blockUI === 'function' && blockProc) openProgress(true);
 	if(contentType == null) {
@@ -976,6 +981,7 @@ function postAjax(url, data, contentType, callback, blockProc=true, retryCount =
 	        	authorizationToken = newToken;
 	        	jwt = parseJwt(authorizationToken);
 	        }
+	    	notifyApprovalWarning(data);
 	    	callback(data);
 	    },
 	    error: function (xhr) {
@@ -1021,6 +1027,7 @@ function postAjaxSync(url, data, contentType, callback, retryCount = 0) {
 	        	authorizationToken = newToken;
 	        	jwt = parseJwt(authorizationToken);
 	        }
+	    	notifyApprovalWarning(data);
 	    	callback(data);
 	    },
 	    error: function (xhr) {
@@ -1058,6 +1065,7 @@ function deleteAjax(url, data, contentType, callback, blockProc=true, retryCount
 	        	authorizationToken = newToken;
 	        	jwt = parseJwt(authorizationToken);
 	        }
+	    	notifyApprovalWarning(data);
 	    	callback(data);
 	    },
 	    error: function (xhr) {
@@ -1098,6 +1106,7 @@ function putAjax(url, data, contentType, callback, blockProc=true, retryCount = 
 	        	authorizationToken = newToken;
 	        	jwt = parseJwt(authorizationToken);
 	        }
+	    	notifyApprovalWarning(data);
 	    	callback(data);
 	    },
 	    error: function (xhr) {
@@ -1338,6 +1347,7 @@ function _filePostAjaxPrepared(url, data, callback, blockProc=true, retryCount =
 	        	authorizationToken = newToken;
 	        	jwt = parseJwt(authorizationToken);
 	        }
+	    	notifyApprovalWarning(data);
 	    	callback(data);
 	    },
 	    error: function (xhr) {
@@ -1378,6 +1388,7 @@ function _filePostAjaxButtonPrepared(url, data, callback, blockProc=true, retryC
 	        	authorizationToken = newToken;
 	        	jwt = parseJwt(authorizationToken);
 	        }
+	    	notifyApprovalWarning(data);
 	    	callback(data);
 	    },
 	    error: function (xhr) {
@@ -1417,6 +1428,7 @@ function _filePutAjaxPrepared(url, data, callback, blockProc=true, retryCount = 
 	        	authorizationToken = newToken;
 	        	jwt = parseJwt(authorizationToken);
 	        }
+	    	notifyApprovalWarning(data);
 	    	callback(data);
 	    },
 	    error: function (xhr) {

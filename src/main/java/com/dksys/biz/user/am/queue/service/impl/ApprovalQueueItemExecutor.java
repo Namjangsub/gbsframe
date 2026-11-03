@@ -15,10 +15,12 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.dksys.biz.user.am.am11.mapper.AM11Mapper;
+import com.dksys.biz.user.am.event.ApprovalNotificationWarning;
 import com.dksys.biz.user.am.postprocessor.ApprovalPostProcessorRegistry;
 import com.dksys.biz.user.am.notification.Kakao10009MessageBuilder;
 import com.dksys.biz.user.am.notification.Kakao10009Sender;
 import com.dksys.biz.user.am.notification.ApprovalNotificationHistorySvc;
+import com.dksys.biz.user.am.util.ApprovalNotificationDispatchMode;
 import com.dksys.biz.user.am.util.ApprovalSecurityUtil;
 import com.dksys.biz.user.bm.bm18.service.BM18Svc;
 import com.dksys.biz.user.wb.wb24.service.WB24Svc;
@@ -37,6 +39,8 @@ public class ApprovalQueueItemExecutor {
 
     @Value("${kakaoSend:false}")
     private boolean kakaoSend;
+    @Value("${approval.notification.dispatch-mode:SCHEDULER}")
+    private String dispatchMode;
     @Value("${GBS_TALK_API_URL:}") private String talkApiUrl;
     @Value("${GBS_TALK_AUTH_TOKEN:}") private String talkAuthToken;
     @Value("${GBS_TALK_SERVER_NAME:}") private String talkServerName;
@@ -137,15 +141,19 @@ public class ApprovalQueueItemExecutor {
                 // 업체가 HTTP 200 으로 오류 status(!= OK, 예: 템플릿 불일치)를 돌려준 경우는 같은 내용을 다시 보내도 같은 사유로 거부되므로
                 // 남은 재시도를 하지 않고 즉시 종료(EXHAUSTED)한다. HTTP 비200·네트워크 예외 등 일시 오류만 maxRetry 까지 재시도한다.
                 boolean vendorRejected = Boolean.TRUE.equals(item.get("sendVendorRejected"));
-                boolean exhausted = vendorRejected || retryCnt >= maxRetry;
+                boolean eventMode = ApprovalNotificationDispatchMode.isEventMode(dispatchMode);
+                boolean exhausted = eventMode || vendorRejected || retryCnt >= maxRetry;
                 String detail = item.get("sendErrDetail") == null ? "" : String.valueOf(item.get("sendErrDetail"));
                 updateParam.put("retryCnt", retryCnt);
                 updateParam.put("notifStatus", exhausted ? "EXHAUSTED" : "FAIL");
-                String errMsg = "발송 실패 (회차: " + retryCnt + "/" + maxRetry + (vendorRejected ? ", 재시도 불가로 즉시 종료" : "") + ")"
+                String errMsg = "발송 실패 (회차: " + retryCnt + "/" + maxRetry + (vendorRejected || eventMode ? ", 재시도 불가로 즉시 종료" : "") + ")"
                         + (detail.isEmpty() ? "" : " - " + detail);
                 errMsg = ApprovalSecurityUtil.maskSensitiveData(errMsg);
                 updateParam.put("errMsg", errMsg.length() > 300 ? errMsg.substring(0, 300) : errMsg);
                 am11Mapper.updateNotificationQueueStatus(updateParam);
+                if (eventMode) {
+                    ApprovalNotificationWarning.record();
+                }
                 if (exhausted) {
                     logger.error("[Notification Worker] 재시도 한도 소진(EXHAUSTED): notifId={}, 시도={}/{}, 사유={}", notifId, retryCnt, maxRetry, detail);
                 } else {
@@ -155,11 +163,15 @@ public class ApprovalQueueItemExecutor {
             }
         } catch (Exception e) {
             logger.error("[Notification Worker] 발송 처리 중 예외 발생: notifId={}", notifId, e);
+            boolean eventMode = ApprovalNotificationDispatchMode.isEventMode(dispatchMode);
+            if (eventMode) {
+                ApprovalNotificationWarning.record();
+            }
             retryCnt++;
             Map<String, Object> updateParam = new HashMap<>();
             updateParam.put("notifId", notifId);
             updateParam.put("retryCnt", retryCnt);
-            updateParam.put("notifStatus", retryCnt >= maxRetry ? "EXHAUSTED" : "FAIL");
+            updateParam.put("notifStatus", eventMode || retryCnt >= maxRetry ? "EXHAUSTED" : "FAIL");
             updateParam.put("errMsg", ApprovalSecurityUtil.maskSensitiveData("발송 예외: " + e.getMessage()));
             am11Mapper.updateNotificationQueueStatus(updateParam);
             return ExecutionResult.FAIL;

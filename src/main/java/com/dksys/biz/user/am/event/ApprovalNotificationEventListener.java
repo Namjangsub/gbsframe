@@ -19,6 +19,7 @@ import org.springframework.transaction.event.TransactionalEventListener;
 import com.dksys.biz.user.am.notification.Kakao10009MessageBuilder;
 import com.dksys.biz.user.am.notification.Kakao10009Sender;
 import com.dksys.biz.user.am.notification.ApprovalNotificationHistorySvc;
+import com.dksys.biz.user.am.util.ApprovalNotificationDispatchMode;
 import com.dksys.biz.user.am.util.ApprovalSecurityUtil;
 import com.dksys.biz.user.am.queue.service.ApprovalQueueSvc;
 import com.dksys.biz.user.bm.bm18.service.BM18Svc;
@@ -27,8 +28,9 @@ import com.google.gson.Gson;
 
 /**
  * 결재 알림 리스너. 모든 결재 알림은 템플릿 10009 로 발송하며, 발송 경로는 Kakao10009Sender 한 곳이다.
- * - 요청/완료/반려/취소/의견 모두 sendTalk10009 가 즉시 직접 발송한다. 상태별 차이는 vars(변수 값)에만 있다.
- * - 일시 오류(HTTP 비200·예외)만 TB_AM91M01 에 적재해 실행기가 재시도한다. 업체 거부 건은 재시도하지 않는다.
+ * - 요청/완료/반려/취소/의견 모두 sendTalk10009 가 이벤트 처리 시 직접 발송한다(dispatch-mode 와 무관). 상태별 차이는 vars(변수 값)에만 있다.
+ * - 일시 오류(HTTP 비200·예외)는 TB_AM91M01 에 재시도 건으로 적재한다. 업체 거부 건은 재시도하지 않는다.
+ * - AM11 이 업무 트랜잭션에서 적재한 평문 큐 행은 dispatch-mode 에 따라 드레인된다(EVENT: 이 리스너, SCHEDULER: 스케줄러).
  */
 @Component
 public class ApprovalNotificationEventListener {
@@ -38,7 +40,7 @@ public class ApprovalNotificationEventListener {
     @Value("${kakaoSend:false}")
     private boolean kakaoSend;
 
-    // 알림 발송 트리거 방식: SCHEDULER(주기적 폴링, 기본) | EVENT(이벤트 발생 시 즉시 일괄 발송)
+    // 알림 발송 트리거 방식: SCHEDULER(스케줄러 폴링 시 큐 드레인, 기본) | EVENT(스케줄러 OFF, 이벤트 커밋 직후 큐 드레인)
     @Value("${approval.notification.dispatch-mode:SCHEDULER}")
     private String dispatchMode;
 
@@ -100,10 +102,9 @@ public class ApprovalNotificationEventListener {
                     event.getEventType(), event.getDocId(), e);
         }
 
-        // 건별(EVENT) 발송 모드: 이 이벤트로 적재된 알림을 즉시 일괄 드레인한다(스케줄러 대기 없이 발송).
-        // 리스너는 @Async(앰비언트 트랜잭션 없음)이고 enqueue는 각각 커밋되므로, 여기서 드레인하면
-        // REQUIRES_NEW 실행기가 커밋된 큐 행을 정상 조회한다.
-        if ("EVENT".equalsIgnoreCase(dispatchMode) && approvalQueueSvc != null) {
+        // EVENT 모드: 스케줄러가 꺼져 있으므로 이 드레인이 큐 소비의 유일한 경로다.
+        // 평문 큐 행(enqueueNotification)은 업무 트랜잭션과 함께 커밋된 뒤 AFTER_COMMIT 에서 조회된다.
+        if (ApprovalNotificationDispatchMode.isEventMode(dispatchMode) && approvalQueueSvc != null) {
             try {
                 approvalQueueSvc.retryPendingNotifications();
             } catch (Exception e) {
@@ -252,6 +253,13 @@ public class ApprovalNotificationEventListener {
             recordHistory(event, receiverId, receiverNm, mobile, title, message, todoNo, todoDiv2CodeId, result);
         }
         if (result.isOk()) {
+            return;
+        }
+        if (ApprovalNotificationDispatchMode.isEventMode(dispatchMode)) {
+            // EVENT 모드는 재시도 큐를 쓰지 않는다. 실패 이력은 위 recordHistory 가 이미 남기고, 같은 요청의 응답으로 사용자에게 알린다.
+            logger.error("[ApprovalNotification] EVENT 발송 실패(재시도 없음): receiverId={}, retryable={}, status={}, detail={}",
+                    receiverId, result.isRetryable(), result.getStatus(), result.getDetail());
+            ApprovalNotificationWarning.record();
             return;
         }
         if (!result.isRetryable()) {
