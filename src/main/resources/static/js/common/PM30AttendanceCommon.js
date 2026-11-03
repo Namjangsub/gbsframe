@@ -498,19 +498,19 @@ function classifyWorkCategory(row) {
 	var wt = String(row.workTypeNm || '').trim();
 	if (wt === '제외' || wt === '휴가' || wt === '휴일' || wt === '정보없음') return null;
 
-	// 1. [코드 최우선] 출장 유형 코드(tripTypeCds) 우선 판정
-	var tc = String(row.tripTypeCds || row.tripTypeCd || '').trim().toUpperCase();
-	if (tc === 'PM51TYPE30') return 'install';
-	if (tc === 'PM51TYPE40') return 'fault';
-	if (tc === 'PM51TYPE60') return 'asFree';
-	if (tc.indexOf('PM51TYPE') !== -1) return 'etcTrip';
-
-	// 2. [텍스트 fallback] 코드가 없거나 매핑되지 않은 경우 근무형태 텍스트 기준 판정
+	// 1. [근무형태 최우선] 근무형태(workTypeNm)는 자동 판별값 또는 담당자가 마지막으로 변경한 값이므로 이를 기준으로 분류
 	if (wt === '사내1' || wt === '사내2' || wt === '사내3') return 'inhouse';
 	if (wt === '설치시운전') return 'install';
 	if (wt === '설치장애') return 'fault';
 	if (wt === 'A/S(무상)') return 'asFree';
 	if (wt === '기타출장') return 'etcTrip';
+
+	// 2. [코드 fallback] 근무형태로 분류되지 않는 경우 출장 유형 코드(tripTypeCds)로 판정
+	var tc = String(row.tripTypeCds || row.tripTypeCd || '').trim().toUpperCase();
+	if (tc === 'PM51TYPE30') return 'install';
+	if (tc === 'PM51TYPE40') return 'fault';
+	if (tc === 'PM51TYPE60') return 'asFree';
+	if (tc.indexOf('PM51TYPE') !== -1) return 'etcTrip';
 
 	if (row.tripApplNo || row.tripReplyNo) return 'etcTrip';
 	return null;
