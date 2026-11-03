@@ -58,7 +58,7 @@
 		color: #fff;
 		margin-left: 3px;
 		vertical-align: middle;
-		cursor: default;
+		cursor: pointer;
 	}
 	.badge-issue.badge-issue-has-unresolved {
 		background-color: #d9534f; /* 미완료 이슈 있음 (붉은색) */
@@ -77,7 +77,7 @@
 		background-color: #e67e22; /* 미확정 주황/경고 */
 		margin-left: 3px;
 		vertical-align: middle;
-		cursor: default;
+		cursor: pointer;
 	}
 	.badge-unsettled {
 		display: inline-block;
@@ -90,7 +90,7 @@
 		background-color: #9b59b6; /* 미정산(추후정산) 보라색 */
 		margin-left: 3px;
 		vertical-align: middle;
-		cursor: default;
+		cursor: pointer;
 	}
 	.badge-settlement {
 		display: inline-block;
@@ -103,7 +103,76 @@
 		background-color: #3498db; /* 정산상계 파란색 */
 		margin-left: 3px;
 		vertical-align: middle;
-		cursor: default;
+		cursor: pointer;
+	}
+
+	/* 마우스 호버 시 표시되는 수주 뱃지 상세 팝오버 툴팁 레이어 (BM1901M01 스타일) */
+	.cr02-badge-popover {
+		position: fixed;
+		z-index: 999999;
+		display: none;
+		background: #ffffff;
+		border: 1px solid #3b62b1;
+		border-radius: 6px;
+		box-shadow: 0 4px 18px rgba(0, 0, 0, 0.22);
+		padding: 10px 14px;
+		min-width: 320px;
+		max-width: 480px;
+		max-height: 520px;
+		overflow-y: auto;
+		font-size: 12px;
+		color: #333333;
+		pointer-events: auto;
+		line-height: 1.45;
+	}
+	.cr02-badge-popover .popover-title {
+		font-weight: bold;
+		border-bottom: 2px solid #3b62b1;
+		padding-bottom: 6px;
+		margin-bottom: 8px;
+		font-size: 13px;
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+	}
+	.cr02-badge-popover .popover-badge {
+		font-size: 11px;
+		font-weight: bold;
+		color: #ffffff;
+		padding: 2px 7px;
+		border-radius: 3px;
+		white-space: nowrap;
+		margin-left: 8px;
+	}
+	.cr02-badge-popover .popover-item {
+		padding: 2.5px 0;
+		color: #444444;
+		word-break: break-all;
+	}
+	.cr02-badge-popover .popover-item b {
+		color: #222222;
+		display: inline-block;
+		min-width: 78px;
+		font-weight: 600;
+	}
+	.cr02-badge-popover .popover-box {
+		margin-top: 5px;
+		margin-bottom: 5px;
+		padding: 6px 9px;
+		background: #f8f9fa;
+		border-radius: 4px;
+		border-left: 3px solid #3b62b1;
+		white-space: pre-wrap;
+		word-break: break-all;
+		max-height: 130px;
+		overflow-y: auto;
+		color: #333333;
+		font-size: 11.5px;
+		line-height: 1.4;
+	}
+	.cr02-badge-popover .popover-divider {
+		margin: 6px 0;
+		border-top: 1px dashed #dadce0;
 	}
 
     ul.ul_list.type03-est li {
@@ -429,6 +498,14 @@
 	function getSalesCdBadgesHtml(item) {
 		if (!item) return '';
 		var badges = '';
+		var ordrsNoAttr = escapeHtml(item.ordrsNo || '');
+		var salesCdAttr = escapeHtml((item.salesCd && item.salesCd !== '-') ? item.salesCd : '');
+		var lvlAttr = escapeHtml(item.lvl || '');
+		var ioSeqAttr = escapeHtml(item.ioSeq !== undefined && item.ioSeq !== null ? item.ioSeq : '');
+		var dataAttrs = ' data-ordrs-no="' + ordrsNoAttr + '"'
+		              + ' data-sales-cd="' + salesCdAttr + '"'
+		              + ' data-lvl="' + lvlAttr + '"'
+		              + ' data-io-seq="' + ioSeqAttr + '"';
 
 		// 1) 이슈 뱃지 (미완료문제건수 / 발생건수)
 		var totIss = parseInt(item.issueTotCnt, 10);
@@ -436,33 +513,780 @@
 		if (!isNaN(totIss) && totIss > 0) {
 			var uncomp = isNaN(uncompIss) ? 0 : uncompIss;
 			var cls = uncomp > 0 ? "badge-issue-has-unresolved" : "badge-issue-all-resolved";
-			badges += '<span class="badge-issue ' + cls + '" title="미완료문제 ' + uncomp + '건 / 발생 ' + totIss + '건">' + uncomp + '/' + totIss + '</span>';
+			badges += '<span class="badge-issue ' + cls + '" data-badge-type="issue"' + dataAttrs + '>' + uncomp + '/' + totIss + '</span>';
 		}
 
 		// 2) 미확정 뱃지 (기준: 확정구분이 미확정(cnfmYn === 'N')이거나 미확정금액 존재 시 금액 유무와 무관하게 표시)
 		var cnfmV = String(item.cnfmYn || '').trim();
 		var isUnconfirmed = (cnfmV === 'N' || cnfmV === '미확정' || item.hasUnconfirmed === true || Math.abs(gPasFloatChk(item.rawCnfmYnAmt !== undefined ? item.rawCnfmYnAmt : item.cnfmYnAmt)) > 0);
 		if (isUnconfirmed) {
-			badges += '<span class="badge-unconfirmed" title="미확정 건 존재">미확정</span>';
+			badges += '<span class="badge-unconfirmed" data-badge-type="unconfirmed"' + dataAttrs + '>미확정</span>';
 		}
 
 		// 3) 미정산 뱃지 (추후정산 항목이 있는 경우: unsettledAmt != 0 또는 ordrsDtlDiv10 === 'ORDRSDTLDIV1040' 또는 하위 추후정산 존재)
 		var unsettledAmt = gPasFloatChk(item.unsettledAmt);
 		var isUnsettledItem = (item.ordrsDtlDiv10 === 'ORDRSDTLDIV1040' || item.hasUnsettled === true);
 		if (Math.abs(unsettledAmt) > 0 || isUnsettledItem) {
-			var unsettledTitle = "추후정산: " + (Math.abs(unsettledAmt) > 0 ? unsettledAmt.toLocaleString() + "천원" : "항목존재");
-			badges += '<span class="badge-unsettled" title="' + unsettledTitle + '">미정산</span>';
+			badges += '<span class="badge-unsettled" data-badge-type="unsettled"' + dataAttrs + '>미정산</span>';
 		}
 
 		// 4) 정산상계 뱃지 (정산상계 항목이 있는 경우: settlementAmt != 0 또는 ordrsDtlDiv10 === 'ORDRSDTLDIV1050' 또는 하위 정산상계 존재)
 		var settlementAmt = gPasFloatChk(item.settlementAmt);
 		var isSettlementItem = (item.ordrsDtlDiv10 === 'ORDRSDTLDIV1050' || item.hasSettlement === true);
 		if (Math.abs(settlementAmt) > 0 || isSettlementItem) {
-			var settlementTitle = "정산상계: " + (Math.abs(settlementAmt) > 0 ? settlementAmt.toLocaleString() + "천원" : "항목존재");
-			badges += '<span class="badge-settlement" title="' + settlementTitle + '">정산상계</span>';
+			badges += '<span class="badge-settlement" data-badge-type="settlement"' + dataAttrs + '>정산상계</span>';
 		}
 
 		return badges;
+	}
+
+	/* =========================================================================
+	 *  BM1901M01 스타일 뱃지 상세 팝오버 툴팁 함수군
+	 * ========================================================================= */
+	function escapeHtml(text) {
+		if (text === null || text === undefined) return "";
+		return String(text)
+			.replace(/&/g, "&amp;")
+			.replace(/</g, "&lt;")
+			.replace(/>/g, "&gt;")
+			.replace(/"/g, "&quot;")
+			.replace(/'/g, "&#039;");
+	}
+
+	/**
+	 * AX5-Grid 트리 구조에서 숨겨진 하위 행(collapsed)으로 인해 dindex(화면 표시 행)와 doindex(전체 list 인덱스)가
+	 * 어긋나는 문제를 방지하기 위해, doindex 및 뱃지 자체 data-* 속성으로 정확한 행 데이터를 조회한다.
+	 */
+	function getFullGridList() {
+		if (gridView && gridView.target && gridView.target.list && gridView.target.list.length > 0) {
+			return gridView.target.list;
+		}
+		if (gridView && gridView.target && typeof gridView.target.getList === "function") {
+			return gridView.target.getList() || [];
+		}
+		return [];
+	}
+
+	function resolveGridItem($badge, $tr) {
+		var list = getFullGridList();
+		if (!list || list.length === 0) return null;
+
+		var bOrdrsNo = String($badge.attr("data-ordrs-no") || "").trim();
+		var bSalesCd = String($badge.attr("data-sales-cd") || "").trim();
+		var bLvl     = String($badge.attr("data-lvl") || "").trim();
+		var bIoSeq   = String($badge.attr("data-io-seq") || "").trim();
+
+		function isMatch(row) {
+			if (!row) return false;
+			if (bOrdrsNo && String(row.ordrsNo || "").trim() !== bOrdrsNo) return false;
+			if (bLvl && String(row.lvl || "").trim() !== bLvl) return false;
+			if (bLvl === "2") {
+				var rSc = (row.salesCd && row.salesCd !== "-") ? String(row.salesCd).trim() : "";
+				if (bSalesCd && rSc !== bSalesCd) return false;
+				if (!bSalesCd && bIoSeq && String(row.ioSeq !== undefined && row.ioSeq !== null ? row.ioSeq : "").trim() !== bIoSeq) return false;
+			}
+			return true;
+		}
+
+		// 1순위: tr의 data-ax5grid-tr-data-o-index (doindex: 원본 list 인덱스)
+		if ($tr && $tr.length > 0) {
+			var doindexAttr = $tr.attr("data-ax5grid-tr-data-o-index");
+			if (doindexAttr !== undefined && doindexAttr !== null && doindexAttr !== "") {
+				var doIdx = parseInt(doindexAttr, 10);
+				if (!isNaN(doIdx) && list[doIdx] && isMatch(list[doIdx])) {
+					return list[doIdx];
+				}
+			}
+			// 2순위: proxyList(화면 표시용 트리 배열)에서 dindex로 조회
+			var dindexAttr = $tr.attr("data-ax5grid-tr-data-index");
+			if (dindexAttr !== undefined && dindexAttr !== null && dindexAttr !== "" && gridView.target && gridView.target.proxyList) {
+				var dIdx = parseInt(dindexAttr, 10);
+				if (!isNaN(dIdx) && gridView.target.proxyList[dIdx] && isMatch(gridView.target.proxyList[dIdx])) {
+					var proxyRow = gridView.target.proxyList[dIdx];
+					if (proxyRow.__origin_index__ !== undefined && list[proxyRow.__origin_index__]) {
+						return list[proxyRow.__origin_index__];
+					}
+					return proxyRow;
+				}
+			}
+		}
+
+		// 3순위: 뱃지 data-* 속성(ordrsNo, salesCd, lvl, ioSeq)으로 원본 list에서 직접 탐색
+		if (bOrdrsNo) {
+			for (var i = 0; i < list.length; i++) {
+				if (isMatch(list[i])) {
+					return list[i];
+				}
+			}
+		}
+
+		// 4순위 fallback
+		if ($tr && $tr.length > 0) {
+			var fallbackDo = $tr.attr("data-ax5grid-tr-data-o-index");
+			if (fallbackDo !== undefined && fallbackDo !== "") {
+				return list[parseInt(fallbackDo, 10)] || null;
+			}
+			var fallbackD = $tr.attr("data-ax5grid-tr-data-index");
+			if (fallbackD !== undefined && fallbackD !== "") {
+				return list[parseInt(fallbackD, 10)] || null;
+			}
+		}
+		return null;
+	}
+
+	/**
+	 * 특정 수주번호(ordrsNo)에 속한 모든 하위(lvl=2) 상세 행 목록 반환 (트리가 접혀 있어도 원본 list에서 모두 조회)
+	 */
+	function getChildSalesCdRows(ordrsNo) {
+		var targetNo = String(ordrsNo || "").trim();
+		if (!targetNo) return [];
+		var list = getFullGridList();
+		var children = [];
+		for (var i = 0; i < list.length; i++) {
+			var r = list[i];
+			if (r && String(r.lvl) === "2" && String(r.ordrsNo || "").trim() === targetNo) {
+				children.push(r);
+			}
+		}
+		return children;
+	}
+
+	var cr02IssueCache = {};
+	var cr02CurrentPopoverKey = null;
+	var cr02CurrentPopoverItem = null;
+	var cr02CurrentBadgeEl = null;
+	var cr02PopoverHideTimer = null;
+	var lastBadgeHoverEvent = null;
+
+	function clearPopoverHideTimer() {
+		if (cr02PopoverHideTimer) {
+			clearTimeout(cr02PopoverHideTimer);
+			cr02PopoverHideTimer = null;
+		}
+	}
+
+	function scheduleHideBadgePopover(delayMs) {
+		clearPopoverHideTimer();
+		cr02PopoverHideTimer = setTimeout(function() {
+			cr02PopoverHideTimer = null;
+			hideBadgePopover();
+		}, delayMs || 220);
+	}
+
+	function isPointerInsidePopover(e) {
+		var $pop = $("#cr02BadgePopover");
+		if ($pop.length === 0 || !$pop.is(":visible")) return false;
+		var cx = e.clientX !== undefined ? e.clientX : (e.originalEvent ? e.originalEvent.clientX : -1);
+		var cy = e.clientY !== undefined ? e.clientY : (e.originalEvent ? e.originalEvent.clientY : -1);
+		if (cx < 0 || cy < 0) return false;
+		var rect = $pop[0].getBoundingClientRect();
+		return (cx >= rect.left - 2 && cx <= rect.right + 2 && cy >= rect.top - 2 && cy <= rect.bottom + 2);
+	}
+
+	function bindBadgePopover() {
+		var badgeSelector = ".badge-issue, .badge-unconfirmed, .badge-unsettled, .badge-settlement";
+
+		// 뱃지 마우스 진입 시 툴팁 표시 (타이머 취소)
+		$(document).on("mouseenter", badgeSelector, function(e) {
+			clearPopoverHideTimer();
+			var $badge = $(this);
+			var badgeType = $badge.attr("data-badge-type");
+			var $tr = $badge.closest("tr[data-ax5grid-tr-data-index]");
+			var item = resolveGridItem($badge, $tr);
+			showBadgePopover(e, badgeType, item, $badge);
+		});
+		// 뱃지에서 마우스가 나갈 때 툴팁 위로 이동할 수 있도록 유예 시간 부여
+		$(document).on("mouseleave", badgeSelector, function(e) {
+			scheduleHideBadgePopover(240);
+		});
+		// 툴팁 내부로 마우스가 진입하면 닫힘 타이머 취소하여 툴팁 유지 및 스크롤 가능
+		$(document).on("mouseenter", "#cr02BadgePopover", function(e) {
+			clearPopoverHideTimer();
+		});
+		// 툴팁 밖으로 마우스가 나가면 즉시(짧은 유예 후) 닫기
+		$(document).on("mouseleave", "#cr02BadgePopover", function(e) {
+			scheduleHideBadgePopover(140);
+		});
+		// 마우스 이동 시 뱃지나 툴팁 영역 밖이면 닫힘 타이머가 누락되지 않도록 상시 감시 (휠 관성 이벤트나 그리드 행 재렌더링으로 mouseleave가 누락되는 현상 방지)
+		$(document).on("mousemove", function(e) {
+			var $pop = $("#cr02BadgePopover");
+			if ($pop.length === 0 || !$pop.is(":visible")) return;
+			var onBadgeOrPop = $(e.target).closest("#cr02BadgePopover, " + badgeSelector).length > 0 || isPointerInsidePopover(e);
+			if (onBadgeOrPop) {
+				clearPopoverHideTimer();
+			} else if (!cr02PopoverHideTimer) {
+				scheduleHideBadgePopover(160);
+			}
+		});
+		// 툴팁/뱃지 외부 클릭(마우스 휠 클릭 포함) 시 즉시 닫기
+		$(document).on("mousedown", function(e) {
+			if ($(e.target).closest("#cr02BadgePopover, " + badgeSelector).length === 0) {
+				hideBadgePopover();
+			}
+		});
+		// 이슈 뱃지 클릭 시 팝업 오픈
+		$(document).on("click", ".badge-issue", function(e) {
+			e.stopPropagation();
+			var $badge = $(this);
+			var $tr = $badge.closest("tr[data-ax5grid-tr-data-index]");
+			var item = resolveGridItem($badge, $tr);
+			hideBadgePopover();
+			if (item) {
+				openIssueList(item);
+			}
+		});
+		// 툴팁 내부의 이슈 팝업 열기 안내문 클릭 시에도 동일하게 팝업 오픈
+		$(document).on("click", "#cr02BadgePopover .popover-open-issue-btn", function(e) {
+			e.stopPropagation();
+			var targetItem = cr02CurrentPopoverItem;
+			hideBadgePopover();
+			if (targetItem) {
+				openIssueList(targetItem);
+			}
+		});
+		// 마우스 휠 스크롤 처리: 포인터가 실제 툴팁 내부에 있을 때만 툴팁 스크롤을 유지하고, 그 외(그리드 스크롤 또는 툴팁 이탈 후 관성 휠)에는 닫기 처리
+		$(document).on("wheel mousewheel", function(e) {
+			var $pop = $("#cr02BadgePopover");
+			if ($pop.length === 0 || !$pop.is(":visible")) return;
+			if ($(e.target).closest("#cr02BadgePopover").length > 0 && isPointerInsidePopover(e)) {
+				e.stopPropagation();
+				return;
+			}
+			hideBadgePopover();
+		});
+		$(window).on("scroll", function(e) {
+			if (e && e.target && $(e.target).closest("#cr02BadgePopover").length > 0) {
+				return;
+			}
+			hideBadgePopover();
+		});
+	}
+
+	function fmtAmt(val, unit) {
+		var n = gPasFloatChk(val);
+		if (isNaN(n) || n === 0) return "0" + (unit || "천원");
+		return n.toLocaleString() + (unit || "천원");
+	}
+
+	function isRowUnconfirmed(r) {
+		if (!r) return false;
+		var v = String(r.cnfmYn || "").trim();
+		var rawAmt = gPasFloatChk(r.rawCnfmYnAmt !== undefined ? r.rawCnfmYnAmt : r.cnfmYnAmt);
+		return (v === "N" || v === "미확정" || r.hasUnconfirmed === true || Math.abs(rawAmt) > 0);
+	}
+
+	/**
+	 * 상위 수주(lvl=1) 호버 시 하위 모든 salesCd(lvl=2) 상세 목록 HTML 생성
+	 */
+	function buildChildSalesCdListHtml(childRows, mode) {
+		if (!childRows || childRows.length === 0) return "";
+		var html = '<div class="popover-divider"></div>';
+		html += '<div class="popover-item" style="font-weight:bold; color:#1e3a8a; margin-bottom:4px; display:flex; justify-content:space-between; align-items:center;">'
+		      + '  <span><i class="fa fa-sitemap" style="margin-right:4px;"></i>하위 Sales Code 전체 내역 (' + childRows.length + '건)</span>'
+		      + '  <span style="font-size:10px; font-weight:normal; color:#64748b;">(마우스 휠 스크롤)</span>'
+		      + '</div>';
+		html += '<div class="popover-scroll-area" style="max-height: 220px; overflow-y: auto; border: 1px solid #cbd5e1; border-radius: 4px; padding: 4px; background: #f8fafc;">';
+
+		for (var i = 0; i < childRows.length; i++) {
+			var c = childRows[i];
+			var scLabel = (c.salesCd && c.salesCd !== "-") ? c.salesCd : (c.ordrsDtlDiv10Nm || ("항목#" + (c.ioSeq || (i + 1))));
+			var eqp = c.eqpNm || c.prdtNm || c.ordrsDtlDiv10Nm || "-";
+			var prc = gPasFloatChk(c.ordrsPrc);
+			var prcMach = gPasFloatChk(c.ordrsPrcMach);
+			var prcElcty = gPasFloatChk(c.ordrsPrcElcty);
+			var trgt = gPasFloatChk(c.estTrgtCost);
+			var act = gPasFloatChk(c.actTot);
+			var unconf = isRowUnconfirmed(c);
+			var unsettled = gPasFloatChk(c.unsettledAmt);
+			var settlement = gPasFloatChk(c.settlementAmt);
+			var cTotIss = gPasIntChk(c.issueTotCnt);
+			var cUncompIss = gPasIntChk(c.issueUncompCnt);
+
+			var borderColor = "#94a3b8";
+			var statusBadge = "";
+
+			if (mode === "unconfirmed") {
+				borderColor = unconf ? "#e67e22" : "#10b981";
+				statusBadge = unconf
+					? '<span style="background:#e67e22;color:#fff;font-size:10px;padding:1px 5px;border-radius:8px;font-weight:bold;">미확정</span>'
+					: '<span style="background:#10b981;color:#fff;font-size:10px;padding:1px 5px;border-radius:8px;font-weight:bold;">확정</span>';
+			} else if (mode === "unsettled") {
+				var hasUn = (c.ordrsDtlDiv10 === "ORDRSDTLDIV1040" || Math.abs(unsettled) > 0);
+				borderColor = hasUn ? "#9b59b6" : "#cbd5e1";
+				statusBadge = hasUn
+					? '<span style="background:#9b59b6;color:#fff;font-size:10px;padding:1px 5px;border-radius:8px;font-weight:bold;">미정산 ' + fmtAmt(unsettled) + '</span>'
+					: '<span style="background:#94a3b8;color:#fff;font-size:10px;padding:1px 5px;border-radius:8px;">일반</span>';
+			} else if (mode === "settlement") {
+				var hasSet = (c.ordrsDtlDiv10 === "ORDRSDTLDIV1050" || Math.abs(settlement) > 0);
+				borderColor = hasSet ? "#3498db" : "#cbd5e1";
+				statusBadge = hasSet
+					? '<span style="background:#3498db;color:#fff;font-size:10px;padding:1px 5px;border-radius:8px;font-weight:bold;">상계 ' + fmtAmt(settlement) + '</span>'
+					: '<span style="background:#94a3b8;color:#fff;font-size:10px;padding:1px 5px;border-radius:8px;">일반</span>';
+			} else if (mode === "issue") {
+				if (cTotIss > 0) {
+					borderColor = cUncompIss > 0 ? "#d9534f" : "#5cb85c";
+					statusBadge = '<span style="background:' + borderColor + ';color:#fff;font-size:10px;padding:1px 5px;border-radius:8px;font-weight:bold;">이슈 ' + cUncompIss + '/' + cTotIss + '</span>';
+				} else {
+					borderColor = "#cbd5e1";
+					statusBadge = '<span style="background:#cbd5e1;color:#475569;font-size:10px;padding:1px 5px;border-radius:8px;">이슈없음</span>';
+				}
+			}
+
+			html += '<div style="padding: 4px 6px; margin-bottom: 3px; background: #ffffff; border-radius: 3px; border-left: 3px solid ' + borderColor + '; box-shadow: 0 1px 2px rgba(0,0,0,0.04);">'
+			      + '  <div style="display:flex; justify-content:space-between; align-items:center; font-weight:600; color:#1e293b;">'
+			      + '    <span>' + escapeHtml(scLabel) + ' <span style="font-weight:normal; color:#475569; font-size:11px;">(' + escapeHtml(eqp) + ')</span></span>'
+			      + '    ' + statusBadge
+			      + '  </div>'
+			      + '  <div style="font-size: 10.5px; color: #475569; margin-top: 2px;">'
+			      + '    <span><b>수주가:</b> ' + fmtAmt(prc) + ' <span style="color:#64748b;">(기계 ' + fmtAmt(prcMach) + ' / 전기 ' + fmtAmt(prcElcty) + ')</span></span>'
+			      + '    <span style="margin-left: 8px;"><b>목표원가:</b> ' + fmtAmt(trgt) + '</span>'
+			      + (act ? '<span style="margin-left: 8px;"><b>실행원가:</b> ' + fmtAmt(act) + '</span>' : '')
+			      + '  </div>'
+			      + '</div>';
+		}
+
+		html += '</div>';
+		return html;
+	}
+
+	function buildIssuePopoverHtml(item, issues, isLoading) {
+		var isMaster = (String(item.lvl) === "1" || !item.salesCd || item.salesCd === "-");
+		var ordrsNo = item.ordrsNo || "";
+		var salesCd = (!isMaster && item.salesCd && item.salesCd !== "-") ? item.salesCd : "";
+		var clntInfo = (item.clntNm || "") + (item.clntPjtNm ? " [" + item.clntPjtNm + "]" : "");
+		var eqpInfo = isMaster ? (item.ctrtNm || item.eqpNm || "") : (item.eqpNm || item.ctrtNm || "");
+		var mngNm = item.mngNm || item.mngIdNm || "";
+		var childRows = isMaster ? getChildSalesCdRows(ordrsNo) : [];
+
+		var totIss = issues ? issues.length : (parseInt(item.issueTotCnt, 10) || 0);
+		var uncompIss = 0;
+		if (issues) {
+			uncompIss = issues.filter(function(x) {
+				return x.issSts !== 'ISSSTS03' && x.issSts !== 'REQST03';
+			}).length;
+		} else {
+			uncompIss = parseInt(item.issueUncompCnt, 10) || 0;
+		}
+
+		var hasUnresolved = (uncompIss > 0);
+		var themeColor = hasUnresolved ? "#d9534f" : "#5cb85c";
+		var badgeText = hasUnresolved ? "미완료 " + uncompIss + "건" : "전체 완료";
+
+		var html = "";
+		html += '<div class="popover-title" style="color: ' + themeColor + '; border-bottom-color: ' + themeColor + ';">'
+		      + '  <span><i class="fa fa-exclamation-triangle" style="margin-right: 5px;"></i>' + (isMaster ? '수주 전체 문제/이슈 현황' : 'Sales Code 문제/이슈 현황') + ' (' + uncompIss + '/' + totIss + ')</span>'
+		      + '  <span class="popover-badge" style="background: ' + themeColor + ';">' + badgeText + '</span>'
+		      + '</div>';
+
+		if (ordrsNo) html += '<div class="popover-item"><b>수주번호:</b> ' + escapeHtml(ordrsNo) + (isMaster ? ' <span style="color:#2563eb;font-weight:bold;">(상위 수주)</span>' : '') + '</div>';
+		if (salesCd) html += '<div class="popover-item"><b>Sales Code:</b> ' + escapeHtml(salesCd) + '</div>';
+		if (clntInfo) html += '<div class="popover-item"><b>고객사/PJT:</b> ' + escapeHtml(clntInfo) + '</div>';
+		if (eqpInfo) html += '<div class="popover-item"><b>' + (isMaster ? '계약명:' : '설비명:') + '</b> ' + escapeHtml(eqpInfo) + '</div>';
+		if (mngNm) html += '<div class="popover-item"><b>담당자:</b> ' + escapeHtml(mngNm) + '</div>';
+
+		html += '<div class="popover-divider"></div>';
+		if (isMaster) {
+			var sumPrc = 0, sumTrgt = 0, sumAct = 0;
+			for (var cIdx = 0; cIdx < childRows.length; cIdx++) {
+				sumPrc += gPasFloatChk(childRows[cIdx].ordrsPrc);
+				sumTrgt += gPasFloatChk(childRows[cIdx].estTrgtCost);
+				sumAct += gPasFloatChk(childRows[cIdx].actTot);
+			}
+			var masterOrdAmt = gPasFloatChk(item.ordrsAmt) || sumPrc;
+			var masterTrgt = gPasFloatChk(item.estTrgtCost) || sumTrgt;
+			var masterAct = gPasFloatChk(item.actTot) || sumAct;
+			html += '<div class="popover-item"><b>총 수주금액:</b> <span style="font-weight:600;">' + fmtAmt(masterOrdAmt) + '</span></div>';
+			html += '<div class="popover-item"><b>수주목표원가:</b> ' + fmtAmt(masterTrgt) + '</div>';
+			if (masterAct) html += '<div class="popover-item"><b>실행원가:</b> ' + fmtAmt(masterAct) + '</div>';
+		} else {
+			html += '<div class="popover-item"><b>설비 수주가:</b> <span style="font-weight:600;">' + fmtAmt(item.ordrsPrc) + '</span> <span style="color:#666;font-size:11px;">(기계 ' + fmtAmt(item.ordrsPrcMach) + ' / 전기 ' + fmtAmt(item.ordrsPrcElcty) + ')</span></div>';
+			html += '<div class="popover-item"><b>수주목표원가:</b> ' + fmtAmt(item.estTrgtCost) + '</div>';
+			if (gPasFloatChk(item.actTot)) html += '<div class="popover-item"><b>실행원가:</b> ' + fmtAmt(item.actTot) + '</div>';
+		}
+
+		html += '<div class="popover-divider"></div>';
+		html += '<div class="popover-item" style="display:flex; justify-content:space-between;">'
+		      + '  <span><b>총 발생:</b> ' + totIss + '건</span>'
+		      + '  <span><b>미완료:</b> <span style="color:#d9534f;font-weight:bold;">' + uncompIss + '건</span></span>'
+		      + '  <span><b>조치완료:</b> <span style="color:#5cb85c;font-weight:bold;">' + (totIss - uncompIss) + '건</span></span>'
+		      + '</div>';
+
+		if (isMaster && childRows.length > 0) {
+			html += buildChildSalesCdListHtml(childRows, "issue");
+		}
+
+		if (isLoading) {
+			html += '<div class="popover-divider"></div>';
+			html += '<div style="padding: 8px; text-align: center; color: #888; font-size: 11px;">'
+			      + '  <i class="fa fa-spinner fa-spin" style="margin-right: 5px;"></i>문제 상세내역 조회 중...'
+			      + '</div>';
+		} else if (issues && issues.length > 0) {
+			html += '<div class="popover-divider"></div>';
+			html += '<div class="popover-item" style="font-weight:bold; color:#222; margin-bottom:3px; display:flex; justify-content:space-between; align-items:center;">'
+			      + '  <span><i class="fa fa-list-alt" style="margin-right:4px; color:' + themeColor + ';"></i>등록 문제 내역 (전체 ' + issues.length + '건)</span>'
+			      + '  <span style="font-size:10px; font-weight:normal; color:#64748b;">(마우스 휠 스크롤)</span>'
+			      + '</div>';
+			html += '<div class="popover-scroll-area" style="max-height: 210px; overflow-y: auto; border: 1px solid #e2e8f0; border-radius: 4px; padding: 4px; background: #fafbfc;">';
+
+			var sortedIssues = issues.slice().sort(function(a, b) {
+				var aUncomp = (a.issSts !== 'ISSSTS03' && a.issSts !== 'REQST03') ? 0 : 1;
+				var bUncomp = (b.issSts !== 'ISSSTS03' && b.issSts !== 'REQST03') ? 0 : 1;
+				if (aUncomp !== bUncomp) return aUncomp - bUncomp;
+				var dtA = (a.workRptDt || a.creatDttm || '');
+				var dtB = (b.workRptDt || b.creatDttm || '');
+				return dtB.localeCompare(dtA);
+			});
+
+			for (var i = 0; i < sortedIssues.length; i++) {
+				var iss = sortedIssues[i];
+				var isUncomp = (iss.issSts !== 'ISSSTS03' && iss.issSts !== 'REQST03');
+				var statusTag = isUncomp
+					? '<span style="color:#d9534f;font-weight:bold;margin-right:4px;">[미완료]</span>'
+					: '<span style="color:#5cb85c;font-weight:bold;margin-right:4px;">[완료]</span>';
+				var scTag = (isMaster && iss.salesCd)
+					? '<span style="color:#2563eb;font-weight:600;margin-right:4px;">[' + escapeHtml(iss.salesCd) + ']</span>'
+					: '';
+				var occDate = iss.workRptDt || iss.creatDttm || '-';
+				var actor = (iss.actIdNm || iss.workRptIdNm || '-') + (iss.actDeptNm ? ' (' + iss.actDeptNm + ')' : '');
+				var title = iss.issueTitle || iss.issSj || iss.workRptRmk || '문제제목 없음';
+
+				html += '<div style="padding: 4px 6px; margin-bottom: 3px; background: #ffffff; border-radius: 3px; border-left: 3px solid ' + (isUncomp ? '#d9534f' : '#5cb85c') + '; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">'
+				      + '  <div style="font-weight:600; color:#333; line-height: 1.3;">' + statusTag + scTag + escapeHtml(title) + '</div>'
+				      + '  <div style="font-size: 10px; color: #666; margin-top: 2px;">'
+				      + '    <span><b>발생일자:</b> ' + escapeHtml(occDate) + '</span>'
+				      + '    <span style="margin-left: 10px;"><b>조치자:</b> ' + escapeHtml(actor) + '</span>'
+				      + (iss.wbsRsltseDt ? '<span style="margin-left: 10px;"><b>완료일:</b> ' + escapeHtml(iss.wbsRsltseDt) + '</span>' : '')
+				      + '  </div>'
+				      + (iss.workRptRmk && iss.workRptRmk !== title ? '<div style="font-size: 10px; color: #777; margin-top: 2px; white-space: pre-wrap; word-break: break-all;">' + escapeHtml(iss.workRptRmk) + '</div>' : '')
+				      + '</div>';
+			}
+
+			html += '</div>';
+		} else if (issues && issues.length === 0) {
+			html += '<div class="popover-divider"></div>';
+			html += '<div style="padding: 6px; text-align: center; color: #888; font-size: 11px;">등록된 문제가 없습니다.</div>';
+		}
+
+		html += '<div class="popover-box popover-open-issue-btn" style="border-left-color: ' + themeColor + '; margin-top: 6px; text-align:center; cursor:pointer;">'
+		      + '  <i class="fa fa-mouse-pointer" style="margin-right: 4px;"></i>뱃지 또는 여기를 클릭 시 문제/이슈 팝업 목록이 열립니다.'
+		      + '</div>';
+
+		return html;
+	}
+
+	function updateIssueBadgeCountInDom(item, uncomp, tot) {
+		if (!item) return;
+		item.issueUncompCnt = uncomp;
+		item.issueTotCnt = tot;
+		var bOrdrsNo = String(item.ordrsNo || "").trim();
+		var bSalesCd = (item.salesCd && item.salesCd !== "-") ? String(item.salesCd).trim() : "";
+		var bLvl = String(item.lvl || "").trim();
+		$('.badge-issue').each(function() {
+			var $el = $(this);
+			if (String($el.attr("data-ordrs-no") || "").trim() === bOrdrsNo &&
+			    String($el.attr("data-sales-cd") || "").trim() === bSalesCd &&
+			    String($el.attr("data-lvl") || "").trim() === bLvl) {
+				$el.text(uncomp + '/' + tot);
+				if (uncomp > 0) {
+					$el.removeClass('badge-issue-all-resolved').addClass('badge-issue-has-unresolved');
+				} else {
+					$el.removeClass('badge-issue-has-unresolved').addClass('badge-issue-all-resolved');
+				}
+			}
+		});
+	}
+
+	function showBadgePopover(e, badgeType, item, $badge) {
+		lastBadgeHoverEvent = e;
+		if (!item) return;
+		cr02CurrentPopoverItem = item;
+		cr02CurrentBadgeEl = $badge;
+
+		var $pop = $("#cr02BadgePopover");
+		if ($pop.length === 0) {
+			$pop = $('<div id="cr02BadgePopover" class="cr02-badge-popover"></div>');
+			$("body").append($pop);
+		}
+
+		var html = "";
+		var isMaster = (String(item.lvl) === "1" || !item.salesCd || item.salesCd === "-");
+		var ordrsNo = item.ordrsNo || "";
+		var salesCd = (!isMaster && item.salesCd && item.salesCd !== "-") ? item.salesCd : "";
+		var clntInfo = (item.clntNm || "") + (item.clntPjtNm ? " [" + item.clntPjtNm + "]" : "");
+		var eqpInfo = isMaster ? (item.ctrtNm || item.eqpNm || "") : (item.eqpNm || item.ctrtNm || "");
+		var mngNm = item.mngNm || item.mngIdNm || "";
+		var childRows = isMaster ? getChildSalesCdRows(ordrsNo) : [];
+
+		if (badgeType === "issue") {
+			var searchVal = salesCd || ordrsNo;
+			var targetKey = (item.coCd || "") + "_" + (isMaster ? ("MASTER_" + ordrsNo) : ("CHILD_" + salesCd));
+			cr02CurrentPopoverKey = targetKey;
+
+			if (cr02IssueCache[targetKey]) {
+				var cachedIssues = cr02IssueCache[targetKey];
+				html = buildIssuePopoverHtml(item, cachedIssues, false);
+				$pop.html(html).show();
+				positionBadgePopover(e, $badge, false);
+
+				var uncomp = cachedIssues.filter(function(x) { return x.issSts !== 'ISSSTS03' && x.issSts !== 'REQST03'; }).length;
+				var tot = cachedIssues.length;
+				updateIssueBadgeCountInDom(item, uncomp, tot);
+			} else {
+				html = buildIssuePopoverHtml(item, null, true);
+				$pop.html(html).show();
+				positionBadgePopover(e, $badge, false);
+
+				var fetchParam = {
+					"coCd"        : item.coCd || $("#coCd_S").val() || "",
+					"salesCd"     : searchVal,
+					"reqDtFrom"   : "20200101",
+					"reqDtTo"     : "20991231",
+					"workRptId"   : "",
+					"workRptIdNm" : "",
+					"prjctCd"     : "",
+					"prjctCdNm"   : "",
+					"prdtCd"      : "",
+					"prdtNm"      : "",
+					"itemDiv"     : "",
+					"actId"       : "",
+					"actIdNm"     : "",
+					"prdtDiv"     : "",
+					"pageNo"      : 1,
+					"recordCnt"   : 99999999,
+					"issSts"      : ""
+				};
+				postAjax("/user/pm/pm01/selectAllIssueWorkList", fetchParam, null, function(data) {
+					var resList = data.result || [];
+					if (salesCd) {
+						var upper = salesCd.toUpperCase();
+						resList = resList.filter(function(x) {
+							return !x.salesCd || x.salesCd.toUpperCase().indexOf(upper) >= 0;
+						});
+					} else if (ordrsNo) {
+						var prefix = String(ordrsNo).toUpperCase();
+						resList = resList.filter(function(x) {
+							return !x.salesCd || x.salesCd.toUpperCase().indexOf(prefix) === 0;
+						});
+					}
+					cr02IssueCache[targetKey] = resList;
+
+					var uncomp = resList.filter(function(x) { return x.issSts !== 'ISSSTS03' && x.issSts !== 'REQST03'; }).length;
+					var tot = resList.length;
+					updateIssueBadgeCountInDom(item, uncomp, tot);
+
+					if ($pop.is(":visible") && cr02CurrentPopoverKey === targetKey) {
+						var updatedHtml = buildIssuePopoverHtml(item, resList, false);
+						$pop.html(updatedHtml);
+						positionBadgePopover(lastBadgeHoverEvent || e, cr02CurrentBadgeEl, true);
+					}
+				});
+			}
+			return;
+		}
+		else if (badgeType === "unconfirmed") {
+			html += '<div class="popover-title" style="color: #e67e22; border-bottom-color: #e67e22;">'
+			      + '  <span><i class="fa fa-question-circle" style="margin-right: 5px;"></i>' + (isMaster ? '수주 미확정 종합 정보' : 'Sales Code 미확정 상세 정보') + '</span>'
+			      + '  <span class="popover-badge" style="background: #e67e22;">미확정</span>'
+			      + '</div>';
+
+			if (ordrsNo) html += '<div class="popover-item"><b>수주번호:</b> ' + escapeHtml(ordrsNo) + (isMaster ? ' <span style="color:#2563eb;font-weight:bold;">(상위 수주)</span>' : '') + '</div>';
+			if (salesCd) html += '<div class="popover-item"><b>Sales Code:</b> ' + escapeHtml(salesCd) + '</div>';
+			if (clntInfo) html += '<div class="popover-item"><b>고객사/PJT:</b> ' + escapeHtml(clntInfo) + '</div>';
+			if (eqpInfo) html += '<div class="popover-item"><b>' + (isMaster ? '계약명:' : '설비명:') + '</b> ' + escapeHtml(eqpInfo) + '</div>';
+			if (mngNm) html += '<div class="popover-item"><b>담당자:</b> ' + escapeHtml(mngNm) + '</div>';
+
+			if (isMaster) {
+				var unconfCnt = 0;
+				var sumUnconfPrc = 0, sumUnconfTrgt = 0, sumPrc = 0, sumMach = 0, sumElcty = 0, sumTrgt = 0, sumAct = 0;
+				for (var u = 0; u < childRows.length; u++) {
+					var cr = childRows[u];
+					var cPrc = gPasFloatChk(cr.ordrsPrc);
+					var cTrgt = gPasFloatChk(cr.estTrgtCost);
+					sumPrc += cPrc;
+					sumMach += gPasFloatChk(cr.ordrsPrcMach);
+					sumElcty += gPasFloatChk(cr.ordrsPrcElcty);
+					sumTrgt += cTrgt;
+					sumAct += gPasFloatChk(cr.actTot);
+					if (isRowUnconfirmed(cr)) {
+						unconfCnt++;
+						sumUnconfPrc += gPasFloatChk(cr.rawCnfmYnAmt !== undefined ? cr.rawCnfmYnAmt : (cr.cnfmYnAmt || cPrc));
+						sumUnconfTrgt += cTrgt;
+					}
+				}
+				var totOrdAmt = gPasFloatChk(item.ordrsAmt) || sumPrc;
+				var masterCnfmAmt = gPasFloatChk(item.rawCnfmYnAmt !== undefined ? item.rawCnfmYnAmt : item.cnfmYnAmt) || sumUnconfPrc;
+				html += '<div class="popover-item"><b>미확정 현황:</b> <span style="color:#e67e22;font-weight:bold;">전체 ' + childRows.length + '건 중 미확정 ' + unconfCnt + '건</span></div>';
+				html += '<div class="popover-divider"></div>';
+				html += '<div class="popover-item"><b>총 수주금액:</b> <span style="font-weight:bold;">' + fmtAmt(totOrdAmt) + '</span> <span style="color:#666;font-size:11px;">(기계 ' + fmtAmt(sumMach) + ' / 전기 ' + fmtAmt(sumElcty) + ')</span></div>';
+				html += '<div class="popover-item"><b>미확정 수주가:</b> <span style="color:#d9534f;font-weight:bold;">' + fmtAmt(masterCnfmAmt) + '</span>' + (sumUnconfTrgt > 0 ? ' <span style="color:#666;font-size:11px;">(미확정 목표원가: ' + fmtAmt(sumUnconfTrgt) + ')</span>' : '') + '</div>';
+				html += '<div class="popover-item"><b>수주목표원가 합계:</b> ' + fmtAmt(sumTrgt || item.estTrgtCost) + '</div>';
+				if (sumAct) html += '<div class="popover-item"><b>실행원가 합계:</b> ' + fmtAmt(sumAct) + '</div>';
+
+				html += buildChildSalesCdListHtml(childRows, "unconfirmed");
+			} else {
+				var cnfmAmt = gPasFloatChk(item.rawCnfmYnAmt !== undefined ? item.rawCnfmYnAmt : item.cnfmYnAmt);
+				var itemPrc = gPasFloatChk(item.ordrsPrc);
+				var trgtCost = gPasFloatChk(item.estTrgtCost);
+				var prcMach = gPasFloatChk(item.ordrsPrcMach);
+				var prcElcty = gPasFloatChk(item.ordrsPrcElcty);
+				var actCost = gPasFloatChk(item.actTot);
+				var parentOrdAmt = gPasFloatChk(item.ordrsAmt);
+
+				html += '<div class="popover-item"><b>확정구분:</b> <span style="color:#e67e22;font-weight:bold;">미확정 (N)</span></div>';
+				html += '<div class="popover-divider"></div>';
+				html += '<div class="popover-item"><b>설비 수주가:</b> <span style="color:#d9534f;font-weight:bold;font-size:12px;">' + fmtAmt(itemPrc) + '</span></div>';
+				html += '<div class="popover-item"><b>파트별 수주가:</b> 기계 ' + fmtAmt(prcMach) + ' / 전기 ' + fmtAmt(prcElcty) + '</div>';
+				html += '<div class="popover-item"><b>수주목표원가:</b> <span style="font-weight:600;">' + fmtAmt(trgtCost) + '</span></div>';
+				if (cnfmAmt && cnfmAmt !== itemPrc) {
+					html += '<div class="popover-item"><b>미확정금액:</b> ' + fmtAmt(cnfmAmt) + '</div>';
+				}
+				if (actCost) html += '<div class="popover-item"><b>실행원가:</b> ' + fmtAmt(actCost) + '</div>';
+				if (parentOrdAmt) html += '<div class="popover-item" style="color:#64748b;"><b>전체 수주금액:</b> ' + fmtAmt(parentOrdAmt) + '</div>';
+			}
+
+			html += '<div class="popover-box" style="border-left-color: #e67e22; margin-top: 6px;">'
+			      + '  확정 처리가 완료되지 않은 품목입니다. 견적 및 목표원가 상세 검토 후 확정 처리가 필요합니다.'
+			      + '</div>';
+		}
+		else if (badgeType === "unsettled") {
+			html += '<div class="popover-title" style="color: #9b59b6; border-bottom-color: #9b59b6;">'
+			      + '  <span><i class="fa fa-calculator" style="margin-right: 5px;"></i>' + (isMaster ? '수주 추후정산 종합 정보' : '추후정산 상세 정보') + '</span>'
+			      + '  <span class="popover-badge" style="background: #9b59b6;">미정산</span>'
+			      + '</div>';
+
+			if (ordrsNo) html += '<div class="popover-item"><b>수주번호:</b> ' + escapeHtml(ordrsNo) + (isMaster ? ' <span style="color:#2563eb;font-weight:bold;">(상위 수주)</span>' : '') + '</div>';
+			if (salesCd) html += '<div class="popover-item"><b>Sales Code:</b> ' + escapeHtml(salesCd) + '</div>';
+			if (clntInfo) html += '<div class="popover-item"><b>고객사/PJT:</b> ' + escapeHtml(clntInfo) + '</div>';
+			if (eqpInfo) html += '<div class="popover-item"><b>' + (isMaster ? '계약명:' : '설비명:') + '</b> ' + escapeHtml(eqpInfo) + '</div>';
+			if (!isMaster && (item.ordrsDtlDiv20Nm || item.ordrsDtlDiv10Nm)) {
+				html += '<div class="popover-item"><b>입력/작업구분:</b> ' + escapeHtml(item.ordrsDtlDiv10Nm || item.ordrsDtlDiv20Nm) + '</div>';
+			}
+
+			html += '<div class="popover-divider"></div>';
+			if (isMaster) {
+				var sumUnAmt = 0, sumPrc2 = 0, sumTrgt2 = 0;
+				for (var k = 0; k < childRows.length; k++) {
+					sumUnAmt += gPasFloatChk(childRows[k].unsettledAmt);
+					sumPrc2 += gPasFloatChk(childRows[k].ordrsPrc);
+					sumTrgt2 += gPasFloatChk(childRows[k].estTrgtCost);
+				}
+				var masterUnAmt = gPasFloatChk(item.unsettledAmt) || sumUnAmt;
+				html += '<div class="popover-item"><b>추후정산 잔액:</b> <span style="color:#d9534f;font-weight:bold;font-size:12px;">' + fmtAmt(masterUnAmt) + '</span></div>';
+				html += '<div class="popover-item"><b>총 수주금액:</b> ' + fmtAmt(gPasFloatChk(item.ordrsAmt) || sumPrc2) + '</div>';
+				html += '<div class="popover-item"><b>수주목표원가 합계:</b> ' + fmtAmt(sumTrgt2 || item.estTrgtCost) + '</div>';
+				html += buildChildSalesCdListHtml(childRows, "unsettled");
+			} else {
+				var unAmt = gPasFloatChk(item.unsettledAmt);
+				html += '<div class="popover-item"><b>추후정산 잔액:</b> <span style="color:#d9534f;font-weight:bold;font-size:12px;">' + fmtAmt(unAmt) + '</span></div>';
+				html += '<div class="popover-item"><b>설비 수주가:</b> ' + fmtAmt(item.ordrsPrc) + '</div>';
+				html += '<div class="popover-item"><b>수주목표원가:</b> ' + fmtAmt(item.estTrgtCost) + '</div>';
+				if (gPasFloatChk(item.ordrsAmt)) html += '<div class="popover-item" style="color:#64748b;"><b>전체 수주금액:</b> ' + fmtAmt(item.ordrsAmt) + '</div>';
+			}
+
+			html += '<div class="popover-box" style="border-left-color: #9b59b6; margin-top: 6px;">'
+			      + '  추후 정산상계 처리 예정인 금액(마이너스 잔액)입니다. 상계 차수 등록 시 반영됩니다.'
+			      + '</div>';
+		}
+		else if (badgeType === "settlement") {
+			html += '<div class="popover-title" style="color: #3498db; border-bottom-color: #3498db;">'
+			      + '  <span><i class="fa fa-exchange" style="margin-right: 5px;"></i>' + (isMaster ? '수주 정산상계 종합 정보' : '정산상계 상세 정보') + '</span>'
+			      + '  <span class="popover-badge" style="background: #3498db;">정산상계</span>'
+			      + '</div>';
+
+			if (ordrsNo) html += '<div class="popover-item"><b>수주번호:</b> ' + escapeHtml(ordrsNo) + (isMaster ? ' <span style="color:#2563eb;font-weight:bold;">(상위 수주)</span>' : '') + '</div>';
+			if (salesCd) html += '<div class="popover-item"><b>Sales Code:</b> ' + escapeHtml(salesCd) + '</div>';
+			if (clntInfo) html += '<div class="popover-item"><b>고객사/PJT:</b> ' + escapeHtml(clntInfo) + '</div>';
+			if (eqpInfo) html += '<div class="popover-item"><b>' + (isMaster ? '계약명:' : '설비명:') + '</b> ' + escapeHtml(eqpInfo) + '</div>';
+			if (!isMaster && (item.ordrsDtlDiv20Nm || item.ordrsDtlDiv10Nm)) {
+				html += '<div class="popover-item"><b>입력/작업구분:</b> ' + escapeHtml(item.ordrsDtlDiv10Nm || item.ordrsDtlDiv20Nm) + '</div>';
+			}
+
+			html += '<div class="popover-divider"></div>';
+			if (isMaster) {
+				var sumSetAmt = 0, sumPrc3 = 0;
+				for (var s = 0; s < childRows.length; s++) {
+					sumSetAmt += gPasFloatChk(childRows[s].settlementAmt);
+					sumPrc3 += gPasFloatChk(childRows[s].ordrsPrc);
+				}
+				var masterSetAmt = gPasFloatChk(item.settlementAmt) || sumSetAmt;
+				html += '<div class="popover-item"><b>정산상계금액:</b> <span style="color:#2980b9;font-weight:bold;font-size:12px;">' + fmtAmt(masterSetAmt) + '</span></div>';
+				html += '<div class="popover-item"><b>총 수주금액:</b> ' + fmtAmt(gPasFloatChk(item.ordrsAmt) || sumPrc3) + '</div>';
+				html += buildChildSalesCdListHtml(childRows, "settlement");
+			} else {
+				var setAmt = gPasFloatChk(item.settlementAmt);
+				html += '<div class="popover-item"><b>정산상계금액:</b> <span style="color:#2980b9;font-weight:bold;font-size:12px;">' + fmtAmt(setAmt) + '</span></div>';
+				html += '<div class="popover-item"><b>설비 수주가:</b> ' + fmtAmt(item.ordrsPrc) + '</div>';
+				if (gPasFloatChk(item.ordrsAmt)) html += '<div class="popover-item" style="color:#64748b;"><b>전체 수주금액:</b> ' + fmtAmt(item.ordrsAmt) + '</div>';
+			}
+
+			html += '<div class="popover-box" style="border-left-color: #3498db; margin-top: 6px;">'
+			      + '  기존 추후정산 건과 정산 상계 처리가 완료된 금액입니다.'
+			      + '</div>';
+		}
+
+		$pop.html(html);
+		$pop.show();
+		positionBadgePopover(e, $badge, false);
+	}
+
+	function moveBadgePopover(e) {
+		// 마우스가 툴팁 위로 쉽게 이동하여 스크롤할 수 있도록 위치를 고정 유지
+	}
+
+	function positionBadgePopover(e, $badge, keepPositionIfVisible) {
+		var $pop = $("#cr02BadgePopover");
+		if (!$pop.is(":visible")) return;
+
+		var popW = $pop.outerWidth() || 340;
+		var popH = $pop.outerHeight() || 240;
+		var winW = $(window).width();
+		var winH = $(window).height();
+
+		if (keepPositionIfVisible) {
+			var curLeft = parseFloat($pop.css("left")) || 10;
+			var curTop = parseFloat($pop.css("top")) || 10;
+			if (curLeft + popW > winW - 10) curLeft = Math.max(10, winW - popW - 10);
+			if (curTop + popH > winH - 10) curTop = Math.max(10, winH - popH - 10);
+			$pop.css({ "top": curTop + "px", "left": curLeft + "px" });
+			return;
+		}
+
+		var posX = 0;
+		var posY = 0;
+
+		// 뱃지 엘리먼트 바로 우측(6px 간격)에 고정 배치하여 마우스가 툴팁 위로 즉시 진입 가능하게 처리
+		if ($badge && $badge.length > 0 && $badge[0].getBoundingClientRect) {
+			var rect = $badge[0].getBoundingClientRect();
+			posX = rect.right + 6;
+			posY = rect.top - 4;
+			if (posX + popW > winW - 10) {
+				posX = rect.left - popW - 6;
+			}
+		} else if (e) {
+			var mouseX = e.clientX || (e.originalEvent ? e.originalEvent.clientX : 0);
+			var mouseY = e.clientY || (e.originalEvent ? e.originalEvent.clientY : 0);
+			posX = mouseX + 10;
+			posY = mouseY - 4;
+			if (posX + popW > winW - 10) {
+				posX = mouseX - popW - 10;
+			}
+		}
+
+		if (posY + popH > winH - 10) {
+			posY = winH - popH - 10;
+		}
+		if (posX < 10) posX = 10;
+		if (posY < 10) posY = 10;
+
+		$pop.css({
+			"top": posY + "px",
+			"left": posX + "px"
+		});
+	}
+
+	function hideBadgePopover() {
+		clearPopoverHideTimer();
+		$("#cr02BadgePopover").hide();
 	}
 
 	/**
@@ -1142,6 +1966,7 @@
 
     //화면로드시
     $(document).ready(function () {
+        bindBadgePopover();
         $("td").off("mouseover");
         mainDefaultLoad("영업관리", "수주 관리(수주번호)");
         setCommonSelect($("select[data-kind]"));
@@ -1509,41 +2334,46 @@
 	}
 
 
-    function openIssueList() {
+    function openIssueList(pIdxOrItem) {
         var row = null;
-        var selectedList = gridView.target.getList("selected");
-        if (selectedList && selectedList.length > 0) {
-            row = selectedList[0];
-        } else if (typeof select_index === "number" && select_index >= 0) {
-            row = gridView.target.getList()[select_index];
+        if (pIdxOrItem && typeof pIdxOrItem === "object") {
+            row = pIdxOrItem;
+        } else if (typeof pIdxOrItem === "number" && pIdxOrItem >= 0) {
+            var list = getFullGridList();
+            row = list ? list[pIdxOrItem] : null;
         }
-
-        // 선택된 row가 없으면 그리드의 첫 번째 row를 기본 참조
         if (!row) {
-            var allList = gridView.target.getList();
+            var selectedList = gridView.target.getList("selected");
+            if (selectedList && selectedList.length > 0) {
+                row = selectedList[0];
+            } else if (typeof select_index === "number" && select_index >= 0) {
+                var fullList = getFullGridList();
+                row = fullList ? fullList[select_index] : null;
+            }
+        }
+        if (!row) {
+            var allList = getFullGridList();
             if (allList && allList.length > 0) {
                 row = allList[0];
             }
         }
 
-        var searchVal = (row && row.ordrsNo) ? row.ordrsNo : "";
+        var isMaster = (row && (String(row.lvl) === "1" || !row.salesCd || row.salesCd === "-"));
+        var searchVal = (!isMaster && row && row.salesCd && row.salesCd !== "-") ? row.salesCd : ((row && row.ordrsNo) ? row.ordrsNo : "");
         var clntNm = (row && (row.clntNm || row.ordrsClntNm)) ? (row.clntNm || row.ordrsClntNm) : "";
-        var modalTitle = searchVal ? ("수주번호 검색 (" + searchVal + ")") : "미완료 이슈 전체 현황";
+        var modalTitle = searchVal ? ((!isMaster && row && row.salesCd && row.salesCd !== "-") ? ("Sales Code 검색 (" + searchVal + ")") : ("수주번호 검색 (" + searchVal + ")")) : "미완료 이슈 전체 현황";
         var paramObj = {
-            "coCd"        : $('#coCd_S').val(),
+            "coCd"        : $('#coCd_S').val() || (row ? row.coCd : ""),
             "searchValue" : searchVal,
-            "ordrsNo"     : searchVal,
+            "salesCd"     : (!isMaster && row && row.salesCd && row.salesCd !== "-") ? row.salesCd : "",
+            "ordrsNo"     : (row && row.ordrsNo) ? row.ordrsNo : "",
             "clntNm"      : clntNm
         };
         openModal("/static/html/cmn/modal/ordrsIssueList.html", 1700, $('body').height()-40, modalTitle, paramObj, function (grid) {
-//             var row = grid.target.getList("selected")[0];
-//             $('#ordrsNo_S').val(row.ordrsNo);
-//             gridView.setData(0);
         });
     }
 
-	// 영업담당자 검색 //
-    function openSecondUserSearch5() {
+function openSecondUserSearch5() {
     	var paramObj = {
     		  "coCd" : $('#coCd_S').val(),
     		"userId" : $('#mngId_S').val(),
