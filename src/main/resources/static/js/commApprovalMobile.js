@@ -122,10 +122,35 @@ function pm51SubjectParticle(text) {
 //function approvalConfirm() {
 //	commApprovalMobile.confirmApproval();
 //}
+// history.back()은 실패 여부를 반환하지 않으므로, 현재 화면에 남아 있으면 결재목록으로 이동한다.
+function backAfterMobileApproval() {
+	var listUrl = '/static/mobile/admin/cm/cm11/M08.html';
+	if (window.history.length <= 1) {
+		window.location.replace(listUrl);
+		return;
+	}
+	var currentUrl = window.location.href;
+	var timer = setTimeout(function () {
+		window.removeEventListener('pagehide', cancelFallback);
+		if (window.location.href === currentUrl) window.location.replace(listUrl);
+	}, 1000);
+	function cancelFallback() {
+		clearTimeout(timer);
+		window.removeEventListener('pagehide', cancelFallback);
+	}
+	window.addEventListener('pagehide', cancelFallback);
+	try {
+		window.history.back();
+	} catch (e) {
+		cancelFallback();
+		window.location.replace(listUrl);
+	}
+}
+
 function approvalConfirm() {
 	$('#appConfirmAnchor').hide();
 	if (commApproval.confirmApproval()) {
-		window.history.back();
+		backAfterMobileApproval();
 		return true;
 	}
 	$('#appConfirmAnchor').show();

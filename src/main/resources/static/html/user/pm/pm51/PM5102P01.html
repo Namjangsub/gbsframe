@@ -817,12 +817,25 @@
 		}
 	};
 
-	// 국내는 1일 3식, 해외는 1일 2식 기준으로 총 식수 계산 (첫날/마지막날 이동으로 1식 차감)
-	function calcTravelerEatCnt(dayCnt) {
+	// 국내는 각 식사시간 전체가 출장기간에 포함된 경우만 1식. 해외 식대 금액은 별도로 박수 기준 계산.
+	function calcTravelerEatCnt(dayCnt, row) {
 		var tripDiv = (currentTripReqMaster && currentTripReqMaster.tripDiv) || $('#reqViewTripDiv').val() || 'PM51DIV10';
 		var isDomestic = tripDiv === 'PM51DIV10';
-		var mealsPerDay = isDomestic ? 3 : 2;
-		return Math.max(0, dayCnt * mealsPerDay - 1);
+		if (!isDomestic) return Math.max(0, dayCnt * 2 - 1);
+		if (!row) return 0;
+		var start = moment(normalizeDateText(row.tripStDt) + ' ' + normalizeTimeText(row.tripStTm), 'YYYY-MM-DD HH:mm', true);
+		var end = moment(normalizeDateText(row.tripEdDt) + ' ' + normalizeTimeText(row.tripEdTm), 'YYYY-MM-DD HH:mm', true);
+		if (!start.isValid() || !end.isValid() || end.isBefore(start)) return 0;
+		var mealTimes = [[7, 0, 7, 30], [12, 30, 13, 30], [17, 30, 18, 0]];
+		var count = 0;
+		for (var date = start.clone().startOf('day'); !date.isAfter(end, 'day'); date.add(1, 'day')) {
+			mealTimes.forEach(function(time) {
+				var mealStart = date.clone().hour(time[0]).minute(time[1]);
+				var mealEnd = date.clone().hour(time[2]).minute(time[3]);
+				if (!start.isAfter(mealStart) && !end.isBefore(mealEnd)) count++;
+			});
+		}
+		return count;
 	}
 
 	// 근태마감년월을 "YYYY/MM" 형식으로 포매팅
@@ -1175,6 +1188,11 @@
 				},
 				onDataChanged: function () {
 					calculateRptTravelerCounts(this.dindex, this.key);
+					if (['tripStDt', 'tripStTm', 'tripEdDt', 'tripEdTm', 'nightCnt', 'dayCnt', 'eatCnt'].indexOf(this.key) > -1) {
+						$('#acctNightCnt').val(this.item.nightCnt).data('autoCalculated', false);
+						$('#acctDayCnt').val(this.item.dayCnt).data('autoCalculated', false);
+						refreshSettlementSummaryGrids(true);
+					}
 					updateRptTravelerRowTotal(this.dindex);
 					updateActualTripPeriodFromRptTravelers();
 					resizeRptTravelerGrid();
@@ -1976,31 +1994,22 @@
 		$('#reservePayUsd2Amt').val(formatSettlementUsd(useCurr2 ? usd2Amt : 0));
 	}
 
-	// 최종확정(일비): 실제출장기간 기준 숙박비+식대+잡비를 GIM-050-02 단가로 재계산 (PM5101P01.recalculatePaymentByTravelerGrid와 동일 로직)
+	// 최종확정(일비): 숙박비를 제외한 식대+잡비. 해외 식대는 기내식 1일을 제외한 박수 기준.
 	function calcActualDailyLodgingMeal(travelers, m01) {
 		var tripDiv = m01.tripDiv || 'PM51DIV10';
 		var isDomestic = tripDiv === 'PM51DIV10';
 		var areaDiv = m01.tripAreaDiv;
-		var lodgingKrw = 0, lodgingUsd = 0, mealKrw = 0, mealUsd = 0, miscKrw = 0, totalNightCnt = 0;
+		var mealKrw = 0, mealUsd = 0, miscKrw = 0, totalNightCnt = 0;
 
 		var acctNightVal = $('#acctNightCnt').val();
-		var acctDayVal = $('#acctDayCnt').val();
 
 		$.each(travelers || [], function(idx, row) {
 			var nightCnt = (acctNightVal !== undefined && acctNightVal !== null && acctNightVal !== '') ? Number(acctNightVal) : Number(row.nightCnt || 0);
-			var dayCnt = (acctDayVal !== undefined && acctDayVal !== null && acctDayVal !== '') ? Number(acctDayVal) : Number(row.dayCnt || 0);
 			var eatCnt = Number(row.eatCnt || 0);
 			totalNightCnt += isNaN(nightCnt) ? 0 : nightCnt;
 			if (isDomestic) {
-				for (var night = 0; night < nightCnt; night++) {
-					var start = moment(normalizeDateText(row.tripStDt), 'YYYY-MM-DD', true);
-					var nightDate = start.isValid() ? start.clone().add(night, 'days') : null;
-					var isWeekend = nightDate && (nightDate.day() === 0 || nightDate.day() === 6);
-					lodgingKrw += isWeekend ? PM51_RATE.domestic.lodgingWeekend : PM51_RATE.domestic.lodgingWeekday;
-				}
 				mealKrw += eatCnt * PM51_RATE.domestic.mealUnit;
 			} else if (['A', 'B', 'C'].indexOf(areaDiv) > -1) {
-				lodgingUsd += nightCnt * PM51_RATE.overseas.lodging[areaDiv];
 				mealUsd += nightCnt * PM51_RATE.overseas.daily[{ A: 0, B: 1, C: 2 }[areaDiv]];
 			}
 		});
@@ -2008,12 +2017,12 @@
 		miscKrw = totalNightCnt * (isDomestic ? 10000 : 15000);
 
 		return {
-			krw: (isDomestic ? lodgingKrw : 0) + (isDomestic ? mealKrw : 0) + miscKrw,
-			usd: (isDomestic ? 0 : lodgingUsd) + (isDomestic ? 0 : mealUsd)
+			krw: mealKrw + miscKrw,
+			usd: mealUsd
 		};
 	}
 
-	function refreshSettlementSummaryGrids() {
+	function refreshSettlementSummaryGrids(recalculateFinal) {
 		var travelers = rptTravelerGridView && rptTravelerGridView.target ? rptTravelerGridView.target.getList() || [] : [];
 		var requestedTravelers = tripReqTravelerGridView && tripReqTravelerGridView.target ? tripReqTravelerGridView.target.getList() || [] : [];
 		// 선택된 경비 현황만 집계
@@ -2076,7 +2085,18 @@
 			var firstSchedule = formatStayPeriod(requested.tripStDt, requested.tripEdDt);
 			var actualSchedule = formatStayPeriod(row.tripStDt, row.tripEdDt);
 			var userNm = row.userNm || row.userId || '';
-			var savedDailyAmt = (row.dailyAmt !== undefined && row.dailyAmt !== null && row.dailyAmt !== '' && Number(row.dailyAmt) > 0) ? Number(row.dailyAmt) : null;
+			// 실제 박/일/식 수정 시에만 이전 최종확정액을 해제한다. 재조회·경비선택·수동행 금액은 보존한다.
+			if (recalculateFinal === true) {
+				row.dailyAmt = 0;
+				var recalcCurr = (currentTripReqMaster && currentTripReqMaster.currCd) || $('#tripRptCurr').val() || '';
+				['CURR01', recalcCurr].forEach(function(curr, index) {
+					if (!curr || (index === 1 && isKrwCurrency(curr))) return;
+					var key = userNm + '|' + curr;
+					if (!savedDailyByKey[key]) savedDailyByKey[key] = { dailyAdvance: index === 0 ? reqAdvKrw : reqAdvUsd };
+					savedDailyByKey[key]._userEditedFinal = false;
+				});
+			}
+			var savedDailyAmt = (dailyDbOnlyMode && row.dailyAmt !== undefined && row.dailyAmt !== null && row.dailyAmt !== '' && Number(row.dailyAmt) > 0) ? Number(row.dailyAmt) : null;
 			var krwKey = userNm + '|CURR01';
 			// 수정(저장된 D05 존재) 시에는 DB 저장값(선지급분/최종확정)을 그대로 표시, 저장값 없는 행만 자동계산
 			if (!suppressedDailyKeys[krwKey] && (dailyDbOnlyMode ? !!savedDailyByKey[krwKey] : (reqAdvKrw || finalKrw || savedDailyByKey[krwKey] || (savedDailyAmt !== null && isKrwCurrency('CURR01'))))) {
@@ -2890,7 +2910,7 @@
 			if (popParam.actionType !== 'U') {
 				setApplicantDefaultApprovalLine(m01.userId || jwt.userId, m01.userNm || m01.userId || jwt.userNm);
 			}
-			bindRptTravelerGrid(filterOwnTraveler(d01, m01));
+			bindRptTravelerGrid(filterOwnTraveler(d01, m01), true);
 
 			var reqProjectList = data.result.d03 || [];
 			mapProjectDateFields(reqProjectList);
@@ -2963,7 +2983,7 @@
 		}];
 	}
 
-	function bindRptTravelerGrid(travelerList) {
+	function bindRptTravelerGrid(travelerList, isNew) {
 		var rows = $.map(travelerList || [], function(row) {
 			return buildRptTravelerRow(row);
 		});
@@ -2971,7 +2991,6 @@
 			list: rows,
 			page: { totalElements: rows.length }
 		});
-		var isNew = popParam.actionType !== 'U' && popParam.actionType !== 'V';
 		$.each(rows, function(idx) { calculateRptTravelerCounts(idx, isNew ? undefined : 'INIT'); });
 		updateActualTripPeriodFromRptTravelers();
 		refreshSettlementSummaryGrids();
@@ -3034,7 +3053,7 @@
 			if (start.isValid() && end.isValid() && !end.isBefore(start)) {
 				nightCnt = end.diff(start, 'days');
 				dayCnt = nightCnt + 1;
-				eatCnt = calcTravelerEatCnt(dayCnt);
+				eatCnt = calcTravelerEatCnt(dayCnt, row);
 			}
 		}
 
@@ -3979,11 +3998,14 @@
 							var dayCnt = nightCnt + 1;
 							tRow.nightCnt = Math.max(0, nightCnt);
 							tRow.dayCnt = Math.max(0, dayCnt);
-							tRow.eatCnt = calcTravelerEatCnt(dayCnt);
+							tRow.eatCnt = calcTravelerEatCnt(dayCnt, tRow);
 						}
 					}
 				});
 				rptTravelerGridView.target.setData({ list: tList, page: { totalElements: tList.length } });
+				$('#acctNightCnt').val(tList[0].nightCnt).data('autoCalculated', false);
+				$('#acctDayCnt').val(tList[0].dayCnt).data('autoCalculated', false);
+				refreshSettlementSummaryGrids(true);
 				updateActualTripPeriodFromRptTravelers();
 			}
 		}
@@ -4615,11 +4637,11 @@
 			$.each(list, function(idx, row) {
 				if (nCnt !== '') row.nightCnt = getSettlementNumber(nCnt);
 				if (dCnt !== '') row.dayCnt = getSettlementNumber(dCnt);
-				row.eatCnt = calcTravelerEatCnt(row.dayCnt);
+				row.eatCnt = calcTravelerEatCnt(row.dayCnt, row);
 			});
 			rptTravelerGridView.target.repaint();
 		}
-		refreshSettlementSummaryGrids();
+		refreshSettlementSummaryGrids(true);
 		calcSettlementKrw();
 		calcSettlementUsd();
 		calcSettlementUsd2();

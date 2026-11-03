@@ -54,6 +54,11 @@ public class Kakao10009Sender {
         }
     }
 
+    /** 발송 비활성 환경: 업체 호출 없이 이력용 ID와 OK 결과만 생성한다. 재시도 대상이 아니다. */
+    public Result historyOnly() {
+        return new Result(nextMessageId(), true, 0, "OK", false, false, "");
+    }
+
     private Result doSend(String mobile, String title, String message, String todoNo, String todoDiv2CodeId) {
         if (isBlank(mobile)) {
             return Result.notSent("수신 휴대전화번호 없음");

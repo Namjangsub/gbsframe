@@ -36,6 +36,8 @@ public interface AM11Mapper {
 
     int updateApprovalLineStatus(Map<String, Object> paramMap);
 
+    int syncTripSelfApproval(Map<String, Object> paramMap);
+
     int updateNextLinePending(Map<String, Object> paramMap);
 
     int cancelArbitCurrentLine(Map<String, Object> paramMap);

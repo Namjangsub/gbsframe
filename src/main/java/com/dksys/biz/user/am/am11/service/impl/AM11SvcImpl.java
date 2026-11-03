@@ -69,14 +69,25 @@ public class AM11SvcImpl implements AM11Svc {
 
         Map<String, Object> docInfo = am11Mapper.selectApprovalDocInfo(paramMap);
         if (docInfo == null || docInfo.isEmpty()) {
+            logger.warn("[AM 상세조회] 문서 조회 결과 없음: docId={}, authenticatedUserId={}", paramMap.get("docId"), paramMap.get("userId"));
             resultMap.put("resultCode", "500");
             resultMap.put("resultMessage", "해당 결재문서가 존재하지 않습니다.");
             return resultMap;
         }
 
         normalizeClobValues(docInfo);
+        docInfo = new HashMap<>(docInfo);
 
         List<Map<String, Object>> lineList = am11Mapper.selectApprovalLineList(paramMap);
+
+        // 권한 검증 전에는 협조 개방/결재 상태 보정 등 문서 상태를 변경하지 않는다.
+        String userId = (String) paramMap.get("userId");
+        if (!isAuthorizedDocViewer(userId, docInfo, lineList)) {
+            logger.warn("[AM 상세조회] 열람 권한 불일치: docId={}, authenticatedUserId={}", paramMap.get("docId"), userId);
+            resultMap.put("resultCode", "403");
+            resultMap.put("resultMessage", "해당 결재문서에 대한 열람 권한이 없습니다.");
+            return resultMap;
+        }
 
         // 방안 A (협조 비구속 병렬): 진행 중 문서의 READY 협조(COOP) 라인은 즉시 PENDING으로 개방 보정
         String currentDocStatus = (String) docInfo.get("docStatus");
@@ -98,19 +109,11 @@ public class AM11SvcImpl implements AM11Svc {
             }
         }
 
-        String userId = (String) paramMap.get("userId");
         if ("PM08".equals(String.valueOf(docInfo.get("erpBizType")))) {
             Map<String, Object> managerParam = new HashMap<>();
             managerParam.put("approverId", userId);
             managerParam.put("draUserId", docInfo.get("draUserId"));
             docInfo.put("pm08TeamManagerOpinionRequired", "Y".equals(am11Mapper.selectPm08TeamManagerYn(managerParam)) ? "Y" : "N");
-        }
-
-        // 1. 문서 열람 권한 검증 (기안자, 결재선/참조선 포함자, 대결자, 관리자)
-        if (!isAuthorizedDocViewer(userId, docInfo, lineList)) {
-            resultMap.put("resultCode", "403");
-            resultMap.put("resultMessage", "해당 결재문서에 대한 열람 권한이 없습니다.");
-            return resultMap;
         }
 
         // 1-1. 비-CR02 결재 커서 보정 (권한 검증 통과 후에만 실행, 보정 시 결재선 재조회)
@@ -418,6 +421,7 @@ public class AM11SvcImpl implements AM11Svc {
             return resultMap;
         }
 
+        docLock = new HashMap<>(docLock);
         if (("PM07".equals(docLock.get("erpBizType")) || "PM51".equals(docLock.get("erpBizType")) || "PM52".equals(docLock.get("erpBizType")) || "PM08".equals(docLock.get("erpBizType")) || "CR02".equals(docLock.get("erpBizType")))
                 && am11Mapper.selectLinkedSourceCount(docLock) == 0) {
             resultMap.put("resultCode", "409");
@@ -1972,6 +1976,23 @@ public class AM11SvcImpl implements AM11Svc {
      * @return 이번 호출에서 READY→PENDING으로 전환된 라인(알림 대상). 변경 없으면 빈 목록.
      */
     private List<Map<String, Object>> reconcileBindingCursor(Map<String, Object> paramMap, Map<String, Object> docLock) {
+        // 취소된 WB20(N)은 복원하지 않는다. 문서를 잠근 뒤 실제 원본 승인(Y)이 남은 자체승인만 복원한다.
+        String bizType = String.valueOf(docLock.get("erpBizType"));
+        if ("PM51".equals(bizType) || "PM52".equals(bizType)) {
+            Map<String, Object> syncParam = new HashMap<>(paramMap);
+            syncParam.put("docId", docLock.get("docId"));
+            Map<String, Object> locked = am11Mapper.selectApprovalDocForUpdate(syncParam);
+            if (locked != null && am11Mapper.syncTripSelfApproval(syncParam) > 0) {
+                Map<String, Object> update = new HashMap<>(syncParam);
+                update.put("nextStatus", "PROGRESS");
+                update.put("currLineSeq", locked.get("currLineSeq"));
+                update.put("currApproverId", locked.get("currApproverId"));
+                update.put("currApproverNm", locked.get("currApproverNm"));
+                update.put("pgmId", "AM_TRIP_SYNC");
+                am11Mapper.updateApprovalDocStatus(update);
+                docLock.put("docStatus", "PROGRESS");
+            }
+        }
         try {
             Map<String, Object> lineParam = new HashMap<>(paramMap);
             lineParam.put("docId", docLock.get("docId"));
@@ -2080,6 +2101,19 @@ public class AM11SvcImpl implements AM11Svc {
             }
             if (first.get("wb20SanctnSn") != null) {
                 eventSource.put("rcvSanctnSn", first.get("wb20SanctnSn"));
+            }
+            if ("PM51".equals(bizType) || "PM52".equals(bizType)) {
+                int receiverSeq = Integer.parseInt(String.valueOf(first.get("lineSeq")));
+                for (Map<String, Object> previous : lineList) {
+                    if (Integer.parseInt(String.valueOf(previous.get("lineSeq"))) < receiverSeq
+                            && "APPROVED".equals(previous.get("lineStatus"))
+                            && ("APPR".equals(lineTypeOf(previous)) || "AGREE".equals(lineTypeOf(previous)))) {
+                        eventSource.put("notificationSenderId", valueOf(previous.get("actualUserId")).isEmpty()
+                                ? previous.get("approverId") : previous.get("actualUserId"));
+                        eventSource.put("notificationSenderNm", valueOf(previous.get("actualUserNm")).isEmpty()
+                                ? previous.get("approverNm") : previous.get("actualUserNm"));
+                    }
+                }
             }
             eventPublisher.publishEvent(new ApprovalEvent(
                 "APPROVE_NEXT", docId, docNo, docTitle,
@@ -2779,6 +2813,14 @@ public class AM11SvcImpl implements AM11Svc {
         // 8. 변경 후 결재선 조회 및 Snapshot 저장 (실패 시 원자적 롤백 보장)
         if (paramMap.get("docDataJson") != null && paramMap.get("docRenderHtml") != null) {
             am11Mapper.updateApprovalDocContent(paramMap);
+        }
+        // 원본 재저장 후 자체승인이 복원되면 아래 일반 변경 알림 대신 보정 경로에서 다음 순번에 한 번만 알린다.
+        if ("PM51".equals(docLock.get("erpBizType")) || "PM52".equals(docLock.get("erpBizType"))) {
+            Map<String, Object> reconciledDoc = new HashMap<>(docLock);
+            if (!reconcileBindingCursor(paramMap, reconciledDoc).isEmpty()) {
+                nextFirstApproverId = null;
+                docStatus = valueOf(reconciledDoc.get("docStatus"));
+            }
         }
         List<Map<String, Object>> afterLineList = am11Mapper.selectApprovalLineList(paramMap);
         try {
