@@ -74,10 +74,7 @@
           FROM TB_AM11M01 M
           LEFT OUTER JOIN TB_AM02M01 F ON M.FORM_CD = F.FORM_CD
          WHERE M.DOC_ID = #{docId}
-           AND (M.DRA_USER_ID = #{userId}
-                OR EXISTS (SELECT 1 FROM TB_AM11D01 P
-                            WHERE P.DOC_ID = M.DOC_ID
-                              AND (P.APPROVER_ID = #{userId} OR P.ACTUAL_USER_ID = #{userId})))
+           <!-- 상세 열람 권한은 서비스의 isAuthorizedDocViewer에서 관리자/대결자까지 함께 검증한다. -->
     </select>
 
     <!-- 결재선 상세 목록 조회 (Snapshot 보존 + 열람 상태 조인) -->
@@ -424,6 +421,43 @@
                UDT_DTTM        = SYSTIMESTAMP
          WHERE DOC_ID = #{docId}
            AND LINE_SEQ = #{lineSeq}
+    </update>
+
+    <!-- 출장 신청/복명서의 원본 자체승인 복원. 사용자 요청값이 아닌 연결된 WB20 승인 행만 신뢰한다. -->
+    <update id="syncTripSelfApproval" parameterType="Map">
+        UPDATE TB_AM11D01 D
+           SET LINE_STATUS = 'APPROVED',
+               APPR_DT = (SELECT W.TODO_CF_DT FROM TB_WB20M03 W WHERE W.TODO_KEY = D.WB20_TODO_KEY),
+               APPR_OPINION = (SELECT W.TODO_CF_OPN FROM TB_WB20M03 W WHERE W.TODO_KEY = D.WB20_TODO_KEY),
+               ACTUAL_USER_ID = D.APPROVER_ID,
+               ACTUAL_USER_NM = FN_CM06M01_ID_TO_NM(D.APPROVER_ID),
+               UDT_ID = #{userId}, UDT_PGM = 'AM_TRIP_SYNC', UDT_DTTM = SYSTIMESTAMP
+         WHERE D.DOC_ID = #{docId}
+           AND D.LINE_SEQ = 1
+           AND D.LINE_STATUS = 'PENDING'
+           AND NVL(D.LINE_TYPE, 'APPR') IN ('APPR', 'AGREE')
+           AND EXISTS (
+               SELECT 1 FROM TB_AM11M01 M
+               JOIN TB_WB20M03 W ON W.TODO_KEY = D.WB20_TODO_KEY
+                WHERE M.DOC_ID = D.DOC_ID
+                  AND M.DOC_STATUS IN ('REQUEST', 'PROGRESS')
+                  AND ((M.ERP_BIZ_TYPE = 'PM51' AND W.TODO_DIV2_CODE_ID = 'TODODIV2190')
+                    OR (M.ERP_BIZ_TYPE = 'PM52' AND W.TODO_DIV2_CODE_ID = 'TODODIV2200'))
+                  AND W.CO_CD = M.CO_CD AND W.CO_CD = D.WB20_CO_CD
+                  AND W.TODO_NO = M.ERP_BIZ_KEY AND W.TODO_NO = D.WB20_TODO_NO
+                  AND W.TODO_ID = D.APPROVER_ID
+                  AND W.SANCTN_SN = 1 AND D.WB20_SANCTN_SN = 1
+                  AND W.TODO_DIV1_CODE_ID = 'TODODIV20' AND D.WB20_DIV1_CODE_ID = 'TODODIV20'
+                  AND W.TODO_DIV2_CODE_ID = D.WB20_DIV2_CODE_ID
+                  AND W.SANCTN_STTUS = 'Y' AND W.TODO_CF_DT IS NOT NULL
+                  AND W.TODO_CF_OPN = '자체승인'
+                  AND NVL(W.APPR_REJECT_YN, 'N') = 'N'
+           )
+           AND EXISTS (
+               SELECT 1 FROM TB_AM11D01 N WHERE N.DOC_ID = D.DOC_ID
+                  AND N.LINE_SEQ &gt; 1 AND N.LINE_STATUS = 'READY'
+                  AND NVL(N.LINE_TYPE, 'APPR') IN ('APPR', 'AGREE')
+           )
     </update>
 
     <!-- P4 역방향 동기화: 신규 WB20 행의 TODO_KEY를 AM11D01에 백필 -->

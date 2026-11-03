@@ -226,10 +226,6 @@ public class ApprovalNotificationEventListener {
      */
     private void sendTalk10009(ApprovalEvent event, String receiverId, String receiverNm,
                                Map<String, String> vars, String todoNo, String todoDiv2CodeId) {
-        if (!kakaoSend) {
-            logger.info("[ApprovalNotification] kakaoSend=false 로 발송 대상에서 제외: docId={}, receiverId={}", event.getDocId(), receiverId);
-            return;
-        }
         if (isBlank(receiverId) || isBlank(todoNo) || isBlank(todoDiv2CodeId)) {
             logger.warn("[ApprovalNotification] 필수 알림 식별값 누락으로 발송 생략: receiverId={}, todoNo={}, todoDiv2CodeId={}",
                     receiverId, todoNo, todoDiv2CodeId);
@@ -245,7 +241,13 @@ public class ApprovalNotificationEventListener {
         logger.info("[ApprovalNotification -> Receiver({}): {}] Title: {}", receiverId, receiverNm,
                 ApprovalSecurityUtil.maskSensitiveData(title));
 
-        Kakao10009Sender.Result result = kakao10009Sender.send(mobile, title, message, todoNo, todoDiv2CodeId);
+        Kakao10009Sender.Result result;
+        if (kakaoSend) {
+            result = kakao10009Sender.send(mobile, title, message, todoNo, todoDiv2CodeId);
+        } else {
+            logger.info("[ApprovalNotification] kakaoSend=false: 실제 발송 없이 OK 이력만 저장: docId={}, receiverId={}", event.getDocId(), receiverId);
+            result = kakao10009Sender.historyOnly();
+        }
         if (result.getMessageId() != null) {
             recordHistory(event, receiverId, receiverNm, mobile, title, message, todoNo, todoDiv2CodeId, result);
         }

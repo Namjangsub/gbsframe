@@ -829,10 +829,18 @@ public class WB20SvcImpl implements WB20Svc {
 			String docId = wb20Mapper.selectAmDocIdByWbLineKey(keyParam);
 			return hasText(docId) ? docId : null;
 		} catch (Exception e) {
+			if (isTripApprovalCode(paramMap.get("todoDiv2CodeId"))) {
+				throw new IllegalStateException("출장 전자결재 문서 조회에 실패하여 결재취소를 중단합니다.", e);
+			}
 			logger.warn("[findAmDocIdForCancel] AM docId 탐색 중 예외 발생 (일반 결재취소 정상 진행): todoNo={}, userId={}, msg={}",
 					paramMap.get("todoNo"), paramMap.get("userId"), e.getMessage());
 			return null;
 		}
+	}
+
+	private boolean isTripApprovalCode(String code) {
+		return "TODODIV2190".equals(code) || "TODODIV2191".equals(code)
+				|| "TODODIV2200".equals(code) || "TODODIV2201".equals(code);
 	}
 
 	private boolean isPm51SalesApproval(Map<String, String> paramMap) {
@@ -1132,6 +1140,7 @@ public class WB20SvcImpl implements WB20Svc {
 	public int updateApprovalCancle(Map<String, String> paramMap) {
 		validateSequentialCancel(paramMap);
 		int result = wb20Mapper.updateApprovalCancle(paramMap);
+		if (result <= 0) return result;
 
 		// 기존 WB20 결재취소 결과를 동일 업무의 AM 전자결재 문서/결재선/이력에 반영
 		// 대상 AM 문서를 식별키(DIV1+DIV2+TODO_ID+TODO_NO, CR02만 ETC_FIELD2)로 한 번 특정해 넘기고, 미연동이면 건너뛴다.
@@ -1139,7 +1148,10 @@ public class WB20SvcImpl implements WB20Svc {
 		if (hasText(amDocId)) {
 			paramMap.put("amDocId", amDocId);
 			wb20Mapper.syncAmApprovalCancelNextLine(paramMap);
-			wb20Mapper.syncAmApprovalCancelLine(paramMap);
+			int amUpdated = wb20Mapper.syncAmApprovalCancelLine(paramMap);
+			if (isTripApprovalCode(paramMap.get("todoDiv2CodeId")) && amUpdated != 1) {
+				throw new IllegalStateException("전자결재 취소 대상이 일치하지 않아 결재취소를 중단합니다. 결재선을 확인해주세요.");
+			}
 			wb20Mapper.syncAmApprovalCancelHist(paramMap);
 			wb20Mapper.syncAmApprovalCancelDocument(paramMap);
 		}
