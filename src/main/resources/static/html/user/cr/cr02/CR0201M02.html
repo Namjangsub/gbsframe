@@ -50,13 +50,13 @@
 
 	.badge-issue {
 		display: inline-block;
-		padding: 1px 5px;
+		padding: 1px 4px;
 		font-size: 10px;
 		font-weight: bold;
 		line-height: 1.3;
 		border-radius: 9px;
 		color: #fff;
-		margin-left: 4px;
+		margin-left: 3px;
 		vertical-align: middle;
 		cursor: default;
 	}
@@ -68,40 +68,40 @@
 	}
 	.badge-unconfirmed {
 		display: inline-block;
-		padding: 1px 5px;
+		padding: 1px 4px;
 		font-size: 10px;
 		font-weight: bold;
 		line-height: 1.3;
 		border-radius: 9px;
 		color: #fff;
 		background-color: #e67e22; /* 미확정 주황/경고 */
-		margin-left: 4px;
+		margin-left: 3px;
 		vertical-align: middle;
 		cursor: default;
 	}
 	.badge-unsettled {
 		display: inline-block;
-		padding: 1px 5px;
+		padding: 1px 4px;
 		font-size: 10px;
 		font-weight: bold;
 		line-height: 1.3;
 		border-radius: 9px;
 		color: #fff;
 		background-color: #9b59b6; /* 미정산(추후정산) 보라색 */
-		margin-left: 4px;
+		margin-left: 3px;
 		vertical-align: middle;
 		cursor: default;
 	}
 	.badge-settlement {
 		display: inline-block;
-		padding: 1px 5px;
+		padding: 1px 4px;
 		font-size: 10px;
 		font-weight: bold;
 		line-height: 1.3;
 		border-radius: 9px;
 		color: #fff;
 		background-color: #3498db; /* 정산상계 파란색 */
-		margin-left: 4px;
+		margin-left: 3px;
 		vertical-align: middle;
 		cursor: default;
 	}
@@ -439,28 +439,91 @@
 			badges += '<span class="badge-issue ' + cls + '" title="미완료문제 ' + uncomp + '건 / 발생 ' + totIss + '건">' + uncomp + '/' + totIss + '</span>';
 		}
 
-		// 2) 미확정 뱃지 (기준: 확정여부 미확정 cnfmYn === 'N' 인 경우)
-		if (item.cnfmYn === 'N') {
+		// 2) 미확정 뱃지 (기준: 확정구분이 미확정(cnfmYn === 'N')이거나 미확정금액 존재 시 금액 유무와 무관하게 표시)
+		var cnfmV = String(item.cnfmYn || '').trim();
+		var isUnconfirmed = (cnfmV === 'N' || cnfmV === '미확정' || item.hasUnconfirmed === true || Math.abs(gPasFloatChk(item.rawCnfmYnAmt !== undefined ? item.rawCnfmYnAmt : item.cnfmYnAmt)) > 0);
+		if (isUnconfirmed) {
 			badges += '<span class="badge-unconfirmed" title="미확정 건 존재">미확정</span>';
 		}
 
-		// 3) 미정산 뱃지 (추후정산 항목이 있는 경우: unsettledAmt > 0 또는 ordrsDtlDiv10 === 'ORDRSDTLDIV1040')
+		// 3) 미정산 뱃지 (추후정산 항목이 있는 경우: unsettledAmt != 0 또는 ordrsDtlDiv10 === 'ORDRSDTLDIV1040' 또는 하위 추후정산 존재)
 		var unsettledAmt = gPasFloatChk(item.unsettledAmt);
-		var isUnsettledItem = (item.ordrsDtlDiv10 === 'ORDRSDTLDIV1040');
-		if (unsettledAmt > 0 || isUnsettledItem) {
-			var unsettledTitle = "추후정산: " + (unsettledAmt > 0 ? unsettledAmt.toLocaleString() + "천원" : "항목존재");
+		var isUnsettledItem = (item.ordrsDtlDiv10 === 'ORDRSDTLDIV1040' || item.hasUnsettled === true);
+		if (Math.abs(unsettledAmt) > 0 || isUnsettledItem) {
+			var unsettledTitle = "추후정산: " + (Math.abs(unsettledAmt) > 0 ? unsettledAmt.toLocaleString() + "천원" : "항목존재");
 			badges += '<span class="badge-unsettled" title="' + unsettledTitle + '">미정산</span>';
 		}
 
-		// 4) 정산상계 뱃지 (정산상계 항목이 있는 경우: settlementAmt > 0 또는 ordrsDtlDiv10 === 'ORDRSDTLDIV1050')
+		// 4) 정산상계 뱃지 (정산상계 항목이 있는 경우: settlementAmt != 0 또는 ordrsDtlDiv10 === 'ORDRSDTLDIV1050' 또는 하위 정산상계 존재)
 		var settlementAmt = gPasFloatChk(item.settlementAmt);
-		var isSettlementItem = (item.ordrsDtlDiv10 === 'ORDRSDTLDIV1050');
-		if (settlementAmt > 0 || isSettlementItem) {
-			var settlementTitle = "정산상계: " + (settlementAmt > 0 ? settlementAmt.toLocaleString() + "천원" : "항목존재");
+		var isSettlementItem = (item.ordrsDtlDiv10 === 'ORDRSDTLDIV1050' || item.hasSettlement === true);
+		if (Math.abs(settlementAmt) > 0 || isSettlementItem) {
+			var settlementTitle = "정산상계: " + (Math.abs(settlementAmt) > 0 ? settlementAmt.toLocaleString() + "천원" : "항목존재");
 			badges += '<span class="badge-settlement" title="' + settlementTitle + '">정산상계</span>';
 		}
 
 		return badges;
+	}
+
+	/**
+	 * 하위(lvl=2) 상세 행들의 뱃지 조건(미확정, 미정산, 정산상계, 이슈건수)을 상위(lvl=1) 마스터 행으로 집계/전파
+	 */
+	function applyBadgeAggregation(list) {
+		if (!list || !list.length) return;
+		var parentStateMap = {};
+		for (var i = 0; i < list.length; i++) {
+			var row = list[i];
+			var on = String(row.ordrsNo || '').trim();
+			if (!on) continue;
+			if (!parentStateMap[on]) {
+				parentStateMap[on] = {
+					hasUnconfirmed: false,
+					hasUnsettled: false,
+					hasSettlement: false,
+					issueTotCnt: 0,
+					issueUncompCnt: 0
+				};
+			}
+			var st = parentStateMap[on];
+			var cnfmV = String(row.cnfmYn || '').trim();
+			var rawAmt = gPasFloatChk(row.rawCnfmYnAmt !== undefined ? row.rawCnfmYnAmt : row.cnfmYnAmt);
+			if (cnfmV === 'N' || cnfmV === '미확정' || Math.abs(rawAmt) > 0) {
+				row.cnfmYn = 'N';
+				row.hasUnconfirmed = true;
+				st.hasUnconfirmed = true;
+			}
+			if (row.ordrsDtlDiv10 === 'ORDRSDTLDIV1040' || Math.abs(gPasFloatChk(row.unsettledAmt)) > 0) {
+				row.hasUnsettled = true;
+				st.hasUnsettled = true;
+			}
+			if (row.ordrsDtlDiv10 === 'ORDRSDTLDIV1050' || Math.abs(gPasFloatChk(row.settlementAmt)) > 0) {
+				row.hasSettlement = true;
+				st.hasSettlement = true;
+			}
+			if (String(row.lvl) === '2') {
+				st.issueTotCnt += gPasIntChk(row.issueTotCnt);
+				st.issueUncompCnt += gPasIntChk(row.issueUncompCnt);
+			}
+		}
+		for (var j = 0; j < list.length; j++) {
+			var r = list[j];
+			if (String(r.lvl) === '1') {
+				var pOn = String(r.ordrsNo || '').trim();
+				var pSt = parentStateMap[pOn];
+				if (pSt) {
+					if (pSt.hasUnconfirmed) {
+						r.cnfmYn = 'N';
+						r.hasUnconfirmed = true;
+					}
+					if (pSt.hasUnsettled) r.hasUnsettled = true;
+					if (pSt.hasSettlement) r.hasSettlement = true;
+					if (gPasIntChk(r.issueTotCnt) === 0 && pSt.issueTotCnt > 0) {
+						r.issueTotCnt = pSt.issueTotCnt;
+						r.issueUncompCnt = pSt.issueUncompCnt;
+					}
+				}
+			}
+		}
 	}
 
 	ax5.ui.grid.formatter["salesCdBadge"] = function () {
@@ -471,7 +534,7 @@
 	};
 
 	var defaultColumns = [
-					{key: "salesCd"			, label: "수주번호/salesCd", align: "left", width: 200 , hidden: false, treeControl: true, formatter: "salesCdBadge", styleClass: function () {return gridColorSet(this.item);}},
+					{key: "salesCd"			, label: "수주번호/salesCd", align: "left", width: 250 , hidden: false, treeControl: true, formatter: "salesCdBadge", styleClass: function () {return gridColorSet(this.item);}},
 					{key: "clntNm"			, label: "고객사명"	, align: "left", width: 180, styleClass: function () {return gridColorSet(this.item);}},
 					{key: "mngNm"			, label: "영업담당자"	, align: "center", width: 70, styleClass: function () {return gridColorSet(this.item);}},
 					{key: "clntPjtNm"		, label: "고객사PJT"	, align: "left", width: 80, styleClass: function () {return gridColorSet(this.item);}, styleClass: function () {return this.item.ordrsDiv =='ORDRSDIV8'||this.item.ordrsDiv =='ORDRSDIV9'||this.item.ctrtDoc=='CONTRACT01'? 'grid-font-blue-bold':''}},
@@ -595,6 +658,11 @@
 			var _this = this;
 			// 사용자별 컬럼설정 적용 (순서/숨김/너비) - 합계행도 이 순서 기준으로 재생성
 			var cols = GridColumnConfig.apply("CR0201M02", "first-grid", defaultColumns);
+			$.each(cols, function(idx, col) {
+				if (col && col.key === "salesCd" && (!col.width || col.width < 250)) {
+					col.width = 250;
+				}
+			});
             this.target.setConfig({
                 target: $('[data-ax5grid="first-grid"]'),
                 frozenColumnIndex : 7,
@@ -693,15 +761,20 @@
                         }
                			
 
+						var hasServerCnfmYn = (list.length > 0 && list[0].cnfmYn !== undefined && list[0].cnfmYn !== null && list[0].cnfmYn !== "");
+						var hasServerIssueCnt = (list.length > 0 && list[0].issueTotCnt !== undefined && list[0].issueTotCnt !== null);
+
 						const seenNo2 = new Set();
 						for (let i = 0; i < list.length; i++) {
+							var rawCnfmYnAmt = gPasFloatChk(list[i].cnfmYnAmt);
+							list[i].rawCnfmYnAmt = rawCnfmYnAmt;
 							if (userVisiable) {	//ex.  영업팀은 조회가능하나 타팀은 금액확인 못하게
 								list[i].ordrsAmt = gPasFloatChk(list[i].ordrsAmt);
 								list[i].exchangeAmt = gPasFloatChk(list[i].exchangeAmt);
 								list[i].ordrsPrcMach = gPasFloatChk(list[i].ordrsPrcMach);
 								list[i].ordrsPrcElcty = gPasFloatChk(list[i].ordrsPrcElcty);
 								list[i].ordrsPrc = gPasFloatChk(list[i].ordrsPrc);
-								list[i].cnfmYnAmt = gPasFloatChk(list[i].cnfmYnAmt);
+								list[i].cnfmYnAmt = rawCnfmYnAmt;
 							} else {
                                 list[i].ordrsAmt = 0;			//수주가
                                 list[i].exchangeAmt = 0;		//
@@ -712,10 +785,15 @@
                                 list[i].cnfmYnAmt = 0;
 							}
 							list[i].exrate = gPasFloatChk(list[i].exrate);
-							// 확정구분(cnfmYn) 정규화: 값이 없을 경우 미확정금액(cnfmYnAmt > 0)에 따라 판별
-							if (list[i].cnfmYn === undefined || list[i].cnfmYn === null || list[i].cnfmYn === "") {
-								list[i].cnfmYn = (list[i].cnfmYnAmt > 0) ? "N" : "Y";
+							// 확정구분(cnfmYn) 정규화: cnfmYn === 'N' 이거나 미확정금액(rawCnfmYnAmt != 0) 존재 시 미확정('N') 처리
+							var curCnfm = String(list[i].cnfmYn || '').trim();
+							if (curCnfm === 'N' || curCnfm === '미확정' || Math.abs(rawCnfmYnAmt) > 0) {
+								list[i].cnfmYn = "N";
+							} else {
+								list[i].cnfmYn = "Y";
 							}
+							list[i].issueTotCnt = gPasIntChk(list[i].issueTotCnt);
+							list[i].issueUncompCnt = gPasIntChk(list[i].issueUncompCnt);
 							list[i].unsettledAmt = gPasFloatChk(list[i].unsettledAmt);
 							list[i].settlementAmt = gPasFloatChk(list[i].settlementAmt);
 							list[i].ordrsQty = gPasFloatChk(list[i].ordrsQty);
@@ -780,15 +858,7 @@
 							}
 						}
 
-						// 목록 salesCd / ordrsNo 대상 이슈 건수 조회 및 뱃지 데이터 매핑
-						var salesCdSet = new Set();
-						for (var k = 0; k < list.length; k++) {
-							var sc = String(list[k].salesCd || '').trim();
-							var on = String(list[k].ordrsNo || '').trim();
-							if (sc) salesCdSet.add(sc);
-							if (on) salesCdSet.add(on);
-						}
-						var salesCdArr = Array.from(salesCdSet);
+						applyBadgeAggregation(list);
 
 						function renderGrid() {
 							gridViewIn.setData({
@@ -802,100 +872,116 @@
 							});
 						}
 
-						if (salesCdArr.length > 0) {
-							var reqCoCd = $("#coCd_S").val() || (list[0] && list[0].coCd) || jwt.coCd;
-							// ordrsIssueList 팝업 및 작업일보/WBS 이슈 전체 대상과 동일하게 조회
-							var issueParam = {
-								"coCd"      : reqCoCd,
-								"salesCd"   : "",
-								"reqDtFrom" : "20200101",
-								"reqDtTo"   : "20991231",
-								"workRptId" : "",
-								"prdtCd"    : "",
-								"itemDiv"   : "",
-								"prdtNm"    : "",
-								"actId"     : "",
-								"pageNo"    : 1,
-								"recordCnt" : 99999999,
-								"issSts"    : ""
-							};
-							postAjax("/user/pm/pm01/selectAllIssueWorkList", issueParam, null, function(issData) {
+						renderGrid();
+
+						var reqCoCd = $("#coCd_S").val() || (list[0] && list[0].coCd) || jwt.coCd;
+
+						// 백엔드 selectOrdrsList 에 cnfmYn 필드가 아직 반영되지 않은 경우(서버 미재기동 시) 금액 0원 미확정건 보강 조회
+						if (!hasServerCnfmYn && list.length > 0) {
+							postAjax("/user/cr/cr02/selectOrdrsUnconfirmedDetails", { coCd: reqCoCd }, null, function(unconfData) {
 								try {
-									var allIssues = issData.result || [];
-									// 현재 페이지의 수주번호 및 salesCd 목록 필터링 및 집계
-									var issMap = {};
-									for (var m = 0; m < allIssues.length; m++) {
-										var rowIss = allIssues[m];
-										var isSalesCd = String(rowIss.salesCd || '').trim();
-										var isOrdrsNo = String(rowIss.ordrsNo || '').trim();
-										if (!isSalesCd && !isOrdrsNo) continue;
-
-										// 상태 판별: ISSSTS03(완료) 또는 REQST03(완료)가 아니면 미완료
-										var isUncomp = (rowIss.issSts !== 'ISSSTS03' && rowIss.issSts !== 'REQST03' && rowIss.reqSt !== 'REQST03');
-
-										// salesCd 키 기준 누적
-										if (isSalesCd) {
-											if (!issMap[isSalesCd]) issMap[isSalesCd] = { totCnt: 0, uncompCnt: 0 };
-											issMap[isSalesCd].totCnt += 1;
-											if (isUncomp) issMap[isSalesCd].uncompCnt += 1;
+									var unconfList = (unconfData && unconfData.result) ? unconfData.result : [];
+									if (unconfList.length > 0) {
+										var unconfOrdrsNoSet = new Set();
+										var unconfSeqSet = new Set();
+										var unconfSalesCdSet = new Set();
+										for (var u = 0; u < unconfList.length; u++) {
+											var uRow = unconfList[u];
+											var uCnfm = String(uRow.cnfmYn || '').trim();
+											if (uCnfm !== 'N' && uCnfm !== '미확정') continue;
+											var uOn = String(uRow.ordrsNo || '').trim();
+											var uSeq = String(uRow.ordrsSeq !== undefined && uRow.ordrsSeq !== null ? uRow.ordrsSeq : '').trim();
+											var uSc = String(uRow.salesCd || '').trim();
+											if (uOn) unconfOrdrsNoSet.add(uOn);
+											if (uOn && uSeq) unconfSeqSet.add(uOn + "_" + uSeq);
+											if (uSc) unconfSalesCdSet.add(uSc);
 										}
-
-										// ordrsNo 키 기준 누적 (수주번호 접두사 또는 일치)
-										var targetOrdrsNo = isOrdrsNo;
-										if (!targetOrdrsNo && isSalesCd.indexOf('-') > 0) {
-											targetOrdrsNo = isSalesCd.split('-')[0];
-										}
-										if (targetOrdrsNo) {
-											if (!issMap[targetOrdrsNo]) issMap[targetOrdrsNo] = { totCnt: 0, uncompCnt: 0 };
-											issMap[targetOrdrsNo].totCnt += 1;
-											if (isUncomp) issMap[targetOrdrsNo].uncompCnt += 1;
-										}
-									}
-
-									// 자식(lvl 2) 행의 이슈 건수 합산하여 부모(lvl 1)에 반영
-									var parentIssueMap = {};
-									for (var p = 0; p < list.length; p++) {
-										var pSc = String(list[p].salesCd || '').trim();
-										var pOn = String(list[p].ordrsNo || '').trim();
-										var hit = issMap[pSc] || (pSc ? issMap[pSc.split('-')[0]] : null);
-										if (hit && list[p].lvl == '2') {
-											if (!parentIssueMap[pOn]) {
-												parentIssueMap[pOn] = { totCnt: 0, uncompCnt: 0 };
+										var changedCnfm = false;
+										for (var idx = 0; idx < list.length; idx++) {
+											var itemRow = list[idx];
+											var cOn = String(itemRow.ordrsNo || '').trim();
+											var cSeq = String(itemRow.ioSeq !== undefined && itemRow.ioSeq !== null ? itemRow.ioSeq : '').trim();
+											var cSc = String(itemRow.salesCd || '').trim();
+											if (String(itemRow.lvl) === '1') {
+												if (cOn && unconfOrdrsNoSet.has(cOn) && itemRow.cnfmYn !== 'N') {
+													itemRow.cnfmYn = 'N';
+													itemRow.hasUnconfirmed = true;
+													changedCnfm = true;
+												}
+											} else {
+												if (((cOn && cSeq && unconfSeqSet.has(cOn + "_" + cSeq)) || (cSc && unconfSalesCdSet.has(cSc))) && itemRow.cnfmYn !== 'N') {
+													itemRow.cnfmYn = 'N';
+													itemRow.hasUnconfirmed = true;
+													changedCnfm = true;
+												}
 											}
-											parentIssueMap[pOn].totCnt += hit.totCnt;
-											parentIssueMap[pOn].uncompCnt += hit.uncompCnt;
 										}
-									}
-
-									for (var n = 0; n < list.length; n++) {
-										var curSc = String(list[n].salesCd || '').trim();
-										var curOn = String(list[n].ordrsNo || '').trim();
-										var matched = null;
-
-										if (list[n].lvl == '1') {
-											// 마스터 수주번호 기준 매핑 (직접 매핑 또는 자식들 합산)
-											matched = issMap[curOn] || issMap[curSc] || parentIssueMap[curOn];
-										} else {
-											// 상세 행: salesCd 정확 매칭
-											matched = issMap[curSc];
-										}
-
-										if (matched && matched.totCnt > 0) {
-											list[n].issueTotCnt = matched.totCnt;
-											list[n].issueUncompCnt = matched.uncompCnt;
-										} else {
-											list[n].issueTotCnt = 0;
-											list[n].issueUncompCnt = 0;
+										if (changedCnfm) {
+											applyBadgeAggregation(list);
+											renderGrid();
 										}
 									}
 								} catch (e) {
-									console.error("이슈 집계 매핑 오류", e);
-								} finally {
-									renderGrid();
+									console.error("미확정 뱃지 보강 조회 오류", e);
 								}
-							});
-						} else {
-							renderGrid();
+							}, false);
+						}
+
+						// 백엔드 selectOrdrsList 에 issueTotCnt 필드가 아직 반영되지 않은 경우(서버 미재기동 시) 경량 API로 보강 조회
+						if (!hasServerIssueCnt && list.length > 0) {
+							var salesCdSet = new Set();
+							for (var k = 0; k < list.length; k++) {
+								if (String(list[k].lvl) === '2') {
+									var sc = String(list[k].salesCd || '').trim();
+									if (sc && sc.indexOf('상세없음') === -1) salesCdSet.add(sc);
+								}
+							}
+							var salesCdArr = Array.from(salesCdSet);
+							if (salesCdArr.length > 0) {
+								postAjax("/user/wb/wb24/selectWbsIssueCountBySalesCds", { coCd: reqCoCd, salesCds: salesCdArr }, null, function(cntData) {
+									try {
+										var cntRows = (cntData && cntData.result) ? cntData.result : [];
+										if (cntRows.length === 0) return;
+										var issMap = {};
+										for (var c = 0; c < cntRows.length; c++) {
+											var cSc = String(cntRows[c].salesCd || cntRows[c].SALES_CD || '').trim();
+											var cTot = gPasIntChk(cntRows[c].cnt !== undefined ? cntRows[c].cnt : cntRows[c].CNT);
+											if (cSc && cTot > 0) {
+												issMap[cSc] = { totCnt: cTot, uncompCnt: 0 };
+											}
+										}
+										postAjax("/user/wb/wb24/selectWbsIssueListDashboard", { coCd: reqCoCd }, null, function(dashData) {
+											try {
+												var dashRows = (dashData && dashData.result) ? dashData.result : [];
+												for (var d = 0; d < dashRows.length; d++) {
+													var dRow = dashRows[d];
+													if (dRow.gubun !== '계획' && dRow.gubun !== '실적') continue;
+													var dSc = String(dRow.salesCd || '').trim();
+													if (dSc && issMap[dSc]) {
+														issMap[dSc].uncompCnt += 1;
+													}
+												}
+												for (var n = 0; n < list.length; n++) {
+													if (String(list[n].lvl) === '2') {
+														var curSc = String(list[n].salesCd || '').trim();
+														var matched = issMap[curSc];
+														if (matched) {
+															list[n].issueTotCnt = matched.totCnt;
+															list[n].issueUncompCnt = matched.uncompCnt;
+														}
+													}
+												}
+												applyBadgeAggregation(list);
+												renderGrid();
+											} catch (e2) {
+												console.error("이슈 미완료 집계 오류", e2);
+											}
+										}, false);
+									} catch (e1) {
+										console.error("이슈 건수 조회 오류", e1);
+									}
+								}, false);
+							}
 						}
                     } catch (error) {
                         alert("오류 발생!! 전산실 연락 바랍니다", error.message);
@@ -1064,7 +1150,7 @@
         setByCoCd($("#coCd_S").val());
 
 		// 시작일/종료일 셋팅
-		$('#strtDt_S').val(moment(new Date()).subtract(2, 'months').startOf("month").format("YYYY-MM-DD"));
+		$('#strtDt_S').val(moment(new Date()).subtract(5, 'months').startOf("month").format("YYYY-MM-DD"));
 		$('#endDt_S').val(moment(new Date()).endOf("month").format("YYYY-MM-DD"));
 
 		// 날짜 범위 선택기

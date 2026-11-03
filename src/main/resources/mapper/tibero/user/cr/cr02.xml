@@ -169,6 +169,7 @@
 		       , ROUND(SUM(A.UNSETTLED_AMT) / 1000, 1)                  AS UNSETTLED_AMT                  --추후정산금액
 		       , ROUND(SUM(A.SETTLEMENT_AMT) / 1000, 1)                 AS SETTLEMENT_AMT                 --정산상계금액
 		       , ROUND(SUM(A.CNFM_YN_AMT) / 1000, 1)                    AS CNFM_YN_AMT                    --미확정금액
+		       , CASE WHEN SUM(CASE WHEN A.CNFM_YN = 'N' THEN 1 ELSE 0 END) &gt; 0 THEN 'N' ELSE 'Y' END AS CNFM_YN --확정여부
 		  FROM   (
 		          SELECT CO_CD
 				       , ORDRS_NO
@@ -199,11 +200,47 @@
 				       , CASE WHEN D.ORDRS_DTL_DIV10 = 'ORDRSDTLDIV1040' THEN NVL(D.ORDRS_PRC, 0)*(-1) ELSE 0 END AS UNSETTLED_AMT --추후정산금액
 				       , CASE WHEN D.ORDRS_DTL_DIV10 = 'ORDRSDTLDIV1050' THEN NVL(D.ORDRS_PRC, 0)      ELSE 0 END AS SETTLEMENT_AMT --정산상계금액
 			       , CASE WHEN NVL(D.CNFM_YN, 'Y') = 'N' THEN NVL(D.ORDRS_PRC, 0) ELSE 0 END AS CNFM_YN_AMT --미확정금액
+			       , NVL(D.CNFM_YN, 'Y') AS CNFM_YN
 		          FROM   TB_CR02D02 D
 				  WHERE  1 = 1
 				    AND EXISTS (SELECT 1 FROM SJT WHERE SJT.ORDRS_NO = D.ORDRS_NO)
 		         ) AS A
 		  GROUP BY A.CO_CD, A.ORDRS_NO
+		)
+		, ISS_SCD AS
+		(
+		  SELECT D.CO_CD
+		       , D.ORDRS_NO
+		       , D.SALES_CD
+		       , COUNT(ISU.ISS_NO) AS ISSUE_TOT_CNT
+		       , SUM(CASE WHEN DECODE(ISU.REQ_NO, '', ISU.ISS_STS, QM.REQ_ST) IN ('ISSSTS03', 'REQST03')
+		                    OR QM.REQ_ST = 'REQST03'
+		                  THEN 0
+		                  ELSE 1
+		             END) AS ISSUE_UNCOMP_CNT
+		  FROM   (
+		          SELECT DISTINCT D.CO_CD, D.ORDRS_NO, D.SALES_CD
+		          FROM   TB_CR02D02 D
+		          WHERE  D.SALES_CD IS NOT NULL
+		            AND  EXISTS (SELECT 1 FROM SJT WHERE SJT.CO_CD = D.CO_CD AND SJT.ORDRS_NO = D.ORDRS_NO)
+		         ) AS D
+		         INNER JOIN TB_WB24M02 AS ISU ON ISU.CO_CD = D.CO_CD AND ISU.SALES_CD = D.SALES_CD
+		         LEFT OUTER JOIN TB_QM01M01 AS QM ON QM.REQ_NO = ISU.REQ_NO
+		  WHERE  (
+		          ((QM.REQ_ST = 'REQST03' OR ISU.ISS_STS = 'ISSSTS03') AND ISU.CREAT_DTTM BETWEEN TO_DATE('20200101', 'YYYYMMDD') AND TO_DATE('20991231235959', 'YYYYMMDDHH24MISS'))
+		          OR (NVL(QM.REQ_ST, 'REQST01') != 'REQST03' AND ISU.ISS_STS != 'ISSSTS03')
+		          OR (NVL(ISU.ISS_STS, 'ISSSTS01') != 'ISSSTS03' AND ISU.REQ_NO IS NULL)
+		         )
+		  GROUP BY D.CO_CD, D.ORDRS_NO, D.SALES_CD
+		)
+		, ISS_ORD AS
+		(
+		  SELECT CO_CD
+		       , ORDRS_NO
+		       , SUM(ISSUE_TOT_CNT)    AS ISSUE_TOT_CNT
+		       , SUM(ISSUE_UNCOMP_CNT) AS ISSUE_UNCOMP_CNT
+		  FROM   ISS_SCD
+		  GROUP BY CO_CD, ORDRS_NO
 		)
 		, SJM AS
 		(
@@ -232,6 +269,9 @@
 							   , SDS.UNSETTLED_AMT                  --추후정산금액
 							   , SDS.SETTLEMENT_AMT                 --정산상계금액
 								   , SDS.CNFM_YN_AMT                    --미확정금액
+							   , NVL(SDS.CNFM_YN, 'Y')              AS CNFM_YN
+							   , NVL(ISSO.ISSUE_TOT_CNT, 0)         AS ISSUE_TOT_CNT
+							   , NVL(ISSO.ISSUE_UNCOMP_CNT, 0)      AS ISSUE_UNCOMP_CNT
 							   , U.NAME AS MNG_NM					--담당자명
 /*							   , (SELECT CASE WHEN ( COUNT(A.TODO_KEY) = SUM(DECODE(NVL(A.SANCTN_STTUS, 'N'), 'N', 0, 'Y', 1) ) )
 											  THEN 'Y'
@@ -245,6 +285,8 @@
 		                  FROM   SJT AS M  -- 수주마스터
 								 LEFT OUTER JOIN SJS AS SDS  ON M.CO_CD    = SDS.CO_CD
 		                                                    AND M.ORDRS_NO = SDS.ORDRS_NO
+		                         LEFT OUTER JOIN ISS_ORD AS ISSO ON M.CO_CD    = ISSO.CO_CD
+		                                                        AND M.ORDRS_NO = ISSO.ORDRS_NO
 		                         LEFT OUTER JOIN TB_CM06M01 AS U ON U.ID = M.MNG_ID
 		                  WHERE  1 = 1
 		)
@@ -318,9 +360,15 @@
 		       , SM.CURR_CD
 		       , SM.EXRATE
 		       , CASE WHEN NVL(SD.CNFM_YN, 'Y') = 'N' THEN ROUND(NVL(SD.ORDRS_PRC, 0) / 1000, 1) ELSE 0 END AS CNFM_YN_AMT --미확정금액
+		       , NVL(SD.CNFM_YN, 'Y')                                  AS CNFM_YN
+		       , NVL(ISSD.ISSUE_TOT_CNT, 0)                            AS ISSUE_TOT_CNT
+		       , NVL(ISSD.ISSUE_UNCOMP_CNT, 0)                         AS ISSUE_UNCOMP_CNT
 		  FROM   SJM AS SM --수주마스터
 		         LEFT OUTER JOIN TB_CR02D02 AS SD  ON SM.CO_CD    = SD.CO_CD
 		                                          AND SM.ORDRS_NO = SD.ORDRS_NO
+		         LEFT OUTER JOIN ISS_SCD AS ISSD   ON SD.CO_CD    = ISSD.CO_CD
+		                                          AND SD.ORDRS_NO = ISSD.ORDRS_NO
+		                                          AND SD.SALES_CD = ISSD.SALES_CD
 		         LEFT OUTER JOIN TB_BM01M01 AS P   ON SD.PRDT_CD  = P.PRDT_CD
 		  WHERE  1 = 1
 		)
@@ -428,6 +476,9 @@
 		     , CURR_CD
 		     , EXRATE
 		     , NVL(CNFM_YN_AMT, 0)              AS CNFM_YN_AMT    --미확정금액
+		     , NVL(CNFM_YN, 'Y')                AS CNFM_YN        --확정여부
+		     , NVL(ISSUE_TOT_CNT, 0)            AS ISSUE_TOT_CNT  --이슈총건수
+		     , NVL(ISSUE_UNCOMP_CNT, 0)         AS ISSUE_UNCOMP_CNT --미완료이슈건수
 		FROM   SJM
 		UNION ALL
 		SELECT CO_CD                           AS CO_CD        --회사코드
@@ -531,6 +582,9 @@
 		     , CURR_CD
 		     , EXRATE
 		     , CNFM_YN_AMT                      AS CNFM_YN_AMT    --미확정금액
+		     , NVL(CNFM_YN, 'Y')                AS CNFM_YN        --확정여부
+		     , NVL(ISSUE_TOT_CNT, 0)            AS ISSUE_TOT_CNT  --이슈총건수
+		     , NVL(ISSUE_UNCOMP_CNT, 0)         AS ISSUE_UNCOMP_CNT --미완료이슈건수
 		FROM   SJD
 		)
 		SELECT SJALL.*
