@@ -918,8 +918,12 @@
 				"searchValue" : searchValue,
 				"clntDivCd"   : "CLNTDIV12"
 			};
+			var prevClntCd = String($('#ordrsClntCd').val() || '').trim();
 			openSecondModal("/static/html/cmn/modal/clntSearch.html", 650, 650, "고객사 검색", paramObj, function (grid) {
 				var row = grid.target.getList("selected")[0];
+				var newClntCd = String(row.clntCd || '').trim();
+				var isClntChanged = (prevClntCd !== newClntCd);
+
 				$('#ordrsClntCd').val(row.clntCd);
 				$('#ordrsClntNm').val(row.clntNm);
 				$('#vatCd').val(row.sellVatCd);
@@ -939,8 +943,245 @@
 				// 거래처 변경시 물류정보 새로 가져오기
 				setLgistInfo(row.clntCd);
 
+				// 고객사 코드가 이전값과 다르게 실제로 변경되었을 때만 미정산/미확정 내역 체크 및 알림 팝업
+				if (isClntChanged) {
+					checkClientUnsettledAndUnconfirmed(row.clntCd, row.clntNm, $('#coCd').val());
+				}
 			});
 		// }
+	}
+
+	var lastCheckedAlertClntCd = "";
+
+	// 고객사 변경 시 미정산 잔액 및 미확정 설비 내역 조회 및 알림 모달 표출
+	function checkClientUnsettledAndUnconfirmed(checkClientCd, clntNm, currentCoCd, reqUnsettled, force) {
+		checkClientCd = String(checkClientCd || '').trim();
+		if (!checkClientCd) return;
+		// 강제 실행(수정모드 초기 로드 등)이 아니면서 이전 확인한 고객사코드와 동일한 경우 중복 표출 방지
+		if (!force && lastCheckedAlertClntCd === checkClientCd) return;
+		lastCheckedAlertClntCd = checkClientCd;
+
+		currentCoCd = currentCoCd || $('#coCd').val() || '';
+		var passChkDeptId = jwt.deptId || "";
+		var canViewAmt = (
+			(currentCoCd == 'GUN' && (passChkDeptId.includes('GUN00') || passChkDeptId.includes('GUN30') || passChkDeptId.includes('GUN20') || passChkDeptId.includes('GUN80'))) ||
+			(currentCoCd == 'TRN' && (passChkDeptId.includes('GUN00') || passChkDeptId.includes('TRN')   || passChkDeptId.includes('GUN20') || passChkDeptId.includes('GUN80')))
+		);
+
+		if (!canViewAmt) return;
+
+		var unParam = {
+			coCd: currentCoCd,
+			ordrsClntCd: checkClientCd,
+			billyn: "N",
+			pageNo: 1,
+			recordCnt: 99999999
+		};
+
+		var unCnfmParam = {
+			coCd: currentCoCd,
+			ordrsClntCd: checkClientCd
+		};
+
+		var unSettledFinished = false;
+		var unCnfmFinished = false;
+		var unSettledDataList = [];
+		var unCnfmDataList = [];
+
+		function renderClntAlertModal() {
+			if (!unSettledFinished || !unCnfmFinished) return;
+
+			// 1. 미정산 데이터 집계
+			var uniqueItems = [];
+			var seenKeys = {};
+			var totalUnsettledAmt = 0;
+			for (var i = 0; i < unSettledDataList.length; i++) {
+				var item = unSettledDataList[i];
+				var key = (item.ordrsNo || '') + '_' + (item.ordrsSeq || '');
+				if (!seenKeys[key]) {
+					seenKeys[key] = true;
+					var prc = gPasFloatChk(item.ordrsPrc);
+					var unAmt = gPasFloatChk(item.unUnsettledAmt);
+					if (unAmt !== 0) {
+						totalUnsettledAmt += unAmt;
+						uniqueItems.push({
+							ordrsNo: item.ordrsNo || '',
+							eqpNm: item.eqpNm || '',
+							mngNm: item.mngIdNm || item.mngNm || '',
+							ordrsPrc: prc,
+							unUnsettledAmt: unAmt
+						});
+					}
+				}
+			}
+
+			// 미정산 잔액 존재 여부에 따라 상단 미정산잔액조회 버튼 표시 제어
+			if (uniqueItems.length > 0) {
+				$('#clntUnsettledAmtBtn').show();
+			} else {
+				$('#clntUnsettledAmtBtn').hide();
+			}
+
+			// 2. 미확정 데이터 집계 (cnfmYn == 'N' 또는 미확정)
+			var uniqueCnfmItems = [];
+			var totalCnfmPrc = 0;
+			var totalCnfmTrgtCost = 0;
+			for (var j = 0; j < unCnfmDataList.length; j++) {
+				var cItem = unCnfmDataList[j];
+				var cStatus = String(cItem.cnfmYn || '').trim();
+				if (cStatus == 'N' || cStatus == '미확정') {
+					var cOrdrsPrc = gPasFloatChk(cItem.ordrsPrc);
+					var cTrgtCost = gPasFloatChk(cItem.estTrgtCost);
+					totalCnfmPrc += cOrdrsPrc;
+					totalCnfmTrgtCost += cTrgtCost;
+					uniqueCnfmItems.push({
+						ordrsNo: cItem.ordrsNo || '',
+						ordrsSeq: cItem.ordrsSeq || '',
+						ordrsDivNm: cItem.ordrsDivNm || '',
+						salesCd: cItem.salesCd || '',
+						eqpNm: cItem.eqpNm || '',
+						mngNm: cItem.mngNm || cItem.mngIdNm || '',
+						estTrgtCost: cTrgtCost,
+						ordrsPrc: cOrdrsPrc
+					});
+				}
+			}
+
+			if (uniqueItems.length === 0 && uniqueCnfmItems.length === 0) {
+				if (reqUnsettled) customAlert("미정산잔액이 있는 고객사입니다.");
+				return;
+			}
+
+			var alertHtml = '<div style="min-width: 850px; max-width: 850px;">'
+				+ '<div style="font-weight: bold; font-size: 15px; margin-bottom: 8px; color: #d9534f;">'
+				+ '<i class="fa fa-exclamation-triangle"></i> '
+				+ (clntNm ? '고객사 [' + clntNm + '] ' : '')
+				+ '미정산 / 미확정 알림'
+				+ '</div>';
+
+			alertHtml += '<div style="margin-bottom: 8px; font-size: 12px; color: #333; background: #fff8f8; padding: 6px 10px; border: 1px solid #f5c6cb; border-radius: 4px;">';
+			if (uniqueItems.length > 0) {
+				alertHtml += '미정산: <b style="color: #d9534f;">' + addCommaStr(totalUnsettledAmt) + '원</b> (' + uniqueItems.length + '건)&nbsp;&nbsp;';
+			}
+			if (uniqueCnfmItems.length > 0) {
+				alertHtml += '|&nbsp;&nbsp;미확정 수주가: <b style="color: #d9534f;">' + addCommaStr(totalCnfmPrc) + '원</b> (' + uniqueCnfmItems.length + '건)';
+			}
+			alertHtml += '</div>';
+
+			// [섹션 1] 미정산 내역
+			if (uniqueItems.length > 0) {
+				alertHtml += '<div style="margin-top: 10px; margin-bottom: 4px; font-weight: bold; font-size: 13px; color: #333;">'
+					+ '<i class="fa fa-list"></i> 미정산 잔액 내역 (' + uniqueItems.length + '건)'
+					+ '</div>'
+					+ '<div style="max-height: 180px; overflow-y: auto; border: 1px solid #d5d5d5; border-radius: 3px; margin-bottom: 10px;">'
+					+ '<table style="width: 100%; border-collapse: collapse; font-size: 12px; text-align: left;">'
+					+ '<thead style="background: #f2f2f2; position: sticky; top: 0; z-index: 1;">'
+					+ '<tr style="border-bottom: 1px solid #ccc; height: 26px;">'
+					+ '<th style="padding: 4px 6px; text-align: center; width: 75px; border-right: 1px solid #e0e0e0;">수주번호</th>'
+					+ '<th style="padding: 4px 6px; border-right: 1px solid #e0e0e0;">설비명</th>'
+					+ '<th style="padding: 4px 6px; text-align: right; width: 90px; border-right: 1px solid #e0e0e0;">발생금액</th>'
+					+ '<th style="padding: 4px 6px; text-align: right; width: 95px; border-right: 1px solid #e0e0e0;">미정산잔액</th>'
+					+ '<th style="padding: 4px 6px; text-align: center; width: 80px;">수주담당자</th>'
+					+ '</tr>'
+					+ '</thead>'
+					+ '<tbody>';
+
+				for (var k = 0; k < uniqueItems.length; k++) {
+					var u = uniqueItems[k];
+					var bg = (k % 2 === 1) ? ' style="background: #fafafa; border-bottom: 1px solid #eee;"' : ' style="border-bottom: 1px solid #eee;"';
+					alertHtml += '<tr' + bg + '>'
+						+ '<td style="padding: 4px 6px; text-align: center; border-right: 1px solid #eee;">' + u.ordrsNo + '</td>'
+						+ '<td style="padding: 4px 6px; border-right: 1px solid #eee; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 250px;" title="' + (u.eqpNm || '') + '">' + (u.eqpNm || '') + '</td>'
+						+ '<td style="padding: 4px 6px; text-align: right; border-right: 1px solid #eee;">' + addCommaStr(u.ordrsPrc) + '</td>'
+						+ '<td style="padding: 4px 6px; text-align: right; font-weight: bold; color: #d9534f; border-right: 1px solid #eee;">' + addCommaStr(u.unUnsettledAmt) + '</td>'
+						+ '<td style="padding: 4px 6px; text-align: center;">' + (u.mngNm || '') + '</td>'
+						+ '</tr>';
+				}
+
+				alertHtml += '</tbody>'
+					+ '<tfoot style="background: #f7f7f7; font-weight: bold; border-top: 2px solid #ccc;">'
+					+ '<tr>'
+					+ '<td colspan="3" style="padding: 5px 6px; text-align: center; border-right: 1px solid #e0e0e0;">총 미정산잔액 합계</td>'
+					+ '<td style="padding: 5px 6px; text-align: right; color: #d9534f; border-right: 1px solid #e0e0e0;">' + addCommaStr(totalUnsettledAmt) + '</td>'
+					+ '<td></td>'
+					+ '</tr>'
+					+ '</tfoot>'
+					+ '</table>'
+					+ '</div>';
+			}
+
+			// [섹션 2] 미확정 설비원가 내역
+			if (uniqueCnfmItems.length > 0) {
+				alertHtml += '<div style="margin-top: 6px; margin-bottom: 4px; font-weight: bold; font-size: 13px; color: #333;">'
+					+ '<i class="fa fa-exclamation-circle" style="color:#d9534f;"></i> 미확정 설비 내역 (' + uniqueCnfmItems.length + '건)'
+					+ '</div>'
+					+ '<div style="max-height: 180px; overflow-y: auto; border: 1px solid #d5d5d5; border-radius: 3px;">'
+					+ '<table style="width: 100%; border-collapse: collapse; font-size: 12px; text-align: left;">'
+					+ '<thead style="background: #f2f2f2; position: sticky; top: 0; z-index: 1;">'
+					+ '<tr style="border-bottom: 1px solid #ccc; height: 26px;">'
+					+ '<th style="padding: 4px 6px; text-align: center; width: 65px; border-right: 1px solid #e0e0e0;">수주번호</th>'
+					+ '<th style="padding: 4px 6px; text-align: center; width: 40px; border-right: 1px solid #e0e0e0;">순번</th>'
+					+ '<th style="padding: 4px 6px; text-align: center; width: 110px; border-right: 1px solid #e0e0e0;">SalesCode</th>'
+					+ '<th style="padding: 4px 6px; border-right: 1px solid #e0e0e0;">설비명</th>'
+					+ '<th style="padding: 4px 6px; text-align: right; width: 85px; border-right: 1px solid #e0e0e0;">목표가</th>'
+					+ '<th style="padding: 4px 6px; text-align: right; width: 90px; border-right: 1px solid #e0e0e0;">수주예상가</th>'
+					+ '<th style="padding: 4px 6px; text-align: center; width: 80px;">수주담당자</th>'
+					+ '</tr>'
+					+ '</thead>'
+					+ '<tbody>';
+
+				for (var m = 0; m < uniqueCnfmItems.length; m++) {
+					var ci = uniqueCnfmItems[m];
+					var cbg = (m % 2 === 1) ? ' style="background: #fafafa; border-bottom: 1px solid #eee;"' : ' style="border-bottom: 1px solid #eee;"';
+					alertHtml += '<tr' + cbg + '>'
+						+ '<td style="padding: 4px 6px; text-align: center; border-right: 1px solid #eee;">' + ci.ordrsNo + '</td>'
+						+ '<td style="padding: 4px 6px; text-align: center; border-right: 1px solid #eee;">' + ci.ordrsSeq + '</td>'
+						+ '<td style="padding: 4px 6px; text-align: center; border-right: 1px solid #eee;">' + ci.salesCd + '</td>'
+						+ '<td style="padding: 4px 6px; border-right: 1px solid #eee; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 200px;" title="' + (ci.eqpNm || '') + '">' + (ci.eqpNm || '') + '</td>'
+						+ '<td style="padding: 4px 6px; text-align: right; border-right: 1px solid #eee;">' + addCommaStr(ci.estTrgtCost) + '</td>'
+						+ '<td style="padding: 4px 6px; text-align: right; font-weight: bold; color: #d9534f; border-right: 1px solid #eee;">' + addCommaStr(ci.ordrsPrc) + '</td>'
+						+ '<td style="padding: 4px 6px; text-align: center;">' + (ci.mngNm || '') + '</td>'
+						+ '</tr>';
+				}
+
+				alertHtml += '</tbody>'
+					+ '<tfoot style="background: #f7f7f7; font-weight: bold; border-top: 2px solid #ccc;">'
+					+ '<tr>'
+					+ '<td colspan="4" style="padding: 5px 6px; text-align: center; border-right: 1px solid #e0e0e0;">미확정 합계</td>'
+					+ '<td style="padding: 5px 6px; text-align: right; border-right: 1px solid #e0e0e0;">' + addCommaStr(totalCnfmTrgtCost) + '</td>'
+					+ '<td style="padding: 5px 6px; text-align: right; color: #d9534f; border-right: 1px solid #e0e0e0;">' + addCommaStr(totalCnfmPrc) + '</td>'
+					+ '<td></td>'
+					+ '</tr>'
+					+ '</tfoot>'
+					+ '</table>'
+					+ '</div>';
+			}
+
+			alertHtml += '<div style="margin-top: 6px; font-size: 11px; color: #777; text-align: right;">'
+				+ '* 상세 내역은 상단 [미정산잔액조회] 및 [미확정 조회] 버튼을 통해 확인하실 수 있습니다.'
+				+ '</div>'
+				+ '</div>';
+
+			customAlert(alertHtml);
+			$('#custom-alert-overlay > div:first-child').css({
+				'max-width': '950px',
+				'width': '950px'
+			});
+		}
+
+		// 미정산 조회
+		postAjax("/user/cr/cr20/select_cr20m01_List", unParam, null, function (unData) {
+			unSettledDataList = (unData && unData.result) ? unData.result : [];
+			unSettledFinished = true;
+			renderClntAlertModal();
+		});
+
+		// 미확정 내역 조회
+		postAjax("/user/cr/cr02/selectOrdrsUnconfirmedDetails", unCnfmParam, null, function (cnfmData) {
+			unCnfmDataList = (cnfmData && cnfmData.result) ? cnfmData.result : [];
+			unCnfmFinished = true;
+			renderClntAlertModal();
+		});
 	}
 
 	// 거래처의 물류정보 조회 및 화면 설정 함수
@@ -1012,8 +1253,16 @@
 					"coCd": $('#coCd').val(),
 					"clntCd": row.estClntCd
 				}
+				var prevClntCd = String($('#ordrsClntCd').val() || '').trim();
+				var newClntCd = String(row.estClntCd || '').trim();
+				var isClntChanged = (prevClntCd !== newClntCd);
+
 				setMngInfo(paramObj);
 				setLgistInfo(row.estClntCd);
+
+				if (row.estClntCd && isClntChanged) {
+					checkClientUnsettledAndUnconfirmed(row.estClntCd, row.estClntNm, $('#coCd').val());
+				}
 			});
 		} else if (actionType == "U" && (aordrsDiv == "ORDRSDIV1" || aordrsDiv == "ORDRSDIV2")) {
 			//수정시 견적서 연결할때 견적서번호&&견척차수만 세팅(11/28 요청사항)
@@ -2596,227 +2845,14 @@
 			// 원본 데이터를 깊은 복사로 저장
 			originalOrdrsInfo = JSON.parse(JSON.stringify(parsedData.ordrsInfo));
 
-			var passChkDeptId = jwt.deptId;
 			var currentCoCd = parsedData.ordrsInfo.coCd;
-			var canViewAmt = (
-				(currentCoCd == 'GUN' && (passChkDeptId.includes('GUN00') || passChkDeptId.includes('GUN30') || passChkDeptId.includes('GUN20') || passChkDeptId.includes('GUN80'))) ||
-				(currentCoCd == 'TRN' && (passChkDeptId.includes('GUN00') || passChkDeptId.includes('TRN')   || passChkDeptId.includes('GUN20') || passChkDeptId.includes('GUN80')))
+			checkClientUnsettledAndUnconfirmed(
+				parsedData.ordrsInfo.ordrsClntCd,
+				parsedData.ordrsInfo.ordrsClntNm || parsedData.ordrsInfo.clntNm || '',
+				currentCoCd,
+				parsedData.ordrsInfo.unsettledYn == 'Y',
+				true
 			);
-
-			if (canViewAmt) {
-				var checkClientCd = parsedData.ordrsInfo.ordrsClntCd;
-				var clntNm = parsedData.ordrsInfo.ordrsClntNm || parsedData.ordrsInfo.clntNm || '';
-
-				var unParam = {
-					coCd: currentCoCd,
-					ordrsClntCd: checkClientCd,
-					billyn: "N",
-					pageNo: 1,
-					recordCnt: 99999999
-				};
-
-				var unCnfmParam = {
-					coCd: currentCoCd,
-					ordrsClntCd: checkClientCd
-				};
-
-				var reqUnsettled = (parsedData.ordrsInfo.unsettledYn == 'Y');
-				var unSettledFinished = !reqUnsettled;
-				var unCnfmFinished = false;
-				var unSettledDataList = [];
-				var unCnfmDataList = [];
-
-				function renderClntAlertModal() {
-					if (!unSettledFinished || !unCnfmFinished) return;
-
-					// 1. 미정산 데이터 집계
-					var uniqueItems = [];
-					var seenKeys = {};
-					var totalUnsettledAmt = 0;
-					for (var i = 0; i < unSettledDataList.length; i++) {
-						var item = unSettledDataList[i];
-						var key = (item.ordrsNo || '') + '_' + (item.ordrsSeq || '');
-						if (!seenKeys[key]) {
-							seenKeys[key] = true;
-							var prc = gPasFloatChk(item.ordrsPrc);
-							var unAmt = gPasFloatChk(item.unUnsettledAmt);
-							if (unAmt !== 0) {
-								totalUnsettledAmt += unAmt;
-								uniqueItems.push({
-									ordrsNo: item.ordrsNo || '',
-									eqpNm: item.eqpNm || '',
-									mngNm: item.mngIdNm || item.mngNm || '',
-									ordrsPrc: prc,
-									unUnsettledAmt: unAmt
-								});
-							}
-						}
-					}
-
-					// 2. 미확정 데이터 집계 (cnfmYn == 'N' 또는 미확정)
-					var uniqueCnfmItems = [];
-					var totalCnfmPrc = 0;
-					var totalCnfmTrgtCost = 0;
-					for (var j = 0; j < unCnfmDataList.length; j++) {
-						var cItem = unCnfmDataList[j];
-						var cStatus = String(cItem.cnfmYn || '').trim();
-						if (cStatus == 'N' || cStatus == '미확정') {
-							var cOrdrsPrc = gPasFloatChk(cItem.ordrsPrc);
-							var cTrgtCost = gPasFloatChk(cItem.estTrgtCost);
-							totalCnfmPrc += cOrdrsPrc;
-							totalCnfmTrgtCost += cTrgtCost;
-							uniqueCnfmItems.push({
-								ordrsNo: cItem.ordrsNo || '',
-								ordrsSeq: cItem.ordrsSeq || '',
-								ordrsDivNm: cItem.ordrsDivNm || '',
-								salesCd: cItem.salesCd || '',
-								eqpNm: cItem.eqpNm || '',
-								mngNm: cItem.mngNm || cItem.mngIdNm || '',
-								estTrgtCost: cTrgtCost,
-								ordrsPrc: cOrdrsPrc
-							});
-						}
-					}
-
-					if (uniqueItems.length === 0 && uniqueCnfmItems.length === 0) {
-						if (reqUnsettled) customAlert("미정산잔액이 있는 고객사입니다.");
-						return;
-					}
-
-					var alertHtml = '<div style="min-width: 850px; max-width: 850px;">'
-						+ '<div style="font-weight: bold; font-size: 15px; margin-bottom: 8px; color: #d9534f;">'
-						+ '<i class="fa fa-exclamation-triangle"></i> '
-						+ (clntNm ? '고객사 [' + clntNm + '] ' : '')
-						+ '미정산 / 미확정 알림'
-						+ '</div>';
-
-					alertHtml += '<div style="margin-bottom: 8px; font-size: 12px; color: #333; background: #fff8f8; padding: 6px 10px; border: 1px solid #f5c6cb; border-radius: 4px;">';
-					if (uniqueItems.length > 0) {
-						alertHtml += '미정산: <b style="color: #d9534f;">' + addCommaStr(totalUnsettledAmt) + '원</b> (' + uniqueItems.length + '건)&nbsp;&nbsp;';
-					}
-					if (uniqueCnfmItems.length > 0) {
-						alertHtml += '|&nbsp;&nbsp;미확정 수주가: <b style="color: #d9534f;">' + addCommaStr(totalCnfmPrc) + '원</b> (' + uniqueCnfmItems.length + '건)';
-					}
-					alertHtml += '</div>';
-
-					// [섹션 1] 미정산 내역
-					if (uniqueItems.length > 0) {
-						alertHtml += '<div style="margin-top: 10px; margin-bottom: 4px; font-weight: bold; font-size: 13px; color: #333;">'
-							+ '<i class="fa fa-list"></i> 미정산 잔액 내역 (' + uniqueItems.length + '건)'
-							+ '</div>'
-							+ '<div style="max-height: 180px; overflow-y: auto; border: 1px solid #d5d5d5; border-radius: 3px; margin-bottom: 10px;">'
-							+ '<table style="width: 100%; border-collapse: collapse; font-size: 12px; text-align: left;">'
-							+ '<thead style="background: #f2f2f2; position: sticky; top: 0; z-index: 1;">'
-							+ '<tr style="border-bottom: 1px solid #ccc; height: 26px;">'
-							+ '<th style="padding: 4px 6px; text-align: center; width: 75px; border-right: 1px solid #e0e0e0;">수주번호</th>'
-							+ '<th style="padding: 4px 6px; border-right: 1px solid #e0e0e0;">설비명</th>'
-							+ '<th style="padding: 4px 6px; text-align: right; width: 90px; border-right: 1px solid #e0e0e0;">발생금액</th>'
-							+ '<th style="padding: 4px 6px; text-align: right; width: 95px; border-right: 1px solid #e0e0e0;">미정산잔액</th>'
-							+ '<th style="padding: 4px 6px; text-align: center; width: 80px;">수주담당자</th>'
-							+ '</tr>'
-							+ '</thead>'
-							+ '<tbody>';
-
-						for (var k = 0; k < uniqueItems.length; k++) {
-							var u = uniqueItems[k];
-							var bg = (k % 2 === 1) ? ' style="background: #fafafa; border-bottom: 1px solid #eee;"' : ' style="border-bottom: 1px solid #eee;"';
-							alertHtml += '<tr' + bg + '>'
-								+ '<td style="padding: 4px 6px; text-align: center; border-right: 1px solid #eee;">' + u.ordrsNo + '</td>'
-								+ '<td style="padding: 4px 6px; border-right: 1px solid #eee; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 250px;" title="' + (u.eqpNm || '') + '">' + (u.eqpNm || '') + '</td>'
-								+ '<td style="padding: 4px 6px; text-align: right; border-right: 1px solid #eee;">' + addCommaStr(u.ordrsPrc) + '</td>'
-								+ '<td style="padding: 4px 6px; text-align: right; font-weight: bold; color: #d9534f; border-right: 1px solid #eee;">' + addCommaStr(u.unUnsettledAmt) + '</td>'
-								+ '<td style="padding: 4px 6px; text-align: center;">' + (u.mngNm || '') + '</td>'
-								+ '</tr>';
-						}
-
-						alertHtml += '</tbody>'
-							+ '<tfoot style="background: #f7f7f7; font-weight: bold; border-top: 2px solid #ccc;">'
-							+ '<tr>'
-							+ '<td colspan="3" style="padding: 5px 6px; text-align: center; border-right: 1px solid #e0e0e0;">총 미정산잔액 합계</td>'
-							+ '<td style="padding: 5px 6px; text-align: right; color: #d9534f; border-right: 1px solid #e0e0e0;">' + addCommaStr(totalUnsettledAmt) + '</td>'
-							+ '<td></td>'
-							+ '</tr>'
-							+ '</tfoot>'
-							+ '</table>'
-							+ '</div>';
-					}
-
-					// [섹션 2] 미확정 설비원가 내역
-					if (uniqueCnfmItems.length > 0) {
-						alertHtml += '<div style="margin-top: 6px; margin-bottom: 4px; font-weight: bold; font-size: 13px; color: #333;">'
-							+ '<i class="fa fa-exclamation-circle" style="color:#d9534f;"></i> 미확정 설비 내역 (' + uniqueCnfmItems.length + '건)'
-							+ '</div>'
-							+ '<div style="max-height: 180px; overflow-y: auto; border: 1px solid #d5d5d5; border-radius: 3px;">'
-							+ '<table style="width: 100%; border-collapse: collapse; font-size: 12px; text-align: left;">'
-							+ '<thead style="background: #f2f2f2; position: sticky; top: 0; z-index: 1;">'
-							+ '<tr style="border-bottom: 1px solid #ccc; height: 26px;">'
-							+ '<th style="padding: 4px 6px; text-align: center; width: 65px; border-right: 1px solid #e0e0e0;">수주번호</th>'
-							+ '<th style="padding: 4px 6px; text-align: center; width: 40px; border-right: 1px solid #e0e0e0;">순번</th>'
-							+ '<th style="padding: 4px 6px; text-align: center; width: 110px; border-right: 1px solid #e0e0e0;">SalesCode</th>'
-							+ '<th style="padding: 4px 6px; border-right: 1px solid #e0e0e0;">설비명</th>'
-							+ '<th style="padding: 4px 6px; text-align: right; width: 85px; border-right: 1px solid #e0e0e0;">목표가</th>'
-							+ '<th style="padding: 4px 6px; text-align: right; width: 90px; border-right: 1px solid #e0e0e0;">수주예상가</th>'
-							+ '<th style="padding: 4px 6px; text-align: center; width: 80px;">수주담당자</th>'
-							+ '</tr>'
-							+ '</thead>'
-							+ '<tbody>';
-
-						for (var m = 0; m < uniqueCnfmItems.length; m++) {
-							var ci = uniqueCnfmItems[m];
-							var cbg = (m % 2 === 1) ? ' style="background: #fafafa; border-bottom: 1px solid #eee;"' : ' style="border-bottom: 1px solid #eee;"';
-							alertHtml += '<tr' + cbg + '>'
-								+ '<td style="padding: 4px 6px; text-align: center; border-right: 1px solid #eee;">' + ci.ordrsNo + '</td>'
-								+ '<td style="padding: 4px 6px; text-align: center; border-right: 1px solid #eee;">' + ci.ordrsSeq + '</td>'
-								+ '<td style="padding: 4px 6px; text-align: center; border-right: 1px solid #eee;">' + ci.salesCd + '</td>'
-								+ '<td style="padding: 4px 6px; border-right: 1px solid #eee; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 200px;" title="' + (ci.eqpNm || '') + '">' + (ci.eqpNm || '') + '</td>'
-								+ '<td style="padding: 4px 6px; text-align: right; border-right: 1px solid #eee;">' + addCommaStr(ci.estTrgtCost) + '</td>'
-								+ '<td style="padding: 4px 6px; text-align: right; font-weight: bold; color: #d9534f; border-right: 1px solid #eee;">' + addCommaStr(ci.ordrsPrc) + '</td>'
-								+ '<td style="padding: 4px 6px; text-align: center;">' + (ci.mngNm || '') + '</td>'
-								+ '</tr>';
-						}
-
-						alertHtml += '</tbody>'
-							+ '<tfoot style="background: #f7f7f7; font-weight: bold; border-top: 2px solid #ccc;">'
-							+ '<tr>'
-							+ '<td colspan="4" style="padding: 5px 6px; text-align: center; border-right: 1px solid #e0e0e0;">미확정 합계</td>'
-							+ '<td style="padding: 5px 6px; text-align: right; border-right: 1px solid #e0e0e0;">' + addCommaStr(totalCnfmTrgtCost) + '</td>'
-							+ '<td style="padding: 5px 6px; text-align: right; color: #d9534f; border-right: 1px solid #e0e0e0;">' + addCommaStr(totalCnfmPrc) + '</td>'
-							+ '<td></td>'
-							+ '</tr>'
-							+ '</tfoot>'
-							+ '</table>'
-							+ '</div>';
-					}
-
-					alertHtml += '<div style="margin-top: 6px; font-size: 11px; color: #777; text-align: right;">'
-						+ '* 상세 내역은 상단 [미정산잔액조회] 및 [미확정 조회] 버튼을 통해 확인하실 수 있습니다.'
-						+ '</div>'
-						+ '</div>';
-
-					customAlert(alertHtml);
-					$('#custom-alert-overlay > div:first-child').css({
-						'max-width': '950px',
-						'width': '950px'
-					});
-				}
-
-				// 미정산 조회
-				if (reqUnsettled) {
-					$('#clntUnsettledAmtBtn').show();
-					postAjax("/user/cr/cr20/select_cr20m01_List", unParam, null, function (unData) {
-						unSettledDataList = (unData && unData.result) ? unData.result : [];
-						unSettledFinished = true;
-						renderClntAlertModal();
-					});
-				}
-
-				// 미확정 내역 조회
-				postAjax("/user/cr/cr02/selectOrdrsUnconfirmedDetails", unCnfmParam, null, function (cnfmData) {
-					unCnfmDataList = (cnfmData && cnfmData.result) ? cnfmData.result : [];
-					unCnfmFinished = true;
-					renderClntAlertModal();
-				});
-			}
 
 			Object.keys(parsedData.ordrsInfo).forEach(function (key) {
 				var inputField = document.getElementById(key == 'estNo' ? 'estNoOrdrs' : key);
