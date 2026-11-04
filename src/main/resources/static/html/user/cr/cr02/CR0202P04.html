@@ -1,35 +1,78 @@
+<link rel="stylesheet" href="/static/bootstrap/css/bootstrap-multiselect.css">
+<script src="/static/bootstrap/js/bootstrap-multiselect.min.js"></script>
+
+<style>
+	#cr0202p04Form .cr0202p04-highlight-row {
+		background: #ff9b46 !important;
+	}
+	/* Multiselect 버튼 톤앤매너 */
+	#cr0202p04Form .btn-group {
+		width: 100%;
+	}
+	#cr0202p04Form button.multiselect.dropdown-toggle {
+		font-size: 12px;
+		padding: 2px 8px;
+		height: 24px;
+		width: 100%;
+		color: #333;
+		background: #ffffff;
+		border: 1px solid #ccc;
+		border-radius: 3px;
+		text-align: left;
+		line-height: 18px;
+	}
+	#cr0202p04Form button.multiselect.dropdown-toggle .caret {
+		float: right;
+		margin-top: 7px;
+	}
+	#cr0202p04Form ul.multiselect-container.dropdown-menu {
+		font-size: 12px;
+		max-height: 320px;
+		overflow-y: auto;
+		z-index: 1050;
+	}
+</style>
+
 <div id="cr0202p04Form" class="popup_area of_a" style="width: 100%; height: 100%;">
 	<div class="tit_contents">
 		<h4 class="tit">미확정 설비원가 조회</h4>
+		<div class="add_btn_small pdl10">
+			<a onclick="cr0202p04ExportExcel();" style="height: 30px; line-height: 28px; width: 90px;"><i class="fas fa-file-excel"></i> 엑셀다운로드</a>
+		</div>
 	</div>
 
 	<table>
 		<colgroup>
-			<col width="8%">
-			<col width="24%">
-			<col width="8%">
-			<col width="18%">
-			<col width="8%">
+			<col width="6%">
+			<col width="12%">
+			<col width="6%">
+			<col width="22%">
+			<col width="6%">
 			<col width="16%">
-			<col width="18%">
+			<col width="6%">
+			<col width="14%">
+			<col width="12%">
 		</colgroup>
 		<tr style="height:28px;">
+			<th>회사</th>
+			<td>
+				<select id="coCd" name="coCd" data-kind="CO" data-search="coCd" onchange="cr0202p04Load();"></select>
+			</td>
 			<th>고객사</th>
 			<td style="white-space:nowrap;">
-				<input type="hidden" id="coCd_S" name="coCd_S" data-search="coCd">
-				<input type="hidden" id="ordrsClntCd_S" name="ordrsClntCd_S" data-search="ordrsClntCd">
+				<input type="hidden" id="ordrsClntCd" name="ordrsClntCd" data-search="ordrsClntCd">
 				<div class="search_form">
-					<input type="text" id="ordrsClntNm_S" name="ordrsClntNm_S" data-search="ordrsClntNm" placeholder="전체고객사" oninput="cr0202p04OnClntNmInput();" onkeydown="if (event.keyCode == 13) cr0202p04Load();">
+					<input type="text" id="ordrsClntNm" name="ordrsClntNm" class="form-control input-sm" data-search="ordrsClntNm" placeholder="전체고객사" oninput="cr0202p04OnClntNmInput();" onkeydown="if (event.keyCode == 13) cr0202p04Load();">
 					<a onclick="cr0202p04OpenClntSearch();"><i class="i_search_w"></i></a>
 				</div>
 			</td>
 			<th>발주자</th>
 			<td>
-				<input type="text" id="ordrger_S" name="ordrger_S" class="form-control input-sm" data-search="ordrger" placeholder="발주자" onkeydown="if (event.keyCode == 13) cr0202p04Load();">
+				<select id="ordrger" name="ordrger" multiple="multiple" class="form-control input-sm"></select>
 			</td>
 			<th>수주구분</th>
 			<td>
-				<select id="ordrsDiv_S" name="ordrsDiv_S" data-kind="ORDRSDIV" data-search="ordrsDiv" onchange="cr0202p04Load();">
+				<select id="ordrsDiv" name="ordrsDiv" data-kind="ORDRSDIV" data-search="ordrsDiv" onchange="cr0202p04Load();">
 					<option value="">전체</option>
 				</select>
 			</td>
@@ -39,7 +82,6 @@
 			</td>
 		</tr>
 	</table>
-
 
 	<table style="margin: 8px 0;">
 		<colgroup>
@@ -66,9 +108,9 @@
 
 	<div class="contents">
 		<div class="ax5_grid">
-				<div data-ax5grid="cr0202p04Grid" data-ax5grid-config="{}" style="height: 640px; min-height:200px;"></div>
-				<div style="text-align:right; margin-top:4px;">전체 <span id="cr0202p04TotalCnt">0</span>건</div>
-			</div>
+			<div data-ax5grid="cr0202p04Grid" data-ax5grid-config="{}" style="height: 640px; min-height:200px;"></div>
+			<div style="text-align:right; margin-top:4px;">전체 <span id="cr0202p04TotalCnt">0</span>건</div>
+		</div>
 	</div>
 </div>
 
@@ -79,13 +121,33 @@
 
 <script type="text/javascript">
 	var cr0202p04Grid = null;
+	var p04CoCd = "";
+	var p04OrdrsNo = "";
+	var p04OrdrsClntCd = "";
+	var p04OrdrsClntNm = "";
+	var p04Ordrger = "";
+	var p04RawList = [];
+
+	function cr0202p04EnsureMultiselect(callback) {
+		if ($.fn.multiselect) {
+			callback();
+		} else {
+			$('<link/>', {
+				rel: 'stylesheet',
+				type: 'text/css',
+				href: '/static/bootstrap/css/bootstrap-multiselect.css'
+			}).appendTo('head');
+			$.getScript('/static/bootstrap/js/bootstrap-multiselect.min.js', function() {
+				callback();
+			});
+		}
+	}
 
 	function cr0202p04CnfmName(value) {
 		var v = String(value || "").trim();
 		return (v == "N" || v == "미확정") ? "미확정" : "확정";
 	}
 
-	// 수주금액 노출 권한 (CR0202P01 의 조회 제한 조건과 동일하게 유지)
 	function cr0202p04CanViewAmt(coCd) {
 		var deptId = jwt.deptId || "";
 		if (coCd == 'GUN') {
@@ -97,11 +159,18 @@
 		return false;
 	}
 
+	function cr0202p04ExportExcel() {
+		var dateStr = (new Date()).format ? (new Date()).format("yyyyMMdd") : "";
+		if (cr0202p04Grid) {
+			cr0202p04Grid.exportExcel("미확정설비원가조회_" + dateStr + ".xls");
+		}
+	}
+
 	function cr0202p04InitGrid() {
 		cr0202p04Grid = new ax5.ui.grid();
 		cr0202p04Grid.setConfig({
 			target: $('#cr0202p04Form [data-ax5grid="cr0202p04Grid"]'),
-			showLineNumber: false,
+			showLineNumber: true,
 			showRowSelector: false,
 			multipleSelect: false,
 			sortable: false,
@@ -110,7 +179,7 @@
 				selector: false
 			},
 			body: {
-				mergeCells: ["ordrger", "clntNm", "clntPjtNm", "ordrsNo", "ordrsDivNm"],
+				mergeCells: ["ordrger", "clntNm", "clntPjtNm", "ordrsNo", "ordrsDt", "ordrsDivNm", "ordrsSeq", "ordrsDtlDiv10Nm", "cnfmYn", "salesCd", "eqpNm"],
 				grouping: {
 					by: ["ordrger"],
 					columns: [
@@ -129,21 +198,23 @@
 				}
 			},
 			columns: [
-				{key: "seq", label: "No", align: "center", width: 40, formatter: function () { return this.item.__index + 1; }},
-				{key: "ordrger", label: "발주자", align: "center", width: 80},
-				{key: "clntNm", label: "고객사", align: "left", width: 150},
+				/* 공통 11개 컬럼 정렬 */
+				{key: "ordrger", label: "발주자", align: "center", width: 75},
+				{key: "clntNm", label: "고객사", align: "left", width: 140},
 				{key: "clntPjtNm", label: "고객사PJT", align: "left", width: 80},
 				{key: "ordrsNo", label: "수주번호", align: "center", width: 60},
-				{key: "ordrsDivNm", label: "수주구분", align: "center", width: 120, styleClass: function () {return this.item.ordrsDiv == 'ORDRSDIV9' ? 'grid-font-blue-bold' : '';}},
+				{key: "ordrsDt", label: "수주일자", align: "center", width: 80},
+				{key: "ordrsDivNm", label: "수주구분", align: "center", width: 85, styleClass: function () { return this.item.ordrsDiv == 'ORDRSDIV9' ? 'grid-font-blue-bold' : ''; }},
 				{key: "ordrsSeq", label: "순번", align: "center", width: 40},
-				{key: "ordrsDtlDiv10Nm", label: "입력구분", align: "center", width: 60},
+				{key: "ordrsDtlDiv10Nm", label: "입력구분", align: "center", width: 65},
 				{key: "cnfmYn", label: "확정구분", align: "center", width: 60, formatter: function () { return cr0202p04CnfmName(this.value); }},
 				{key: "salesCd", label: "SALES CODE", align: "center", width: 110},
-				{key: "eqpNm", label: "설비명", align: "left", width: 280},
-				// {key: "prdtCd", label: "제품구분", align: "center", width: 60},
-				{key: "estTrgtCost", label: "수주목표가", align: "right", width: 100, formatter: function () { return addCommaStr(this.value); }},
-				{key: "ordrsPrc", label: "수주가", align: "right", width: 100, formatter: function () { return addCommaStr(this.value); }},
-				{key: "estEpctMatPrc", label: "견적 예상 재료비", align: "right", width: 100, formatter: function () { return addCommaStr(this.value); }},
+				{key: "eqpNm", label: "설비명", align: "left", width: 220},
+
+				/* 미확정 특화 컬럼 */
+				{key: "estTrgtCost", label: "수주목표가", align: "right", width: 95, formatter: "money"},
+				{key: "ordrsPrc", label: "수주가", align: "right", width: 95, formatter: "money"},
+				{key: "estEpctMatPrc", label: "견적 예상 재료비", align: "right", width: 95, formatter: "money"},
 				{key: "outtkClntNm", label: "외주턴키", align: "left", width: 100},
 				{key: "remark", label: "비고", align: "left", width: 120},
 				{key: "mngNm", label: "수주담당자", align: "center", width: 60}
@@ -167,26 +238,29 @@
 
 	function cr0202p04OpenClntSearch() {
 		var paramObj = {
-			"searchValue" : $("#cr0202p04Form #ordrsClntNm_S").val(),
+			"searchValue" : $("#cr0202p04Form #ordrsClntNm").val(),
 			"clntDivCd"   : "CLNTDIV12"
 		};
 		openAutoModal("/static/html/cmn/modal/clntSearch.html", 650, 650, "거래처 검색", paramObj, function (grid) {
 			var row = grid.target.getList("selected")[0];
-			$("#cr0202p04Form #ordrsClntCd_S").val(row.clntCd);
-			$("#cr0202p04Form #ordrsClntNm_S").val(row.clntNm);
+			$("#cr0202p04Form #ordrsClntCd").val(row.clntCd);
+			$("#cr0202p04Form #ordrsClntNm").val(row.clntNm);
 			cr0202p04Load();
 		});
 	}
 
 	function cr0202p04ClearClnt() {
-		$("#cr0202p04Form #ordrsClntCd_S").val("");
-		$("#cr0202p04Form #ordrsClntNm_S").val("");
-		$("#cr0202p04Form #ordrger_S").val("");
+		$("#cr0202p04Form #ordrsClntCd").val("");
+		$("#cr0202p04Form #ordrsClntNm").val("");
+		if ($('#cr0202p04Form #ordrger').data('multiselect')) {
+			$('#cr0202p04Form #ordrger').multiselect('deselectAll', false);
+			$('#cr0202p04Form #ordrger').multiselect('updateButtonText');
+		}
 		cr0202p04Load();
 	}
 
 	function cr0202p04OnClntNmInput() {
-		$("#cr0202p04Form #ordrsClntCd_S").val("");
+		$("#cr0202p04Form #ordrsClntCd").val("");
 	}
 
 	function cr0202p04Load() {
@@ -196,40 +270,160 @@
 		});
 
 		postAjax("/user/cr/cr02/selectOrdrsUnconfirmedDetails", formData, null, function (data) {
-			var canViewAmt = cr0202p04CanViewAmt(formData.coCd);
-			var deptId = jwt.deptId || "";
-			var maskMatPrc = !canViewAmt && (deptId == "GUN70" || deptId.startsWith("GUN60"));
-
-			var list = (data.result || []).filter(function (row) {
-				return cr0202p04CnfmName(row.cnfmYn) == "미확정";
-			});
-
-			var sumEstTrgtCost = 0, sumOrdrsPrc = 0, sumEstEpctMatPrc = 0;
-			list.forEach(function (row) {
-				row.estTrgtCost = canViewAmt ? gPasFloatChk(row.estTrgtCost) : 0;
-				row.ordrsPrc = canViewAmt ? gPasFloatChk(row.ordrsPrc) : 0;
-				row.estEpctMatPrc = maskMatPrc ? 0 : gPasFloatChk(row.estEpctMatPrc);
-				sumEstTrgtCost += row.estTrgtCost;
-				sumOrdrsPrc += row.ordrsPrc;
-				sumEstEpctMatPrc += row.estEpctMatPrc;
-			});
-
-			cr0202p04Grid.setData({ list: list, page: { totalElements: list.length } });
-			$("#cr0202p04CntSum").text(addCommaStr(list.length));
-			$("#cr0202p04TotalCnt").text(addCommaStr(list.length));
-			$("#cr0202p04EstTrgtCostSum").text(addCommaStr(sumEstTrgtCost));
-			$("#cr0202p04OrdrsPrcSum").text(addCommaStr(sumOrdrsPrc));
-			$("#cr0202p04EstEpctMatPrcSum").text(addCommaStr(sumEstEpctMatPrc));
+			p04RawList = (data && data.result) ? data.result : [];
+			cr0202p04BuildOrdererOptionsAndFilter();
 		});
 	}
 
+	function cr0202p04BuildOrdererOptionsAndFilter() {
+		var ordererSet = new Set();
+		var hasEmptyOrderer = false;
+
+		for (var i = 0; i < p04RawList.length; i++) {
+			var ord = String(p04RawList[i].ordrger || '').trim();
+			if (ord) {
+				ordererSet.add(ord);
+			} else {
+				hasEmptyOrderer = true;
+			}
+		}
+
+		var sortedOrderers = Array.from(ordererSet).sort();
+		var ordererOptions = [];
+		for (var k = 0; k < sortedOrderers.length; k++) {
+			ordererOptions.push({
+				code: sortedOrderers[k],
+				name: sortedOrderers[k]
+			});
+		}
+		if (hasEmptyOrderer) {
+			ordererOptions.push({
+				code: "__EMPTY__",
+				name: "(발주자 미입력)"
+			});
+		}
+
+		var prevSelected = $('#cr0202p04Form #ordrger').val() || [];
+		if (prevSelected.length === 0 && p04Ordrger) {
+			prevSelected = [p04Ordrger];
+			p04Ordrger = '';
+		}
+
+		var $sel = $('#cr0202p04Form #ordrger');
+		$sel.empty();
+		for (var m = 0; m < ordererOptions.length; m++) {
+			var opt = ordererOptions[m];
+			$sel.append('<option value="' + opt.code + '">' + opt.name + '</option>');
+		}
+
+		if ($sel.data('multiselect')) {
+			$sel.multiselect('rebuild');
+		}
+
+		if (prevSelected.length > 0) {
+			$sel.multiselect('select', prevSelected);
+		}
+
+		cr0202p04ApplyFilter();
+	}
+
+	function cr0202p04ApplyFilter() {
+		var currentCoCd = p04CoCd || $('#cr0202p04Form #coCd').val();
+		var canViewAmt = cr0202p04CanViewAmt(currentCoCd);
+		var deptId = jwt.deptId || "";
+		var maskMatPrc = !canViewAmt && (deptId == "GUN70" || deptId.startsWith("GUN60"));
+
+		var selectedOrderers = $('#cr0202p04Form #ordrger').val() || [];
+		var isFiltered = (selectedOrderers.length > 0);
+		var filterSet = new Set(selectedOrderers);
+		var allowEmpty = filterSet.has('__EMPTY__');
+
+		function matchesOrderer(row) {
+			if (!isFiltered) return true;
+			var o = String(row.ordrger || '').trim();
+			if (!o) return allowEmpty;
+			return filterSet.has(o);
+		}
+
+		var filteredList = [];
+		var sumEstTrgtCost = 0, sumOrdrsPrc = 0, sumEstEpctMatPrc = 0;
+
+		for (var i = 0; i < p04RawList.length; i++) {
+			var row = p04RawList[i];
+			if (cr0202p04CnfmName(row.cnfmYn) != "미확정") continue;
+			if (!matchesOrderer(row)) continue;
+
+			var rowCopy = $.extend({}, row);
+			rowCopy.estTrgtCost = canViewAmt ? gPasFloatChk(rowCopy.estTrgtCost) : 0;
+			rowCopy.ordrsPrc = canViewAmt ? gPasFloatChk(rowCopy.ordrsPrc) : 0;
+			rowCopy.estEpctMatPrc = maskMatPrc ? 0 : gPasFloatChk(rowCopy.estEpctMatPrc);
+
+			sumEstTrgtCost += rowCopy.estTrgtCost;
+			sumOrdrsPrc += rowCopy.ordrsPrc;
+			sumEstEpctMatPrc += rowCopy.estEpctMatPrc;
+
+			filteredList.push(rowCopy);
+		}
+
+		if (cr0202p04Grid) {
+			cr0202p04Grid.setData({
+				list: filteredList,
+				page: {
+					totalElements: filteredList.length
+				}
+			});
+		}
+
+		$("#cr0202p04CntSum").text(addCommaStr(filteredList.length));
+		$("#cr0202p04TotalCnt").text(addCommaStr(filteredList.length));
+		$("#cr0202p04EstTrgtCostSum").text(addCommaStr(sumEstTrgtCost));
+		$("#cr0202p04OrdrsPrcSum").text(addCommaStr(sumOrdrsPrc));
+		$("#cr0202p04EstEpctMatPrcSum").text(addCommaStr(sumEstEpctMatPrc));
+	}
+
 	$(document.body).ready(function () {
-		var cr0202p04Param = modalStack.last().paramObj;
-		$("#cr0202p04Form #coCd_S").val(cr0202p04Param.coCd);
-		$("#cr0202p04Form #ordrsClntCd_S").val(cr0202p04Param.ordrsClntCd);
-		$("#cr0202p04Form #ordrsClntNm_S").val(cr0202p04Param.ordrsClntNm);
+		var pObj = (modalStack && modalStack.last() && modalStack.last().paramObj) ? modalStack.last().paramObj : {};
+		p04CoCd = pObj.coCd || '';
+		p04OrdrsNo = pObj.ordrsNo || '';
+		p04OrdrsClntCd = pObj.ordrsClntCd || '';
+		p04OrdrsClntNm = pObj.ordrsClntNm || '';
+		p04Ordrger = pObj.ordrger || '';
+
+		if (p04CoCd) {
+			$("#cr0202p04Form #coCd").val(p04CoCd);
+		}
+		if (p04OrdrsClntCd) {
+			$("#cr0202p04Form #ordrsClntCd").val(p04OrdrsClntCd);
+		}
+		if (p04OrdrsClntNm) {
+			$("#cr0202p04Form #ordrsClntNm").val(p04OrdrsClntNm);
+		}
+
 		setCommonSelect($("#cr0202p04Form select[data-kind]"));
-		cr0202p04InitGrid();
-		cr0202p04Load();
+
+		cr0202p04EnsureMultiselect(function() {
+			$('#cr0202p04Form #ordrger').multiselect({
+				includeSelectAllOption: true,
+				selectAllText: '전체 선택',
+				nonSelectedText: '발주자 전체',
+				allSelectedText: '발주자 전체',
+				nSelectedText: '명 선택',
+				numberDisplayed: 1,
+				maxHeight: 250,
+				buttonWidth: '100%',
+				onChange: function() {
+					cr0202p04ApplyFilter();
+				},
+				onSelectAll: function() {
+					cr0202p04ApplyFilter();
+				},
+				onDeselectAll: function() {
+					cr0202p04ApplyFilter();
+				}
+			});
+
+			cr0202p04InitGrid();
+			cr0202p04Load();
+		});
 	});
 </script>
