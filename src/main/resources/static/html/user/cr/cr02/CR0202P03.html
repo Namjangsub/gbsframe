@@ -11,14 +11,13 @@
 	
 	<table>
 		<colgroup>
-			<col width="10%">
-			<col width="15%">
-			<col width="10%">
-			<col width="15%">
-			<col width="10%">
-			<col width="15%">
-			<col width="10%">
-			<col width="15%">
+			<col width="6%">
+			<col width="12%">
+			<col width="6%">
+			<col width="22%">
+			<col width="6%">
+			<col width="16%">
+			<col width="32%">
 		</colgroup>
 		<tr style="height:28px;">
 			<th>회사</th>
@@ -26,9 +25,20 @@
 				<select id="coCd" name="coCd" data-kind="CO" data-search="coCd"></select>
 			</td>
 			<th>고객사</th>
-			<td>
+			<td style="white-space:nowrap;">
 				<input type="hidden" id="ordrsClntCd" name="ordrsClntCd" data-search="ordrsClntCd">
-				<input type="text" id="ordrsClntNm" name="ordrsClntNm" readonly>
+				<div class="search_form">
+					<input type="text" id="ordrsClntNm" name="ordrsClntNm" class="form-control input-sm" data-search="ordrsClntNm" placeholder="고객사" oninput="cr0202p03OnClntNmInput();" onkeydown="if (event.keyCode == 13) gridViewCr02P03.setData(0);">
+					<a onclick="cr0202p03OpenClntSearch();"><i class="i_search_w"></i></a>
+				</div>
+			</td>
+			<th>발주자</th>
+			<td>
+				<input type="text" id="ordrger" name="ordrger" class="form-control input-sm" data-search="ordrger" placeholder="발주자" onkeydown="if (event.keyCode == 13) gridViewCr02P03.setData(0);">
+			</td>
+			<td style="text-align:right; white-space:nowrap;">
+				<button type="button" class="bg_gray" style="margin-right:4px;" onclick="cr0202p03ClearClnt();">전체고객사</button>
+				<button type="button" class="bg_gray" onclick="gridViewCr02P03.setData(0);">조회</button>
 			</td>
 		</tr>
 	</table>
@@ -51,6 +61,29 @@
 	var ordrsNo = "";
 	var ordrsClntCd = "";
 	var ordrsClntNm = "";
+
+	function cr0202p03OpenClntSearch() {
+		var paramObj = {
+			"searchValue" : $("#cr0202p03popForm #ordrsClntNm").val(),
+			"clntDivCd"   : "CLNTDIV12"
+		};
+		openAutoModal("/static/html/cmn/modal/clntSearch.html", 650, 650, "거래처 검색", paramObj, function (grid) {
+			var row = grid.target.getList("selected")[0];
+			$("#cr0202p03popForm #ordrsClntCd").val(row.clntCd);
+			$("#cr0202p03popForm #ordrsClntNm").val(row.clntNm);
+			gridViewCr02P03.setData(0);
+		});
+	}
+
+	function cr0202p03ClearClnt() {
+		$("#cr0202p03popForm #ordrsClntCd").val("");
+		$("#cr0202p03popForm #ordrsClntNm").val("");
+		gridViewCr02P03.setData(0);
+	}
+
+	function cr0202p03OnClntNmInput() {
+		$("#cr0202p03popForm #ordrsClntCd").val("");
+	}
 
 	ax5.ui.grid.formatter["useYn"] = function () {
 		var color = this.value == "Y" ? "color-circle_02.png" : "color-circle_01.png";
@@ -120,17 +153,36 @@
 					selector: false
 				},
 				body: {
+					mergeCells : [ "ordrger", "clntPjtNm", "ordrsNo", "ordrsSeq", "ordrsDt", "ordrsDivNm", "eqpNm", "ordrsAmt", "pmntMtdNm"
+					             , "mngIdNm", "billYn", "ordrsPrc", "unUnsettledAmt"],
+					grouping: {
+						by: ["ordrger"],
+						columns: [
+							{
+								label: function () {
+									return "[ " + (this.groupBy.labels[0] || "발주자 미입력") + " 소계 ]";
+								},
+								colspan: 7,
+								align: "center"
+							},
+							{key: "sumOrdrsAmt", collector: "sum", formatter: "money", align: "right"},
+							{},
+							{},
+							{},
+							{key: "sumOrdrsPrc", collector: "sum", formatter: "money", align: "right"},
+							{key: "unOrdrsPrc", collector: "sum", formatter: "money", align: "right"},
+							{key: "sumUnUnsettledAmt", collector: "sum", formatter: "money", align: "right"},
+						]
+					},
 					onClick: function () {
 					},
 					onDBLClick: function () { 
 					},
 					onDataChanged: function () {
 					},
-					mergeCells : [ "clntPjtNm", "ordrsDivNm", "eqpNm", "ordrsAmt", "pmntMtdNm"
-					             , "mngIdNm", "ordrsNo", "ordrsSeq", "ordrsDt"
-								 , "billYn", "ordrsPrc", "unUnsettledAmt"],
 				},
 				columns : applyCr0202P03GridColor([
+					{key: "ordrger"				, label: "발주자"	, align: "center", width:80},
 					{key: "clntPjtNm"			, label: "프로젝트"	, align: "left", width:100},
 					{key: undefined				, label: "미정산 발생 수주정보",
 						columns: [
@@ -139,7 +191,6 @@
 							{key: "ordrsDt"		, label: "수주일자"	, align: "center", width: 80, styleClass: function () { return (this.item.ctrtDoc == "CONTRACT01") ? "grid-font-blue-bold" : "";}},
 							{key: "ordrsDivNm"	, label: "수주구분"	, align: "center", width:70},
 							{key: "eqpNm"		, label: "발생설비명"	, align: "left", width:200},
-							{key: "ordrger"		, label: "발주자"	, align: "center", width:80},
 							{key: "ordrsAmt"	, label: "수주금액"	, align: "right", width: 90, formatter: "money"},
 							{key: "pmntMtdNm"	, label: "결재방법"	, align: "center", width: 60},
 							{key: "mngIdNm"		, label: "담당자"	, align: "center", width: 60},
