@@ -833,6 +833,49 @@
 		return n.toLocaleString() + (unit || "천원");
 	}
 
+	function getWonOrdrsAmt(row, fallbackSum) {
+		if (!row) return fallbackSum || 0;
+		var exAmt = gPasFloatChk(row.exchangeAmt);
+		var ordAmt = gPasFloatChk(row.ordrsAmt);
+		var exrate = gPasFloatChk(row.exrate);
+		var currCd = String(row.currCd || "").trim();
+
+		// 외화(CURR01이 아님)이거나 환율이 1이 아닌 경우
+		if (currCd && currCd !== "CURR01") {
+			if (exAmt !== 0) return exAmt;
+			if (ordAmt !== 0 && exrate > 0) return Math.round(ordAmt * exrate * 10) / 10;
+		}
+
+		// 환율이 1보다 크고 원화환산금액이 있는 경우
+		if (exrate > 1 && exAmt !== 0) {
+			return exAmt;
+		}
+
+		// 원화이거나 환율이 없는 경우
+		if (exAmt !== 0) return exAmt;
+		if (ordAmt !== 0) return ordAmt;
+
+		return fallbackSum || 0;
+	}
+
+	function getForeignAmtSpan(row) {
+		if (!row) return "";
+		var currCd = String(row.currCd || "").trim();
+		var rawAmt = gPasFloatChk(row.ordrsAmt);
+		if (currCd && currCd !== "CURR01" && rawAmt > 0) {
+			var currNm = row.currNm;
+			if (!currNm) {
+				if (currCd === "CURR02") currNm = "달러";
+				else if (currCd === "CURR03") currNm = "유로";
+				else if (currCd === "CURR04") currNm = "엔화";
+				else if (currCd === "CURR05") currNm = "위안";
+				else currNm = "외화";
+			}
+			return ' <span style="color:#666;font-size:11px;font-weight:normal;">(' + escapeHtml(currNm) + ' ' + rawAmt.toLocaleString() + ')</span>';
+		}
+		return "";
+	}
+
 	function isRowUnconfirmed(r) {
 		if (!r) return false;
 		var v = String(r.cnfmYn || "").trim();
@@ -1034,10 +1077,10 @@
 				sumTrgt += getTargetPchsCost(childRows[cIdx]);
 				sumAct += gPasFloatChk(childRows[cIdx].actTot);
 			}
-			var masterOrdAmt = gPasFloatChk(item.ordrsAmt) || sumPrc;
+			var masterOrdAmt = getWonOrdrsAmt(item, sumPrc);
 			var masterTrgt = getTargetPchsCost(item) || sumTrgt;
 			var masterAct = gPasFloatChk(item.actTot) || sumAct;
-			html += '<div class="popover-item"><b>총 수주금액:</b> <span style="font-weight:600;">' + fmtAmt(masterOrdAmt) + '</span></div>';
+			html += '<div class="popover-item"><b>총 수주금액:</b> <span style="font-weight:600;">' + fmtAmt(masterOrdAmt) + getForeignAmtSpan(item) + '</span></div>';
 			html += '<div class="popover-item"><b>목표구매원가합계:</b> ' + fmtAmt(masterTrgt) + '</div>';
 			if (masterAct) html += '<div class="popover-item"><b>실행원가:</b> ' + fmtAmt(masterAct) + '</div>';
 		} else {
@@ -1263,11 +1306,11 @@
 						sumUnconfTrgt += cTrgt;
 					}
 				}
-				var totOrdAmt = gPasFloatChk(item.ordrsAmt) || sumPrc;
+				var totOrdAmt = getWonOrdrsAmt(item, sumPrc);
 				var masterCnfmAmt = gPasFloatChk(item.rawCnfmYnAmt !== undefined ? item.rawCnfmYnAmt : item.cnfmYnAmt) || sumUnconfPrc;
 				html += '<div class="popover-item"><b>미확정 현황:</b> <span style="color:#e67e22;font-weight:bold;">전체 ' + childRows.length + '건 중 미확정 ' + unconfCnt + '건</span></div>';
 				html += '<div class="popover-divider"></div>';
-				html += '<div class="popover-item"><b>총 수주금액:</b> <span style="font-weight:bold;">' + fmtAmt(totOrdAmt) + '</span> <span style="color:#666;font-size:11px;">(기계 ' + fmtAmt(sumMach) + ' / 전기 ' + fmtAmt(sumElcty) + ')</span></div>';
+				html += '<div class="popover-item"><b>총 수주금액:</b> <span style="font-weight:bold;">' + fmtAmt(totOrdAmt) + '</span>' + getForeignAmtSpan(item) + ' <span style="color:#666;font-size:11px;">(기계 ' + fmtAmt(sumMach) + ' / 전기 ' + fmtAmt(sumElcty) + ')</span></div>';
 				html += '<div class="popover-item"><b>미확정 수주가:</b> <span style="color:#d9534f;font-weight:bold;">' + fmtAmt(masterCnfmAmt) + '</span>' + (sumUnconfTrgt > 0 ? ' <span style="color:#666;font-size:11px;">(미확정 목표구매원가: ' + fmtAmt(sumUnconfTrgt) + ')</span>' : '') + '</div>';
 				html += '<div class="popover-item"><b>목표구매원가합계:</b> ' + fmtAmt(sumTrgt || getTargetPchsCost(item)) + '</div>';
 				if (sumAct) html += '<div class="popover-item"><b>실행원가 합계:</b> ' + fmtAmt(sumAct) + '</div>';
@@ -1280,7 +1323,7 @@
 				var prcMach = gPasFloatChk(item.ordrsPrcMach);
 				var prcElcty = gPasFloatChk(item.ordrsPrcElcty);
 				var actCost = gPasFloatChk(item.actTot);
-				var parentOrdAmt = gPasFloatChk(item.ordrsAmt);
+				var parentOrdAmt = getWonOrdrsAmt(item);
 
 				html += '<div class="popover-item"><b>확정구분:</b> <span style="color:#e67e22;font-weight:bold;">미확정 (N)</span></div>';
 				html += '<div class="popover-divider"></div>';
@@ -1291,7 +1334,7 @@
 					html += '<div class="popover-item"><b>미확정금액:</b> ' + fmtAmt(cnfmAmt) + '</div>';
 				}
 				if (actCost) html += '<div class="popover-item"><b>실행원가:</b> ' + fmtAmt(actCost) + '</div>';
-				if (parentOrdAmt) html += '<div class="popover-item" style="color:#64748b;"><b>전체 수주금액:</b> ' + fmtAmt(parentOrdAmt) + '</div>';
+				if (parentOrdAmt) html += '<div class="popover-item" style="color:#64748b;"><b>전체 수주금액:</b> ' + fmtAmt(parentOrdAmt) + getForeignAmtSpan(item) + '</div>';
 			}
 
 			html += '<div class="popover-box" style="border-left-color: #e67e22; margin-top: 6px;">'
@@ -1322,7 +1365,7 @@
 				}
 				var masterUnAmt = gPasFloatChk(item.unsettledAmt) || sumUnAmt;
 				html += '<div class="popover-item"><b>추후정산 잔액:</b> <span style="color:#d9534f;font-weight:bold;font-size:12px;">' + fmtAmt(masterUnAmt) + '</span></div>';
-				html += '<div class="popover-item"><b>총 수주금액:</b> ' + fmtAmt(gPasFloatChk(item.ordrsAmt) || sumPrc2) + '</div>';
+				html += '<div class="popover-item"><b>총 수주금액:</b> ' + fmtAmt(getWonOrdrsAmt(item, sumPrc2)) + getForeignAmtSpan(item) + '</div>';
 				html += '<div class="popover-item"><b>목표구매원가합계:</b> ' + fmtAmt(sumTrgt2 || getTargetPchsCost(item)) + '</div>';
 				html += buildChildSalesCdListHtml(childRows, "unsettled");
 			} else {
@@ -1330,7 +1373,7 @@
 				html += '<div class="popover-item"><b>추후정산 잔액:</b> <span style="color:#d9534f;font-weight:bold;font-size:12px;">' + fmtAmt(unAmt) + '</span></div>';
 				html += '<div class="popover-item"><b>설비 수주가:</b> ' + fmtAmt(item.ordrsPrc) + '</div>';
 				html += '<div class="popover-item"><b>목표구매원가합계:</b> ' + fmtAmt(getTargetPchsCost(item)) + '</div>';
-				if (gPasFloatChk(item.ordrsAmt)) html += '<div class="popover-item" style="color:#64748b;"><b>전체 수주금액:</b> ' + fmtAmt(item.ordrsAmt) + '</div>';
+				if (gPasFloatChk(item.ordrsAmt) || gPasFloatChk(item.exchangeAmt)) html += '<div class="popover-item" style="color:#64748b;"><b>전체 수주금액:</b> ' + fmtAmt(getWonOrdrsAmt(item)) + getForeignAmtSpan(item) + '</div>';
 			}
 
 			html += '<div class="popover-box" style="border-left-color: #9b59b6; margin-top: 6px;">'
@@ -1360,13 +1403,13 @@
 				}
 				var masterSetAmt = gPasFloatChk(item.settlementAmt) || sumSetAmt;
 				html += '<div class="popover-item"><b>정산상계금액:</b> <span style="color:#2980b9;font-weight:bold;font-size:12px;">' + fmtAmt(masterSetAmt) + '</span></div>';
-				html += '<div class="popover-item"><b>총 수주금액:</b> ' + fmtAmt(gPasFloatChk(item.ordrsAmt) || sumPrc3) + '</div>';
+				html += '<div class="popover-item"><b>총 수주금액:</b> ' + fmtAmt(getWonOrdrsAmt(item, sumPrc3)) + getForeignAmtSpan(item) + '</div>';
 				html += buildChildSalesCdListHtml(childRows, "settlement");
 			} else {
 				var setAmt = gPasFloatChk(item.settlementAmt);
 				html += '<div class="popover-item"><b>정산상계금액:</b> <span style="color:#2980b9;font-weight:bold;font-size:12px;">' + fmtAmt(setAmt) + '</span></div>';
 				html += '<div class="popover-item"><b>설비 수주가:</b> ' + fmtAmt(item.ordrsPrc) + '</div>';
-				if (gPasFloatChk(item.ordrsAmt)) html += '<div class="popover-item" style="color:#64748b;"><b>전체 수주금액:</b> ' + fmtAmt(item.ordrsAmt) + '</div>';
+				if (gPasFloatChk(item.ordrsAmt) || gPasFloatChk(item.exchangeAmt)) html += '<div class="popover-item" style="color:#64748b;"><b>전체 수주금액:</b> ' + fmtAmt(getWonOrdrsAmt(item)) + getForeignAmtSpan(item) + '</div>';
 			}
 
 			html += '<div class="popover-box" style="border-left-color: #3498db; margin-top: 6px;">'
