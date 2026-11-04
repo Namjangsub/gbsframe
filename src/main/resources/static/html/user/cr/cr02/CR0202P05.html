@@ -1,0 +1,746 @@
+<link rel="stylesheet" href="/static/bootstrap/css/bootstrap-multiselect.css">
+<script src="/static/bootstrap/js/bootstrap-multiselect.min.js"></script>
+
+<style>
+	#cr0202p05Form .cr0202p05-highlight-row {
+		background: #ff9b46 !important;
+	}
+	#cr0202p05Form .add_btn_small a.on {
+		background: #337ab7 !important;
+		border-color: #2e6da4 !important;
+		color: #ffffff !important;
+		font-weight: bold;
+	}
+	/* Multiselect 버튼 톤앤매너 */
+	#cr0202p05Form .btn-group {
+		width: 100%;
+	}
+	#cr0202p05Form button.multiselect.dropdown-toggle {
+		font-size: 12px;
+		padding: 2px 8px;
+		height: 24px;
+		width: 100%;
+		color: #333;
+		background: #ffffff;
+		border: 1px solid #ccc;
+		border-radius: 3px;
+		text-align: left;
+		line-height: 18px;
+	}
+	#cr0202p05Form button.multiselect.dropdown-toggle .caret {
+		float: right;
+		margin-top: 7px;
+	}
+	#cr0202p05Form ul.multiselect-container.dropdown-menu {
+		font-size: 12px;
+		max-height: 320px;
+		overflow-y: auto;
+		z-index: 1050;
+	}
+</style>
+
+<div id="cr0202p05Form" class="popup_area of_a" style="width: 100%; height: 100%;">
+	<div class="tit_contents">
+		<h4 class="tit">미정산 / 미확정 내역 통합 조회</h4>
+	</div>
+
+	<!-- 검색 조건 테이블 -->
+	<table>
+		<colgroup>
+			<col width="6%">
+			<col width="12%">
+			<col width="6%">
+			<col width="22%">
+			<col width="6%">
+			<col width="16%">
+			<col width="6%">
+			<col width="14%">
+			<col width="12%">
+		</colgroup>
+		<tr style="height:28px;">
+			<th>회사</th>
+			<td>
+				<select id="coCd" name="coCd" data-kind="CO" data-search="coCd" onchange="cr0202p05Load();"></select>
+			</td>
+			<th>고객사</th>
+			<td style="white-space:nowrap;">
+				<input type="hidden" id="ordrsClntCd" name="ordrsClntCd" data-search="ordrsClntCd">
+				<div class="search_form">
+					<input type="text" id="ordrsClntNm" name="ordrsClntNm" class="form-control input-sm" data-search="ordrsClntNm" placeholder="전체 고객사" oninput="cr0202p05OnClntNmInput();" onkeydown="if (event.keyCode == 13) cr0202p05Load();">
+					<a onclick="cr0202p05OpenClntSearch();"><i class="i_search_w"></i></a>
+				</div>
+			</td>
+			<th>발주자</th>
+			<td>
+				<select id="ordrger" name="ordrger" multiple="multiple" class="form-control input-sm">
+				</select>
+			</td>
+			<th>수주구분</th>
+			<td>
+				<select id="ordrsDiv" name="ordrsDiv" data-kind="ORDRSDIV" data-search="ordrsDiv" onchange="cr0202p05Load();">
+					<option value="">전체</option>
+				</select>
+			</td>
+			<td style="text-align:right; white-space:nowrap;">
+				<button type="button" class="bg_gray" style="margin-right:4px;" onclick="cr0202p05ClearClnt();">전체고객사</button>
+				<button type="button" class="bg_gray" onclick="cr0202p05Load();">조회</button>
+			</td>
+		</tr>
+	</table>
+
+	<!-- 요약 현황 테이블 (CR0202P04 톤앤매너 계승) -->
+	<table style="margin: 8px 0;">
+		<colgroup>
+			<col width="11%">
+			<col width="14%">
+			<col width="11%">
+			<col width="14%">
+			<col width="11%">
+			<col width="14%">
+			<col width="12%">
+			<col width="13%">
+		</colgroup>
+		<tr style="height:28px;">
+			<th>미정산 건수</th>
+			<td><span id="p05UnsettledCnt">0</span> 건</td>
+			<th>미정산 잔액 합계</th>
+			<td style="text-align:right;"><span id="p05UnsettledAmtSum">0</span></td>
+			<th>미확정 건수</th>
+			<td><span id="p05UnCnfmCnt">0</span> 건</td>
+			<th>미확정 수주가 합계</th>
+			<td style="text-align:right;"><span id="p05OrdrsPrcSum">0</span></td>
+		</tr>
+	</table>
+
+	<!-- [섹션 1] 미정산 잔액 내역 그리드 -->
+	<div id="p05UnsettledSection" class="contents" style="margin-bottom:12px;">
+		<div class="contents_tit" style="margin-bottom: 5px;">
+			<div style="float: left;">
+				<span style="font-size: 14px; font-weight: bold;">
+					※ 미정산 잔액 내역 (<span id="p05UnsettledGridCnt">0</span>건)
+				</span>
+			</div>
+			<div style="float: right;" class="add_btn_small pdl10">
+				<a id="btnViewAll" class="on" onclick="cr0202p05SetViewMode('all');" style="height: 30px; line-height: 28px; width: 80px;">상하 분할</a>
+				<a id="btnViewUnsettled" onclick="cr0202p05SetViewMode('unsettled');" style="height: 30px; line-height: 28px; width: 85px;">미정산만</a>
+				<a id="btnViewUnconfirmed" onclick="cr0202p05SetViewMode('unconfirmed');" style="height: 30px; line-height: 28px; width: 85px;">미확정만</a>
+				<a onclick="cr0202p05ExportExcel('unsettled');" style="height: 30px; line-height: 28px; width: 95px;"><i class="fas fa-file-excel"></i> 엑셀다운로드</a>
+			</div>
+		</div>
+		<div class="ax5_grid">
+			<div data-ax5grid="p05-unsettled-grid" data-ax5grid-config="{}" style="height: 280px; min-height: 180px;"></div>
+		</div>
+	</div>
+
+	<!-- [섹션 2] 미확정 설비원가 내역 그리드 -->
+	<div id="p05UnCnfmSection" class="contents">
+		<div class="contents_tit" style="margin-bottom: 5px;">
+			<div style="float: left;">
+				<span style="font-size: 14px; font-weight: bold; color: #d9534f;">
+					※ 미확정 설비 내역 (<span id="p05UnCnfmGridCnt">0</span>건)
+				</span>
+			</div>
+			<div style="float: right;" class="add_btn_small pdl10">
+				<a onclick="cr0202p05ExportExcel('unconfirmed');" style="height: 30px; line-height: 28px; width: 95px;"><i class="fas fa-file-excel"></i> 엑셀다운로드</a>
+			</div>
+		</div>
+		<div class="ax5_grid">
+			<div data-ax5grid="p05-uncnfm-grid" data-ax5grid-config="{}" style="height: 280px; min-height: 180px;"></div>
+		</div>
+	</div>
+</div>
+
+<!-- 하단 버튼 -->
+<div class="popup_bottom_btn">
+	<button type="button" class="close_btn" onclick="modalStack.close();">닫기</button>
+</div>
+
+<script type="text/javascript">
+	var p05CoCd = "";
+	var p05OrdrsNo = "";
+	var p05OrdrsClntCd = "";
+	var p05OrdrsClntNm = "";
+	var p05Ordrger = "";
+
+	var p05UnsettledGrid = null;
+	var p05UnCnfmGrid = null;
+	var p05CurrentViewMode = "all";
+
+	var p05RawUnsettledList = [];
+	var p05RawUnCnfmList = [];
+
+	if (!ax5.ui.grid.formatter["useYn"]) {
+		ax5.ui.grid.formatter["useYn"] = function () {
+			var color = this.value == "Y" ? "color-circle_02.png" : "color-circle_01.png";
+			if (this.value == "E"){
+				return 'E';
+			} else {
+				return '<img src="/static/img/' + color + '" style="width: 10px; height: 10px;"></img>';
+			}
+		};
+	}
+
+	function cr0202p05EnsureMultiselect(callback) {
+		if ($.fn.multiselect) {
+			callback();
+		} else {
+			$('<link/>', {
+				rel: 'stylesheet',
+				type: 'text/css',
+				href: '/static/bootstrap/css/bootstrap-multiselect.css'
+			}).appendTo('head');
+			$.getScript('/static/bootstrap/js/bootstrap-multiselect.min.js', function() {
+				callback();
+			});
+		}
+	}
+
+	function cr0202p05CnfmName(value) {
+		var v = String(value || "").trim();
+		return (v == "N" || v == "미확정") ? "미확정" : "확정";
+	}
+
+	function cr0202p05CanViewAmt(coCd) {
+		var deptId = jwt.deptId || "";
+		if (coCd == 'GUN') {
+			return deptId.includes('GUN00') || deptId.includes('GUN30') || deptId.includes('GUN20') || deptId.includes('GUN80');
+		}
+		if (coCd == 'TRN') {
+			return deptId.includes('GUN00') || deptId.includes('TRN') || deptId.includes('GUN20') || deptId.includes('GUN80');
+		}
+		return false;
+	}
+
+	function cr0202p05GridColor(dataValue) {
+		let rtnColor = "";
+		let row = dataValue.item || {};
+		if (p05OrdrsNo && row.ordrsNo == p05OrdrsNo) {
+			rtnColor = "cr0202p05-highlight-row";
+		}
+		return rtnColor;
+	}
+
+	function applyCr0202P05GridColor(columns) {
+		$.each(columns, function (idx, column) {
+			if (column.columns) {
+				applyCr0202P05GridColor(column.columns);
+				return true;
+			}
+
+			let styleClass = column.styleClass;
+			column.styleClass = function () {
+				let rtnClass = "";
+				let baseClass = "";
+
+				if (typeof styleClass == "function") {
+					baseClass = styleClass.call(this);
+				} else if (styleClass) {
+					baseClass = styleClass;
+				}
+
+				if (baseClass) {
+					rtnClass += baseClass;
+				}
+
+				let colorClass = cr0202p05GridColor(this);
+				if (colorClass) {
+					rtnClass += (rtnClass ? " " : "") + colorClass;
+				}
+
+				return rtnClass;
+			};
+		});
+
+		return columns;
+	}
+
+	function cr0202p05OpenClntSearch() {
+		var paramObj = {
+			"searchValue" : $("#cr0202p05Form #ordrsClntNm").val(),
+			"clntDivCd"   : "CLNTDIV12"
+		};
+		openAutoModal("/static/html/cmn/modal/clntSearch.html", 650, 650, "거래처 검색", paramObj, function (grid) {
+			var row = grid.target.getList("selected")[0];
+			$("#cr0202p05Form #ordrsClntCd").val(row.clntCd);
+			$("#cr0202p05Form #ordrsClntNm").val(row.clntNm);
+			cr0202p05Load();
+		});
+	}
+
+	function cr0202p05ClearClnt() {
+		$("#cr0202p05Form #ordrsClntCd").val("");
+		$("#cr0202p05Form #ordrsClntNm").val("");
+		if ($('#cr0202p05Form #ordrger').data('multiselect')) {
+			$('#cr0202p05Form #ordrger').multiselect('deselectAll', false);
+			$('#cr0202p05Form #ordrger').multiselect('updateButtonText');
+		}
+		cr0202p05Load();
+	}
+
+	function cr0202p05OnClntNmInput() {
+		$("#cr0202p05Form #ordrsClntCd").val("");
+	}
+
+	function cr0202p05SetViewMode(mode) {
+		p05CurrentViewMode = mode;
+		$('#btnViewAll, #btnViewUnsettled, #btnViewUnconfirmed').removeClass('on');
+
+		if (mode === 'all') {
+			$('#btnViewAll').addClass('on');
+			$('#p05UnsettledSection').show();
+			$('#p05UnCnfmSection').show();
+			$('#cr0202p05Form [data-ax5grid="p05-unsettled-grid"]').css('height', '280px');
+			$('#cr0202p05Form [data-ax5grid="p05-uncnfm-grid"]').css('height', '280px');
+			if (p05UnsettledGrid) p05UnsettledGrid.setHeight(280);
+			if (p05UnCnfmGrid) p05UnCnfmGrid.setHeight(280);
+		} else if (mode === 'unsettled') {
+			$('#btnViewUnsettled').addClass('on');
+			$('#p05UnsettledSection').show();
+			$('#p05UnCnfmSection').hide();
+			$('#cr0202p05Form [data-ax5grid="p05-unsettled-grid"]').css('height', '600px');
+			if (p05UnsettledGrid) p05UnsettledGrid.setHeight(600);
+		} else if (mode === 'unconfirmed') {
+			$('#btnViewUnconfirmed').addClass('on');
+			$('#p05UnsettledSection').hide();
+			$('#p05UnCnfmSection').show();
+			$('#cr0202p05Form [data-ax5grid="p05-uncnfm-grid"]').css('height', '600px');
+			if (p05UnCnfmGrid) p05UnCnfmGrid.setHeight(600);
+		}
+
+		setTimeout(function() {
+			if (p05UnsettledGrid) p05UnsettledGrid.repaint();
+			if (p05UnCnfmGrid) p05UnCnfmGrid.repaint();
+		}, 50);
+	}
+
+	function cr0202p05ExportExcel(type) {
+		var dateStr = (new Date()).format ? (new Date()).format("yyyyMMdd") : "";
+		if (type === 'unsettled') {
+			if (p05UnsettledGrid) p05UnsettledGrid.exportExcel("미정산잔액내역_" + dateStr + ".xls");
+		} else if (type === 'unconfirmed') {
+			if (p05UnCnfmGrid) p05UnCnfmGrid.exportExcel("미확정설비내역_" + dateStr + ".xls");
+		}
+	}
+
+	function cr0202p05InitUnsettledGrid() {
+		p05UnsettledGrid = new ax5.ui.grid();
+		p05UnsettledGrid.setConfig({
+			target: $('#cr0202p05Form [data-ax5grid="p05-unsettled-grid"]'),
+			lineNumberColumnWidth: 40,
+			showLineNumber: true,
+			showRowSelector: false,
+			multipleSelect: false,
+			sortable: false,
+			header: {
+				align: "center",
+				selector: false
+			},
+			body: {
+				mergeCells: [
+					"ordrger", "clntNm", "clntPjtNm", "ordrsNo", "ordrsDt", "ordrsDivNm", "ordrsSeq", "ordrsDtlDiv10Nm", "cnfmYn", "salesCd", "eqpNm"
+				],
+				grouping: {
+					by: ["ordrger"],
+					columns: [
+						{
+							label: function () {
+								return "[ " + (this.groupBy.labels[0] || "발주자 미입력") + " 소계 ]";
+							},
+							colspan: 11,
+							align: "center"
+						},
+						{key: "sumOrdrsAmt", collector: "sum", formatter: "money", align: "right"},
+						{},
+						{},
+						{},
+						{key: "sumOrdrsPrc", collector: "sum", formatter: "money", align: "right"},
+						{key: "unOrdrsPrc", collector: "sum", formatter: "money", align: "right"},
+						{key: "sumUnUnsettledAmt", collector: "sum", formatter: "money", align: "right"}
+					]
+				}
+			},
+			columns: applyCr0202P05GridColor([
+				/* 공통 11개 컬럼 정렬 */
+				{key: "ordrger", label: "발주자", align: "center", width: 75},
+				{key: "clntNm", label: "고객사", align: "left", width: 140},
+				{key: "clntPjtNm", label: "고객사PJT", align: "left", width: 80},
+				{key: "ordrsNo", label: "수주번호", align: "center", width: 60, styleClass: function () { return (this.item.ctrtDoc == "CONTRACT01") ? "grid-font-blue-bold" : ""; }},
+				{key: "ordrsDt", label: "수주일자", align: "center", width: 80, styleClass: function () { return (this.item.ctrtDoc == "CONTRACT01") ? "grid-font-blue-bold" : ""; }},
+				{key: "ordrsDivNm", label: "수주구분", align: "center", width: 85, styleClass: function () { return this.item.ordrsDiv == 'ORDRSDIV9' ? 'grid-font-blue-bold' : ''; }},
+				{key: "ordrsSeq", label: "순번", align: "center", width: 40, styleClass: function () { return (this.item.ctrtDoc == "CONTRACT01") ? "grid-font-blue-bold" : ""; }},
+				{key: "ordrsDtlDiv10Nm", label: "입력구분", align: "center", width: 65},
+				{key: "cnfmYn", label: "확정구분", align: "center", width: 60, formatter: function () { return cr0202p05CnfmName(this.value); }},
+				{key: "salesCd", label: "SALES CODE", align: "center", width: 110},
+				{key: "eqpNm", label: "설비명", align: "left", width: 220},
+
+				/* 미정산 특화 컬럼 */
+				{key: "ordrsAmt", label: "수주금액", align: "right", width: 90, formatter: "money"},
+				{key: "pmntMtdNm", label: "결재방법", align: "center", width: 60},
+				{key: "mngIdNm", label: "담당자", align: "center", width: 60},
+				{key: undefined, label: "정산내역",
+					columns: [
+						{key: "billYn", label: "완료", align: "center", width: 50, formatter: "useYn"},
+						{key: "ordrsPrc", label: "발생금액", align: "right", width: 95, formatter: "money", styleClass: function () { return "grid-row-blue grid-font-red-bold"; }},
+						{key: "unOrdrsPrc", label: "정산금액", align: "right", width: 95, formatter: "money", styleClass: function () { return "grid-row-blue grid-no-msg-font-blue-bold"; }},
+						{key: "unUnsettledAmt", label: "미정산잔액", align: "right", width: 95, formatter: "money"}
+					]
+				},
+				{key: undefined, label: "정산상계 수주정보",
+					columns: [
+						{key: "unOrdrsNo", label: "번호", align: "center", width: 60, styleClass: function () { return (this.item.ctrtDoc == "CONTRACT01") ? "grid-font-blue-bold" : ""; }},
+						{key: "unOrdrsSeq", label: "순번", align: "center", width: 40, styleClass: function () { return (this.item.ctrtDoc == "CONTRACT01") ? "grid-font-blue-bold" : ""; }},
+						{key: "unOrdrsDt", label: "수주일자", align: "center", width: 80, styleClass: function () { return (this.item.ctrtDoc == "CONTRACT01") ? "grid-font-blue-bold" : ""; }},
+						{key: "unPmntMtdNm", label: "결재방법", align: "center", width: 60},
+						{key: "unClntPjtNm", label: "프로젝트", align: "left", width: 80},
+						{key: "unEqpNm", label: "정산설비명", align: "left", width: 220}
+					]
+				}
+			]),
+			footSum: [
+				[
+					{label: "총계", colspan: 11, align: "center"},
+					{key: "sumOrdrsAmt", collector: "sum", formatter: "money", align: "right"},
+					{},
+					{},
+					{},
+					{key: "sumOrdrsPrc", collector: "sum", formatter: "money", align: "right"},
+					{key: "unOrdrsPrc", collector: "sum", formatter: "money", align: "right"},
+					{key: "sumUnUnsettledAmt", collector: "sum", formatter: "money", align: "right"}
+				]
+			],
+			page: {
+				display: false
+			}
+		});
+	}
+
+	function cr0202p05InitUnCnfmGrid() {
+		p05UnCnfmGrid = new ax5.ui.grid();
+		p05UnCnfmGrid.setConfig({
+			target: $('#cr0202p05Form [data-ax5grid="p05-uncnfm-grid"]'),
+			showLineNumber: true,
+			showRowSelector: false,
+			multipleSelect: false,
+			sortable: false,
+			header: {
+				align: "center",
+				selector: false
+			},
+			body: {
+				mergeCells: ["ordrger", "clntNm", "clntPjtNm", "ordrsNo", "ordrsDt", "ordrsDivNm", "ordrsSeq", "ordrsDtlDiv10Nm", "cnfmYn", "salesCd", "eqpNm"],
+				grouping: {
+					by: ["ordrger"],
+					columns: [
+						{
+							label: function () {
+								return "[ " + (this.groupBy.labels[0] || "발주자 미입력") + " 소계 ]";
+							},
+							colspan: 11,
+							align: "center"
+						},
+						{key: "estTrgtCost", collector: "sum", formatter: "money", align: "right"},
+						{key: "ordrsPrc", collector: "sum", formatter: "money", align: "right"},
+						{key: "estEpctMatPrc", collector: "sum", formatter: "money", align: "right"},
+						{}, {}, {}
+					]
+				}
+			},
+			columns: [
+				/* 공통 11개 컬럼 정렬 */
+				{key: "ordrger", label: "발주자", align: "center", width: 75},
+				{key: "clntNm", label: "고객사", align: "left", width: 140},
+				{key: "clntPjtNm", label: "고객사PJT", align: "left", width: 80},
+				{key: "ordrsNo", label: "수주번호", align: "center", width: 60},
+				{key: "ordrsDt", label: "수주일자", align: "center", width: 80},
+				{key: "ordrsDivNm", label: "수주구분", align: "center", width: 85, styleClass: function () { return this.item.ordrsDiv == 'ORDRSDIV9' ? 'grid-font-blue-bold' : ''; }},
+				{key: "ordrsSeq", label: "순번", align: "center", width: 40},
+				{key: "ordrsDtlDiv10Nm", label: "입력구분", align: "center", width: 65},
+				{key: "cnfmYn", label: "확정구분", align: "center", width: 60, formatter: function () { return cr0202p05CnfmName(this.value); }},
+				{key: "salesCd", label: "SALES CODE", align: "center", width: 110},
+				{key: "eqpNm", label: "설비명", align: "left", width: 220},
+
+				/* 미확정 특화 컬럼 */
+				{key: "estTrgtCost", label: "수주목표가", align: "right", width: 95, formatter: "money"},
+				{key: "ordrsPrc", label: "수주가", align: "right", width: 95, formatter: "money"},
+				{key: "estEpctMatPrc", label: "견적 예상 재료비", align: "right", width: 95, formatter: "money"},
+				{key: "outtkClntNm", label: "외주턴키", align: "left", width: 100},
+				{key: "remark", label: "비고", align: "left", width: 120},
+				{key: "mngNm", label: "수주담당자", align: "center", width: 60}
+			],
+			footSum: [
+				[
+					{label: "합계", colspan: 11, align: "center"},
+					{key: "estTrgtCost", collector: "sum", formatter: "money", align: "right"},
+					{key: "ordrsPrc", collector: "sum", formatter: "money", align: "right"},
+					{key: "estEpctMatPrc", collector: "sum", formatter: "money", align: "right"},
+					{}, {}, {}
+				]
+			],
+			page: {
+				display: false
+			}
+		});
+	}
+
+	function cr0202p05Load() {
+		var formData = {};
+		$.each($('#cr0202p05Form [data-search]'), function (idx, elem) {
+			formData[$(elem).data("search")] = $(elem).val();
+		});
+
+		var currentCoCd = formData.coCd || p05CoCd || $('#cr0202p05Form #coCd').val();
+
+		var unParam = {
+			coCd: currentCoCd,
+			ordrsClntCd: formData.ordrsClntCd || '',
+			ordrsClntNm: formData.ordrsClntNm || '',
+			ordrsDiv: formData.ordrsDiv || '',
+			billyn: "N",
+			pageNo: 1,
+			recordCnt: 99999999
+		};
+
+		var unCnfmParam = {
+			coCd: currentCoCd,
+			ordrsClntCd: formData.ordrsClntCd || '',
+			ordrsClntNm: formData.ordrsClntNm || '',
+			ordrsDiv: formData.ordrsDiv || ''
+		};
+
+		var unSettledFinished = false;
+		var unCnfmFinished = false;
+
+		// 1. 미정산 조회
+		postAjax("/user/cr/cr20/select_cr20m01_List", unParam, null, function (data) {
+			p05RawUnsettledList = (data && data.result) ? data.result : [];
+			unSettledFinished = true;
+			if (unCnfmFinished) {
+				cr0202p05BuildOrdererOptionsAndFilter();
+			}
+		});
+
+		// 2. 미확정 조회
+		postAjax("/user/cr/cr02/selectOrdrsUnconfirmedDetails", unCnfmParam, null, function (data) {
+			p05RawUnCnfmList = (data && data.result) ? data.result : [];
+			unCnfmFinished = true;
+			if (unSettledFinished) {
+				cr0202p05BuildOrdererOptionsAndFilter();
+			}
+		});
+	}
+
+	function cr0202p05BuildOrdererOptionsAndFilter() {
+		// 미정산 및 미확정 자료에 등록된 고유 발주자 수집
+		var ordererSet = new Set();
+		var hasEmptyOrderer = false;
+
+		for (var i = 0; i < p05RawUnsettledList.length; i++) {
+			var ord = String(p05RawUnsettledList[i].ordrger || '').trim();
+			if (ord) {
+				ordererSet.add(ord);
+			} else {
+				hasEmptyOrderer = true;
+			}
+		}
+
+		for (var j = 0; j < p05RawUnCnfmList.length; j++) {
+			var ord2 = String(p05RawUnCnfmList[j].ordrger || '').trim();
+			if (ord2) {
+				ordererSet.add(ord2);
+			} else {
+				hasEmptyOrderer = true;
+			}
+		}
+
+		var sortedOrderers = Array.from(ordererSet).sort();
+		var ordererOptions = [];
+		for (var k = 0; k < sortedOrderers.length; k++) {
+			ordererOptions.push({
+				code: sortedOrderers[k],
+				name: sortedOrderers[k]
+			});
+		}
+		if (hasEmptyOrderer) {
+			ordererOptions.push({
+				code: "__EMPTY__",
+				name: "(발주자 미입력)"
+			});
+		}
+
+		// 이전 선택된 값 보존 또는 초기 파라미터 적용
+		var prevSelected = $('#cr0202p05Form #ordrger').val() || [];
+		if (prevSelected.length === 0 && p05Ordrger) {
+			prevSelected = [p05Ordrger];
+			p05Ordrger = ''; // 1회 적용 후 초기화
+		}
+
+		// select 옵션 재생성
+		var $sel = $('#cr0202p05Form #ordrger');
+		$sel.empty();
+		for (var m = 0; m < ordererOptions.length; m++) {
+			var opt = ordererOptions[m];
+			$sel.append('<option value="' + opt.code + '">' + opt.name + '</option>');
+		}
+
+		if ($sel.data('multiselect')) {
+			$sel.multiselect('rebuild');
+		}
+
+		// 이전 선택 복원
+		if (prevSelected.length > 0) {
+			$sel.multiselect('select', prevSelected);
+		}
+
+		// 필터 적용 및 그리드 렌더링
+		cr0202p05ApplyFilter();
+	}
+
+	function cr0202p05ApplyFilter() {
+		var selectedOrderers = $('#cr0202p05Form #ordrger').val() || [];
+		var isFiltered = (selectedOrderers.length > 0);
+		var filterSet = new Set(selectedOrderers);
+		var allowEmpty = filterSet.has('__EMPTY__');
+
+		function matchesOrderer(row) {
+			if (!isFiltered) return true;
+			var o = String(row.ordrger || '').trim();
+			if (!o) return allowEmpty;
+			return filterSet.has(o);
+		}
+
+		// 1. 미정산 목록 필터 및 집계
+		var filteredUnsettled = [];
+		var seenNo = new Set();
+		var distinctUnsettledCnt = 0;
+		var totalUnsettledAmt = 0;
+
+		for (var i = 0; i < p05RawUnsettledList.length; i++) {
+			var item = p05RawUnsettledList[i];
+			if (!matchesOrderer(item)) continue;
+
+			var rowCopy = $.extend({}, item);
+			rowCopy.ordrsAmt = gPasFloatChk(rowCopy.ordrsAmt);
+			rowCopy.ordrsPrc = gPasFloatChk(rowCopy.ordrsPrc);
+			rowCopy.unOrdrsPrc = gPasFloatChk(rowCopy.unOrdrsPrc) * (-1);
+			rowCopy.unUnsettledAmt = gPasFloatChk(rowCopy.unUnsettledAmt);
+
+			var key = (rowCopy.ordrsNo || '') + '_' + (rowCopy.ordrsSeq || '');
+			if (seenNo.has(key)) {
+				rowCopy.sumOrdrsAmt = 0;
+				rowCopy.sumOrdrsPrc = 0;
+				rowCopy.sumUnUnsettledAmt = 0;
+			} else {
+				seenNo.add(key);
+				rowCopy.sumOrdrsAmt = rowCopy.ordrsAmt;
+				rowCopy.sumOrdrsPrc = rowCopy.ordrsPrc;
+				rowCopy.sumUnUnsettledAmt = rowCopy.unUnsettledAmt;
+				if (rowCopy.unUnsettledAmt !== 0) {
+					distinctUnsettledCnt++;
+					totalUnsettledAmt += rowCopy.unUnsettledAmt;
+				}
+			}
+			filteredUnsettled.push(rowCopy);
+		}
+
+		if (p05UnsettledGrid) {
+			p05UnsettledGrid.setData({
+				list: filteredUnsettled,
+				page: {
+					totalElements: filteredUnsettled.length
+				}
+			});
+		}
+
+		$("#p05UnsettledCnt").text(addCommaStr(distinctUnsettledCnt));
+		$("#p05UnsettledAmtSum").text(addCommaStr(totalUnsettledAmt));
+		$("#p05UnsettledGridCnt").text(addCommaStr(filteredUnsettled.length));
+
+		// 2. 미확정 목록 필터 및 집계
+		var currentCoCd = p05CoCd || $('#cr0202p05Form #coCd').val();
+		var canViewAmt = cr0202p05CanViewAmt(currentCoCd);
+		var deptId = jwt.deptId || "";
+		var maskMatPrc = !canViewAmt && (deptId == "GUN70" || deptId.startsWith("GUN60"));
+
+		var filteredUnCnfm = [];
+		var sumEstTrgtCost = 0, sumOrdrsPrc = 0, sumEstEpctMatPrc = 0;
+
+		for (var j = 0; j < p05RawUnCnfmList.length; j++) {
+			var cItem = p05RawUnCnfmList[j];
+			if (cr0202p05CnfmName(cItem.cnfmYn) != "미확정") continue;
+			if (!matchesOrderer(cItem)) continue;
+
+			var cRowCopy = $.extend({}, cItem);
+			cRowCopy.estTrgtCost = canViewAmt ? gPasFloatChk(cRowCopy.estTrgtCost) : 0;
+			cRowCopy.ordrsPrc = canViewAmt ? gPasFloatChk(cRowCopy.ordrsPrc) : 0;
+			cRowCopy.estEpctMatPrc = maskMatPrc ? 0 : gPasFloatChk(cRowCopy.estEpctMatPrc);
+
+			sumEstTrgtCost += cRowCopy.estTrgtCost;
+			sumOrdrsPrc += cRowCopy.ordrsPrc;
+			sumEstEpctMatPrc += cRowCopy.estEpctMatPrc;
+
+			filteredUnCnfm.push(cRowCopy);
+		}
+
+		if (p05UnCnfmGrid) {
+			p05UnCnfmGrid.setData({
+				list: filteredUnCnfm,
+				page: {
+					totalElements: filteredUnCnfm.length
+				}
+			});
+		}
+
+		$("#p05UnCnfmCnt").text(addCommaStr(filteredUnCnfm.length));
+		$("#p05UnCnfmGridCnt").text(addCommaStr(filteredUnCnfm.length));
+		$("#p05EstTrgtCostSum").text(addCommaStr(sumEstTrgtCost));
+		$("#p05OrdrsPrcSum").text(addCommaStr(sumOrdrsPrc));
+		$("#p05EstEpctMatPrcSum").text(addCommaStr(sumEstEpctMatPrc));
+	}
+
+	$(document.body).ready(function () {
+		setCommonSelect($("#cr0202p05Form select[data-kind]"));
+
+		var pObj = (modalStack && modalStack.last() && modalStack.last().paramObj) ? modalStack.last().paramObj : {};
+		p05CoCd = pObj.coCd || '';
+		p05OrdrsNo = pObj.ordrsNo || '';
+		p05OrdrsClntCd = pObj.ordrsClntCd || '';
+		p05OrdrsClntNm = pObj.ordrsClntNm || '';
+		p05Ordrger = pObj.ordrger || '';
+
+		if (p05CoCd) {
+			$("#cr0202p05Form #coCd").val(p05CoCd);
+		}
+		if (p05OrdrsClntCd) {
+			$("#cr0202p05Form #ordrsClntCd").val(p05OrdrsClntCd);
+		}
+		if (p05OrdrsClntNm) {
+			$("#cr0202p05Form #ordrsClntNm").val(p05OrdrsClntNm);
+		}
+
+		cr0202p05EnsureMultiselect(function() {
+			$('#cr0202p05Form #ordrger').multiselect({
+				includeSelectAllOption: true,
+				selectAllText: '전체 선택',
+				nonSelectedText: '발주자 전체',
+				allSelectedText: '발주자 전체',
+				nSelectedText: '명 선택',
+				numberDisplayed: 1,
+				maxHeight: 250,
+				buttonWidth: '100%',
+				onChange: function() {
+					cr0202p05ApplyFilter();
+				},
+				onSelectAll: function() {
+					cr0202p05ApplyFilter();
+				},
+				onDeselectAll: function() {
+					cr0202p05ApplyFilter();
+				}
+			});
+
+			cr0202p05InitUnsettledGrid();
+			cr0202p05InitUnCnfmGrid();
+			cr0202p05Load();
+		});
+	});
+</script>
