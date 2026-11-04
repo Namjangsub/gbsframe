@@ -907,7 +907,7 @@
 	var manualDailyRows = [];
 	var suppressedDailyKeys = {};
 	var savedDailyByKey = {};
-	var dailyDbOnlyMode = false; // 저장된 복명서 수정 시 true: 일비정산 자동행 생성 없이 DB 저장행만 표시 (추가는 수동행으로)
+	var dailyDbOnlyMode = false; // 정산 행이 저장됐거나 지급완료된 복명서는 DB 저장행만 표시
 
 	// 근태마감년월 (PM30 관리 값)
 	var pm51AttendanceCloseYm = null;
@@ -1378,7 +1378,8 @@
 					setTimeout(function() {
 						refreshSettlementSummaryGrids();
 						if (tripExpenseStatusGridView && tripExpenseStatusGridView.target) {
-							tripExpenseStatusGridView.target.repaint(); // footSum 재계산
+							tripExpenseStatusGridView.target.needToPaintSum = true;
+							tripExpenseStatusGridView.target.repaint();
 						}
 						syncTripExpenseStatusHeaderCheckbox();
 					}, 0);
@@ -1391,7 +1392,7 @@
 					{ key: "tripRptAmt", collector: function() {
 						var sum = 0;
 						$.each(this.list, function(idx, item) {
-							if (item.__selected__) sum += Number(item.tripRptAmt || 0);
+							if (item.__selected__) sum += getSettlementNumber(item.tripRptAmt);
 						});
 						return sum;
 					}, formatter: "money", align: "right" },
@@ -1469,6 +1470,7 @@
 			setTimeout(function() {
 				refreshSettlementSummaryGrids();
 				if (tripExpenseStatusGridView && tripExpenseStatusGridView.target) {
+					tripExpenseStatusGridView.target.needToPaintSum = true;
 					tripExpenseStatusGridView.target.repaint();
 				}
 				syncTripExpenseStatusHeaderCheckbox();
@@ -2516,6 +2518,8 @@
 				tripExpenseStatusGridView.target.setValue(idx, 'krwAmt', calculatedKrw);
 			}
 		});
+		// 조회 시 자동 선택한 경비도 원화금액 변경 여부와 관계없이 합계에 반영한다.
+		tripExpenseStatusGridView.target.needToPaintSum = true;
 		tripExpenseStatusGridView.target.repaint();
 	}
 
@@ -3362,8 +3366,9 @@
 			manualDailyRows = [];
 			suppressedDailyKeys = {};
 			savedDailyByKey = {};
-			dailyDbOnlyMode = true;
 			var rptDailyList = data.result.rptDailyList || [];
+			// 미지급 복명서에 정산 행이 없으면 신청서와 실제 일정으로 초기값을 계산한다.
+			dailyDbOnlyMode = rptDailyList.length > 0 || !!$.trim(m02.payDt || '');
 			$.each(rptDailyList, function(idx, item) {
 				var key = (item.userNm || '') + '|' + (item.currCd || '');
 				if (item.manualYn === 'Y') {
