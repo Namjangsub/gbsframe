@@ -60,24 +60,24 @@
 		<tr style="height:28px;">
 			<th>회사</th>
 			<td>
-				<select id="coCd" name="coCd" data-kind="CO" data-search="coCd" onchange="cr0202p05Load();"></select>
+				<select id="p05CoCd" name="p05CoCd" data-kind="CO" data-search="coCd" onchange="cr0202p05Load();"></select>
 			</td>
 			<th>고객사</th>
 			<td style="white-space:nowrap;">
-				<input type="hidden" id="ordrsClntCd" name="ordrsClntCd" data-search="ordrsClntCd">
+				<input type="hidden" id="p05OrdrsClntCd" name="p05OrdrsClntCd" data-search="ordrsClntCd">
 				<div class="search_form">
-					<input type="text" id="ordrsClntNm" name="ordrsClntNm" class="form-control input-sm" data-search="ordrsClntNm" placeholder="전체 고객사" oninput="cr0202p05OnClntNmInput();" onkeydown="if (event.keyCode == 13) cr0202p05Load();">
+					<input type="text" id="p05OrdrsClntNm" name="p05OrdrsClntNm" class="form-control input-sm" data-search="ordrsClntNm" placeholder="전체 고객사" oninput="cr0202p05OnClntNmInput();" onkeydown="if (event.keyCode == 13) cr0202p05Load();">
 					<a onclick="cr0202p05OpenClntSearch();"><i class="i_search_w"></i></a>
 				</div>
 			</td>
 			<th>발주자</th>
 			<td>
-				<select id="ordrger" name="ordrger" multiple="multiple" class="form-control input-sm">
+				<select id="p05Ordrger" name="p05Ordrger" multiple="multiple" class="form-control input-sm">
 				</select>
 			</td>
 			<th>수주구분</th>
 			<td>
-				<select id="ordrsDiv" name="ordrsDiv" data-kind="ORDRSDIV" data-search="ordrsDiv" onchange="cr0202p05Load();">
+				<select id="p05OrdrsDiv" name="p05OrdrsDiv" data-kind="ORDRSDIV" data-search="ordrsDiv" onchange="cr0202p05Load();">
 					<option value="">전체</option>
 				</select>
 			</td>
@@ -267,29 +267,29 @@
 
 	function cr0202p05OpenClntSearch() {
 		var paramObj = {
-			"searchValue" : $("#cr0202p05Form #ordrsClntNm").val(),
+			"searchValue" : $("#cr0202p05Form #p05OrdrsClntNm").val(),
 			"clntDivCd"   : "CLNTDIV12"
 		};
 		openAutoModal("/static/html/cmn/modal/clntSearch.html", 650, 650, "거래처 검색", paramObj, function (grid) {
 			var row = grid.target.getList("selected")[0];
-			$("#cr0202p05Form #ordrsClntCd").val(row.clntCd);
-			$("#cr0202p05Form #ordrsClntNm").val(row.clntNm);
+			$("#cr0202p05Form #p05OrdrsClntCd").val(row.clntCd);
+			$("#cr0202p05Form #p05OrdrsClntNm").val(row.clntNm);
 			cr0202p05Load();
 		});
 	}
 
 	function cr0202p05ClearClnt() {
-		$("#cr0202p05Form #ordrsClntCd").val("");
-		$("#cr0202p05Form #ordrsClntNm").val("");
-		if ($('#cr0202p05Form #ordrger').data('multiselect')) {
-			$('#cr0202p05Form #ordrger').multiselect('deselectAll', false);
-			$('#cr0202p05Form #ordrger').multiselect('updateButtonText');
+		$("#cr0202p05Form #p05OrdrsClntCd").val("");
+		$("#cr0202p05Form #p05OrdrsClntNm").val("");
+		if ($('#cr0202p05Form #p05Ordrger').data('multiselect')) {
+			$('#cr0202p05Form #p05Ordrger').multiselect('deselectAll', false);
+			$('#cr0202p05Form #p05Ordrger').multiselect('updateButtonText');
 		}
 		cr0202p05Load();
 	}
 
 	function cr0202p05OnClntNmInput() {
-		$("#cr0202p05Form #ordrsClntCd").val("");
+		$("#cr0202p05Form #p05OrdrsClntCd").val("");
 	}
 
 	function cr0202p05SetViewMode(mode) {
@@ -368,6 +368,37 @@
 						{key: "unOrdrsPrc", collector: "sum", formatter: "money", align: "right"},
 						{key: "sumUnUnsettledAmt", collector: "sum", formatter: "money", align: "right"}
 					]
+				},
+				onDBLClick: function () {
+					var item = this.item;
+					if (!item || item.__isGrouping) return;
+
+					var colKey = this.column ? (this.column.key || '') : '';
+					var isSettlePart = (colKey === 'unOrdrsPrc') || (colKey && colKey.indexOf('un') === 0 && colKey !== 'unUnsettledAmt') || (typeof this.colIndex === 'number' && this.colIndex >= 16 && this.colIndex !== 17);
+
+					var targetOrdrsNo = isSettlePart ? item.unOrdrsNo : item.ordrsNo;
+					var targetCoCd = isSettlePart ? (item.unCoCd || item.coCd) : item.coCd;
+					var targetHistNo = isSettlePart ? (item.unHistNo || 0) : (item.histNo || 0);
+					var targetFileTrgtKey = isSettlePart ? (item.unFileTrgtKey || 0) : (item.fileTrgtKey || 0);
+
+					if (!targetOrdrsNo) {
+						if (isSettlePart) {
+							alert("정산상계 수주정보가 없습니다.");
+						}
+						return;
+					}
+
+					var paramObj = {
+						actionType: "U",
+						coCd: targetCoCd,
+						ordrsNo: targetOrdrsNo,
+						fileTrgtKey: targetFileTrgtKey,
+						histNo: targetHistNo,
+						userId: jwt.userId,
+						pgmId: "CR0201M02",
+						hideUnsettledButtons: "Y"
+					};
+					openAutoModal("/static/html/user/cr/cr02/CR0202P02.html", 1600, 850, "수주 상세", paramObj);
 				}
 			},
 			columns: applyCr0202P05GridColor([
@@ -454,6 +485,21 @@
 						{key: "estEpctMatPrc", collector: "sum", formatter: "money", align: "right"},
 						{}, {}, {}
 					]
+				},
+				onDBLClick: function () {
+					var item = this.item;
+					if (!item || !item.ordrsNo) return;
+					var paramObj = {
+						actionType: "U",
+						coCd: item.coCd,
+						ordrsNo: item.ordrsNo,
+						fileTrgtKey: item.fileTrgtKey || 0,
+						histNo: item.histNo,
+						userId: jwt.userId,
+						pgmId: "CR0201M02",
+						hideUnsettledButtons: "Y"
+					};
+					openAutoModal("/static/html/user/cr/cr02/CR0202P02.html", 1600, 850, "수주 상세", paramObj);
 				}
 			},
 			columns: [
@@ -499,7 +545,7 @@
 			formData[$(elem).data("search")] = $(elem).val();
 		});
 
-		var currentCoCd = formData.coCd || p05CoCd || $('#cr0202p05Form #coCd').val();
+		var currentCoCd = formData.coCd || p05CoCd || $('#cr0202p05Form #p05CoCd').val();
 
 		var unParam = {
 			coCd: currentCoCd,
@@ -579,14 +625,14 @@
 		}
 
 		// 이전 선택된 값 보존 또는 초기 파라미터 적용
-		var prevSelected = $('#cr0202p05Form #ordrger').val() || [];
+		var prevSelected = $('#cr0202p05Form #p05Ordrger').val() || [];
 		if (prevSelected.length === 0 && p05Ordrger) {
 			prevSelected = [p05Ordrger];
 			p05Ordrger = ''; // 1회 적용 후 초기화
 		}
 
 		// select 옵션 재생성
-		var $sel = $('#cr0202p05Form #ordrger');
+		var $sel = $('#cr0202p05Form #p05Ordrger');
 		$sel.empty();
 		for (var m = 0; m < ordererOptions.length; m++) {
 			var opt = ordererOptions[m];
@@ -607,7 +653,7 @@
 	}
 
 	function cr0202p05ApplyFilter() {
-		var selectedOrderers = $('#cr0202p05Form #ordrger').val() || [];
+		var selectedOrderers = $('#cr0202p05Form #p05Ordrger').val() || [];
 		var isFiltered = (selectedOrderers.length > 0);
 		var filterSet = new Set(selectedOrderers);
 		var allowEmpty = filterSet.has('__EMPTY__');
@@ -667,7 +713,7 @@
 		$("#p05UnsettledGridCnt").text(addCommaStr(filteredUnsettled.length));
 
 		// 2. 미확정 목록 필터 및 집계
-		var currentCoCd = p05CoCd || $('#cr0202p05Form #coCd').val();
+		var currentCoCd = p05CoCd || $('#cr0202p05Form #p05CoCd').val();
 		var canViewAmt = cr0202p05CanViewAmt(currentCoCd);
 		var deptId = jwt.deptId || "";
 		var maskMatPrc = !canViewAmt && (deptId == "GUN70" || deptId.startsWith("GUN60"));
@@ -719,17 +765,17 @@
 		p05Ordrger = pObj.ordrger || '';
 
 		if (p05CoCd) {
-			$("#cr0202p05Form #coCd").val(p05CoCd);
+			$("#cr0202p05Form #p05CoCd").val(p05CoCd);
 		}
 		if (p05OrdrsClntCd) {
-			$("#cr0202p05Form #ordrsClntCd").val(p05OrdrsClntCd);
+			$("#cr0202p05Form #p05OrdrsClntCd").val(p05OrdrsClntCd);
 		}
 		if (p05OrdrsClntNm) {
-			$("#cr0202p05Form #ordrsClntNm").val(p05OrdrsClntNm);
+			$("#cr0202p05Form #p05OrdrsClntNm").val(p05OrdrsClntNm);
 		}
 
 		cr0202p05EnsureMultiselect(function() {
-			$('#cr0202p05Form #ordrger').multiselect({
+			$('#cr0202p05Form #p05Ordrger').multiselect({
 				includeSelectAllOption: true,
 				selectAllText: '전체 선택',
 				nonSelectedText: '발주자 전체',
