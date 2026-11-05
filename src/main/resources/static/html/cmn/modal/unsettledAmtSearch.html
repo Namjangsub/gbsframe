@@ -3,33 +3,27 @@
 		<div class="popup_table">
 			<table>
 				<colgroup>
-					<col width="20%">
-					<col width="20%">
+					<col width="16%">
+					<col width="32%">
+					<col width="12%">
 					<col width="">
 				</colgroup>
 				<tr>
 					<td>
-						<select id="coCd_PS" name="coCd_PS" data-kind="CO" data-search="coCd" required msg="회사" onchange="ModalSalesCodeGridView.setData(0);">
+						<select id="coCd_PS" name="coCd_PS" class="form-control input-sm" data-kind="CO" data-search="coCd" required msg="회사" onchange="ModalSalesCodeGridView.setData(0);">
 						</select>
 					</td>
-					
-<!-- 					<td> -->
-<!-- 						<select data-search="searchType"> -->
-<!-- 	                		<option value="X.DATA_SEARCH">통합</option> -->
-<!-- 	                		<option value="CLNT_PJT_NM">고객사PJT</option> -->
-<!-- 	                		<option value="SALES_CD">SALES CODE</option> -->
-<!-- 	                		<option value="CLNT_NM">고객사</option> -->
-<!-- 	                		<option value="EQP_NM">설비명</option> -->
-<!-- 	              		</select>     -->
-<!-- 					</td> -->
-<!-- 					<td> -->
-<!-- 						<div class="search_form"> -->
-<!-- 							<input type="text" id="searchValue" name="searchValue" data-search="searchValue" onkeypress="if(event.keyCode == 13){ModalSalesCodeGridView.setData(0);}"> -->
-<!-- 							<a onclick="ModalSalesCodeGridView.setData(0);"> -->
-<!-- 								<i class="i_search_w"></i> -->
-<!-- 							</a> -->
-<!-- 						</div> -->
-<!-- 					</td> -->
+					<td>
+						<div class="search_form">
+							<input type="hidden" id="clntCd" name="clntCd">
+							<input type="text" id="clntNm" name="clntNm" class="form-control input-sm" placeholder="고객사 검색" oninput="$('#commonPopup #clntCd').val('');" onkeydown="onClntNmKeyDown(event);">
+							<a onclick="openClntSearchModal();"><i class="i_search_w"></i></a>
+						</div>
+					</td>
+					<td>
+						<button type="button" class="btn btn-default btn-sm" onclick="clearClntSearch();" style="height: 24px; line-height: 12px; font-size: 11px;">전체 고객사</button>
+					</td>
+					<td></td>
 				</tr>
 			</table>
 			<div class="ax5_grid" data-ax5grid="ModalSalesCode-grid" data-ax5grid-config="{}" style="height: 630px; width: 100%"></div>
@@ -101,9 +95,9 @@
 		setData : function(_pageNo) {
 			var targetObj = this.target;
 			var paramObj = {
-				coCd	: $('#coCd_PS').val(),
-				clntCd  : modalStack.last().paramObj.clntCd,
-				ordrsNo  : modalStack.last().paramObj.ordrsNo,	//자기자신의 추후정산은 제외처리함.
+				coCd    : $('#coCd_PS').val(),
+				clntCd  : $('#commonPopup #clntCd').val(),
+				ordrsNo : (modalStack.last().paramObj ? modalStack.last().paramObj.ordrsNo : ''),	//자기자신의 추후정산은 제외처리함.
 			};
 			postAjax("/user/cr/cr02/selectUnsettledAmtSalesCodeList", paramObj, null, function(data) {
 				var list = data.result;
@@ -123,10 +117,50 @@
 		}
 	}
 
+	function openClntSearchModal() {
+		var paramObj = {
+			"searchValue" : $('#commonPopup #clntNm').val(),
+			"clntDivCd"   : "CLNTDIV12"
+		};
+		openAutoModal("/static/html/cmn/modal/clntSearch.html", 650, 650, "거래처 검색", paramObj, function(grid) {
+			var row = grid.target.getList("selected")[0];
+			if (row) {
+				$('#commonPopup #clntCd').val(row.clntCd);
+				$('#commonPopup #clntNm').val(row.clntNm);
+				ModalSalesCodeGridView.setData(0);
+			}
+		});
+	}
+
+	function clearClntSearch() {
+		$('#commonPopup #clntCd').val('');
+		$('#commonPopup #clntNm').val('');
+		ModalSalesCodeGridView.setData(0);
+	}
+
+	function onClntNmKeyDown(event) {
+		if (event.keyCode == 13) {
+			if (!$('#commonPopup #clntCd').val() && $('#commonPopup #clntNm').val().trim() !== '') {
+				openClntSearchModal();
+			} else {
+				ModalSalesCodeGridView.setData(0);
+			}
+		}
+	}
+
 	$(document).ready(function() {
-// 		$('#searchValue').focus();
-		setCommonSelect($('#commonPopup select[data-kind]'));		
-// 		$('#searchValue').val(modalStack.last().paramObj.searchValue);
+		setCommonSelect($('#commonPopup select[data-kind]'));
+
+		var initParam = modalStack.last().paramObj || {};
+		if (initParam.coCd) {
+			$('#coCd_PS').val(initParam.coCd);
+		}
+		if (initParam.clntCd) {
+			$('#commonPopup #clntCd').val(initParam.clntCd);
+		}
+		if (initParam.clntNm) {
+			$('#commonPopup #clntNm').val(initParam.clntNm);
+		}
 
 		ModalSalesCodeGridView.initView().setData(0);
 	});

@@ -25,10 +25,41 @@
 <link rel="stylesheet" href="/static/css/main.css">
 <link rel="stylesheet" href="/static/css/sub.css">
 <link rel="stylesheet" href="/static/css/common.css">
+<link rel="stylesheet" href="/static/bootstrap/css/bootstrap-multiselect.css">
+
+<style>
+	/* Multiselect 버튼 톤앤매너 */
+	#main_area .btn-group {
+		width: 100%;
+	}
+	#main_area button.multiselect.dropdown-toggle {
+		font-size: 12px;
+		padding: 2px 8px;
+		height: 24px;
+		width: 100%;
+		color: #333;
+		background: #ffffff;
+		border: 1px solid #ccc;
+		border-radius: 3px;
+		text-align: left;
+		line-height: 18px;
+	}
+	#main_area button.multiselect.dropdown-toggle .caret {
+		float: right;
+		margin-top: 7px;
+	}
+	#main_area ul.multiselect-container.dropdown-menu {
+		font-size: 12px;
+		max-height: 320px;
+		overflow-y: auto;
+		z-index: 1050;
+	}
+</style>
 
 <script src="/static/js/jquery-latest.min.js"></script>
 <script src="/static/js/jquery.serializeObject.js"></script>
 <script src="/static/bootstrap/js/bootstrap.min.js"></script>
+<script src="/static/bootstrap/js/bootstrap-multiselect.min.js"></script>
 <script src="/static/bootstrap/js/bootstrap-datepicker.min.js"></script>
 <script src="/static/bootstrap/js/bootstrap-datepicker.ko.min.js"></script>
 <script src="/static/js/moment/moment-with-locales.js"></script>
@@ -95,7 +126,7 @@
 						</td>
 						<th>발주자</th>
 						<td>
-							<input type="text" id="ordrger_S" name="ordrger_S" data-search="ordrger" onkeyup="event.keyCode == 13 ? DataSearch() : ''">
+							<select id="ordrger_S" name="ordrger_S" multiple="multiple" class="form-control input-sm"></select>
 						</td>
 					</tr>
 
@@ -183,6 +214,132 @@
 <script type="text/javascript">
 	var isFirst = true;
 	var group_text = "";
+	var cr20RawList = [];
+
+	function ensureMultiselect(callback) {
+		if ($.fn.multiselect) {
+			callback();
+		} else {
+			$('<link/>', {
+				rel: 'stylesheet',
+				type: 'text/css',
+				href: '/static/bootstrap/css/bootstrap-multiselect.css'
+			}).appendTo('head');
+			$.getScript('/static/bootstrap/js/bootstrap-multiselect.min.js', function() {
+				callback();
+			});
+		}
+	}
+
+	function buildOrdererOptionsAndFilter() {
+		var ordererSet = new Set();
+		var hasEmptyOrderer = false;
+
+		for (var i = 0; i < cr20RawList.length; i++) {
+			var ord = String(cr20RawList[i].ordrger || '').trim();
+			if (ord) {
+				ordererSet.add(ord);
+			} else {
+				hasEmptyOrderer = true;
+			}
+		}
+
+		var sortedOrderers = Array.from(ordererSet).sort();
+		var ordererOptions = [];
+		for (var k = 0; k < sortedOrderers.length; k++) {
+			ordererOptions.push({
+				code: sortedOrderers[k],
+				name: sortedOrderers[k]
+			});
+		}
+		if (hasEmptyOrderer) {
+			ordererOptions.push({
+				code: "__EMPTY__",
+				name: "(발주자 미입력)"
+			});
+		}
+
+		var prevSelected = $('#ordrger_S').val() || [];
+
+		var $sel = $('#ordrger_S');
+		$sel.empty();
+		for (var m = 0; m < ordererOptions.length; m++) {
+			var opt = ordererOptions[m];
+			$sel.append('<option value="' + opt.code + '">' + opt.name + '</option>');
+		}
+
+		if ($sel.data('multiselect')) {
+			$sel.multiselect('rebuild');
+		}
+
+		if (prevSelected.length > 0) {
+			$sel.multiselect('select', prevSelected);
+		}
+
+		applyOrdererFilter();
+	}
+
+	function applyOrdererFilter() {
+		var selectedOrderers = $('#ordrger_S').val() || [];
+		var isFiltered = (selectedOrderers.length > 0);
+		var filterSet = new Set(selectedOrderers);
+		var allowEmpty = filterSet.has('__EMPTY__');
+
+		function matchesOrderer(row) {
+			if (!isFiltered) return true;
+			var o = String(row.ordrger || '').trim();
+			if (!o) return allowEmpty;
+			return filterSet.has(o);
+		}
+
+		var filteredList = [];
+		var seenNo2 = new Set();
+
+		for (var i = 0; i < cr20RawList.length; i++) {
+			var item = cr20RawList[i];
+			if (!matchesOrderer(item)) continue;
+
+			var rowCopy = $.extend({}, item);
+			rowCopy.ordrsAmt = gPasFloatChk(rowCopy.ordrsAmt);
+			rowCopy.ordrsPrc = gPasFloatChk(rowCopy.ordrsPrc);
+			rowCopy.unOrdrsPrc = gPasFloatChk(rowCopy.unOrdrsPrc) * (-1);
+			rowCopy.unUnsettledAmt = gPasFloatChk(rowCopy.unUnsettledAmt);
+
+			var key = (rowCopy.ordrsNo || '') + '_' + (rowCopy.ordrsSeq || '');
+			if (seenNo2.has(key)) {
+				rowCopy.sumOrdrsAmt = 0;
+				rowCopy.sumOrdrsPrc = 0;
+				rowCopy.sumUnUnsettledAmt = 0;
+			} else {
+				seenNo2.add(key);
+				rowCopy.sumOrdrsAmt = rowCopy.ordrsAmt;
+				rowCopy.sumOrdrsPrc = rowCopy.ordrsPrc;
+				rowCopy.sumUnUnsettledAmt = rowCopy.unUnsettledAmt;
+			}
+			filteredList.push(rowCopy);
+		}
+
+		if (gridView && gridView.target) {
+			gridView.target.setData({
+				list : filteredList,
+				page : {
+					currentPage : 0,
+					pageSize : filteredList.length,
+					totalElements : filteredList.length,
+					totalPages : 1
+				}
+			});
+		}
+
+		if (excelView && excelView.target) {
+			excelView.target.setData({
+				list : filteredList,
+				page : {
+					totalElements : filteredList.length
+				}
+			});
+		}
+	}
 	ax5.ui.grid.formatter["useYn"] = function () {
 		var color = this.value == "Y" ? "color-circle_02.png" : "color-circle_01.png";
 		if (this.value == "E"){
@@ -201,8 +358,8 @@
 
 	var defaultColumns = [
 		{key: "ordrger"				, label: "발주자"	, align: "center", width:80},
-		{key: "clntNm"				, label: "고객사"	, align: "left", width:140},
-		{key: "clntPjtNm"			, label: "프로젝트"	, align: "left", width:100},
+		{key: "clntNm"				, label: "고객사"	, align: "left", width:120},
+		{key: "clntPjtNm"			, label: "프로젝트"	, align: "left", width:80},
 		{key: undefined				, label: "미정산 발생 수주정보",
 			columns: [
 				{key: "ordrsDivNm"	, label: "수주구분"	, align: "center", width:70},
@@ -227,8 +384,9 @@
 				{key: "unOrdrsSeq"	, label: "순번"		, align: "center", width: 50, styleClass: function () { return (this.item.ctrtDoc == "CONTRACT01") ? "grid-font-blue-bold" : "";}},
 				{key: "unOrdrsDt"	, label: "수주일자"	, align: "center", width: 80, styleClass: function () { return (this.item.ctrtDoc == "CONTRACT01") ? "grid-font-blue-bold" : "";}},
 				{key: "unPmntMtdNm"	, label: "결재방법"	, align: "center", width: 60},
-				{key: "unClntPjtNm"	, label: "포르젝트"	, align: "left", width:100},
-				{key: "unEqpNm"		, label: "정산설비명"	, align: "left", width:260},
+				{key: "unClntNm"	, label: "고객사"	, align: "left", width: 120},
+				{key: "unClntPjtNm"	, label: "프로젝트"	, align: "left", width: 80},
+				{key: "unEqpNm"		, label: "정산설비명"	, align: "left", width: 200},
 			]
 		},
 	];
@@ -309,41 +467,12 @@
 				formData["recordCnt"] = $('#recordCnt').val();
 				postAjax("/user/cr/cr20/select_cr20m01_List", formData, null, function(data) {
 					try {
-						gridHeightResize(gridView, 195); // 224 = 919 - 695 : 화면 Body 높이 - 그리드 기본크기 695
-						var list = data.result;
-
-						const seenNo2 = new Set();
-						for (let i = 0; i < list.length; i++) {
-							list[i].ordrsAmt = gPasFloatChk(list[i].ordrsAmt);
-							list[i].ordrsPrc = gPasFloatChk(list[i].ordrsPrc);
-							list[i].unOrdrsPrc = gPasFloatChk(list[i].unOrdrsPrc) * (-1);
-							list[i].unUnsettledAmt = gPasFloatChk(list[i].unUnsettledAmt);
-							if (seenNo2.has(list[i].ordrsNo+list[i].ordrsSeq)) {
-								list[i].sumOrdrsAmt = 0;            // 중복 번호면 합계용 금액 0
-								list[i].sumOrdrsPrc = 0;            // 중복 번호면 합계용 금액 0
-								list[i].sumUnUnsettledAmt = 0;            // 중복 번호면 합계용 금액 0
-							} else {
-							    seenNo2.add(list[i].ordrsNo+list[i].ordrsSeq);
-							    list[i].sumOrdrsAmt = list[i].ordrsAmt;   // 첫 등장 번호면 원래 금액
-							    list[i].sumOrdrsPrc = list[i].ordrsPrc;   // 첫 등장 번호면 원래 금액
-							    list[i].sumUnUnsettledAmt = list[i].unUnsettledAmt;   // 첫 등장 번호면 원래 금액
-							}
-						}
-
-						targetObj.setData({
-							list : list,
-							page : {
-								currentPage : _pageNo,
-								pageSize : data.paginationInfo.pageSize,
-								totalElements : data.paginationInfo.totalRecordCount,
-								totalPages : data.paginationInfo.totalPageCount
-							}
-						});
+						gridHeightResize(gridView, 195);
+						cr20RawList = data.result || [];
+						buildOrdererOptionsAndFilter();
 					} catch (error) {
 						alert("오류 발생!! 전산실 연락 바랍니다", error.message);
-						return null; // 오류 발생 시 null 반환
-					} finally {
-						// console.log("함수 실행 완료.");
+						return null;
 					}
 				});
   			}
@@ -391,8 +520,9 @@
 						]
 					},
 					{key: "unPmntMtdNm"			, label: "결재방법"	, align: "center", width: 60},
-					{key: "unClntPjtNm"			, label: "프로젝트"	, align: "left", width:100},
-					{key: "unEqpNm"				, label: "정산설비명"	, align: "left", width:150},
+					{key: "unClntNm"			, label: "고객사"	, align: "left", width: 140},
+					{key: "unClntPjtNm"			, label: "프로젝트"	, align: "left", width: 100},
+					{key: "unEqpNm"				, label: "정산설비명"	, align: "left", width: 150},
 				],
 				footSum: [
   			    	[
@@ -425,19 +555,41 @@
 		$("#coCd_S").val(jwt.coCd);
 		setByCoCd($("#coCd_S").val());
 
-		isFirst = false;
-		//그리드 초기화
-		gridView.initView();
-		excelView.initView();
+		ensureMultiselect(function() {
+			$('#ordrger_S').multiselect({
+				includeSelectAllOption: true,
+				selectAllText: '전체 선택',
+				nonSelectedText: '발주자 전체',
+				allSelectedText: '발주자 전체',
+				nSelectedText: '명 선택',
+				numberDisplayed: 1,
+				maxHeight: 250,
+				buttonWidth: '100%',
+				onChange: function() {
+					applyOrdererFilter();
+				},
+				onSelectAll: function() {
+					applyOrdererFilter();
+				},
+				onDeselectAll: function() {
+					applyOrdererFilter();
+				}
+			});
 
-		// 검색조건 이벤트 bind
-  		$('[data-search]').on("change", function(){
-  			DataSearch();
-  		});
+			isFirst = false;
+			//그리드 초기화
+			gridView.initView();
+			excelView.initView();
 
-  		DataSearch()
-  		//권한체크
-  		authChk();
+			// 검색조건 이벤트 bind
+	  		$('[data-search]').on("change", function(){
+	  			DataSearch();
+	  		});
+
+	  		DataSearch();
+	  		//권한체크
+	  		authChk();
+		});
 	});
 
 	// 초기화 버튼
@@ -446,6 +598,11 @@
 		$('.contents.search select, .contents.search input').val("");
 		// 회사 선택 상자 값 설정
 		$("#coCd_S").val(jwt.coCd);
+
+		if ($('#ordrger_S').data('multiselect')) {
+			$('#ordrger_S').multiselect('deselectAll', false);
+			$('#ordrger_S').multiselect('updateButtonText');
+		}
 
 		// 검색조건 이벤트 bind
 		$('[data-search]').on("change", function(){
@@ -462,41 +619,8 @@
     }
 
 	function excelDown() {
-		var formData = {};
-		$.each($('[data-search]'), function(idx, elem){
-			formData[$(elem).data("search")] = $(elem).val();
-		});
-		formData["pageNo"]    = 1;
-		formData["recordCnt"] = 99999999;
-
-		postAjax("/user/cr/cr20/select_cr20m01_List", formData, null, function(data) {
-			var list = data.result;
-
-			const seenNo2 = new Set();
-			for (let i = 0; i < list.length; i++) {
-				list[i].ordrsAmt = gPasFloatChk(list[i].ordrsAmt);
-				list[i].ordrsPrc = gPasFloatChk(list[i].ordrsPrc);
-				list[i].unOrdrsPrc = gPasFloatChk(list[i].unOrdrsPrc);
-				list[i].unUnsettledAmt = gPasFloatChk(list[i].unUnsettledAmt);
-				if (seenNo2.has(list[i].ordrsNo+list[i].ordrsSeq)) {
-					list[i].sumOrdrsAmt = 0;            // 중복 번호면 합계용 금액 0
-					list[i].sumOrdrsPrc = 0;            // 중복 번호면 합계용 금액 0
-				} else {
-				    seenNo2.add(list[i].ordrsNo+list[i].ordrsSeq);
-				    list[i].sumOrdrsAmt = list[i].ordrsAmt;   // 첫 등장 번호면 원래 금액
-				    list[i].sumOrdrsPrc = list[i].ordrsPrc;   // 첫 등장 번호면 원래 금액
-				}
-			}
-
-			excelView.target.setData({
-				list : list,
-				page : {
-					totalElements : list.length,
-				}
-			});
-			var todayDate = new Date().format('yyyyMMddHHmmss');
-			excelView.target.exportExcel("수주 미정산현황 관리_"+todayDate+".xls");
-		});
+		var todayDate = new Date().format('yyyyMMddHHmmss');
+		excelView.target.exportExcel("수주 미정산현황 관리_" + todayDate + ".xls");
 	}
 
 	// 거래처 검색
