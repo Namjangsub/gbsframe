@@ -118,38 +118,29 @@
 		padding: 10px 14px;
 		min-width: 320px;
 		max-width: 480px;
-		max-height: 520px;
+		max-height: calc(100vh - 30px);
+		box-sizing: border-box;
+		overflow-x: hidden;
 		overflow-y: auto;
 		font-size: 12px;
 		color: #333333;
 		pointer-events: auto;
 		line-height: 1.45;
 	}
+	.cr02-badge-popover * {
+		box-sizing: border-box;
+	}
+	.cr02-badge-popover > *:last-child {
+		margin-bottom: 0 !important;
+	}
 	.cr02-badge-popover::before {
 		content: "";
 		position: absolute;
-		top: -15px;
-		bottom: -15px;
-		left: -20px;
-		right: -20px;
+		top: 0;
+		left: -12px;
+		width: 14px;
+		height: 100%;
 		background: transparent;
-		pointer-events: auto;
-		z-index: -1;
-	}
-	.cr02-badge-popover .popover-close-btn {
-		background: none;
-		border: none;
-		font-size: 16px;
-		line-height: 1;
-		cursor: pointer;
-		color: #64748b;
-		padding: 0 4px;
-		margin-left: 4px;
-		border-radius: 3px;
-	}
-	.cr02-badge-popover .popover-close-btn:hover {
-		color: #ef4444;
-		background: #f1f5f9;
 	}
 	.cr02-badge-popover .popover-title {
 		font-weight: bold;
@@ -190,8 +181,6 @@
 		border-left: 3px solid #3b62b1;
 		white-space: pre-wrap;
 		word-break: break-all;
-		max-height: 130px;
-		overflow-y: auto;
 		color: #333333;
 		font-size: 11.5px;
 		line-height: 1.4;
@@ -696,7 +685,6 @@
 	var cr02CurrentPopoverItem = null;
 	var cr02CurrentBadgeEl = null;
 	var cr02PopoverHideTimer = null;
-	var cr02PopoverPinned = false;
 	var lastBadgeHoverEvent = null;
 
 	function clearPopoverHideTimer() {
@@ -707,12 +695,11 @@
 	}
 
 	function scheduleHideBadgePopover(delayMs) {
-		if (cr02PopoverPinned) return;
 		clearPopoverHideTimer();
 		cr02PopoverHideTimer = setTimeout(function() {
 			cr02PopoverHideTimer = null;
 			hideBadgePopover();
-		}, delayMs || 600);
+		}, delayMs || 220);
 	}
 
 	function isPointerInsidePopover(e) {
@@ -730,7 +717,6 @@
 
 		// 뱃지 마우스 진입 시 툴팁 표시 (타이머 취소)
 		$(document).on("mouseenter", badgeSelector, function(e) {
-			if (cr02PopoverPinned) return;
 			clearPopoverHideTimer();
 			var $badge = $(this);
 			var badgeType = $badge.attr("data-badge-type");
@@ -738,37 +724,22 @@
 			var item = resolveGridItem($badge, $tr);
 			showBadgePopover(e, badgeType, item, $badge);
 		});
-		// 뱃지에서 마우스가 나갈 때 800ms 유예 부여 (툴팁 위로 안전하게 진입)
+		// 뱃지에서 마우스가 나갈 때 300ms 유예 부여 (툴팁 위로 안전하게 진입)
 		$(document).on("mouseleave", badgeSelector, function(e) {
-			if (cr02PopoverPinned) return;
-			scheduleHideBadgePopover(800);
+			scheduleHideBadgePopover(300);
 		});
 		// 툴팁 내부로 마우스가 진입하면 닫힘 타이머 즉시 취소 (툴팁 유지 및 마우스 휠 스크롤 가능)
 		$(document).on("mouseenter", "#cr02BadgePopover", function(e) {
 			clearPopoverHideTimer();
 		});
-		// 툴팁 밖으로 마우스가 나가면 600ms 후 닫기
+		// 툴팁 밖으로 마우스가 나가면 200ms 후 닫기
 		$(document).on("mouseleave", "#cr02BadgePopover", function(e) {
-			if (cr02PopoverPinned) return;
-			scheduleHideBadgePopover(600);
-		});
-		// 툴팁 내부 클릭 시 고정 모드 전환 (스크롤 자유롭게 가능하도록)
-		$(document).on("click", "#cr02BadgePopover", function(e) {
-			if ($(e.target).closest(".popover-close-btn, .popover-open-issue-btn").length === 0) {
-				cr02PopoverPinned = true;
-				clearPopoverHideTimer();
-				$("#cr02BadgePopover .popover-pin-badge").show();
-			}
-		});
-		// 닫기 버튼 클릭 시 즉시 닫기
-		$(document).on("click", "#cr02BadgePopover .popover-close-btn", function(e) {
-			e.stopPropagation();
-			hideBadgePopover(true);
+			scheduleHideBadgePopover(200);
 		});
 		// 툴팁/뱃지 외부 클릭 시 즉시 닫기
 		$(document).on("mousedown", function(e) {
 			if ($(e.target).closest("#cr02BadgePopover, " + badgeSelector).length === 0) {
-				hideBadgePopover(true);
+				hideBadgePopover();
 			}
 		});
 		// 이슈 뱃지 클릭 시 팝업 오픈
@@ -777,7 +748,7 @@
 			var $badge = $(this);
 			var $tr = $badge.closest("tr[data-ax5grid-tr-data-index]");
 			var item = resolveGridItem($badge, $tr);
-			hideBadgePopover(true);
+			hideBadgePopover();
 			if (item) {
 				openIssueList(item);
 			}
@@ -786,12 +757,12 @@
 		$(document).on("click", "#cr02BadgePopover .popover-open-issue-btn", function(e) {
 			e.stopPropagation();
 			var targetItem = cr02CurrentPopoverItem;
-			hideBadgePopover(true);
+			hideBadgePopover();
 			if (targetItem) {
 				openIssueList(targetItem);
 			}
 		});
-		// 마우스 휠 스크롤 처리: 툴팁 내부 휠은 내부 스크롤 유지 및 상위 전파 차단
+		// 마우스 휠 스크롤 처리: 툴팁 내부 휠은 내부 스크롤 유지 및 상위 전파 차단, 툴팁 외부 휠은 즉시 툴팁 닫기(고정 현상 방지)
 		$(document).on("wheel mousewheel DOMMouseScroll", function(e) {
 			var $pop = $("#cr02BadgePopover");
 			if ($pop.length === 0 || !$pop.is(":visible")) return;
@@ -799,17 +770,13 @@
 				e.stopPropagation();
 				return;
 			}
-			if (!cr02PopoverPinned && !cr02PopoverHideTimer) {
-				hideBadgePopover(true);
-			}
+			hideBadgePopover();
 		});
 		$(window).on("scroll", function(e) {
 			if (e && e.target && $(e.target).closest("#cr02BadgePopover").length > 0) {
 				return;
 			}
-			if (!cr02PopoverPinned) {
-				hideBadgePopover(true);
-			}
+			hideBadgePopover();
 		});
 	}
 
@@ -1063,11 +1030,7 @@
 		var html = "";
 		html += '<div class="popover-title" style="color: ' + themeColor + '; border-bottom-color: ' + themeColor + ';">'
 		      + '  <span><i class="fa fa-exclamation-triangle" style="margin-right: 5px;"></i>' + (isMaster ? '수주 전체 문제/이슈 현황' : 'Sales Code 문제/이슈 현황') + ' (' + uncompIss + '/' + totIss + ')</span>'
-		      + '  <div style="display:flex; align-items:center;">'
-		      + '    <span class="popover-badge" style="background: ' + themeColor + ';">' + badgeText + '</span>'
-		      + '    <span class="popover-pin-badge" style="' + (cr02PopoverPinned ? '' : 'display:none;') + 'font-size:10px; background:#f59e0b; color:#fff; border-radius:10px; padding:1px 6px; margin-left:4px; font-weight:normal;">📌 고정됨</span>'
-		      + '    <button type="button" class="popover-close-btn" title="닫기">&times;</button>'
-		      + '  </div>'
+		      + '  <span class="popover-badge" style="background: ' + themeColor + ';">' + badgeText + '</span>'
 		      + '</div>';
 
 		if (ordrsNo) html += '<div class="popover-item"><b>수주번호:</b> ' + escapeHtml(ordrsNo) + (isMaster ? ' <span style="color:#2563eb;font-weight:bold;">(상위 수주)</span>' : '') + '</div>';
@@ -1163,7 +1126,6 @@
 		html += '<div class="popover-box popover-open-issue-btn" style="border-left-color: ' + themeColor + '; margin-top: 6px; text-align:center; cursor:pointer;">'
 		      + '  <i class="fa fa-mouse-pointer" style="margin-right: 4px;"></i>뱃지 또는 여기를 클릭 시 문제/이슈 팝업 목록이 열립니다.'
 		      + '</div>'
-		      + '<div style="font-size: 10px; color: #64748b; margin-top: 4px; text-align: right;">💡 <span style="color:#2563eb; font-weight:600;">클릭 시 팝업이 고정</span>되어 편하게 스크롤할 수 있습니다.</div>';
 
 		return html;
 	}
@@ -1273,7 +1235,7 @@
 						$pop.html(updatedHtml);
 						positionBadgePopover(lastBadgeHoverEvent || e, cr02CurrentBadgeEl, true);
 					}
-				});
+				}, false);
 			}
 			return;
 		}
@@ -1287,11 +1249,7 @@
 		if (badgeType === "unconfirmed") {
 			html += '<div class="popover-title" style="color: #e67e22; border-bottom-color: #e67e22;">'
 			      + '  <span><i class="fa fa-question-circle" style="margin-right: 5px;"></i>' + (isMaster ? '수주 미확정 종합 정보' : 'Sales Code 미확정 상세 정보') + '</span>'
-			      + '  <div style="display:flex; align-items:center;">'
-			      + '    <span class="popover-badge" style="background: #e67e22;">미확정</span>'
-			      + '    <span class="popover-pin-badge" style="' + (cr02PopoverPinned ? '' : 'display:none;') + 'font-size:10px; background:#f59e0b; color:#fff; border-radius:10px; padding:1px 6px; margin-left:4px; font-weight:normal;">📌 고정됨</span>'
-			      + '    <button type="button" class="popover-close-btn" title="닫기">&times;</button>'
-			      + '  </div>'
+			      + '  <span class="popover-badge" style="background: #e67e22;">미확정</span>'
 			      + '</div>';
 
 			if (ordrsNo) html += '<div class="popover-item"><b>수주번호:</b> ' + escapeHtml(ordrsNo) + (isMaster ? ' <span style="color:#2563eb;font-weight:bold;">(상위 수주)</span>' : '') + '</div>';
@@ -1356,11 +1314,7 @@
 		else if (badgeType === "unsettled") {
 			html += '<div class="popover-title" style="color: #9b59b6; border-bottom-color: #9b59b6;">'
 			      + '  <span><i class="fa fa-calculator" style="margin-right: 5px;"></i>' + (isMaster ? '수주 추후정산 종합 정보' : '추후정산 상세 정보') + '</span>'
-			      + '  <div style="display:flex; align-items:center;">'
-			      + '    <span class="popover-badge" style="background: #9b59b6;">미정산</span>'
-			      + '    <span class="popover-pin-badge" style="' + (cr02PopoverPinned ? '' : 'display:none;') + 'font-size:10px; background:#f59e0b; color:#fff; border-radius:10px; padding:1px 6px; margin-left:4px; font-weight:normal;">📌 고정됨</span>'
-			      + '    <button type="button" class="popover-close-btn" title="닫기">&times;</button>'
-			      + '  </div>'
+			      + '  <span class="popover-badge" style="background: #9b59b6;">미정산</span>'
 			      + '</div>';
 
 			if (ordrsNo) html += '<div class="popover-item"><b>수주번호:</b> ' + escapeHtml(ordrsNo) + (isMaster ? ' <span style="color:#2563eb;font-weight:bold;">(상위 수주)</span>' : '') + '</div>';
@@ -1399,11 +1353,7 @@
 		else if (badgeType === "settlement") {
 			html += '<div class="popover-title" style="color: #3498db; border-bottom-color: #3498db;">'
 			      + '  <span><i class="fa fa-exchange" style="margin-right: 5px;"></i>' + (isMaster ? '수주 정산상계 종합 정보' : '정산상계 상세 정보') + '</span>'
-			      + '  <div style="display:flex; align-items:center;">'
-			      + '    <span class="popover-badge" style="background: #3498db;">정산상계</span>'
-			      + '    <span class="popover-pin-badge" style="' + (cr02PopoverPinned ? '' : 'display:none;') + 'font-size:10px; background:#f59e0b; color:#fff; border-radius:10px; padding:1px 6px; margin-left:4px; font-weight:normal;">📌 고정됨</span>'
-			      + '    <button type="button" class="popover-close-btn" title="닫기">&times;</button>'
-			      + '  </div>'
+			      + '  <span class="popover-badge" style="background: #3498db;">정산상계</span>'
 			      + '</div>';
 
 			if (ordrsNo) html += '<div class="popover-item"><b>수주번호:</b> ' + escapeHtml(ordrsNo) + (isMaster ? ' <span style="color:#2563eb;font-weight:bold;">(상위 수주)</span>' : '') + '</div>';
@@ -1437,7 +1387,6 @@
 			      + '</div>';
 		}
 
-		html += '<div style="font-size: 10px; color: #64748b; margin-top: 4px; text-align: right;">💡 <span style="color:#2563eb; font-weight:600;">클릭 시 팝업이 고정</span>되어 편하게 스크롤할 수 있습니다.</div>';
 		$pop.html(html);
 		$pop.show();
 		positionBadgePopover(e, $badge, false);
@@ -1498,9 +1447,7 @@
 		});
 	}
 
-	function hideBadgePopover(force) {
-		if (!force && cr02PopoverPinned) return;
-		cr02PopoverPinned = false;
+	function hideBadgePopover() {
 		clearPopoverHideTimer();
 		$("#cr02BadgePopover").hide();
 	}

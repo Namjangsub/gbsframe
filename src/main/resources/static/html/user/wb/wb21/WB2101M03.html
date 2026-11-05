@@ -55,6 +55,113 @@
 <script src="/static/js/manualPopup.js"></script>
 <!-- 그리드 컬럼 설정 -->
 <script src="/static/js/common/GridColumnConfig.js"></script>
+<style>
+/* 문제 건수 뱃지 스타일 (CR0201M01/CR0201M02 표준) */
+.badge-issue {
+	display: inline-block;
+	padding: 1px 4px;
+	font-size: 10px;
+	font-weight: bold;
+	line-height: 1.3;
+	border-radius: 9px;
+	color: #fff;
+	margin-left: 3px;
+	vertical-align: middle;
+	cursor: pointer;
+}
+.badge-issue.badge-issue-has-unresolved {
+	background-color: #d9534f; /* 미완료 문제 있음 (빨강) */
+}
+.badge-issue.badge-issue-all-resolved {
+	background-color: #2563eb; /* 전체 완료 (파랑) */
+}
+
+/* 마우스 호버 시 표시되는 문제 목록 팝오버 툴팁 */
+.wb-issue-popover {
+	position: fixed;
+	z-index: 999999;
+	display: none;
+	background: #ffffff;
+	border: 1px solid #3b62b1;
+	border-radius: 6px;
+	box-shadow: 0 4px 18px rgba(0, 0, 0, 0.22);
+	padding: 10px 12px;
+	font-size: 11px;
+	color: #222;
+	min-width: 320px;
+	max-width: 480px;
+	box-sizing: border-box;
+	pointer-events: auto;
+	line-height: 1.5;
+}
+.wb-issue-popover * {
+	box-sizing: border-box;
+}
+.wb-issue-popover > *:last-child {
+	margin-bottom: 0 !important;
+}
+.wb-issue-popover::before {
+	content: "";
+	position: absolute;
+	top: -10px;
+	bottom: -10px;
+	left: -15px;
+	right: -15px;
+	background: transparent;
+	pointer-events: auto;
+	z-index: -1;
+}
+.wb-issue-popover .popover-title {
+	font-weight: bold;
+	font-size: 12px;
+	margin-bottom: 6px;
+	padding-bottom: 4px;
+	border-bottom: 2px solid #2563eb;
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+}
+.wb-issue-popover .popover-badge {
+	display: inline-block;
+	padding: 1px 6px;
+	border-radius: 10px;
+	font-size: 10px;
+	color: #fff;
+	font-weight: bold;
+}
+.wb-issue-popover .popover-item {
+	margin: 2px 0;
+	color: #444;
+}
+.wb-issue-popover .popover-item b {
+	color: #111;
+}
+.wb-issue-popover .popover-box {
+	margin-top: 6px;
+	padding: 6px 8px;
+	background: #f8fafc;
+	border-left: 3px solid #2563eb;
+	border-radius: 3px;
+	font-size: 11px;
+}
+.wb-issue-popover .popover-box.clickable {
+	cursor: pointer;
+	transition: background 0.15s;
+}
+.wb-issue-popover .popover-box.clickable:hover {
+	background: #eef2ff;
+}
+.wb-issue-popover .popover-issue-row {
+	margin-bottom: 5px;
+	padding-bottom: 4px;
+	border-bottom: 1px dashed #e2e8f0;
+}
+.wb-issue-popover .popover-issue-row:last-child {
+	margin-bottom: 0;
+	padding-bottom: 0;
+	border-bottom: none;
+}
+</style>
 </head>
 
 <body>
@@ -219,7 +326,7 @@ var defaultColumns = [
     {key: "fileTrgtKey",    label: "파일KEY",     align: "center", width: 80, hidden: true },
     {key: "clntNm",         label: "고객사명",     align: "center", width: 120 },
     {key: "clntPjtNm",      label: "고객사PJT",   align: "center", width: 80},
-    {key: "salesCd",        label: "SALES CD",  align: "center", width: 110},
+    {key: "salesCd",        label: "SALES CD",  align: "center", width: 140, formatter: "salesCdBadge"},
     {key: "sjNm",           label: "과제명",       align: "left",   width: 200},
     {key: "verNo",          label: "Ver.",      align: "center", width: 50},
     {key: "closeYn",        label: "확정",        align: "center", width: 50, formatter: "chkYn"},
@@ -319,6 +426,20 @@ var gridView = {
                 });
 
                 gridHeightResize(gridView, 194);
+
+                loadWbIssueCounts(list, function(updated) {
+                    if (updated) {
+                        targetObj.setData({
+                            list : list,
+                            page : {
+                                currentPage : _pageNo,
+                                pageSize : data.paginationInfo.pageSize,
+                                totalElements : data.paginationInfo.totalRecordCount,
+                                totalPages : data.paginationInfo.totalPageCount
+                            }
+                        });
+                    }
+                });
                 if(list.length > 0) {
                     var listLength = list.length;
                     for (var i = 0; i < listLength; i++) {
@@ -372,6 +493,409 @@ var excelView = {
     }
 }
 
+
+// =========================================================================
+// [문제 건수 뱃지 & 팝오버 / 팝업 기능]
+// =========================================================================
+function escapeHtml(str) {
+	if (str === null || str === undefined) return '';
+	return String(str)
+		.replace(/&/g, '&amp;')
+		.replace(/</g, '&lt;')
+		.replace(/>/g, '&gt;')
+		.replace(/"/g, '&quot;')
+		.replace(/'/g, '&#39;');
+}
+
+function getWbIssueBadgeHtml(item, dindex) {
+	if (!item) return '';
+	var totIss = parseInt(item.issueTotCnt, 10);
+	var uncompIss = parseInt(item.issueUncompCnt, 10);
+	if (isNaN(totIss) || totIss <= 0) return '';
+
+	var uncomp = isNaN(uncompIss) ? 0 : uncompIss;
+	var cls = uncomp > 0 ? "badge-issue-has-unresolved" : "badge-issue-all-resolved";
+	var ordrsNoAttr = escapeHtml(item.ordrsNo || '');
+	var salesCdAttr = escapeHtml(item.salesCd || '');
+	var dindexAttr = (typeof dindex === "number") ? dindex : '';
+
+	return '<span class="badge-issue ' + cls + '" data-badge-type="issue"'
+	     + ' data-ordrs-no="' + ordrsNoAttr + '"'
+	     + ' data-sales-cd="' + salesCdAttr + '"'
+	     + ' data-dindex="' + dindexAttr + '"'
+	     + ' title="문제/이슈 ' + uncomp + '/' + totIss + '">'
+	     + uncomp + '/' + totIss
+	     + '</span>';
+}
+
+ax5.ui.grid.formatter["salesCdBadge"] = function () {
+	var val = this.value || "";
+	var item = this.item;
+	if (!item) return val;
+	var badgeHtml = getWbIssueBadgeHtml(item, this.dindex);
+	return '<span style="display:inline-flex; align-items:center; justify-content:center; white-space:nowrap; width:100%;">'
+	     + '<span>' + val + '</span>'
+	     + badgeHtml
+	     + '</span>';
+};
+
+var wbIssueCache = {};
+var wbCurrentPopoverItem = null;
+var wbCurrentBadgeEl = null;
+var wbIssuePopoverHideTimer = null;
+
+function clearWbIssuePopoverTimer() {
+	if (wbIssuePopoverHideTimer) {
+		clearTimeout(wbIssuePopoverHideTimer);
+		wbIssuePopoverHideTimer = null;
+	}
+}
+
+function scheduleHideWbIssuePopover(delayMs) {
+	clearWbIssuePopoverTimer();
+	wbIssuePopoverHideTimer = setTimeout(function() {
+		wbIssuePopoverHideTimer = null;
+		hideWbIssuePopover();
+	}, delayMs || 200);
+}
+
+function hideWbIssuePopover() {
+	clearWbIssuePopoverTimer();
+	$("#wbIssuePopover").hide();
+}
+
+function initWbIssueBadgeEvents(gridSelector, getGridItemFunc) {
+	// 뱃지 마우스 진입 시 툴팁 표시 (타이머 취소)
+	$(document).on("mouseenter", gridSelector + " .badge-issue", function(e) {
+		clearWbIssuePopoverTimer();
+		var $badge = $(this);
+		var item = getGridItemFunc($badge);
+		showWbIssuePopover(e, item, $badge);
+	});
+
+	// 뱃지에서 마우스가 나갈 때 300ms 유예 부여 (툴팁 위로 안전하게 진입)
+	$(document).on("mouseleave", gridSelector + " .badge-issue", function(e) {
+		scheduleHideWbIssuePopover(300);
+	});
+
+	// 툴팁 내부로 마우스가 진입하면 닫힘 타이머 즉시 취소 (툴팁 유지 및 마우스 휠 스크롤 가능)
+	$(document).on("mouseenter", "#wbIssuePopover", function(e) {
+		clearWbIssuePopoverTimer();
+	});
+
+	// 툴팁 밖으로 마우스가 나가면 200ms 후 닫기
+	$(document).on("mouseleave", "#wbIssuePopover", function(e) {
+		scheduleHideWbIssuePopover(200);
+	});
+
+	// 툴팁/뱃지 외부 클릭 시 즉시 닫기
+	$(document).on("mousedown", function(e) {
+		if ($(e.target).closest("#wbIssuePopover, " + gridSelector + " .badge-issue").length === 0) {
+			hideWbIssuePopover();
+		}
+	});
+
+	$(document).on("click", gridSelector + " .badge-issue", function(e) {
+		e.stopPropagation();
+		var $badge = $(this);
+		var item = getGridItemFunc($badge);
+		hideWbIssuePopover();
+		if (item) {
+			openWbIssueModal(item);
+		}
+	});
+
+	$(document).on("click", "#wbIssuePopover .popover-box.clickable", function(e) {
+		e.stopPropagation();
+		var targetItem = wbCurrentPopoverItem;
+		hideWbIssuePopover();
+		if (targetItem) {
+			openWbIssueModal(targetItem);
+		}
+	});
+
+	// 마우스 휠 스크롤 처리: 툴팁 내부 휠은 내부 스크롤 유지, 외부 휠은 즉시 툴팁 닫기
+	$(document).on("wheel mousewheel DOMMouseScroll", function(e) {
+		var $pop = $("#wbIssuePopover");
+		if ($pop.length === 0 || !$pop.is(":visible")) return;
+		if ($(e.target).closest("#wbIssuePopover").length > 0) {
+			e.stopPropagation();
+			return;
+		}
+		hideWbIssuePopover();
+	});
+
+	$(window).on("scroll resize", function() {
+		hideWbIssuePopover();
+	});
+}
+
+function showWbIssuePopover(e, item, $badge) {
+	if (!item) return;
+	wbCurrentPopoverItem = item;
+	wbCurrentBadgeEl = $badge;
+
+	var $pop = $("#wbIssuePopover");
+	if ($pop.length === 0) {
+		$pop = $('<div id="wbIssuePopover" class="wb-issue-popover"></div>');
+		$("body").append($pop);
+	}
+
+	var salesCd = item.salesCd || "";
+	var ordrsNo = item.ordrsNo || "";
+	var searchVal = salesCd || ordrsNo;
+	var targetKey = (item.coCd || "") + "_" + searchVal;
+
+	if (wbIssueCache[targetKey]) {
+		var cachedIssues = wbIssueCache[targetKey];
+		var html = buildWbIssuePopoverHtml(item, cachedIssues, false);
+		$pop.html(html).show();
+		positionWbIssuePopover($badge);
+	} else {
+		var htmlLoading = buildWbIssuePopoverHtml(item, null, true);
+		$pop.html(htmlLoading).show();
+		positionWbIssuePopover($badge);
+
+		var fetchParam = {
+			"coCd"        : item.coCd || $("#coCd_S").val() || (typeof jwt !== 'undefined' && jwt ? jwt.coCd : '') || "GUN",
+			"salesCd"     : searchVal,
+			"reqDtFrom"   : "20200101",
+			"reqDtTo"     : "20991231",
+			"pageNo"      : 1,
+			"recordCnt"   : 99999999,
+			"issSts"      : ""
+		};
+		postAjax("/user/pm/pm01/selectAllIssueWorkList", fetchParam, null, function(data) {
+			var resList = data.result || [];
+			if (salesCd) {
+				var upper = salesCd.toUpperCase();
+				resList = resList.filter(function(x) {
+					return !x.salesCd || x.salesCd.toUpperCase().indexOf(upper) >= 0;
+				});
+			}
+			wbIssueCache[targetKey] = resList;
+			if ($pop.is(":visible") && wbCurrentPopoverItem === item) {
+				var newHtml = buildWbIssuePopoverHtml(item, resList, false);
+				$pop.html(newHtml);
+				positionWbIssuePopover($badge);
+			}
+		}, false);
+	}
+}
+
+function positionWbIssuePopover($badge) {
+	var $pop = $("#wbIssuePopover");
+	if ($pop.length === 0 || !$pop.is(":visible")) return;
+	if ($badge && $badge.length > 0 && $badge[0].getBoundingClientRect) {
+		var rect = $badge[0].getBoundingClientRect();
+		var popWidth = $pop.outerWidth() || 360;
+		var popHeight = $pop.outerHeight() || 200;
+		var winWidth = $(window).width();
+		var winHeight = $(window).height();
+
+		var left = rect.left + (rect.width / 2) - (popWidth / 2);
+		if (left + popWidth > winWidth - 10) left = winWidth - popWidth - 10;
+		if (left < 10) left = 10;
+
+		var top = rect.bottom + 8;
+		if (top + popHeight > winHeight - 10) {
+			top = rect.top - popHeight - 8;
+		}
+		$pop.css({ left: Math.round(left) + "px", top: Math.round(top) + "px" });
+	}
+}
+
+
+
+function getIssueTrafficLight(iss) {
+	var sts = String(iss.issSts || iss.reqSt || '').trim();
+	if (sts === "ISSSTS03" || sts === "REQST03" || iss.issStsNm === "조치완료" || iss.issStsNm === "완료") {
+		return { color: "#2563eb", bg: "#dbeafe", text: "#1e40af", label: "완료" };
+	}
+	if (sts === "ISSSTS02" || sts === "REQST02" || iss.issStsNm === "처리중") {
+		return { color: "#f59e0b", bg: "#fef3c7", text: "#92400e", label: "처리중" };
+	}
+	return { color: "#dc2626", bg: "#fee2e2", text: "#991b1b", label: "발생" };
+}
+
+function buildWbIssuePopoverHtml(item, issues, isLoading) {
+	var totIss = issues ? issues.length : (parseInt(item.issueTotCnt, 10) || 0);
+	var uncompIss = 0;
+	if (issues) {
+		uncompIss = issues.filter(function(x) {
+			return x.issSts !== 'ISSSTS03' && x.issSts !== 'REQST03';
+		}).length;
+	} else {
+		uncompIss = parseInt(item.issueUncompCnt, 10) || 0;
+	}
+	var hasUnresolved = uncompIss > 0;
+	var themeColor = hasUnresolved ? "#d9534f" : "#2563eb";
+	var badgeText = hasUnresolved ? ("미완료 " + uncompIss + "건") : "전체 완료";
+
+	var html = '';
+	html += '<div class="popover-title" style="border-bottom-color: ' + themeColor + '; color: ' + themeColor + ';">'
+	      + '  <span><i class="fas fa-exclamation-triangle" style="margin-right: 5px;"></i>문제/이슈 현황</span>'
+	      + '  <span class="popover-badge" style="background: ' + themeColor + ';">' + badgeText + '</span>'
+	      + '</div>';
+
+	if (item.salesCd) {
+		html += '<div class="popover-item"><b>Sales Code:</b> ' + escapeHtml(item.salesCd) + '</div>';
+	}
+	if (item.clntNm || item.clntPjtNm) {
+		html += '<div class="popover-item"><b>고객사/PJT:</b> ' + escapeHtml(item.clntNm || '') + (item.clntPjtNm ? ' [' + escapeHtml(item.clntPjtNm) + ']' : '') + '</div>';
+	}
+	if (item.sjNm || item.eqpNm) {
+		html += '<div class="popover-item"><b>과제명:</b> ' + escapeHtml(item.sjNm || item.eqpNm || '') + '</div>';
+	}
+
+	if (isLoading) {
+		html += '<div class="popover-box" style="text-align: center; color: #666;">'
+		      + '  <i class="fa fa-spinner fa-spin" style="margin-right: 5px;"></i>문제 상세내역 조회 중...'
+		      + '</div>';
+	} else if (issues && issues.length > 0) {
+		html += '<div style="margin-top: 8px; font-weight: bold; font-size: 11.5px; color: #1e293b;">'
+		      + '  <i class="fas fa-list-alt" style="margin-right:4px; color:' + themeColor + ';"></i>등록된 문제 내역 (전체 ' + issues.length + '건)'
+		      + '</div>';
+		html += '<div class="popover-box" style="border-left-color: ' + themeColor + '; max-height: 220px; overflow-y: auto;">';
+
+		var sortedIssues = issues.slice().sort(function(a, b) {
+			var aUncomp = (a.issSts !== 'ISSSTS03' && a.issSts !== 'REQST03') ? 0 : 1;
+			var bUncomp = (b.issSts !== 'ISSSTS03' && b.issSts !== 'REQST03') ? 0 : 1;
+			return aUncomp - bUncomp;
+		});
+
+		for (var i = 0; i < sortedIssues.length; i++) {
+			var iss = sortedIssues[i];
+			var traffic = getIssueTrafficLight(iss);
+			var occDate = iss.workRptDt || iss.creatDttm || '-';
+			var actor = (iss.actIdNm || iss.workRptIdNm || '-') + (iss.actDeptNm ? ' (' + iss.actDeptNm + ')' : '');
+			var title = iss.issueTitle || iss.issSj || iss.workRptRmk || '내용 없음';
+
+			html += '<div class="popover-issue-row">'
+			      + '  <div style="display:flex; justify-content:space-between; align-items:center;">'
+			      + '    <span style="display:inline-block; padding:1px 5px; font-size:9.5px; font-weight:bold; border-radius:3px; background:' + traffic.bg + '; color:' + traffic.text + '; border:1px solid ' + traffic.color + ';">' + traffic.label + '</span>'
+			      + '    <span style="font-size:10px; color:#888;">' + escapeHtml(occDate) + ' | ' + escapeHtml(actor) + '</span>'
+			      + '  </div>'
+			      + '  <div style="margin-top:3px; font-weight:600; color:#1e293b; word-break:break-all;">' + escapeHtml(title) + '</div>'
+			      + (iss.wbsRsltseDt ? '<div style="font-size:10px; color:#2563eb; margin-top:1px;">완료일: ' + escapeHtml(iss.wbsRsltseDt) + '</div>' : '')
+			      + '</div>';
+		}
+		html += '</div>';
+	} else {
+		html += '<div class="popover-box" style="text-align: center; color: #888;">등록된 문제가 없습니다.</div>';
+	}
+
+	html += '<div class="popover-box clickable" style="border-left-color: ' + themeColor + '; margin-top: 6px; text-align: center; color: ' + themeColor + '; font-weight: bold;">'
+	      + '  <i class="fa fa-mouse-pointer" style="margin-right: 4px;"></i>뱃지 또는 여기를 클릭하면 문제/이슈 팝업이 열립니다.'
+	      + '</div>';
+
+	return html;
+}
+
+function openWbIssueModal(row) {
+	if (!row) return;
+	var searchVal = row.salesCd || row.ordrsNo || "";
+	var clntNm = row.clntNm || row.ordrsClntNm || "";
+	var modalTitle = searchVal ? ("Sales Code 검색 (" + searchVal + ")") : "문제/이슈 현황";
+	var paramObj = {
+		"coCd"        : $("#coCd_S").val() || row.coCd || (typeof jwt !== 'undefined' && jwt ? jwt.coCd : '') || "GUN",
+		"searchValue" : searchVal,
+		"salesCd"     : row.salesCd || "",
+		"ordrsNo"     : row.ordrsNo || "",
+		"clntNm"      : clntNm
+	};
+	openModal("/static/html/cmn/modal/ordrsIssueList.html", 1700, $('body').height() - 40, modalTitle, paramObj, function(grid) {
+	});
+}
+
+function loadWbIssueCounts(list, onComplete) {
+	if (!list || list.length === 0) return;
+	var salesCdSet = new Set();
+	for (var k = 0; k < list.length; k++) {
+		var sc = String(list[k].salesCd || '').trim();
+		if (sc && sc.indexOf('상세없음') === -1) {
+			salesCdSet.add(sc.toUpperCase());
+		}
+	}
+	var salesCdArr = Array.from(salesCdSet);
+	if (salesCdArr.length === 0) return;
+
+	var reqCoCd = (list[0] && list[0].coCd) || $("#coCd_S").val() || (typeof jwt !== 'undefined' && jwt ? jwt.coCd : '') || "GUN";
+
+	// 1차: WBS 이슈 집계 (WB24)
+	postAjax("/user/wb/wb24/selectWbsIssueCountBySalesCds", { coCd: reqCoCd, salesCds: salesCdArr }, null, function(cntData) {
+		var cntRows = (cntData && cntData.result) ? cntData.result : [];
+		var issMap = {};
+
+		for (var c = 0; c < cntRows.length; c++) {
+			var cSc = String(cntRows[c].salesCd || cntRows[c].SALES_CD || '').trim().toUpperCase();
+			var cTot = gPasIntChk(cntRows[c].cnt !== undefined ? cntRows[c].cnt : cntRows[c].CNT);
+			if (cSc && cTot > 0) {
+				issMap[cSc] = { totCnt: cTot, uncompCnt: 0 };
+			}
+		}
+
+		function applyAndRender() {
+			var updated = false;
+			for (var n = 0; n < list.length; n++) {
+				var curSc = String(list[n].salesCd || '').trim().toUpperCase();
+				var matched = issMap[curSc];
+				if (matched && matched.totCnt > 0) {
+					list[n].issueTotCnt = matched.totCnt;
+					list[n].issueUncompCnt = matched.uncompCnt;
+					updated = true;
+				}
+			}
+			if (typeof onComplete === "function") {
+				onComplete(updated);
+			}
+		}
+
+		// 1차 집계에 건수가 있는 경우 대시보드 미완료 조회
+		if (Object.keys(issMap).length > 0) {
+			postAjax("/user/wb/wb24/selectWbsIssueListDashboard", { coCd: reqCoCd }, null, function(dashData) {
+				var dashRows = (dashData && dashData.result) ? dashData.result : [];
+				for (var d = 0; d < dashRows.length; d++) {
+					var dRow = dashRows[d];
+					var dSc = String(dRow.salesCd || '').trim().toUpperCase();
+					if (dSc && issMap[dSc]) {
+						issMap[dSc].uncompCnt += 1;
+					}
+				}
+				applyAndRender();
+			}, false);
+		} else {
+			// 2차 Fallback: TB_WB24M02에 건수가 없는 경우, 전체 문제/작업일보 통합 API(selectAllIssueWorkList)로 조회
+			var pmParam = {
+				"coCd"      : reqCoCd,
+				"reqDtFrom" : "20200101",
+				"reqDtTo"   : "20991231",
+				"pageNo"    : 1,
+				"recordCnt" : 99999999,
+				"issSts"    : ""
+			};
+			postAjax("/user/pm/pm01/selectAllIssueWorkList", pmParam, null, function(pmData) {
+				var pmList = (pmData && pmData.result) ? pmData.result : [];
+				for (var p = 0; p < pmList.length; p++) {
+					var pRow = pmList[p];
+					var pSc = String(pRow.salesCd || '').trim().toUpperCase();
+					if (pSc && salesCdSet.has(pSc)) {
+						if (!issMap[pSc]) {
+							issMap[pSc] = { totCnt: 0, uncompCnt: 0 };
+						}
+						issMap[pSc].totCnt += 1;
+						var isResolved = (pRow.issSts === 'ISSSTS03' || pRow.issSts === 'REQST03' || pRow.issStsNm === '조치완료' || pRow.issStsNm === '완료');
+						if (!isResolved) {
+							issMap[pSc].uncompCnt += 1;
+						}
+					}
+				}
+				applyAndRender();
+			}, false);
+		}
+	}, false);
+}
+
 $(document).ready(function() {
     mainDefaultLoad("실행계획", "과제관리 (스마트 WBS)");
     setCommonSelect($("#main_area select[data-kind]"));
@@ -402,6 +926,25 @@ $(document).ready(function() {
 
 	gridView.initView().setData(0);
 	excelView.initView();
+
+	initWbIssueBadgeEvents('[data-ax5grid="first-grid"]', function($badge) {
+		var dindex = $badge.attr("data-dindex");
+		if (dindex !== undefined && dindex !== null && dindex !== "") {
+			var list = gridView.target.getList();
+			if (list && list[dindex]) return list[dindex];
+		}
+		var $tr = $badge.closest("tr[data-ax5grid-tr-data-index]");
+		if ($tr.length > 0) {
+			var trIdx = $tr.attr("data-ax5grid-tr-data-index");
+			var list2 = gridView.target.getList();
+			if (list2 && list2[trIdx]) return list2[trIdx];
+		}
+		return {
+			salesCd: $badge.attr("data-sales-cd") || "",
+			ordrsNo: $badge.attr("data-ordrs-no") || "",
+			coCd: $("#coCd_S").val() || jwt.coCd || ""
+		};
+	});
 });
 
 // =========================================================================
