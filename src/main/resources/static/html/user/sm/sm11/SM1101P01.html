@@ -441,6 +441,9 @@
 	                    customAlert('수금금액의 합계는 주문 금액을 초과할 수 없습니다.');
 	                }
 	            }
+	            if (this.key === "clmnAmt" || this.key === "clmnRate" || this.key === "clmnMgmtStatus") {
+	                applyForeignPaymentNotes([this.item]);
+	            }
 	            gridClmnPlan.repaint();
 	            
 	        }
@@ -667,6 +670,10 @@
 		fileTrgtKey = modalStack.last().paramObj.fileTrgtKey;
 		exrateCal(); //최초 로딩시 환율 적용
 	    $('#currCd').on('change', exrateCal);
+		$('#exrate').on('input change keyup', function() {
+			applyForeignPaymentNotes(gridClmnPlan.list);
+			gridClmnPlan.repaint();
+		});
 	    turnKeyGridView.initView();
 	    
 		let refFileTrgtKey = modalStack.last().paramObj.refFileTrgtKey;
@@ -726,6 +733,7 @@
 			        if (selectedRowKey !== undefined) {
 			            let row = gridClmnPlan.getList("selected")[0];
 			            let newRowData = $.extend({}, row, {__index: undefined, clmnRate: 0, clmnAmt: 0});
+			            applyForeignPaymentNotes([newRowData]);
 			            gridClmnPlan.addRow(newRowData, row.__index + 1);
 			        }
 			        // 두 번째 경우: 그리드가 비어 있는 경우
@@ -867,11 +875,34 @@
         return true;
 	}
 	
+	function applyForeignPaymentNotes(rows) {
+		const currencyCode = $('#currCd').val();
+		const currencyName = $('#currCd option:selected').text().trim();
+		const exchangeRate = gPasFloatChk($('#exrate').val());
+		const foreignCurrency = currencyCode && currencyCode !== 'CURR01' && currencyName && exchangeRate > 0;
+		const generatedNote = /^[^\r\n]+ (?:\d[\d,]*(?:\.\d+)? \(환율 \d[\d,]*(?:\.\d+)?\)|\(환율 \d+(?:\.\d+)?\) : \d[\d,]*(?:\.\d+)?)(?: \/ |\r?\n|$)/;
+		const formatAmount = amount => amount.toLocaleString('ko-KR', { maximumFractionDigits: 2 });
+		rows.forEach(function(row) {
+			const note = String(row.clmnMgmtStatus || '');
+			const memo = note.replace(generatedNote, '');
+			const plannedAmount = gPasFloatChk(row.clmnAmt);
+			if (foreignCurrency && plannedAmount > 0) {
+				const rateText = exchangeRate.toLocaleString('ko-KR', { useGrouping: false, maximumFractionDigits: 10 });
+				const currencyNote = currencyName + ' (환율 ' + rateText + ') : ' + formatAmount(plannedAmount);
+				row.clmnMgmtStatus = memo.trim() ? currencyNote + ' / ' + memo : currencyNote;
+			} else {
+				row.clmnMgmtStatus = memo;
+			}
+		});
+	}
+
 	//통화단위 변경
 	function exrateCal() {
 		var currCd = $('#currCd').val();
 		var exrateVal = $('#currCd option[value="' + currCd + '"]').data('etc');
 		$('#exrate').val(exrateVal ? exrateVal : '');
+		applyForeignPaymentNotes(gridClmnPlan.list);
+		gridClmnPlan.repaint();
 	}		
 	
 	function selectContractInfo(_fileTrgtKey, _ctrtNo) {						//그리드에 뿌리는 데이터
@@ -932,6 +963,7 @@
 			        }
 				}
 	            var clmnPlans = data.result.plans;
+	            applyForeignPaymentNotes(clmnPlans);
 	            gridClmnPlan.setData({
 	                list: clmnPlans,
 	                page: {
@@ -1087,6 +1119,7 @@
     	
     
 		if (clmnPlanList.length > 0 ) {
+			applyForeignPaymentNotes(clmnPlanList);
 			formData.append("clmnPlanArr",   JSON.stringify(clmnPlanList));
 		}
 
@@ -1567,6 +1600,7 @@
 			}
 		});
 
+		applyForeignPaymentNotes(rows);
 		gridClmnPlan.setData({ list: rows, page: { totalElements: rows.length }});
 	}
 
@@ -1646,6 +1680,7 @@
             }
             
             var currEndRow = currGridEndRow();
+            if (_type === "PLAN") applyForeignPaymentNotes(currGridData);
             thisGrid.setData(currGridData);
             resetGridFocus(currEndRow, thisGridRow);
         })
