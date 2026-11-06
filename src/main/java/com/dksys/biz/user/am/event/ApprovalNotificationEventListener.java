@@ -80,6 +80,7 @@ public class ApprovalNotificationEventListener {
                     sendApplicantOpinionNotification(event, "결재 처리", false);
                     break;
                 case "TRIP_APPROVAL_REQUEST":
+                case "COOP_REQUEST":
                     sendRequestNotification(event);
                     break;
                 case "ARBIT":
@@ -116,12 +117,13 @@ public class ApprovalNotificationEventListener {
     /** 결재 요청(상신/다음 결재자). 직접 발송 대상 업무(PM07/PM08/PM51/CR02)는 업무별 번호·결재구분 규칙을 쓰고, 그 외는 ERP 원자료 값을 쓴다. */
     private void sendRequestNotification(ApprovalEvent event) {
         String docTitle = notificationDocTitle(event);
+        String requestType = "COOP_REQUEST".equals(event.getEventType()) ? "협조" : "결재";
         Map<String, String> vars = messageBuilder.vars(
-                docTitle + " 건으로 결재",
-                docTitle + " 건으로 결재 요청",
+                docTitle + " 건으로 " + requestType,
+                docTitle + " 건으로 " + requestType + " 요청",
                 todoCodeNameOf(event),
                 notificationSenderName(event),
-                "결재 처리");
+                requestType + " 처리");
         String erpBizType = extra(event, "erpBizType");
         String todoNo = approvalTodoNo(event);
         String todoDiv2CodeId = approvalTodoDiv2CodeId(event);

@@ -314,8 +314,8 @@ public class AM11SvcImpl implements AM11Svc {
 
         // 1차 결재자 알림은 ApprovalNotificationEventListener(SUBMIT, 템플릿 10009)가 발송하므로 평문 중복 적재 제외
 
-        // 협조(COOP) 대상자 알림 큐 적재: 협조는 비구속 병렬이라 상신 즉시 PENDING으로 개방되므로
-        // 1차 결재자와 별도로 협조 요청 알림톡을 함께 발송한다. (completedBySource면 개방 대상 없음)
+        // 상신 즉시 열린 협조(COOP) 대상자에게 1차 결재자와 별도로 알림을 보낸다.
+        // 휴가신청은 승인된 10009 템플릿을 사용하는 이벤트로 전달한다.
         if (!completedBySource) {
             try {
                 Map<String, Object> coopQuery = new HashMap<>(paramMap);
@@ -329,6 +329,15 @@ public class AM11SvcImpl implements AM11Svc {
                             continue;
                         }
                         if ("COOP".equals(lineTypeOf(savedLine)) && "PENDING".equals(savedLine.get("lineStatus"))) {
+                            if ("PM07".equals(paramMap.get("erpBizType"))) {
+                                eventPublisher.publishEvent(new ApprovalEvent(
+                                    "COOP_REQUEST", docId, (String) paramMap.get("docNo"), (String) paramMap.get("docTitle"),
+                                    (String) paramMap.get("draUserId"), (String) paramMap.get("draUserNm"),
+                                    (String) savedLine.get("approverId"), (String) savedLine.get("approverNm"),
+                                    paramMap
+                                ));
+                                continue;
+                            }
                             Map<String, Object> coopNotif = new HashMap<>();
                             coopNotif.put("docId", docId);
                             coopNotif.put("eventType", "SUBMIT");
@@ -342,7 +351,7 @@ public class AM11SvcImpl implements AM11Svc {
                     }
                 }
             } catch (Exception ne) {
-                logger.warn("상신 협조 알림 큐 적재 경고: docId={}", docId, ne);
+                logger.warn("상신 협조 알림 등록 경고: docId={}", docId, ne);
             }
         }
 

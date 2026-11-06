@@ -492,8 +492,9 @@ public class PM07SvcImpl implements PM07Svc {
 					approval.put("salesCd", reqNo);
 					approval.put("etcField1", reqNo);
 					approval.put("todoTitl", buildVacationTodoTitl(paramMap));
-					if (!approval.containsKey("coCd") || approval.get("coCd") == null || approval.get("coCd").isEmpty()) approval.put("coCd", paramMap.get("coCd"));
-					if (!approval.containsKey("todoCoCd") || approval.get("todoCoCd") == null || approval.get("todoCoCd").isEmpty()) approval.put("todoCoCd", paramMap.get("coCd"));
+					// 휴가 본문과 WB20 결재선에 서버가 확정한 인사 회사코드를 동일하게 적용한다.
+					approval.put("coCd", actualCoCd);
+					approval.put("todoCoCd", actualCoCd);
 					boolean isShare = "공유".equals(approval.get("gb"));
 					if (approval.get("todoDiv2CodeId") == null || approval.get("todoDiv2CodeId").isEmpty()) {
 						approval.put("todoDiv2CodeId", isShare ? "TODODIV1300" : "TODODIV2300");
@@ -510,15 +511,18 @@ public class PM07SvcImpl implements PM07Svc {
 						try {
 							Map<String, String> pgParamMap = gsonDtl.fromJson(existingPgParam, pgParamType);
 							pgParamMap.put("reqNo", reqNo);
+							pgParamMap.put("coCd", actualCoCd);
 							approval.put("pgParam", gsonDtl.toJson(pgParamMap));
 						} catch (Exception e) {
 							Map<String, String> pgParamMap = new HashMap<>();
 							pgParamMap.put("reqNo", reqNo);
+							pgParamMap.put("coCd", actualCoCd);
 							approval.put("pgParam", gsonDtl.toJson(pgParamMap));
 						}
 					} else {
 						Map<String, String> pgParamMap = new HashMap<>();
 						pgParamMap.put("reqNo", reqNo);
+						pgParamMap.put("coCd", actualCoCd);
 						approval.put("pgParam", gsonDtl.toJson(pgParamMap));
 					}
 				}
@@ -740,8 +744,9 @@ public class PM07SvcImpl implements PM07Svc {
 					approval.put("salesCd", paramMap.get("reqNo"));
 					approval.put("etcField1", paramMap.get("reqNo"));
 					approval.put("todoTitl", buildVacationTodoTitl(paramMap));
-					if (!approval.containsKey("coCd") || approval.get("coCd") == null || approval.get("coCd").isEmpty()) approval.put("coCd", paramMap.get("coCd"));
-					if (!approval.containsKey("todoCoCd") || approval.get("todoCoCd") == null || approval.get("todoCoCd").isEmpty()) approval.put("todoCoCd", paramMap.get("coCd"));
+					// 휴가 본문과 WB20 결재선에 서버가 확정한 인사 회사코드를 동일하게 적용한다.
+					approval.put("coCd", actualCoCd);
+					approval.put("todoCoCd", actualCoCd);
 					boolean isShare = "공유".equals(approval.get("gb"));
 					if (approval.get("todoDiv2CodeId") == null || approval.get("todoDiv2CodeId").isEmpty()) {
 						approval.put("todoDiv2CodeId", isShare ? "TODODIV1300" : "TODODIV2300");
@@ -758,15 +763,18 @@ public class PM07SvcImpl implements PM07Svc {
 						try {
 							Map<String, String> pgParamMap = gsonDtl.fromJson(existingPgParam, pgParamType);
 							pgParamMap.put("reqNo", paramMap.get("reqNo"));
+							pgParamMap.put("coCd", actualCoCd);
 							approval.put("pgParam", gsonDtl.toJson(pgParamMap));
 						} catch (Exception e) {
 							Map<String, String> pgParamMap = new HashMap<>();
 							pgParamMap.put("reqNo", paramMap.get("reqNo"));
+							pgParamMap.put("coCd", actualCoCd);
 							approval.put("pgParam", gsonDtl.toJson(pgParamMap));
 						}
 					} else {
 						Map<String, String> pgParamMap = new HashMap<>();
 						pgParamMap.put("reqNo", paramMap.get("reqNo"));
+						pgParamMap.put("coCd", actualCoCd);
 						approval.put("pgParam", gsonDtl.toJson(pgParamMap));
 					}
 				}
