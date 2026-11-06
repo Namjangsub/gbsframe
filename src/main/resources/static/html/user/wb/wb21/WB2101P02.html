@@ -690,6 +690,28 @@
 	var currentTimelineStart = null;
 	var currentTimelineEnd = null;
 
+	// 공정별 담당 부서 매핑 마스터 (canEditPlanRow 등 공정 권한 검사에 사용)
+	var deptByPlanCode = {
+		"WBSCODE01" : "GUN30",
+		"WBSCODE02" : "GUN30",
+		"WBSCODE03" : "GUN40",
+		"WBSCODE04" : "TRN50",
+		"WBSCODE05" : "GUN60",
+		"WBSCODE06" : "TRN50",
+		"WBSCODE07" : "GUN60",
+		"WBSCODE08" : "GUN60",
+		"WBSCODE09" : "GUN30",
+		"WBSCODE10" : "GUN30",
+		"WBSCODE11" : "GUN30",
+		"WBSCODE12" : "GUN30",
+		"WBSCODE13" : "GUN30",
+		"WBSCODE14" : "GUN30",
+		"WBSCODE15" : "GUN30",
+		"WBSCODE16" : "GUN30",
+		"WBSCODE17" : "TRN50",
+		"WBSCODE18" : "GUN30"
+	};
+
 	// 전체 간트 일정이 스크롤 없이 한 화면에 다 보이도록 배율(Zoom) 자동 조절
 	function autoFitGanttZoom() {
 		var $wrap = $('#ganttTimelineWrap');
@@ -1007,6 +1029,84 @@
 		taskList: []
 	};
 
+	// WBS 원본 목록 및 상태 플래그 사전 선언
+	var rawWbsList = [];
+	var isProjectDirty = false;
+	var isScheduleDirty = false;
+	var SPECRTS01 = "";
+	var prdMngIds = [];
+	var SPECRTS07 = "";
+	var manualCall = "";
+	var manualFileArr = [];
+	var manualFileDeleteArr = [];
+	var pjtNewFiles = [];
+	var pjtExistingFiles = [];
+	var pjtDeleteFileKeys = [];
+
+	// =========================================================================
+	// [동적 담당자 컬러 테이블 & 순차 자동 배정 엔진]
+	// 특정인에 고정하지 않고, 등장하는 담당자마다 겹치지 않는 고유 테마 컬러를 순차적으로 1:1 대입
+	// $(document).ready 및 렌더링 호출보다 앞서 100% 안전하게 사전 초기화
+	// =========================================================================
+	var MANAGER_COLOR_PALETTE = [
+		{ border: '#0284c7', bg: '#f0f9ff', badgeBg: '#e0f2fe', text: '#0369a1', barBg: '#0284c7' }, // 1. 스카이블루
+		{ border: '#7c3aed', bg: '#f5f3ff', badgeBg: '#ede9fe', text: '#6d28d9', barBg: '#7c3aed' }, // 2. 로열 퍼플
+		{ border: '#d97706', bg: '#fffbeb', badgeBg: '#fef3c7', text: '#b45309', barBg: '#d97706' }, // 3. 앰버 오렌지
+		{ border: '#4f46e5', bg: '#eef2ff', badgeBg: '#e0e7ff', text: '#3730a3', barBg: '#4f46e5' }, // 4. 인디고 블루
+		{ border: '#475569', bg: '#f8fafc', badgeBg: '#f1f5f9', text: '#1e293b', barBg: '#475569' }, // 5. 차콜 슬레이트
+		{ border: '#0891b2', bg: '#ecfeff', badgeBg: '#cffafe', text: '#0e7490', barBg: '#0891b2' }, // 6. 시안 블루
+		{ border: '#ea580c', bg: '#fff7ed', badgeBg: '#ffedd5', text: '#c2410c', barBg: '#ea580c' }, // 7. 코랄 오렌지
+		{ border: '#9333ea', bg: '#faf5ff', badgeBg: '#f3e8ff', text: '#7e22ce', barBg: '#9333ea' }, // 8. 바이올렛
+		{ border: '#854d0e', bg: '#fefce8', badgeBg: '#fef9c3', text: '#713f12', barBg: '#854d0e' }, // 9. 웜 브라운
+		{ border: '#0f766e', bg: '#f0fdfa', badgeBg: '#ccfbf1', text: '#134e4a', barBg: '#0f766e' }, // 10. 다크 틸
+		{ border: '#334155', bg: '#f8fafc', badgeBg: '#e2e8f0', text: '#0f172a', barBg: '#334155' }, // 11. 스모키 그레이
+		{ border: '#b45309', bg: '#fffbeb', badgeBg: '#fef3c7', text: '#78350f', barBg: '#b45309' }  // 12. 딥 앰버
+	];
+
+	// 세션 내 담당자별 1:1 순차 할당 맵 및 카운터
+	var allocatedManagerColorMap = {};
+	var nextPaletteIndex = 0;
+
+	function resetManagerColorAllocation() {
+		allocatedManagerColorMap = {};
+		nextPaletteIndex = 0;
+	}
+
+	function getManagerColor(mngId, mngNm) {
+		var idKey = (mngId || "").trim();
+		var nmKey = (mngNm || "").trim();
+		var primaryKey = idKey || nmKey;
+
+		// 담당자 미지정인 경우 차분한 기본 그레이 반환
+		if (!primaryKey) {
+			return { border: '#94a3b8', bg: '#f8fafc', badgeBg: '#f1f5f9', text: '#475569', barBg: '#94a3b8' };
+		}
+
+		if (!allocatedManagerColorMap) {
+			allocatedManagerColorMap = {};
+		}
+
+		// 1) 이미 할당된 담당자인 경우 기존 할당된 동일 색상 반환 (일관성 100% 보장)
+		if (idKey && allocatedManagerColorMap[idKey]) return allocatedManagerColorMap[idKey];
+		if (nmKey && allocatedManagerColorMap[nmKey]) return allocatedManagerColorMap[nmKey];
+		if (allocatedManagerColorMap[primaryKey]) return allocatedManagerColorMap[primaryKey];
+
+		// 2) 신규 담당자 등장 시 색상 테이블에서 순차적으로 다음 색상 대입 (길이 0 및 undefined 방어)
+		var palette = (typeof MANAGER_COLOR_PALETTE !== 'undefined' && MANAGER_COLOR_PALETTE && MANAGER_COLOR_PALETTE.length)
+			? MANAGER_COLOR_PALETTE
+			: [{ border: '#0284c7', bg: '#f0f9ff', badgeBg: '#e0f2fe', text: '#0369a1', barBg: '#0284c7' }];
+		var pIdx = (typeof nextPaletteIndex === 'number') ? nextPaletteIndex : 0;
+		var assignedColor = palette[pIdx % palette.length];
+		nextPaletteIndex = pIdx + 1;
+
+		// ID 및 성명 모두에 동일 색상 캐싱
+		if (idKey) allocatedManagerColorMap[idKey] = assignedColor;
+		if (nmKey) allocatedManagerColorMap[nmKey] = assignedColor;
+		allocatedManagerColorMap[primaryKey] = assignedColor;
+
+		return assignedColor;
+	}
+
 	$(document).ready(function() {
 		// 0) 특수 권한자 (생산관리자, 일정관리자) 목록 사전 로딩
 		loadSpecialRights();
@@ -1034,6 +1134,30 @@
 		if (paramObj.ordrsNo || (paramObj.row && paramObj.row.ordrsNo)) {
 			$('#ordrsNo').val(paramObj.ordrsNo || paramObj.row.ordrsNo);
 		}
+
+		// 전달받은 row 또는 paramObj의 기본 필드 사전 바인딩 (화면 즉시 렌딩)
+		var r = paramObj.row || {};
+		if (r.salesCd || paramObj.salesCd) $('#salesCd').val(r.salesCd || paramObj.salesCd);
+		if (r.sjNm || paramObj.sjNm) $('#sjNm').val(r.sjNm || paramObj.sjNm);
+		if (r.sjNo || paramObj.sjNo) $('#sjNo').val(r.sjNo || paramObj.sjNo);
+		if (r.verNo || paramObj.verNo) {
+			var v = r.verNo || paramObj.verNo;
+			$('#verNo').val(v);
+			$('#badgeVerNo').text("Ver. " + v);
+		}
+		if (r.clntCd || paramObj.clntCd) $('#clntCd').val(r.clntCd || paramObj.clntCd);
+		if (r.clntPjt || paramObj.clntPjt) $('#clntPjt').val(r.clntPjt || paramObj.clntPjt);
+		var cNm = r.clntNm || paramObj.clntNm || "";
+		var cPjtNm = r.clntPjtNm || paramObj.clntPjtNm || "";
+		if (cNm || cPjtNm) {
+			$('#clntInfo').val((cNm || "-") + " / " + (cPjtNm || "-"));
+		}
+		if (r.beginDt) $('#beginDt').datepicker("setDate", r.beginDt);
+		if (r.deDt) $('#deDt').datepicker("setDate", r.deDt);
+		if (r.acptncDt) $('#acptncDt').datepicker("setDate", r.acptncDt);
+		if (r.mkerDiv) $('#mkerDiv').val(r.mkerDiv);
+		if (r.mkerCd) $('#mkerCd').val(r.mkerCd);
+		if (r.mkerNm) $('#mkerNm').val(r.mkerNm);
 
 		if (actionType === "C") {
 			// [신규 등록 모드] "입력값 기준 일정 수립" 기본 선택 및 착수~출고 자동 비율로 즉시 수립
@@ -2391,61 +2515,7 @@
 	}
 
 	// 좌측 WBS 트리 렌더링
-		// =========================================================================
-	// [동적 담당자 컬러 테이블 & 순차 자동 배정 엔진]
-	// 특정인에 고정하지 않고, 등장하는 담당자마다 겹치지 않는 고유 테마 컬러를 순차적으로 1:1 대입
-	// 동일 담당자는 화면 전체에서 항상 100% 동일한 색상 보장
-	// =========================================================================
-	var MANAGER_COLOR_PALETTE = [
-		{ border: '#0284c7', bg: '#f0f9ff', badgeBg: '#e0f2fe', text: '#0369a1', barBg: '#0284c7' }, // 1. 스카이블루
-		{ border: '#7c3aed', bg: '#f5f3ff', badgeBg: '#ede9fe', text: '#6d28d9', barBg: '#7c3aed' }, // 2. 로열 퍼플
-		{ border: '#d97706', bg: '#fffbeb', badgeBg: '#fef3c7', text: '#b45309', barBg: '#d97706' }, // 3. 앰버 오렌지
-		{ border: '#4f46e5', bg: '#eef2ff', badgeBg: '#e0e7ff', text: '#3730a3', barBg: '#4f46e5' }, // 4. 인디고 블루
-		{ border: '#475569', bg: '#f8fafc', badgeBg: '#f1f5f9', text: '#1e293b', barBg: '#475569' }, // 5. 차콜 슬레이트
-		{ border: '#0891b2', bg: '#ecfeff', badgeBg: '#cffafe', text: '#0e7490', barBg: '#0891b2' }, // 6. 시안 블루
-		{ border: '#ea580c', bg: '#fff7ed', badgeBg: '#ffedd5', text: '#c2410c', barBg: '#ea580c' }, // 7. 코랄 오렌지
-		{ border: '#9333ea', bg: '#faf5ff', badgeBg: '#f3e8ff', text: '#7e22ce', barBg: '#9333ea' }, // 8. 바이올렛
-		{ border: '#854d0e', bg: '#fefce8', badgeBg: '#fef9c3', text: '#713f12', barBg: '#854d0e' }, // 9. 웜 브라운
-		{ border: '#0f766e', bg: '#f0fdfa', badgeBg: '#ccfbf1', text: '#134e4a', barBg: '#0f766e' }, // 10. 다크 틸
-		{ border: '#334155', bg: '#f8fafc', badgeBg: '#e2e8f0', text: '#0f172a', barBg: '#334155' }, // 11. 스모키 그레이
-		{ border: '#b45309', bg: '#fffbeb', badgeBg: '#fef3c7', text: '#78350f', barBg: '#b45309' }  // 12. 딥 앰버
-	];
-
-	// 세션 내 담당자별 1:1 순차 할당 맵 및 카운터
-	var allocatedManagerColorMap = {};
-	var nextPaletteIndex = 0;
-
-	function resetManagerColorAllocation() {
-		allocatedManagerColorMap = {};
-		nextPaletteIndex = 0;
-	}
-
-	function getManagerColor(mngId, mngNm) {
-		var idKey = (mngId || "").trim();
-		var nmKey = (mngNm || "").trim();
-		var primaryKey = idKey || nmKey;
-
-		// 담당자 미지정인 경우 차분한 기본 그레이 반환
-		if (!primaryKey) {
-			return { border: '#94a3b8', bg: '#f8fafc', badgeBg: '#f1f5f9', text: '#475569', barBg: '#94a3b8' };
-		}
-
-		// 1) 이미 할당된 담당자인 경우 기존 할당된 동일 색상 반환 (일관성 100% 보장)
-		if (idKey && allocatedManagerColorMap[idKey]) return allocatedManagerColorMap[idKey];
-		if (nmKey && allocatedManagerColorMap[nmKey]) return allocatedManagerColorMap[nmKey];
-		if (allocatedManagerColorMap[primaryKey]) return allocatedManagerColorMap[primaryKey];
-
-		// 2) 신규 담당자 등장 시 색상 테이블에서 순차적으로 다음 색상 대입
-		var assignedColor = MANAGER_COLOR_PALETTE[nextPaletteIndex % MANAGER_COLOR_PALETTE.length];
-		nextPaletteIndex++;
-
-		// ID 및 성명 모두에 동일 색상 캐싱
-		if (idKey) allocatedManagerColorMap[idKey] = assignedColor;
-		if (nmKey) allocatedManagerColorMap[nmKey] = assignedColor;
-		allocatedManagerColorMap[primaryKey] = assignedColor;
-
-		return assignedColor;
-	}
+		// (getManagerColor 및 MANAGER_COLOR_PALETTE는 $(document).ready 이전에 사전 정의 완료)
 
 	function renderWbsTree() {
 		var $panel = $('#wbsTreePanel');
@@ -5439,27 +5509,6 @@
 		if (pSmrizeId && pSmrizeId === jwt.userId) return true;
 		return false;
 	}
-
-	const deptByPlanCode = {
-		"WBSCODE01" : "GUN30",
-		"WBSCODE02" : "GUN30",
-		"WBSCODE03" : "GUN40",
-		"WBSCODE04" : "TRN50",
-		"WBSCODE05" : "GUN60",
-		"WBSCODE06" : "TRN50",
-		"WBSCODE07" : "GUN60",
-		"WBSCODE08" : "GUN60",
-		"WBSCODE09" : "GUN30",
-		"WBSCODE10" : "GUN30",
-		"WBSCODE11" : "GUN30",
-		"WBSCODE12" : "GUN30",
-		"WBSCODE13" : "GUN30",
-		"WBSCODE14" : "GUN30",
-		"WBSCODE15" : "GUN30",
-		"WBSCODE16" : "GUN30",
-		"WBSCODE17" : "TRN50",
-		"WBSCODE18" : "GUN30"
-	};
 
 	// 단계(공정)별 수정 권한 체크 함수
 	function canEditPlanRow(row) {
