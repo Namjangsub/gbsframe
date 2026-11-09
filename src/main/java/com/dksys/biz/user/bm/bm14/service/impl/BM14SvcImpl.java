@@ -5,6 +5,9 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.HashSet;
+import java.util.Set;
+import java.util.regex.Pattern;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -12,6 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartHttpServletRequest;
 
 import com.dksys.biz.user.bm.bm14.mapper.BM14Mapper;
+import com.dksys.biz.user.bm.bm05.mapper.BM05Mapper;
 import com.dksys.biz.user.bm.bm14.service.BM14Svc;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
@@ -23,6 +27,9 @@ public class BM14SvcImpl implements BM14Svc {
 
 	@Autowired
 	BM14Mapper bm14Mapper;
+
+	@Autowired
+	BM05Mapper bm05Mapper;
 
 	@Autowired
 	BM14Svc bm14Svc;
@@ -381,7 +388,27 @@ public class BM14SvcImpl implements BM14Svc {
 		Type dtlMap = new TypeToken<ArrayList<Map<String, String>>>(){}.getType();
 
 		List<Map<String, String>> bomList = gsonDtl.fromJson(paramMap.get("bomArr"), dtlMap);
-	    for (Map<String, String> dtl : bomList) {
+		List<Map<String, String>> validBomList = new ArrayList<>();
+		if (bomList != null) {
+			for (Map<String, String> row : bomList) {
+				if (row == null) continue;
+				String salesCd = row.get("salesCd");
+				if (salesCd == null || salesCd.matches("[\\s\\p{Z}\\u200B\\uFEFF]*")) {
+					continue;
+				}
+				validBomList.add(row);
+			}
+		}
+		if (validBomList.isEmpty()) {
+			throw new IllegalArgumentException("업로드할 BOM 자료가 없습니다.");
+		}
+		paramMap.put("salesCd", uploadText(validBomList.get(0).get("salesCd")));
+		validateUploadBom(validBomList, paramMap, false);
+		if (paramMap.containsKey("validationRows")) {
+			bm14Mapper.deleteTempBom(paramMap);
+			return paramMap.get("salesCd");
+		}
+	    for (Map<String, String> dtl : validBomList) {
 	    	//재조회시 salesCd 획득을 위한 것
 	    	dtl.put("coCd", paramMap.get("coCd"));
 	    	dtl.put("userId", paramMap.get("userId"));
@@ -398,14 +425,118 @@ public class BM14SvcImpl implements BM14Svc {
 
 	    paramMap.put("salesCd", result);
 	    bm14Mapper.callCheckTempBom(paramMap);
+		if (!"N".equals(paramMap.get("errMsg"))) {
+			for (Map<String, String> row : validBomList) {
+				row.put("excelUseYn", "N");
+				row.put("excelCheckResult", "BOM 검증 처리 실패: " + paramMap.get("errMsg"));
+			}
+			paramMap.put("validationRows", new Gson().toJson(validBomList));
+			throw new IllegalArgumentException("BOM 업로드 검증 실패: " + paramMap.get("errMsg"));
+		}
 
 		return result;
 	}
 
 	@Override
 	public Map<String, String> callDraftTempBom(Map<String, String> paramMap) {
+		List<Map<String, String>> rows = bm14Mapper.selectBomUploadTempList(paramMap);
+		if (rows.isEmpty()) throw new IllegalArgumentException("적용할 BOM 자료가 없습니다. 다시 업로드해 주세요.");
+		for (Map<String, String> row : rows) {
+			if (!"Y".equals(row.get("excelUseYn"))) {
+				throw new IllegalArgumentException("적용할 수 없는 항목이 있습니다: " + row.get("dsgnNo") + " " + row.get("excelCheckResult"));
+			}
+		}
+		validateUploadBom(rows, paramMap, true);
 		bm14Mapper.callDraftTempBom(paramMap);
 		return paramMap;
+	}
+
+	// P02와 같은 형번 검색 규칙을 사용하며, 적용 직전에도 구매BOM/자재 상태를 재확인한다.
+	private void validateUploadBom(List<Map<String, String>> rows, Map<String, String> param, boolean applying) {
+		Pattern purchase = Pattern.compile("\\b(5\\d{2}|6\\d{2}|7\\d{2}|8\\d{2})\\w*\\b");
+		Pattern assembly = Pattern.compile("\\b(?:5\\d{3}|6\\d{3}|7\\d{3}|8\\d{3})(?:[A-Za-z\\d]+)?\\b");
+		List<Map<String, String>> existing = bm14Mapper.selectBomUploadExistingList(param);
+		Map<String, Map<String, String>> drawings = new HashMap<>();
+		Map<String, String> siblingCodes = new HashMap<>();
+		for (Map<String, String> row : existing) {
+			drawings.put(uploadText(row.get("dsgnNo")), row);
+			siblingCodes.put(uploadText(row.get("parentDsgnNo")) + "\t" + uploadText(row.get("lowerCd")), uploadText(row.get("dsgnNo")));
+		}
+		Set<String> codes = new HashSet<>();
+		Set<String> uploadedDrawings = new HashSet<>();
+		for (Map<String, String> row : rows) {
+			row.put("excelUseYn", "Y");
+			row.put("excelCheckResult", "검증완료");
+			try {
+			String salesCd = uploadText(row.get("salesCd"));
+			String parent = uploadText(row.get(applying ? "parentDsgnNo" : "upperCd"));
+			String lowerCd = uploadText(row.get("lowerCd"));
+			String drawing = uploadText(row.get("dsgnNo"));
+			String part = applying && !uploadText(row.get("partNo")).isEmpty() ? uploadText(row.get("partNo")) : lowerCd;
+			if (!salesCd.equals(uploadText(param.get("salesCd")))) throw new IllegalArgumentException("한 번에 하나의 Sales Code만 업로드할 수 있습니다.");
+			if (parent.isEmpty() || lowerCd.isEmpty() || drawing.isEmpty()) throw new IllegalArgumentException("상위코드·하위코드·도면번호를 입력해 주세요: " + drawing);
+			if ("#".equals(parent) || drawing.equals(salesCd)) throw new IllegalArgumentException("최상위 BOM은 자동 반영됩니다. 엑셀에서 최상위 행을 제외해 주세요.");
+			String sibling = parent + "\t" + lowerCd;
+			if (!codes.add(sibling)) throw new IllegalArgumentException("같은 부모 아래 하위코드가 중복됩니다: " + parent + " / " + lowerCd);
+			if (!uploadedDrawings.add(drawing)) throw new IllegalArgumentException("도면번호가 중복됩니다: " + drawing);
+			if (siblingCodes.containsKey(sibling) && !drawing.equals(siblingCodes.get(sibling))) throw new IllegalArgumentException("기존 BOM과 하위코드가 중복됩니다: " + parent + " / " + lowerCd);
+			for (String code : new String[]{drawing, parent}) {
+				Map<String, String> found = drawings.get(code);
+				if (found != null && Double.parseDouble(String.valueOf(found.get("pchsBomCnt"))) > 0) throw new IllegalArgumentException("구매BOM 작성 완료 항목은 수정하거나 하위 항목을 추가할 수 없습니다: " + code);
+			}
+			if (!assembly.matcher(part).find() && purchase.matcher(part).find()) {
+				String model = uploadText(row.get("matrMno"));
+				if (model.isEmpty()) throw new IllegalArgumentException(part + "번 형번/규격 없음");
+				Map<String, String> query = new HashMap<>();
+				query.put("matrMno", model);
+				List<Map<String, String>> materials = bm05Mapper.BOM_selectMatrMnoList(query);
+				if (materials.isEmpty()) throw new IllegalArgumentException(part + "번 형번/규격 없음: " + model);
+				if (materials.size() == 1) {
+					Map<String, String> material = materials.get(0);
+					if (applying && (!uploadText(material.get("matrCd")).equals(uploadText(row.get("matrCd"))) || !uploadText(material.get("matrSpec")).equals(model))) throw new IllegalArgumentException("자재정보가 변경되었습니다. 다시 업로드해 주세요: " + drawing);
+					row.put("matrCd", material.get("matrCd"));
+					row.put("matrMno", material.get("matrSpec"));
+				} else if (materials.stream().noneMatch(m -> uploadText(m.get("matrCd")).equals(uploadText(row.get("matrCd"))))) {
+					throw new IllegalArgumentException(part + "번 자재 2개 이상 중복: 조회된 자재코드를 지정해 주세요.");
+				}
+			}
+			if (!applying) {
+				row.put("salesCd", salesCd);
+				row.put("upperCd", parent);
+				row.put("lowerCd", lowerCd);
+				row.put("dsgnNo", drawing);
+			}
+			} catch (IllegalArgumentException e) {
+				row.put("excelUseYn", "N");
+				row.put("excelCheckResult", e.getMessage());
+			}
+		}
+		// 중복은 뒤쪽 행뿐 아니라 해당되는 모든 행에 표시한다.
+		Map<String, Integer> codeCounts = new HashMap<>();
+		Map<String, Integer> drawingCounts = new HashMap<>();
+		for (Map<String, String> row : rows) {
+			String key = uploadText(row.get(applying ? "parentDsgnNo" : "upperCd")) + "\t" + uploadText(row.get("lowerCd"));
+			codeCounts.put(key, codeCounts.getOrDefault(key, 0) + 1);
+			String drawing = uploadText(row.get("dsgnNo"));
+			drawingCounts.put(drawing, drawingCounts.getOrDefault(drawing, 0) + 1);
+		}
+		for (Map<String, String> row : rows) {
+			String key = uploadText(row.get(applying ? "parentDsgnNo" : "upperCd")) + "\t" + uploadText(row.get("lowerCd"));
+			String duplicate = codeCounts.get(key) > 1 ? "같은 부모 아래 하위코드 중복" : drawingCounts.get(uploadText(row.get("dsgnNo"))) > 1 ? "도면번호 중복" : "";
+			if (!duplicate.isEmpty()) {
+				String message = "N".equals(row.get("excelUseYn")) ? row.get("excelCheckResult") + " / " : "";
+				row.put("excelUseYn", "N");
+				row.put("excelCheckResult", message + duplicate);
+			}
+		}
+		if (rows.stream().anyMatch(row -> "N".equals(row.get("excelUseYn")))) {
+			param.put("validationRows", new Gson().toJson(rows));
+			if (applying) throw new IllegalArgumentException("적용할 수 없는 항목이 있습니다. 확인내용을 확인해 주세요.");
+		}
+	}
+
+	private String uploadText(String value) {
+		return value == null ? "" : value.replaceAll("^[\\s\\p{Z}\\u200B\\uFEFF]+|[\\s\\p{Z}\\u200B\\uFEFF]+$", "");
 	}
 
 	@Override

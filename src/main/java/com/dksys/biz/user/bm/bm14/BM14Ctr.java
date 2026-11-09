@@ -238,7 +238,8 @@ public class BM14Ctr {
     		if (!rtnStr.isEmpty()) {
     			model.addAttribute("rtnStr", rtnStr);
     			model.addAttribute("resultCode", 200);
-    			model.addAttribute("resultMessage", "업로드 되었습니다.");
+                model.addAttribute("resultMessage", paramMap.containsKey("validationRows")
+                        ? "검증 오류가 있습니다. 오른쪽 확인내용을 확인해 주세요." : "업로드 되었습니다.");
     		} else {
     			model.addAttribute("resultCode", 500);
     			model.addAttribute("resultMessage", messageUtils.getMessage("fail"));    			
@@ -247,14 +248,20 @@ public class BM14Ctr {
     		model.addAttribute("resultCode", 900);
     		model.addAttribute("resultMessage", e.getMessage());
     	}
+        model.addAttribute("validationRows", paramMap.get("validationRows"));
     	return "jsonView";
     }
     
     // 업로드 내용 적용 프로시져 호출
     @PostMapping("/callDraftTempBom")
     public String callDraftTempBom(@RequestBody Map<String, String> paramMap, ModelMap model) {
-    	Map<String, String> result = bm14svc.callDraftTempBom(paramMap);
-    	model.addAttribute("result", result);
+        try {
+            Map<String, String> result = bm14svc.callDraftTempBom(paramMap);
+            model.addAttribute("result", result);
+        } catch (IllegalArgumentException e) {
+            paramMap.put("errMsg", e.getMessage());
+            model.addAttribute("result", paramMap);
+        }
     	return "jsonView";
     }
 	

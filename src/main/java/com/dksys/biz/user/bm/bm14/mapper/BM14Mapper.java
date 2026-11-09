@@ -35,6 +35,10 @@ public interface BM14Mapper {
 	List<Map<String, String>> selectBomAllLevelList(Map<String, String> paramMap);
 	
 	List<Map<String, String>> selectBomAllLevelTempList(Map<String, String> paramMap);
+
+	List<Map<String, String>> selectBomUploadExistingList(Map<String, String> paramMap);
+
+	List<Map<String, String>> selectBomUploadTempList(Map<String, String> paramMap);
 	
 	int checkBomInfo(Map<String, String> paramMap);
 
