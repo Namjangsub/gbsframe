@@ -446,7 +446,7 @@
 	var targetDeptCd = ""; 	// 팀장 판단 기준 부서 (발행자 현직→발행자 부서, 퇴사자→작성자 부서)
 	var ordrsDiv3Chk = false;
 
-	// 근본원인/근본예방대책은 발행자의 실제 팀장이면서 현재 결재자인 경우에만 열어준다.
+	// 신규 작성은 발행자의 실제 팀장, 저장된 요청서는 결재선에 포함된 발행자 팀장에게 입력을 허용한다.
 	// 단, 기존 요구사항인 특정 부서 발행자 본인의 직접입력 예외는 유지한다.
 	function refreshRootCauseAccess() {
 		const issuerId = $(currFormId + ' #ordrgId').val() || '';
@@ -454,10 +454,11 @@
 		const regDeptId = (($(currFormId + ' #regDeptId').val() || '').slice(0, 5));
 		const loginDeptId = ((jwt.deptId || '').slice(0, 5));
 		const effectiveIssuerDeptId = ((issuerViewDeptId || targetDeptCd || '').slice(0, 5));
-		const specialDepts = ['TRN50', 'GUN60'];
+		const specialDepts = ['TRN50', 'GUN60', 'GUN70'];
 		const retiredIssuer = issuerId.indexOf('gyrsult') === 0;
 
-		let issuerSelfFlag = issuerId === jwt.userId && specialDepts.includes(effectiveIssuerDeptId || loginDeptId);
+		let issuerSelfFlag = issuerId === jwt.userId
+			&& (specialDepts.includes(effectiveIssuerDeptId || loginDeptId) || loginDeptId === 'GUN70');
 		if (retiredIssuer && regId === jwt.userId && specialDepts.includes(loginDeptId)) {
 			issuerSelfFlag = true;
 		}
@@ -465,7 +466,7 @@
 			issuerSelfFlag = true;
 		}
 
-		const managerApproverFlag = issuerManagerFlag && currentApproverFlag;
+		const managerApproverFlag = issuerManagerFlag && (actionType === 'C' || currentApproverFlag);
 		teamManagerFlag = managerApproverFlag || issuerSelfFlag;
 
 		const currentCobtp = $(currFormId + ' input[name="COBTP"]:checked').val() || $(currFormId + ' #partCd').val();
@@ -1083,6 +1084,7 @@ var ModalApp = (function() {
 			openSecondModal("/static/html/cmn/modal/userSearch.html", 450, 650, "사용자 검색", paramObj, function(tree) {
 				var checkedId = tree.get_checked()[0];
 				var checkedNode = tree.get_node(checkedId);
+				if (!checkedNode) return;
 				
 				$(currFormId + ' #ordrgId').val(checkedNode.id);
 				$(currFormId + ' #ordrgNm').val(checkedNode.text);
@@ -1092,14 +1094,28 @@ var ModalApp = (function() {
 				//	-->퇴사자인경우 작성자를 기준으로 생성해야함므로 작성자의 부서가 필요함
 				// 작성자의 부서는 작성자 정보 출력시 저장해야함.
 				if (checkedNode.id.slice(0,7) == 'gyrsult') {
+					issuerViewDeptId = '';
+					targetDeptCd = jwt.deptId.slice(0,5);
 					createCheckBox(jwt.deptId.slice(0,5));
 					selectAuth(jwt.deptId);
 				} else {
+					const actualDeptId = String((checkedNode.original && (checkedNode.original.originDeptId || checkedNode.original.deptId)) || '').trim().slice(0, 5);
 					const issueDeptId = checkedId === 'jjw'
 						? 'GUN40'
-						: ((checkedNode.parent || checkedNode.original.originDeptId || '').slice(0, 5));
-					createCheckBox(issueDeptId);
+						: ((checkedNode.parent || actualDeptId).slice(0, 5));
+					issuerViewDeptId = issueDeptId;
+					targetDeptCd = issueDeptId;
+					createCheckBox(checkedId !== 'jjw' && actualDeptId === 'GUN70' ? 'GUN60' : issueDeptId);
 					selectAuth(issueDeptId);
+				}
+				issuerManagerFlag = false;
+				if (fromJobType === 'ISS') {
+					const managerTargetId = checkedNode.id.indexOf('gyrsult') === 0
+						? $(currFormId + ' #regId').val()
+						: checkedNode.id;
+					postAjaxSync("/user/wb/wb24/selectTeamManagerInfo", { userId: managerTargetId }, null, function(data) {
+						issuerManagerFlag = !!data.result && data.result.id === jwt.userId;
+					});
 				}
 	
 				createRadioOptions('COBTP', "radio");	//분류 자동 생성
@@ -1116,6 +1132,7 @@ var ModalApp = (function() {
 						alert(checkedNode.text + ' [' + tempCODECOBGBTxt + '] 분류가 존재하지 않습니다. 확인 바랍니다.')
 					}
 				}
+				refreshRootCauseAccess();
 				
 				// 부서코드에 따른 등록사유 HTML TAG생성후
 				// 등록사유(COBGB2999-끝2자리가 99)가 기타이면 사유 입력필드 활성화 해야함 etcInputWrapper.show.
@@ -3041,6 +3058,7 @@ var ModalApp = (function() {
 			$(currDivId + " #actionBtn2").remove();
 
 		}
+		$(currFormId).on('change', 'input[name="COBTP"]', refreshRootCauseAccess);
 		refreshRootCauseAccess();
 
 		// TODO 리스트에서 호출 시 공유 : actionType:T	결재: actionType:S 처리 부분
