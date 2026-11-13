@@ -244,8 +244,8 @@
 			<td>
 			    <div class="search_form" style="width: 100%;">
 					<input type="hidden" id="userId_S" name="userId_S" data-search="workRptId">
-					<input type="text" id="userNm_S" name="userNm_S" data-search="workRptIdNm" placeholder="작성자 선택" onkeyup="if(event.keyCode === 8 || event.keyCode === 46){userId_S.value = '';} else if(event.keyCode === 13){loadWorkCalendar();}">
-					<a onclick="openUserSearch();"><i class="i_search_w"></i></a>
+					<input type="text" id="userNm_S" name="userNm_S" data-search="workRptIdNm" placeholder="작성자 선택" readonly>
+					<a id="workRptUserSearch" onclick="openUserSearch();" style="display:none;"><i class="i_search_w"></i></a>
 				</div>
 			</td>
           </tr>
@@ -463,6 +463,31 @@
 		}
 	}
 
+	var canSelectWorkRptUser = false;
+	var prdMngChk = false;
+
+	function initWorkRptUserSelection() {
+		canSelectWorkRptUser = ['js.nam', 'ceo', 'EMJ8105'].includes(jwt.userId)
+			|| jwt.deptId === 'GUN20' || jwt.userGrade === 'USERS';
+		if (!canSelectWorkRptUser) {
+			postAjaxSync("/admin/cm/cm05/selectChildCodeList", {codeId: "SPECRTS01"}, null, function(data) {
+				var code = data && data.childCodeList && data.childCodeList[0];
+				var users = (code && code.codeEtc || '').replace(/\s/g, '').split(',');
+				prdMngChk = !!jwt.userId && users.includes(jwt.userId);
+				canSelectWorkRptUser = prdMngChk;
+			});
+		}
+		$('#userNm_S').prop('readonly', !canSelectWorkRptUser).on('keyup', function(event) {
+			if (!canSelectWorkRptUser) return;
+			if (event.keyCode === 8 || event.keyCode === 46) {
+				$('#userId_S').val('');
+			} else if (event.keyCode === 13) {
+				loadWorkCalendar();
+			}
+		});
+		$('#workRptUserSearch').toggle(canSelectWorkRptUser);
+	}
+
   	$(document).ready(function() {
   		mainDefaultLoad("공통업무", "개인별월간작업일보현황");
 
@@ -474,6 +499,7 @@
 		$("#deptId_S").val('');
 		$("#userId_S").val(jwt.userId || '');
 		$("#userNm_S").val(jwt.userNm || '');
+		initWorkRptUserSelection();
 
   		dailyGridView.initView();
 		loadWorkCalendar();
@@ -952,10 +978,12 @@
 
 	// 작성자(성명) 검색 팝업
 	function openUserSearch() {
+		if (!canSelectWorkRptUser) return;
 		var paramObj = {
 			"coCd" : $('#coCd_S').val(),
 			"userId" : $('#userId_S').val(),
-			"userNm" : $('#userNm_S').val()
+			"userNm" : $('#userNm_S').val(),
+			"prdMngChk" : prdMngChk
 		};
 
 		openSecondModal("/static/html/cmn/modal/userSearch.html", 450, 650, "사용자 검색", paramObj, function(tree) {
