@@ -369,6 +369,7 @@ public class WB20Ctr {
 
 
 	@PostMapping(value = "/updateApprovalCancle")
+	@Transactional(propagation = Propagation.NOT_SUPPORTED)
 	public String updateApprovalCancle(@RequestBody Map<String, String> paramMap, ModelMap model) {
 		try {
 			wb20Svc.updateApprovalCancle(paramMap);

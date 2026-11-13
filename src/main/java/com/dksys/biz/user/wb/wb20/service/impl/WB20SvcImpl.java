@@ -220,7 +220,7 @@ public class WB20SvcImpl implements WB20Svc {
 			String coCd = paramMap.get("coCd");
 
 			// 진행 중인 AM 연동 문서가 있을 때만 위임한다. 없으면 기존 WB 흐름으로 처리한다.
-			String docId = findActiveAmDocId(paramMap);
+			String docId = findActiveAmDocId(paramMap, true);
 
 			// AM 연동 문서 존재 시 위임
 			if (docId != null && !docId.isEmpty()) {
@@ -627,6 +627,11 @@ public class WB20SvcImpl implements WB20Svc {
 		selfParam.put("todoNo", todoNo);
 		selfParam.put("todoDiv1CodeId", "TODODIV20");
 		selfParam.put("todoDiv2CodeId", todoDiv2CodeId);
+		if ("Y".equals(paramMap.get("cr02Cancel"))) {
+			selfParam.put("cr02Cancel", "Y");
+			selfParam.put("coCd", paramMap.get("coCd"));
+			selfParam.put("histNo", paramMap.get("histNo"));
+		}
 		List<Map<String, String>> lines = wb20Mapper.selectApprovalLineOrder(selfParam);
 		for (Map<String, String> line : lines) {
 			int sn;
@@ -786,10 +791,10 @@ public class WB20SvcImpl implements WB20Svc {
 	/**
 	 * WB20 결재함 승인/반려를 AM 엔진에 위임할 "진행 중인 AM 문서"를 찾는다. 없으면 null(=기존 WB 흐름).
 	 * WB20 결재행 식별키는 TODO_DIV1_CODE_ID + TODO_DIV2_CODE_ID + TODO_ID + TODO_NO + ETC_FIELD2(CR02 차수)이며,
-	 * TODO_KEY는 수정 시 바뀔 수 있어 고유키로 쓰지 않는다. 키가 하나라도 비면 미연동으로 본다.
+	 * CR02 승인에서는 요청의 TODO_KEY로 선택한 WB20 행의 차수를 확인한다.
 	 * CR02는 WB에만 있고 AM 문서가 없는 자료가 있으며, 그런 자료는 AM을 쓰지 않고 기존 WB 모듈로 처리한다.
 	 */
-	private String findActiveAmDocId(Map<String, String> paramMap) {
+	private String findActiveAmDocId(Map<String, String> paramMap, boolean approving) {
 		if (am11Svc == null) {
 			return null;
 		}
@@ -803,6 +808,13 @@ public class WB20SvcImpl implements WB20Svc {
 		keyParam.put("todoDiv1CodeId", paramMap.get("todoDiv1CodeId"));
 		keyParam.put("todoDiv2CodeId", paramMap.get("todoDiv2CodeId"));
 		keyParam.put("coCd", paramMap.get("coCd"));
+		if (approving && "TODODIV20".equals(paramMap.get("todoDiv1CodeId"))
+				&& "TODODIV2100".equals(paramMap.get("todoDiv2CodeId"))) {
+			if (!hasText(paramMap.get("todoKey"))) {
+				throw new IllegalArgumentException("승인할 수주목표원가 결재 건을 다시 선택해주세요.");
+			}
+			keyParam.put("cr02ApprovalTodoKey", paramMap.get("todoKey"));
+		}
 		String docId = wb20Mapper.selectAmDocIdByWbLineKey(keyParam);
 		return hasText(docId) ? docId : null;
 	}
@@ -823,10 +835,15 @@ public class WB20SvcImpl implements WB20Svc {
 		keyParam.put("todoDiv2CodeId", paramMap.get("todoDiv2CodeId"));
 		keyParam.put("coCd", paramMap.get("coCd"));
 		keyParam.put("includeCompleted", "Y");
+		keyParam.put("cr02Cancel", paramMap.get("cr02Cancel"));
+		keyParam.put("histNo", paramMap.get("histNo"));
 		try {
 			String docId = wb20Mapper.selectAmDocIdByWbLineKey(keyParam);
 			return hasText(docId) ? docId : null;
 		} catch (Exception e) {
+			if ("Y".equals(paramMap.get("cr02Cancel"))) {
+				throw new IllegalStateException("수주목표원가 전자결재 문서 조회에 실패했습니다.", e);
+			}
 			if (isTripApprovalCode(paramMap.get("todoDiv2CodeId"))) {
 				throw new IllegalStateException("출장 전자결재 문서 조회에 실패하여 결재취소를 중단합니다.", e);
 			}
@@ -1136,8 +1153,26 @@ public class WB20SvcImpl implements WB20Svc {
 
 	@Override
 	public int updateApprovalCancle(Map<String, String> paramMap) {
+		paramMap.remove("cr02Cancel");
+		boolean cr02Cancel = "TODODIV2100".equals(paramMap.get("todoDiv2CodeId"))
+				&& "TODODIV20".equals(paramMap.get("todoDiv1CodeId"));
+		if (cr02Cancel) {
+			if (!hasText(paramMap.get("todoKey"))) {
+				throw new IllegalArgumentException("취소할 수주목표원가 결재 건을 다시 선택해주세요.");
+			}
+			Map<String, String> target = wb20Mapper.selectCr02ApprovalCancelTarget(paramMap);
+			if (target == null) {
+				throw new IllegalStateException("취소할 승인 건을 찾을 수 없습니다. 목록을 다시 조회해주세요.");
+			}
+			paramMap.put("cr02Cancel", "Y");
+			paramMap.put("coCd", target.get("coCd"));
+			paramMap.put("histNo", target.get("histNo"));
+		}
 		validateSequentialCancel(paramMap);
 		int result = wb20Mapper.updateApprovalCancle(paramMap);
+		if (cr02Cancel && result != 1) {
+			throw new IllegalStateException("취소할 승인 건이 변경되었습니다. 목록을 다시 조회해주세요.");
+		}
 		if (result <= 0) return result;
 
 		boolean isPm08Approval = "TODODIV2410".equals(paramMap.get("todoDiv2CodeId"))
@@ -1149,7 +1184,7 @@ public class WB20SvcImpl implements WB20Svc {
 			paramMap.put("amDocId", amDocId);
 			wb20Mapper.syncAmApprovalCancelNextLine(paramMap);
 			int amUpdated = wb20Mapper.syncAmApprovalCancelLine(paramMap);
-			if ((isTripApprovalCode(paramMap.get("todoDiv2CodeId")) || isPm08Approval) && amUpdated != 1) {
+			if ((isTripApprovalCode(paramMap.get("todoDiv2CodeId")) || isPm08Approval || cr02Cancel) && amUpdated != 1) {
 				throw new IllegalStateException("전자결재 취소 대상이 일치하지 않아 결재취소를 중단합니다. 결재선을 확인해주세요.");
 			}
 			wb20Mapper.syncAmApprovalCancelHist(paramMap);
@@ -1429,7 +1464,7 @@ public class WB20SvcImpl implements WB20Svc {
 			String coCd = paramMap.get("coCd");
 
 			// 진행 중인 AM 연동 문서가 있을 때만 위임한다. 없으면 기존 WB 흐름으로 처리한다.
-			String docId = findActiveAmDocId(paramMap);
+			String docId = findActiveAmDocId(paramMap, false);
 
 			// AM 연동 문서 존재 시 위임
 			if (docId != null && !docId.isEmpty()) {

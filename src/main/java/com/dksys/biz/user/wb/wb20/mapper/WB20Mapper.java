@@ -100,6 +100,7 @@ public interface WB20Mapper {
 
 	Map<String, String> selectTodoFinalYn(Map<String, String> paramMap);
 
+	Map<String, String> selectCr02ApprovalCancelTarget(Map<String, String> paramMap);
 	int updateApprovalCancle(Map<String, String> paramMap);
 
 	int M08selectToDoCount(Map<String, String> paramMap);
