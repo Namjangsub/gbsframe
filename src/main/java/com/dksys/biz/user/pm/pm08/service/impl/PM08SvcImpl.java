@@ -80,9 +80,6 @@ public class PM08SvcImpl implements PM08Svc {
 		if (m01 != null) {
 			result.putAll(m01);
 		}
-		// 결과 결재 허용 여부(신청결재 최종 승인 완료). 화면 게이팅용이며, 최종 방어선은 WB20 가드
-		String resultApprAllowYn = (m01 != null && isRequestApprovedOrMissing(m01)) ? "Y" : "N";
-		result.put("resultApprAllowYn", resultApprAllowYn);
 		result.put("projectList", projectList);
 		return result;
 	}
@@ -268,19 +265,6 @@ public class PM08SvcImpl implements PM08Svc {
 		}
 
 		paramMap.put("udtId", paramMap.get("userId"));
-
-		if (!isResultStage) {
-			// 신청서 수정(REQ)은 결과 컬럼을 건드리지 않는다: 화면은 결과 값을 보내지 않으므로 DB 현재값을 유지
-			Map<String, String> resultQuery = new HashMap<>();
-			resultQuery.put("coCd", paramMap.get("coCd"));
-			resultQuery.put("reqNo", paramMap.get("reqNo"));
-			Map<String, String> resultDtl = pm08Mapper.selectSubstituteWorkDtl(resultQuery);
-			if (resultDtl != null) {
-				paramMap.put("realStTm", resultDtl.get("rawRealStTm"));
-				paramMap.put("realEdTm", resultDtl.get("rawRealEdTm"));
-				paramMap.put("workResult", resultDtl.get("workResult"));
-			}
-		}
 
 		// 2. 결과 작성/상신 모드(RESULT)일 때: 신청서 필드는 절대 수정하지 않고, 결과 영역(REAL_ST_TM, REAL_ED_TM, WORK_RESULT)만 수정
 		int updateResult = isResultStage ? pm08Mapper.updateSubstituteWorkResult(paramMap) : pm08Mapper.updateSubstituteWork(paramMap);
@@ -743,54 +727,6 @@ public class PM08SvcImpl implements PM08Svc {
 	}
 
 	/**
-	 * 신청결재(TODODIV2410) 최종 승인 여부. 신청 결재 라인이 없으면(과거 단독 결과 건) true.
-	 * 목록과 같은 신청 결재 상태를 사용하며, 전무 후결까지 완료해야 한다.
-	 */
-	@Override
-	public boolean isRequestApprovedOrMissing(String reqNo) {
-		if (reqNo == null || reqNo.trim().isEmpty()) {
-			return true;
-		}
-		Map<String, String> param = new HashMap<>();
-		param.put("reqNo", reqNo);
-		return isRequestApprovedOrMissing(pm08Mapper.selectSubstituteWorkDtl(param));
-	}
-
-	private boolean isRequestApprovedOrMissing(Map<String, String> detail) {
-		if (detail == null) return false;
-		String status = detail.get("reqStatus");
-		return status == null || "END".equals(status);
-	}
-
-	/**
-	 * 신청결재 미완료 상태에서 결과결재(TODODIV2420) 상신 시 기안자 본인의 자체승인 행만 예외 허용.
-	 * 결과 결재선에 기안자 외 결재자가 있어야 한다(기안자만 있으면 자체승인이 최종 승인이 되어 신청 완료 전 결과가 END 됨).
-	 */
-	@Override
-	public boolean isDrafterSelfResultApprovalAllowed(String reqNo, String coCd, String todoId, String userId) {
-		if (reqNo == null || reqNo.trim().isEmpty() || todoId == null || todoId.trim().isEmpty() || !todoId.equals(userId)) {
-			return false;
-		}
-		String useCoCd = (coCd == null || coCd.trim().isEmpty()) ? "GUN" : coCd;
-		Map<String, String> dtlQuery = new HashMap<>();
-		dtlQuery.put("coCd", useCoCd);
-		dtlQuery.put("reqNo", reqNo);
-		Map<String, String> dtl = pm08Mapper.selectSubstituteWorkDtl(dtlQuery);
-		if (dtl == null || !todoId.equalsIgnoreCase(dtl.get("reqId"))) {
-			return false;
-		}
-		Map<String, String> lineQuery = new HashMap<>();
-		lineQuery.put("todoNo", reqNo);
-		lineQuery.put("coCd", useCoCd);
-		for (Map<String, String> row : wb20Svc.selectGetApprovalList(lineQuery)) {
-			if ("TODODIV2420".equals(row.get("todoDiv2CodeId")) && !todoId.equalsIgnoreCase(row.get("todoId"))) {
-				return true;
-			}
-		}
-		return false;
-	}
-
-	/**
 	 * 신청결재(TODODIV2410) 결재선 중 반려(APPR_REJECT_YN='Y') 라인 존재 여부. 공유 라인은 판정에서 제외한다.
 	 */
 	@Override
@@ -818,82 +754,6 @@ public class PM08SvcImpl implements PM08Svc {
 			}
 		}
 		return false;
-	}
-
-	/**
-	 * AM 업무키 조회 결과가 휴일대체근무 결과결재(2420) 문서이고, 현재 사용자가 신청결재(2410)에 미승인 라인을 가진 경우
-	 * 신청결재 문서로 연결한다. 그 외에는 입력 docId를 그대로 반환한다(redirectedYn=N). 실패 시에도 입력 docId를 유지한다.
-	 */
-	@Override
-	public Map<String, String> resolveRequestRedirect(String docId, String reqNo, String coCd, String userId) {
-		Map<String, String> result = new HashMap<>();
-		result.put("docId", docId);
-		result.put("redirectedYn", "N");
-		if (docId == null || docId.trim().isEmpty() || reqNo == null || reqNo.trim().isEmpty()
-				|| userId == null || userId.trim().isEmpty()) {
-			return result;
-		}
-		try {
-			String useCoCd = (coCd == null || coCd.trim().isEmpty()) ? "GUN" : coCd;
-			Map<String, String> docQuery = new HashMap<>();
-			docQuery.put("reqNo", reqNo);
-			docQuery.put("coCd", useCoCd);
-			docQuery.put("todoDiv2CodeId", "TODODIV2420");
-			if (!docId.equals(pm08Mapper.selectAmDocIdByReqNo(docQuery))) {
-				return result;
-			}
-			if (isRequestApprovedOrMissing(reqNo)) {
-				return result;
-			}
-
-			Map<String, String> lineQuery = new HashMap<>();
-			lineQuery.put("todoNo", reqNo);
-			lineQuery.put("coCd", useCoCd);
-			Map<String, String> myReqLine = null;
-			List<Map<String, String>> reqLines = new ArrayList<>();
-			for (Map<String, String> row : wb20Svc.selectGetApprovalList(lineQuery)) {
-				if ("TODODIV2410".equals(row.get("todoDiv2CodeId")) && !ApprovalLineTypeGuard.isShareLine(row)) {
-					reqLines.add(row);
-				}
-			}
-			if (hasRejectedRequestLine(reqLines)) {
-				return result;
-			}
-			reqLines.sort(Comparator.comparingInt(row -> parseIntSafe(row.get("sanctnSn"))));
-			for (Map<String, String> row : reqLines) {
-				String lineType = row.get("lineType");
-				if (lineType != null && !"APPR".equals(lineType) && !"AGREE".equals(lineType) && !"POST".equals(lineType)) {
-					continue;
-				}
-				if ("Y".equalsIgnoreCase(row.get("sanctnSttus"))) {
-					continue;
-				}
-				if (userId.equals(row.get("todoId"))) {
-					myReqLine = row;
-				}
-				break;
-			}
-			if (myReqLine == null) {
-				return result;
-			}
-
-			docQuery.put("todoDiv2CodeId", "TODODIV2410");
-			String reqDocId = pm08Mapper.selectAmDocIdByReqNo(docQuery);
-			if (reqDocId == null || reqDocId.trim().isEmpty()) {
-				return result;
-			}
-			result.put("docId", reqDocId);
-			result.put("redirectedYn", "Y");
-			result.put("redirectReason", "신청 결재가 완료되지 않아 휴일대체근무 신청서 결재 문서로 연결했습니다.");
-			result.put("redirectTodoKey", myReqLine.get("todoKey"));
-		} catch (Exception e) {
-			logger.warn("[PM08] 신청결재 리다이렉트 판정 실패(입력 docId 유지): reqNo={}, userId={}", reqNo, userId, e);
-			result.put("docId", docId);
-			result.put("redirectedYn", "N");
-			result.remove("redirectReason");
-			result.remove("redirectTodoKey");
-		}
-		return result;
 	}
 
 	@Override

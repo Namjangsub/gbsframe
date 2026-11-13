@@ -204,7 +204,6 @@
 			<div class="col-xs-12 text-right popup_bottom_btn" style="margin-top: 0px; padding-right: 0;">
 				<button type="button" class="btn btn-warning btn-sm" id="fileUpBtn" form="popForm" onclick="fileUpload($(this.form));" style="display: none;">첨부파일저장</button>
 				<button type="button" class="btn btn-info btn-sm" id="btnSubmitApproval" onclick="submitApproval();" style="display: none;">신청결재 상신</button>
-				<span id="resultApprGuide" class="text-danger" style="display: none; line-height: 30px; margin-right: 6px;">결과 상신은 가능하나 결과 승인은 신청 결재 완료 후 처리됩니다.</span>
 				<button type="button" class="btn btn-success btn-sm" id="btnSubmitResult" onclick="submitResultApproval();" style="display: none;">결과결재 상신</button>
 				<button type="button" class="btn btn-danger btn-sm" id="btnDelete" onclick="deleteData();" style="display: none;">삭 제</button>
 				<button type="button" class="btn btn-default btn-sm" onclick="modalStack.close();">닫 기</button>
@@ -239,9 +238,7 @@
 	// fileTree.js의 selectedNodeId ReferenceError 방어
 	window.selectedNodeId = window.selectedNodeId || "";
 
-	// 결과 결재 허용 플래그(서버 resultApprAllowYn). 상세 로드 시 갱신, 'Y'일 때만 결과 결재(승인) 가능. 결과 상신은 제한 없음. 미수신·신규는 'N'.
 	// 서버 가드(updateSubstituteWork/WB20)가 최종 방어선이며, 이 값은 화면 표시용이다.
-	var pm08ResultApprAllowYn = 'N';
 
 	// fileTree.js가 결재목록 첫번째(신청결재)를 임의로 꺼내 결재버튼을 중복/오생성하는 것을 차단하고
 	// PM0801P01 화면 전용 결재제어(checkAndAppendApprovalBtn)가 진입시점에 맞게 정밀 제어하도록 위임
@@ -1107,23 +1104,7 @@
 		// 1) 기존 모든 결재 버튼 완벽 제거 (fileTree.js가 붙인 버튼 및 PM08 버튼 모두 초기화)
 		$popBottom.find('.callApprovalWorking, .callApprovalWorkingAuto').remove();
 
-		var entryPoint = $('#popForm').find('#entryPoint').val() || "";
-		var todoCode = $('#popForm').find('#todoDiv2CodeId').val() || "";
-		var entryTodoKey = $('#popForm').find('#entryTodoKey').val() || "";
-
-		if (!todoCode) {
-			var pObj = getModalParamObj();
-			todoCode = (pObj && pObj.todoDiv2CodeId) ? pObj.todoDiv2CodeId : "";
-			if (todoCode) $('#popForm').find('#todoDiv2CodeId').val(todoCode);
-			if (!entryTodoKey && pObj && pObj.todoKey) {
-				entryTodoKey = pObj.todoKey;
-				$('#popForm').find('#entryTodoKey').val(entryTodoKey);
-			}
-			if (!entryPoint && (todoCode || entryTodoKey)) {
-				entryPoint = "TODO";
-				$('#popForm').find('#entryPoint').val(entryPoint);
-			}
-		}
+		var todoCode = $('#popForm').find('#todoDiv2CodeId').val() || getModalParamObj().todoDiv2CodeId || '';
 
 		var reqList = (approvalGridViewReq && approvalGridViewReq.target) ? (approvalGridViewReq.target.getList() || []) : [];
 		var resultList = (approvalGridViewResult && approvalGridViewResult.target) ? (approvalGridViewResult.target.getList() || []) : [];
@@ -1131,7 +1112,8 @@
 		// 순차 결재 순번 검사 헬퍼: 내 앞 순번 중 미승인('N')이 있는지 확인
 		function isMyTurn(list, myIdx) {
 			for (var i = 0; i < myIdx; i++) {
-				if (list[i].gb === '결재' && (list[i].sanctnSttus === 'N' || list[i].sanctnSttusNm === '미승인')) {
+				if (list[i].gb === '결재' && list[i].lineType !== 'COOP'
+					&& (list[i].sanctnSttus === 'N' || list[i].sanctnSttusNm === '미승인')) {
 					return false; // 앞 순번 미승인 결재자가 있으므로 아직 내 차례 아님
 				}
 			}
@@ -1144,15 +1126,21 @@
 			return String(u1).trim().toLowerCase() === String(u2).trim().toLowerCase();
 		}
 
-		// (A) 신청 결재선에서 로그인 사용자의 순차결재 차례 탐색
+		// 신청 결재 차례는 진입 경로와 관계없이 같은 결재선에서 찾는다.
 		var myReqAppr = null;
+		var myReqShare = null;
+		function isRejected(row) {
+			return row.gb === '결재' && (row.apprRejectYn === 'Y' || row.sanctnSttusNm === '반려');
+		}
+		var reqRejected = reqList.some(isRejected);
 		for (var i = 0; i < reqList.length; i++) {
 			var r = reqList[i];
 			if (isSameUser(r.usrNm, curUserId) || isSameUser(r.todoId, curUserId)) {
 				if (r.sanctnSttus === 'N' || r.sanctnSttusNm === '미승인') {
-					if (isMyTurn(reqList, i)) {
+					if (r.gb === '공유') {
+						myReqShare = r;
+					} else if (!reqRejected && !myReqAppr && isMyTurn(reqList, i)) {
 						myReqAppr = r;
-						break;
 					}
 				}
 			}
@@ -1160,8 +1148,10 @@
 
 		// (B) 결과 결재선에서 로그인 사용자의 순차결재 차례 탐색
 		var myResultAppr = null;
+		var resultRejected = resultList.some(isRejected);
 		for (var j = 0; j < resultList.length; j++) {
 			var r2 = resultList[j];
+			if ((todoCode === 'TODODIV1420' && r2.gb !== '공유') || (resultRejected && r2.gb === '결재')) continue;
 			if (isSameUser(r2.usrNm, curUserId) || isSameUser(r2.todoId, curUserId)) {
 				if (r2.sanctnSttus === 'N' || r2.sanctnSttusNm === '미승인') {
 					if (isMyTurn(resultList, j)) {
@@ -1172,100 +1162,26 @@
 			}
 		}
 
-		// (C) 결과 To-Do 진입 + 신청 결재 미완료 시 신청 결재로 이동시킬 대상 탐색 (후결/협조 라인 제외, 결재 구분만)
-		var redirectReq = null;
-		var reqWaitTurn = false;
-		var reqRejected = false;
-		for (var q = 0; q < reqList.length; q++) {
-			if (reqList[q].gb === '결재' && (reqList[q].apprRejectYn === 'Y' || reqList[q].sanctnSttusNm === '반려')) {
-				reqRejected = true;
-				break;
-			}
-		}
-		for (var k = 0; k < reqList.length && !reqRejected; k++) {
-			var r3 = reqList[k];
-			if (r3.gb !== '결재' || r3.lineType === 'POST' || r3.lineType === 'COOP') continue;
-			if (!(isSameUser(r3.usrNm, curUserId) || isSameUser(r3.todoId, curUserId))) continue;
-			if (r3.sanctnSttus === 'N' || r3.sanctnSttusNm === '미승인') {
-				if (isMyTurn(reqList, k)) {
-					redirectReq = r3;
-					break;
-				}
-				reqWaitTurn = true;
-			}
+		// 공유 진입은 해당 공유 단계만 표시한다.
+		if (todoCode === 'TODODIV1410') {
+			myReqAppr = myReqShare;
+			myResultAppr = null;
+		} else if (todoCode === 'TODODIV1420') {
+			myReqAppr = null;
 		}
 
-		// 신청 결재가 승인완료(END)되기 전에는 결과 결재 버튼을 노출하지 않는다 (2420 분기에서 이동/안내 처리)
-		if (pm08ResultApprAllowYn !== 'Y') myResultAppr = null;
-
-		// ===== [진입 시점 1: To-Do 결재함/공유함에서 특정 건으로 진입한 경우] =====
-		if (entryPoint === 'TODO' || todoCode === 'TODODIV2410' || todoCode === 'TODODIV1410' || todoCode === 'TODODIV2420' || todoCode === 'TODODIV1420') {
-			if (todoCode === 'TODODIV2410' || todoCode === 'TODODIV1410') {
-				// 1-1) To-Do 신청결재 건: 결과결재 버튼은 절대 노출 금지! 신청결재 버튼만 1개 노출!
-				// 본인이 실제 신청 결재선의 결재차례(myReqAppr)일 때만 노출하고, 라이브 그리드의 todoKey를 사용한다.
-				// (entryTodoKey 폴백은 재등록으로 삭제된 stale 키를 참조해 크래시/오노출을 유발하므로 쓰지 않는다)
-				var isShare1 = (todoCode === 'TODODIV1410');
-				var btnText1 = isShare1 ? "신청공유 확인" : "신청결재 승인";
-
-				if (myReqAppr && myReqAppr.todoKey) {
-					var cmd1 = '<button type="button" class="btn btn-info btn-sm callApprovalWorkingAuto" onclick="treeModule.callApprovalWorking(\'' + myReqAppr.todoKey + '\', \'PM0801P01\')">' + btnText1 + '</button> ';
-					if ($closeBtn.length) { $closeBtn.before(cmd1); } else { $popBottom.append(cmd1); }
-				}
-				$('#popupTitle').text("휴일대체근무 신청 " + (isShare1 ? "[신청공유]" : "[신청결재]"));
-				return;
-			} else if (todoCode === 'TODODIV2420' || todoCode === 'TODODIV1420') {
-				// 1-2) To-Do 결과결재 건: 신청결재 버튼은 절대 노출 금지! 결과결재 버튼만 1개 노출!
-				// 본인이 실제 결과 결재선의 결재차례(myResultAppr)일 때만 노출하고, 라이브 그리드의 todoKey를 사용한다.
-				// (entryTodoKey 폴백은 재등록으로 삭제된 stale 키를 참조해 크래시/오노출을 유발하므로 쓰지 않는다)
-				var isShare2 = (todoCode === 'TODODIV1420');
-				var btnText2 = isShare2 ? "결과공유 확인" : "결과결재 승인";
-
-				var $resultGuide = $('#resultApprGuide');
-				if (pm08ResultApprAllowYn === 'Y') {
-					$resultGuide.hide();
-					if (myResultAppr && myResultAppr.todoKey) {
-						var cmd2 = '<button type="button" class="btn btn-primary btn-sm callApprovalWorkingAuto" onclick="treeModule.callApprovalWorking(\'' + myResultAppr.todoKey + '\', \'PM0801P01\')">' + btnText2 + '</button> ';
-						if ($closeBtn.length) { $closeBtn.before(cmd2); } else { $popBottom.append(cmd2); }
-					}
-				} else if (reqRejected) {
-					$resultGuide.text('신청 결재가 반려되었습니다. 신청서를 수정해 재상신해야 결과 결재가 가능합니다.').show();
-				} else if (redirectReq && redirectReq.todoKey) {
-					var cmd3 ='<button type="button" class="btn btn-info btn-sm callApprovalWorkingAuto" onclick="treeModule.callApprovalWorking(\'' + redirectReq.todoKey + '\', \'PM0801P01\')">신청 결재 먼저 처리</button> ';
-					if ($closeBtn.length) { $closeBtn.before(cmd3); } else { $popBottom.append(cmd3); }
-					$resultGuide.hide();
-				} else {
-					$resultGuide.text(reqWaitTurn ? '신청 결재 순서 대기 중입니다. 앞 순번 신청 결재 완료 후 결과 결재가 가능합니다.' : '신청 결재 완료 후 결과 결재가 가능합니다.').show();
-				}
-				$('#popupTitle').text("휴일대체근무 신청 " + (isShare2 ? "[결과공유]" : "[결과결재]"));
-				return;
-			}
-		}
-
-		// ===== [진입 시점 2: 메인 목록(PM0801M01.html)에서 진입한 경우] =====
-		// 메인 목록에서는 신청서와 결과 구분 없이 열리므로, 신청결재와 결과결재가 각각 독립적으로
-		// 자신의 순차결재 차례에 도달했는지 검사하여 우선순위 없이 동시에 표출!
-
-		// 2-1) 신청결재 버튼 추가
+		// 본인의 신청 결재 차례를 우선하고, 처리 가능한 버튼을 하나만 표시한다.
+		if (!todoCode && !(myResultAppr && myResultAppr.todoKey)) myReqAppr = myReqAppr || myReqShare;
 		if (myReqAppr && myReqAppr.todoKey) {
 			var reqActionNm = (myReqAppr.gb === '결재') ? '신청결재' : '신청공유';
 			var reqCmd = '<button type="button" class="btn btn-info btn-sm callApprovalWorkingAuto" onclick="treeModule.callApprovalWorking(\'' + myReqAppr.todoKey + '\', \'PM0801P01\')">' + reqActionNm + '</button> ';
 			if ($closeBtn.length) { $closeBtn.before(reqCmd); } else { $popBottom.append(reqCmd); }
-		}
-
-		// 2-2) 결과결재 버튼 추가 (우선순위 없이 신청결재와 함께 동시 표출 가능)
-		if (myResultAppr && myResultAppr.todoKey) {
+			$('#popupTitle').text("휴일대체근무 신청 [" + reqActionNm + "]");
+		} else if (myResultAppr && myResultAppr.todoKey) {
 			var resActionNm = (myResultAppr.gb === '결재') ? '결과결재' : '결과공유';
 			var resCmd = '<button type="button" class="btn btn-primary btn-sm callApprovalWorkingAuto" onclick="treeModule.callApprovalWorking(\'' + myResultAppr.todoKey + '\', \'PM0801P01\')">' + resActionNm + '</button> ';
 			if ($closeBtn.length) { $closeBtn.before(resCmd); } else { $popBottom.append(resCmd); }
-		}
-
-		// 상단 타이틀 동적 보정
-		if (myReqAppr && myResultAppr) {
-			$('#popupTitle').text("휴일대체근무 신청 [결재]");
-		} else if (myReqAppr) {
-			$('#popupTitle').text("휴일대체근무 신청 [신청결재]");
-		} else if (myResultAppr) {
-			$('#popupTitle').text("휴일대체근무 신청 [결과결재]");
+			$('#popupTitle').text("휴일대체근무 신청 [" + resActionNm + "]");
 		}
 	}
 
@@ -2128,9 +2044,7 @@
 		if (stage === 'RESULT') return true;
 
 		// 3순위: 일반 목록(PM0801M01) 더블클릭 진입 등:
-		// 신청서 결재가 최종 승인 완료(reqStatus === 'END')된 상태에서 실제 근무결과가 존재할 때만 RESULT 모드
-		var hasResult = checkHasRealResult(dtlData);
-		return (dtlData.reqStatus === 'END' && hasResult);
+		return checkHasRealResult(dtlData);
 	}
 
 	// 상태별 화면 및 권한 제어 (신청등록 시 결과 영역 숨김, 결과가 있으면 결과 영역 항상 표출)
@@ -2143,7 +2057,6 @@
 		var openStage = (pObj && pObj.openStage) ? pObj.openStage : ($('#popForm').find('#openStage').val() || '');
 		var todoCode = (pObj && pObj.todoDiv2CodeId) ? pObj.todoDiv2CodeId : ($('#popForm').find('#todoDiv2CodeId').val() || '');
 		var isResultTodo = (todoCode === 'TODODIV2420' || todoCode === 'TODODIV1420');
-		var isReqApprDone = (pm08ResultApprAllowYn === 'Y');
 
 		var currentUserId = (typeof jwt !== 'undefined' && jwt.userId) ? jwt.userId : "";
 		var reqUserId = dtlData.reqId || $('#popForm').find('#reqId').val() || "";
@@ -2230,20 +2143,17 @@
 
 				var isFirstResult = !hasResult;
 				$('#btnSubmitResult').text(isFirstResult ? '결과결재 상신' : '결과수정').show();
-				$('#resultApprGuide').text('결과 상신은 가능하나 결과 승인은 신청 결재 완료 후 처리됩니다.').toggle(isFirstResult && !isReqApprDone);
 				$('#btnDelete').text('결과삭제').toggle(!isFirstResult).show();
 			} else {
 				// 결과 결재 진행 중(ING) 또는 완료(END), 또는 조회/결재 모드 시 읽기 전용
 				$('#secResult').find('input, select, textarea').prop('disabled', true).css({'background': '#fafafa !important', 'pointer-events': 'none'});
 				$('#btnResultApprovalArea, #btnSubmitResult').hide();
-				$('#resultApprGuide').hide();
 				if (!isReqEditable) {
 					$('#btnDelete').hide();
 				}
 			}
 		} else {
 			$('#btnSubmitResult').hide();
-			$('#resultApprGuide').hide();
 		}
 
 		// [5. 결재 모드(actionType === 'A' || 'V') 또는 타인 접근 시 CUD 버튼 완전 차단]
@@ -2257,7 +2167,7 @@
 		// [6. 근태 마감 잠금]
 		var isClosed = isAttendanceClosed(dtlData.holidayDt || $('#holidayDt').val());
 		if (isClosed && (actionType !== 'C' || hasReq)) {
-			$('#btnSubmitApproval, #btnSubmitResult, #btnDelete, #resultApprGuide').hide();
+			$('#btnSubmitApproval, #btnSubmitResult, #btnDelete').hide();
 			$('#btnProjectArea, #btnReqApprovalArea, #btnResultApprovalArea').hide();
 			$('#secReq, #secResult').find('input, select, textarea').prop('disabled', true).css('background', '#fafafa !important');
 			$('#secReq, #secResult').find('.input_calendar').off('click').css({'cursor': 'default', 'pointer-events': 'none'});
@@ -2462,7 +2372,6 @@
 		$('#actionType').val(actionType);
 
 		if (actionType === "C" && !reqNoVal) {
-			pm08ResultApprAllowYn = 'N';
 			$('#popupTitle').text("휴일대체근무 신청 - 신청등록");
 			var isMng = isMngUser();
 			if (isMng) {
@@ -2539,7 +2448,6 @@
 
 			$('#coCd').val(dtlData.coCd || coCdVal);
 			$('#reqNo').val(dtlData.reqNo || reqNoVal);
-			pm08ResultApprAllowYn = (dtlData.resultApprAllowYn === 'Y') ? 'Y' : 'N';
 			$('#popForm #fileTrgtKey').val(dtlData.reqNo || reqNoVal);
 			$('#popForm #fileTrgtTyp').val("PM0801P01");
 			$('#popForm #pgmId').val("PM0801P01");

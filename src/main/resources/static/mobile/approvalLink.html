@@ -31,11 +31,9 @@
 			generalDiv2Of: { "TODODIV2191": "TODODIV2190" },
 			isMyTurn: isPm51MyTurn
 		},
-		// PM08: 신청(2410)·결과(2420)가 같은 reqNo를 쓰며, 결과 결재는 신청 결재 완료 후에만 진입(WB20 validate와 동일 순서)
 		"PM08": {
 			detailUrl: "/static/mobile/html/user/pm/pm08/PM0801P01_M.html",
 			div2Codes: ["TODODIV2410", "TODODIV2420"],
-			generalDiv2Of: { "TODODIV2420": "TODODIV2410" },
 			overrideParam: true,
 			isMyTurn: function (row) { return Number(row.beforeNotConfirm || 0) === 0; }
 		},
@@ -116,7 +114,7 @@
 		});
 
 		// a) 반려 문서: 내가 결재선에 있으면 조회 모드로 연다(승인 버튼 노출 여부는 상세화면 확인 결과를 보고 참고)
-		if (hasRejectedLine(lines)) {
+		if (pending.go !== 'PM08' && hasRejectedLine(lines)) {
 			if (mine.length > 0) {
 				openApprovalDetail(mine[0], route, true);
 				return;
@@ -126,7 +124,12 @@
 		}
 
 		// b) 지금 내 차례 미결 건 → 결재 모드 (관리부서는 선행 신청부서 전원 승인 필요)
-		var turnRow = $.grep(mine, function (r) { return r.sanctnSttus === "N" && route.isMyTurn(r); })[0];
+		var turnRow = $.grep(mine, function (r) {
+			if (r.sanctnSttus !== "N" || !route.isMyTurn(r)) return false;
+			return pending.go !== 'PM08' || !hasRejectedLine(lines.filter(function (line) {
+				return line.todoDiv2CodeId === r.todoDiv2CodeId;
+			}));
+		})[0];
 		if (turnRow && isGeneralDone(turnRow, route, lines)) {
 			openApprovalDetail(turnRow, route);
 			return;

@@ -89,16 +89,6 @@ public class AM11SvcImpl implements AM11Svc {
             return resultMap;
         }
 
-        if ("PM08".equals(docInfo.get("erpBizType"))) {
-            Map<String, String> redirect = pm08Svc.resolveRequestRedirect(valueOf(docInfo.get("docId")),
-                    valueOf(docInfo.get("erpBizKey")), valueOf(docInfo.get("coCd")), userId);
-            if ("Y".equals(redirect.get("redirectedYn"))) {
-                Map<String, Object> requestParams = new HashMap<>(paramMap);
-                requestParams.put("docId", redirect.get("docId"));
-                return selectApprovalDocDetail(requestParams);
-            }
-        }
-
         // 방안 A (협조 비구속 병렬): 진행 중 문서의 READY 협조(COOP) 라인은 즉시 PENDING으로 개방 보정
         String currentDocStatus = (String) docInfo.get("docStatus");
         if ("REQUEST".equals(currentDocStatus) || "PROGRESS".equals(currentDocStatus) || "POST_PROGRESS".equals(currentDocStatus)) {
