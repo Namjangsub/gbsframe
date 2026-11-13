@@ -89,6 +89,16 @@ public class AM11SvcImpl implements AM11Svc {
             return resultMap;
         }
 
+        if ("PM08".equals(docInfo.get("erpBizType"))) {
+            Map<String, String> redirect = pm08Svc.resolveRequestRedirect(valueOf(docInfo.get("docId")),
+                    valueOf(docInfo.get("erpBizKey")), valueOf(docInfo.get("coCd")), userId);
+            if ("Y".equals(redirect.get("redirectedYn"))) {
+                Map<String, Object> requestParams = new HashMap<>(paramMap);
+                requestParams.put("docId", redirect.get("docId"));
+                return selectApprovalDocDetail(requestParams);
+            }
+        }
+
         // 방안 A (협조 비구속 병렬): 진행 중 문서의 READY 협조(COOP) 라인은 즉시 PENDING으로 개방 보정
         String currentDocStatus = (String) docInfo.get("docStatus");
         if ("REQUEST".equals(currentDocStatus) || "PROGRESS".equals(currentDocStatus) || "POST_PROGRESS".equals(currentDocStatus)) {
@@ -820,7 +830,9 @@ public class AM11SvcImpl implements AM11Svc {
 
         // 6. ERP 사후처리 및 알림 큐/이벤트 발행
         // 본문 승인 완료 시점(일반 결재 완료 시) 또는 최종 완료 시점에 ERP 사후처리 실행
-        if (!"POST_PROGRESS".equals(docStatus) && ("COMPLETED".equals(nextDocStatus) || "POST_PROGRESS".equals(nextDocStatus))) {
+        boolean pm08Document = "PM08".equals(docLock.get("erpBizType"));
+        if (pm08Document ? "COMPLETED".equals(nextDocStatus)
+                : !"POST_PROGRESS".equals(docStatus) && ("COMPLETED".equals(nextDocStatus) || "POST_PROGRESS".equals(nextDocStatus))) {
             String erpBizType = (docInfo != null) ? (String) docInfo.get("erpBizType") : null;
             try {
                 postProcessorRegistry.processCompleted(erpBizType, docInfo, paramMap);
@@ -1640,6 +1652,9 @@ public class AM11SvcImpl implements AM11Svc {
                 wb20ArbitParam.put("todoDiv2CodeId", currentDiv2CodeId);
                 wb20ArbitParam.put("wb20SanctnSn", actingLine != null ? actingLine.get("wb20SanctnSn") : null);
                 wb20ArbitParam.put("apprOpinion", apprOpinion != null ? apprOpinion : "상위 결재자 전결로 인한 종결");
+                if ("PM08".equals(docLock.get("erpBizType"))) {
+                    wb20ArbitParam.put("excludePost", true);
+                }
                 am11Mapper.updateWb20RemainingLinesArbit(wb20ArbitParam);
             }
         }

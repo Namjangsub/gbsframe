@@ -468,6 +468,10 @@ public class WB20SvcImpl implements WB20Svc {
 			}
 		}
 
+		if ("TODODIV2410".equals(todoDiv2CodeId) || "TODODIV2420".equals(todoDiv2CodeId)) {
+			pm08Svc.syncSubstituteWorkApprovalStatus(paramMap, false);
+			if (resultMap == null) resultMap = new HashMap<>();
+		}
 		// PFU결재완료 시 추가 공유자 설정
 		resultMap.put("RESULT_COUNT", Integer.toString(result));
 		resultMap.put("PFU_SHARE_TARGET_YN", "N");
@@ -641,8 +645,11 @@ public class WB20SvcImpl implements WB20Svc {
 				continue;
 			}
 
-			// COOP/REF/POST면 선행차단 하지 않음
-			if (ApprovalLineRules.isNonBinding(ApprovalLineRules.lineType(line.get("lineType")))) {
+			// 휴일대체근무에서는 후결 승인도 취소 순서에 포함한다.
+			String lineType = ApprovalLineRules.lineType(line.get("lineType"));
+			boolean pm08Post = "POST".equals(lineType)
+					&& ("TODODIV2410".equals(todoDiv2CodeId) || "TODODIV2420".equals(todoDiv2CodeId));
+			if (ApprovalLineRules.isNonBinding(lineType) && !pm08Post) {
 				continue;
 			}
 
@@ -1142,6 +1149,8 @@ public class WB20SvcImpl implements WB20Svc {
 		int result = wb20Mapper.updateApprovalCancle(paramMap);
 		if (result <= 0) return result;
 
+		boolean isPm08Approval = "TODODIV2410".equals(paramMap.get("todoDiv2CodeId"))
+				|| "TODODIV2420".equals(paramMap.get("todoDiv2CodeId"));
 		// 기존 WB20 결재취소 결과를 동일 업무의 AM 전자결재 문서/결재선/이력에 반영
 		// 대상 AM 문서를 식별키(DIV1+DIV2+TODO_ID+TODO_NO, CR02만 ETC_FIELD2)로 한 번 특정해 넘기고, 미연동이면 건너뛴다.
 		String amDocId = findAmDocIdForCancel(paramMap);
@@ -1149,11 +1158,14 @@ public class WB20SvcImpl implements WB20Svc {
 			paramMap.put("amDocId", amDocId);
 			wb20Mapper.syncAmApprovalCancelNextLine(paramMap);
 			int amUpdated = wb20Mapper.syncAmApprovalCancelLine(paramMap);
-			if (isTripApprovalCode(paramMap.get("todoDiv2CodeId")) && amUpdated != 1) {
+			if ((isTripApprovalCode(paramMap.get("todoDiv2CodeId")) || isPm08Approval) && amUpdated != 1) {
 				throw new IllegalStateException("전자결재 취소 대상이 일치하지 않아 결재취소를 중단합니다. 결재선을 확인해주세요.");
 			}
 			wb20Mapper.syncAmApprovalCancelHist(paramMap);
 			wb20Mapper.syncAmApprovalCancelDocument(paramMap);
+		}
+		if (isPm08Approval) {
+			pm08Svc.syncSubstituteWorkApprovalStatus(paramMap, true);
 		}
 		// PM51 신청결재 완료를 취소하면 업무 상태도 진행중으로 복구한다.
 		if ("TODODIV2190".equals(paramMap.get("todoDiv2CodeId"))) {

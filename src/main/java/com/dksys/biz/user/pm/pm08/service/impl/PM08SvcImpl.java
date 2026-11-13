@@ -81,7 +81,7 @@ public class PM08SvcImpl implements PM08Svc {
 			result.putAll(m01);
 		}
 		// 결과 결재 허용 여부(신청결재 최종 승인 완료). 화면 게이팅용이며, 최종 방어선은 WB20 가드
-		String resultApprAllowYn = (m01 != null && isRequestApprovedOrMissing(m01.get("reqNo"))) ? "Y" : "N";
+		String resultApprAllowYn = (m01 != null && isRequestApprovedOrMissing(m01)) ? "Y" : "N";
 		result.put("resultApprAllowYn", resultApprAllowYn);
 		result.put("projectList", projectList);
 		return result;
@@ -709,8 +709,42 @@ public class PM08SvcImpl implements PM08Svc {
 	}
 
 	/**
+	 * 해당 단계의 결재선에서 계산한 상태를 마스터에 반영한다.
+	 */
+	@Override
+	public void syncSubstituteWorkApprovalStatus(Map<String, String> paramMap, boolean cancelled) {
+		Map<String, String> updateParam = new HashMap<>();
+		updateParam.put("reqNo", paramMap.get("todoNo"));
+		updateParam.put("coCd", paramMap.get("coCd"));
+		updateParam.put("udtId", paramMap.get("userId"));
+		Map<String, String> detail = pm08Mapper.selectSubstituteWorkDtl(updateParam);
+		if (detail == null) return;
+
+		boolean resultStage = "TODODIV2420".equals(paramMap.get("todoDiv2CodeId"));
+		String statusKey = resultStage ? "resultStatus" : "reqStatus";
+		updateParam.put(statusKey, detail.get(statusKey));
+		if (resultStage) {
+			pm08Mapper.updateSubstituteWorkResultStatus(updateParam);
+		} else {
+			pm08Mapper.updateSubstituteWorkReqStatus(updateParam);
+		}
+		if (cancelled) {
+			Map<String, String> managerParam = new HashMap<>();
+			managerParam.put("userId", detail.get("reqId"));
+			Map<String, String> manager = wb24Svc.selectTeamManagerInfo(managerParam);
+			if (manager != null && manager.get("id") != null && manager.get("id").equals(paramMap.get("userId"))) {
+				if (resultStage) {
+					pm08Mapper.updateSubstituteWorkResultMngOpn(updateParam);
+				} else {
+					pm08Mapper.updateSubstituteWorkReqMngOpn(updateParam);
+				}
+			}
+		}
+	}
+
+	/**
 	 * 신청결재(TODODIV2410) 최종 승인 여부. 신청 결재 라인이 없으면(과거 단독 결과 건) true.
-	 * 판정은 WB20 selectTodoFinalYn(todoYn='Y')과 동일하며, 완료 시 REQ_STATUS=END 가 세팅되는 기준과 같다.
+	 * 목록과 같은 신청 결재 상태를 사용하며, 전무 후결까지 완료해야 한다.
 	 */
 	@Override
 	public boolean isRequestApprovedOrMissing(String reqNo) {
@@ -718,10 +752,14 @@ public class PM08SvcImpl implements PM08Svc {
 			return true;
 		}
 		Map<String, String> param = new HashMap<>();
-		param.put("todoDiv2CodeId", "TODODIV2410");
-		param.put("todoNo", reqNo);
-		Map<String, String> finalYn = wb20Mapper.selectTodoFinalYn(param);
-		return finalYn == null || "Y".equals(finalYn.get("todoYn"));
+		param.put("reqNo", reqNo);
+		return isRequestApprovedOrMissing(pm08Mapper.selectSubstituteWorkDtl(param));
+	}
+
+	private boolean isRequestApprovedOrMissing(Map<String, String> detail) {
+		if (detail == null) return false;
+		String status = detail.get("reqStatus");
+		return status == null || "END".equals(status);
 	}
 
 	/**
@@ -821,18 +859,18 @@ public class PM08SvcImpl implements PM08Svc {
 			if (hasRejectedRequestLine(reqLines)) {
 				return result;
 			}
+			reqLines.sort(Comparator.comparingInt(row -> parseIntSafe(row.get("sanctnSn"))));
 			for (Map<String, String> row : reqLines) {
-				if (!userId.equals(row.get("todoId"))) {
-					continue;
-				}
 				String lineType = row.get("lineType");
-				if (lineType != null && !"APPR".equals(lineType) && !"AGREE".equals(lineType)) {
+				if (lineType != null && !"APPR".equals(lineType) && !"AGREE".equals(lineType) && !"POST".equals(lineType)) {
 					continue;
 				}
 				if ("Y".equalsIgnoreCase(row.get("sanctnSttus"))) {
 					continue;
 				}
-				myReqLine = row;
+				if (userId.equals(row.get("todoId"))) {
+					myReqLine = row;
+				}
 				break;
 			}
 			if (myReqLine == null) {

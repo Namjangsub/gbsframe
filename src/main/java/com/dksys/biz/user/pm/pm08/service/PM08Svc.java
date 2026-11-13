@@ -26,6 +26,7 @@ public interface PM08Svc {
 	int applySubstituteWorkApproved(Map<String, String> paramMap);
 
 	int applySubstituteWorkResultApproved(Map<String, String> paramMap);
+	void syncSubstituteWorkApprovalStatus(Map<String, String> paramMap, boolean cancelled);
 
 	boolean isRequestApprovedOrMissing(String reqNo);
 
