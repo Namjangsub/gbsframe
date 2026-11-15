@@ -310,6 +310,25 @@
 		                                         AND P.SALES_CD = X.SALES_CD
 		                                     )
 		                     )
+		                   , ISS_CNT AS --WBS 문제/이슈 건수 집계
+		                     (
+		                      SELECT ISU.CO_CD
+		                           , ISU.SALES_CD
+		                           , COUNT(DISTINCT ISU.ISS_NO) AS ISSUE_TOT_CNT
+		                           , COUNT(DISTINCT CASE WHEN DECODE(ISU.REQ_NO, '', ISU.ISS_STS, QM.REQ_ST) IN ('ISSSTS03', 'REQST03')
+		                                                 THEN NULL
+		                                                 ELSE ISU.ISS_NO
+		                                            END) AS ISSUE_UNCOMP_CNT
+		                        FROM TB_WB24M02 ISU
+		                             LEFT OUTER JOIN TB_QM01M01 QM ON QM.REQ_NO = ISU.REQ_NO
+		                       WHERE ISU.CO_CD = #{coCd}
+		                         AND EXISTS (SELECT 'X'
+		                                       FROM SJD P
+		                                      WHERE P.CO_CD    = ISU.CO_CD
+		                                        AND P.SALES_CD = ISU.SALES_CD
+		                                    )
+		                       GROUP BY ISU.CO_CD, ISU.SALES_CD
+		                     )
 		                SELECT X.FILE_TRGT_KEY
 		                     , X.CO_CD              --회사코드
 		                     , X.CO_NM              --회사명 
@@ -358,8 +377,11 @@
 		                     , X.MANUAL_MC_CHK    --매뉴얼진행상태체크
 		                     , X.MANUAL_ELEC_CHK    --매뉴얼진행상태체크
 							 , X.END_YN				--마감여부
+							 , NVL(ISS.ISSUE_TOT_CNT, 0)    AS ISSUE_TOT_CNT
+							 , NVL(ISS.ISSUE_UNCOMP_CNT, 0) AS ISSUE_UNCOMP_CNT
 		                  FROM SUBJ X
 		                       LEFT OUTER JOIN SJD AS CR ON X.CO_CD = CR.CO_CD AND X.SALES_CD = CR.SALES_CD 
+		                       LEFT OUTER JOIN ISS_CNT AS ISS ON X.CO_CD = ISS.CO_CD AND X.SALES_CD = ISS.SALES_CD
 		                 WHERE 1=1
                            <if test="lastYn != null and !lastYn.equals('')">
 		                   AND X.VER_NO = X.MAX_VER_NO

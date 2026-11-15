@@ -417,7 +417,8 @@ var gridView = {
         };
         postAjax("/user/wb/wb21/selectSjList", paramObj, null, function(data) {
             try {
-                var list = data.resultList;
+                var list = data.resultList || [];
+                var hasServerIssueCnt = (list.length > 0 && list[0].issueTotCnt !== undefined && list[0].issueTotCnt !== null);
                 targetObj.setData({
                     list : list,
                     page : {
@@ -430,19 +431,21 @@ var gridView = {
 
                 gridHeightResize(gridView, 194);
 
-                loadWbIssueCounts(list, function(updated) {
-                    if (updated) {
-                        targetObj.setData({
-                            list : list,
-                            page : {
-                                currentPage : _pageNo,
-                                pageSize : data.paginationInfo.pageSize,
-                                totalElements : data.paginationInfo.totalRecordCount,
-                                totalPages : data.paginationInfo.totalPageCount
-                            }
-                        });
-                    }
-                });
+                if (!hasServerIssueCnt && list.length > 0) {
+                    loadWbIssueCounts(list, function(updated) {
+                        if (updated) {
+                            targetObj.setData({
+                                list : list,
+                                page : {
+                                    currentPage : _pageNo,
+                                    pageSize : data.paginationInfo.pageSize,
+                                    totalElements : data.paginationInfo.totalRecordCount,
+                                    totalPages : data.paginationInfo.totalPageCount
+                                }
+                            });
+                        }
+                    });
+                }
                 if(list.length > 0) {
                     var listLength = list.length;
                     for (var i = 0; i < listLength; i++) {
@@ -825,16 +828,21 @@ function loadWbIssueCounts(list, onComplete) {
 
 	var reqCoCd = (list[0] && list[0].coCd) || $("#coCd_S").val() || (typeof jwt !== 'undefined' && jwt ? jwt.coCd : '') || "GUN";
 
-	// 1차: WBS 이슈 집계 (WB24)
+	// 1차: WBS 이슈 경량 집계 (WB24)
 	postAjax("/user/wb/wb24/selectWbsIssueCountBySalesCds", { coCd: reqCoCd, salesCds: salesCdArr }, null, function(cntData) {
 		var cntRows = (cntData && cntData.result) ? cntData.result : [];
 		var issMap = {};
+		var hasServerUncomp = false;
 
 		for (var c = 0; c < cntRows.length; c++) {
 			var cSc = String(cntRows[c].salesCd || cntRows[c].SALES_CD || '').trim().toUpperCase();
 			var cTot = gPasIntChk(cntRows[c].cnt !== undefined ? cntRows[c].cnt : cntRows[c].CNT);
+			var rawUncomp = cntRows[c].uncompCnt !== undefined ? cntRows[c].uncompCnt : cntRows[c].UNCOMP_CNT;
+			if (rawUncomp !== undefined && rawUncomp !== null) {
+				hasServerUncomp = true;
+			}
 			if (cSc && cTot > 0) {
-				issMap[cSc] = { totCnt: cTot, uncompCnt: 0 };
+				issMap[cSc] = { totCnt: cTot, uncompCnt: hasServerUncomp ? gPasIntChk(rawUncomp) : 0 };
 			}
 		}
 
@@ -854,43 +862,18 @@ function loadWbIssueCounts(list, onComplete) {
 			}
 		}
 
-		// 1차 집계에 건수가 있는 경우 대시보드 미완료 조회
-		if (Object.keys(issMap).length > 0) {
+		if (hasServerUncomp || Object.keys(issMap).length === 0) {
+			applyAndRender();
+		} else {
+			// 서버 미재기동으로 uncompCnt 필드가 아직 없을 때만 대시보드 미완료 조회 수행
 			postAjax("/user/wb/wb24/selectWbsIssueListDashboard", { coCd: reqCoCd }, null, function(dashData) {
 				var dashRows = (dashData && dashData.result) ? dashData.result : [];
 				for (var d = 0; d < dashRows.length; d++) {
 					var dRow = dashRows[d];
+					if (dRow.gubun !== '계획' && dRow.gubun !== '실적') continue;
 					var dSc = String(dRow.salesCd || '').trim().toUpperCase();
 					if (dSc && issMap[dSc]) {
 						issMap[dSc].uncompCnt += 1;
-					}
-				}
-				applyAndRender();
-			}, false);
-		} else {
-			// 2차 Fallback: TB_WB24M02에 건수가 없는 경우, 전체 문제/작업일보 통합 API(selectAllIssueWorkList)로 조회
-			var pmParam = {
-				"coCd"      : reqCoCd,
-				"reqDtFrom" : "20200101",
-				"reqDtTo"   : "20991231",
-				"pageNo"    : 1,
-				"recordCnt" : 99999999,
-				"issSts"    : ""
-			};
-			postAjax("/user/pm/pm01/selectAllIssueWorkList", pmParam, null, function(pmData) {
-				var pmList = (pmData && pmData.result) ? pmData.result : [];
-				for (var p = 0; p < pmList.length; p++) {
-					var pRow = pmList[p];
-					var pSc = String(pRow.salesCd || '').trim().toUpperCase();
-					if (pSc && salesCdSet.has(pSc)) {
-						if (!issMap[pSc]) {
-							issMap[pSc] = { totCnt: 0, uncompCnt: 0 };
-						}
-						issMap[pSc].totCnt += 1;
-						var isResolved = (pRow.issSts === 'ISSSTS03' || pRow.issSts === 'REQST03' || pRow.issStsNm === '조치완료' || pRow.issStsNm === '완료');
-						if (!isResolved) {
-							issMap[pSc].uncompCnt += 1;
-						}
 					}
 				}
 				applyAndRender();
