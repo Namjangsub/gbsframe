@@ -4,7 +4,7 @@
 		if (typeof localStorage !== 'undefined' && localStorage.getItem('GBS:menuCollapsed') === 'Y') {
 			var style = document.createElement('style');
 			style.id = 'gbs-menu-collapse-prestyle';
-			style.textContent = 
+			style.textContent =
 				'#head_area { display: none !important; } ' +
 				'.menu_off { left: 0 !important; } ' +
 				'.menu_off .off_btn::before { transform: rotate(270deg) !important; } ' +
@@ -1698,7 +1698,7 @@ function checkMenuAuth(accessList) {
 			if(item.upMenuId != "MENU100" && item.menuType == "FOLDER" && item.useYn == 'Y') {
 				var iconId = 'icon-menu-0' + imgIdx;
 				if (imgIdx >= 10) iconId = 'icon-menu-0' + imgIdx;
-				
+
 				html += '<li>';
 				html += '  <svg class="menu-icon" style="width: 20px; height: 20px; vertical-align: middle; fill: currentColor;"><use href="#' + iconId + '"></use></svg>';
 				html += '	<a>'+item.menuNm+'</a> <!-- 서브메뉴 -->';
@@ -2149,7 +2149,7 @@ function setMenuCollapseState(isCollapsed, triggerResize) {
 			try {
 				var style = document.createElement('style');
 				style.id = 'gbs-menu-collapse-prestyle';
-				style.textContent = 
+				style.textContent =
 					'#head_area { display: none !important; } ' +
 					'.menu_off { left: 0 !important; } ' +
 					'.menu_off .off_btn::before { transform: rotate(270deg) !important; } ' +
@@ -2232,6 +2232,7 @@ function mainDefaultLoad(menuNm, subMenuNm) {
 		if (subMenuNm) $('#topSubMenu').text(subMenuNm);
 		$("#topUserNm").text(jwt.userNm);
 		setMenuAuth();
+		if (typeof initTopFlowBar === 'function') initTopFlowBar();
 	});
 
 	//메뉴 off 시 메인그리드 리플레쉬 그리드 이름 gridView 사용시 적용
@@ -5485,4 +5486,102 @@ function gbsApprovalStatusHtml(val, row) {
 		return '<span style="color: #d9534f; font-weight: bold;">미승인</span>';
 	}
 	return val;
+}
+
+/* =========================================================================
+ * [2단계] ETO 글로벌 프로세스 플로우 네비게이터 & 세션 컨텍스트 연동 (Minimal Diff)
+ * ========================================================================= */
+var ETO_FLOW_PAGES = [
+	'CR0201M01', 'WB2101M03', 'WB2201M02', 'BM1402M01', 'SM0301M01', 'PM0301M01',
+	'BM0101M02', 'BM0201M01', 'BM0501M01', 'BM1101M01', 'BM1401M01', 'BM1601M01', 'BM1901M01',
+	'CR0101M01', 'CR0301M01', 'CR0501M01', 'CR0701M01', 'CR0801M01', 'CR0901M01', 'CR1001M01',
+	'CR1101M01', 'CR1301M01', 'CR1801M01', 'CR5001M01', 'DW0201M01', 'DW0302M01', 'PM0101M01',
+	'QM0101M01', 'SM0101M01', 'SM0201M01', 'SM0701M01', 'SM1001M01', 'SM5001M02', 'SM6001M01',
+	'SM6101M01', 'TR0101M01', 'WB0601M01', 'WB2101M02'
+];
+
+function getCurrentFlowPgmId() {
+	var pathMatch = (window.location && window.location.pathname) ? window.location.pathname.match(/([A-Za-z0-9]+)\.html$/i) : null;
+	if (pathMatch && pathMatch[1]) {
+		return pathMatch[1].toUpperCase();
+	}
+	return $('#pgmId').val() || '';
+}
+
+function getFlowContext() {
+	try {
+		var raw = sessionStorage.getItem('GBS_FLOW_CONTEXT');
+		return raw ? JSON.parse(raw) : null;
+	} catch (e) {
+		return null;
+	}
+}
+
+function setFlowContext(ordrsNo, histNo, clntNm) {
+	if (!ordrsNo) return;
+	var ctx = {
+		ordrsNo: String(ordrsNo),
+		histNo: (histNo !== undefined && histNo !== null) ? String(histNo) : '0',
+		clntNm: clntNm || ''
+	};
+	try {
+		sessionStorage.setItem('GBS_FLOW_CONTEXT', JSON.stringify(ctx));
+	} catch (e) {}
+	updateTopFlowBarUI(ctx);
+}
+
+function updateTopFlowBarUI(ctx) {
+	ctx = ctx || getFlowContext();
+	var $bar = $('#topProcessFlowBar');
+	if (!$bar.length) return;
+	if (ctx && ctx.ordrsNo) {
+		var shortText = ctx.ordrsNo + (ctx.histNo ? '-' + ctx.histNo : '');
+		var fullText = shortText + (ctx.clntNm ? ' (' + ctx.clntNm + ')' : '');
+		$('#topFlowPjtLabel').text(shortText);
+		$('#topFlowPjtText').attr('title', fullText + ' [클릭 시 전체 ETO 맵 열기]');
+	} else {
+		$('#topFlowPjtLabel').text('PJT 미선택');
+		$('#topFlowPjtText').attr('title', '프로젝트 미선택 [클릭 시 전체 ETO 맵 열기]');
+	}
+	var curPgm = getCurrentFlowPgmId();
+	if (curPgm) {
+		$('.top_flow_btn').removeClass('active');
+		$('#flowBtn_' + curPgm).addClass('active');
+	}
+}
+
+function jumpFlowStep(url, pgmId) {
+	var ctx = getFlowContext();
+	var targetUrl = url;
+	if (ctx && ctx.ordrsNo) {
+		var sep = targetUrl.indexOf('?') >= 0 ? '&' : '?';
+		targetUrl += sep + 'ordrsNo=' + encodeURIComponent(ctx.ordrsNo) + '&histNo=' + encodeURIComponent(ctx.histNo || '0') + '&flow=Y';
+	}
+	location.href = targetUrl;
+}
+
+function initTopFlowBar() {
+	var curPgm = getCurrentFlowPgmId();
+	var urlParam = typeof gfn_getParam === 'function' ? gfn_getParam() : {};
+	if (urlParam.ordrsNo) {
+		setFlowContext(urlParam.ordrsNo, urlParam.histNo, urlParam.clntNm);
+	}
+	var ctx = getFlowContext();
+	if (ETO_FLOW_PAGES.indexOf(curPgm) >= 0 || urlParam.flow === 'Y' || (ctx && ctx.ordrsNo)) {
+		$('#topProcessFlowBar').css('display', 'inline-flex');
+	}
+	updateTopFlowBarUI(ctx);
+}
+
+function applyFlowContext(callback) {
+	var urlParam = typeof gfn_getParam === 'function' ? gfn_getParam() : {};
+	var ctx = getFlowContext();
+	var ordrsNo = urlParam.ordrsNo || (ctx ? ctx.ordrsNo : '');
+	var histNo = urlParam.histNo || (ctx ? ctx.histNo : '');
+	if (ordrsNo) {
+		if ($('#ordrsNo_S').length) $('#ordrsNo_S').val(ordrsNo);
+		if (typeof callback === 'function') {
+			callback(ordrsNo, histNo);
+		}
+	}
 }

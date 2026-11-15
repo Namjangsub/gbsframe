@@ -24,4 +24,12 @@ public interface CM10Mapper {
 	
 	List<Map<String, String>> selectTaxNList(Map<String, String> paramMap);
 
+	List<Map<String, Object>> selectTaskFlowProjectList(Map<String, String> paramMap);
+
+	Map<String, Object> selectTaskFlowStepStatus(Map<String, String> paramMap);
+
+	List<Map<String, Object>> selectTaskFlowWbsSchedule(Map<String, String> paramMap);
+
+	List<Map<String, Object>> selectTaskFlowWbsIssueList(Map<String, String> paramMap);
+
 }

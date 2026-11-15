@@ -57,4 +57,24 @@ public class CM10SvcImpl implements CM10Svc {
 	public List<Map<String, String>> selectTaxNList(Map<String, String> paramMap) {
 		return cm10Mapper.selectTaxNList(paramMap);
 	}
+
+	@Override
+	public List<Map<String, Object>> selectTaskFlowProjectList(Map<String, String> paramMap) {
+		return cm10Mapper.selectTaskFlowProjectList(paramMap);
+	}
+
+	@Override
+	public Map<String, Object> selectTaskFlowStepStatus(Map<String, String> paramMap) {
+		return cm10Mapper.selectTaskFlowStepStatus(paramMap);
+	}
+
+	@Override
+	public List<Map<String, Object>> selectTaskFlowWbsSchedule(Map<String, String> paramMap) {
+		return cm10Mapper.selectTaskFlowWbsSchedule(paramMap);
+	}
+
+	@Override
+	public List<Map<String, Object>> selectTaskFlowWbsIssueList(Map<String, String> paramMap) {
+		return cm10Mapper.selectTaskFlowWbsIssueList(paramMap);
+	}
 }

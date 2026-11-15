@@ -67,4 +67,32 @@ public class CM10Ctr {
     	return "jsonView";
     }
     
+    @PostMapping(value = "/selectTaskFlowProjectList")
+    public String selectTaskFlowProjectList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+    	List<Map<String, Object>> resultList = cm10Svc.selectTaskFlowProjectList(paramMap);
+    	model.addAttribute("resultList", resultList);
+    	return "jsonView";
+    }
+
+    @PostMapping(value = "/selectTaskFlowStepStatus")
+    public String selectTaskFlowStepStatus(@RequestBody Map<String, String> paramMap, ModelMap model) {
+    	Map<String, Object> result = cm10Svc.selectTaskFlowStepStatus(paramMap);
+    	model.addAttribute("result", result);
+    	return "jsonView";
+    }
+
+    @PostMapping(value = "/selectTaskFlowWbsSchedule")
+    public String selectTaskFlowWbsSchedule(@RequestBody Map<String, String> paramMap, ModelMap model) {
+    	List<Map<String, Object>> resultList = cm10Svc.selectTaskFlowWbsSchedule(paramMap);
+    	model.addAttribute("resultList", resultList);
+    	return "jsonView";
+    }
+
+    @PostMapping(value = "/selectTaskFlowWbsIssueList")
+    public String selectTaskFlowWbsIssueList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+    	List<Map<String, Object>> resultList = cm10Svc.selectTaskFlowWbsIssueList(paramMap);
+    	model.addAttribute("resultList", resultList);
+    	return "jsonView";
+    }
+    
 }

@@ -21,4 +21,12 @@ public interface CM10Svc {
 	
 	public List<Map<String, String>> selectTaxNList(Map<String, String> param);
 	
+	public List<Map<String, Object>> selectTaskFlowProjectList(Map<String, String> param);
+
+	public Map<String, Object> selectTaskFlowStepStatus(Map<String, String> param);
+	
+	public List<Map<String, Object>> selectTaskFlowWbsSchedule(Map<String, String> param);
+
+	public List<Map<String, Object>> selectTaskFlowWbsIssueList(Map<String, String> param);
+	
 }
