@@ -21,6 +21,7 @@ public class CustomAuthenticationProvider implements AuthenticationProvider {
 
     private final PasswordEncoder passwordEncoder;
     private final LoginService loginService;
+    private final PwnedPasswordService pwnedPasswordService;
 
     @Override
     public Authentication authenticate(Authentication authentication) {
@@ -49,8 +50,17 @@ public class CustomAuthenticationProvider implements AuthenticationProvider {
             throw new LoginFailureException("LEAVE_OF_ABSENCE", user);
         }
 
+        // 유출 비밀번호 여부는 권고용으로만 전달(로그인 차단 없음). 평문은 SuccessHandler에서 얻을 수 없으므로 여기서 검사
+        boolean pwned = pwnedPasswordService.isPwned(password);
+        Object details = authentication.getDetails();
+        if (details instanceof Map) {
+            Map<Object, Object> copy = new HashMap<Object, Object>((Map<?, ?>) details);
+            copy.put("pwned", pwned ? "Y" : "N");
+            details = copy;
+        }
+
         UsernamePasswordAuthenticationToken result = new UsernamePasswordAuthenticationToken(user, password, user.getAuthorities());
-        result.setDetails(authentication.getDetails());
+        result.setDetails(details);
         return result;
     }
 

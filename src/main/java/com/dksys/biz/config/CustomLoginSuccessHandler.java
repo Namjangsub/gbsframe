@@ -120,7 +120,8 @@ public class CustomLoginSuccessHandler implements AuthenticationSuccessHandler {
 
         response.setStatus(HttpServletResponse.SC_OK);
         response.setContentType("application/json;charset=UTF-8");
-        response.getWriter().write("{\"msg\":\"success\",\"redirect_uri\":\"" + redirectUri + "\"}");
+        boolean pwned = details instanceof Map && "Y".equals(((Map<?, ?>) details).get("pwned"));
+        response.getWriter().write("{\"msg\":\"success\",\"redirect_uri\":\"" + redirectUri + "\",\"pwned\":" + pwned + "}");
     }
     
 
