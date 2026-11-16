@@ -41,7 +41,9 @@ public class CustomLoginFailureHandler implements AuthenticationFailureHandler {
             com.dksys.biz.main.vo.User user =
                 ((LoginFailureException) ex).getUser();
 
-            if ("N".equals(user.getUseYn())) {
+            if (user == null) {
+                body.put("msg", "아이디를 확인해 주세요.");
+            } else if ("N".equals(user.getUseYn())) {
                 body.put("msg", "비활성화된 계정입니다 ...");
             } else if ("LEAVE_OF_ABSENCE".equals(ex.getMessage())) {
                 body.put("msg", "휴직 상태의 계정입니다. 관리자에게 문의하세요.");
