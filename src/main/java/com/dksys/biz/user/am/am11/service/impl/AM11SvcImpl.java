@@ -89,6 +89,9 @@ public class AM11SvcImpl implements AM11Svc {
             return resultMap;
         }
 
+        // 모든 구속/후결 결재선이 완료된 문서가 진행중 상태로 남아있으면 COMPLETED로 즉시 자동 보정
+        reconcileCompletedDocStatusIfNeeded(paramMap, docInfo);
+
         // 방안 A (협조 비구속 병렬): 진행 중 문서의 READY 협조(COOP) 라인은 즉시 PENDING으로 개방 보정
         String currentDocStatus = (String) docInfo.get("docStatus");
         if ("REQUEST".equals(currentDocStatus) || "PROGRESS".equals(currentDocStatus) || "POST_PROGRESS".equals(currentDocStatus)) {
@@ -431,13 +434,14 @@ public class AM11SvcImpl implements AM11Svc {
         }
 
         docLock = new HashMap<>(docLock);
-        if (("PM07".equals(docLock.get("erpBizType")) || "PM51".equals(docLock.get("erpBizType")) || "PM52".equals(docLock.get("erpBizType")) || "PM08".equals(docLock.get("erpBizType")) || "CR02".equals(docLock.get("erpBizType")))
+        if (("PM07".equals(docLock.get("erpBizType")) || "PM51".equals(docLock.get("erpBizType")) || "PM52".equals(docLock.get("erpBizType")) || "PM08".equals(docLock.get("erpBizType")) || "CR02".equals(docLock.get("erpBizType")) || "WB24".equals(docLock.get("erpBizType")) || "QM01".equals(docLock.get("erpBizType")))
                 && am11Mapper.selectLinkedSourceCount(docLock) == 0) {
             resultMap.put("resultCode", "409");
             resultMap.put("resultMessage", "원본 ERP 결재문서가 삭제되어 승인할 수 없습니다.");
             return resultMap;
         }
 
+        reconcileCompletedDocStatusIfNeeded(paramMap, docLock);
         String docStatus = (String) docLock.get("docStatus");
         if (!"REQUEST".equals(docStatus) && !"PROGRESS".equals(docStatus) && !"POST_PROGRESS".equals(docStatus)) {
             resultMap.put("resultCode", "500");
@@ -1018,6 +1022,7 @@ public class AM11SvcImpl implements AM11Svc {
             return resultMap;
         }
 
+        reconcileCompletedDocStatusIfNeeded(paramMap, docLock);
         String docStatus = (String) docLock.get("docStatus");
         if (!"REQUEST".equals(docStatus) && !"PROGRESS".equals(docStatus)) {
             resultMap.put("resultCode", "500");
@@ -1507,6 +1512,7 @@ public class AM11SvcImpl implements AM11Svc {
             return resultMap;
         }
 
+        reconcileCompletedDocStatusIfNeeded(paramMap, docLock);
         String docStatus = (String) docLock.get("docStatus");
         if (!"REQUEST".equals(docStatus) && !"PROGRESS".equals(docStatus)) {
             resultMap.put("resultCode", "500");
@@ -1965,6 +1971,103 @@ public class AM11SvcImpl implements AM11Svc {
             }
         }
         return stage;
+    }
+
+    /**
+     * 모든 구속/후결 결재선(APPR/AGREE/POST)이 완료되고 반려(REJECTED)가 없는데
+     * 마스터 DOC_STATUS만 REQUEST/PROGRESS/POST_PROGRESS로 남아 있는 경우 COMPLETED로 자동 보정한다.
+     * 멱등: 보정이 불필요하면 no-op. 실패 시 로그만 남기고 호출 흐름을 막지 않는다.
+     */
+    private boolean reconcileCompletedDocStatusIfNeeded(Map<String, Object> paramMap, Map<String, Object> docMap) {
+        if (docMap == null || docMap.get("docId") == null) {
+            return false;
+        }
+        String docStatus = valueOf(docMap.get("docStatus"));
+        if (!"REQUEST".equals(docStatus) && !"PROGRESS".equals(docStatus) && !"POST_PROGRESS".equals(docStatus)) {
+            return false;
+        }
+        try {
+            Map<String, Object> lineParam = new HashMap<>(paramMap);
+            lineParam.put("docId", docMap.get("docId"));
+            List<Map<String, Object>> lineList = am11Mapper.selectApprovalLineList(lineParam);
+            if (!isAllApprovalLinesCompleted(lineList)) {
+                return false;
+            }
+
+            Map<String, Object> locked = am11Mapper.selectApprovalDocForUpdate(lineParam);
+            if (locked == null) {
+                return false;
+            }
+            String lockedStatus = valueOf(locked.get("docStatus"));
+            if (!"REQUEST".equals(lockedStatus) && !"PROGRESS".equals(lockedStatus) && !"POST_PROGRESS".equals(lockedStatus)) {
+                return false;
+            }
+            List<Map<String, Object>> lockedLines = am11Mapper.selectApprovalLineList(lineParam);
+            if (!isAllApprovalLinesCompleted(lockedLines)) {
+                return false;
+            }
+
+            int maxSeq = 0;
+            for (Map<String, Object> line : lockedLines) {
+                Object seqObj = line.get("lineSeq");
+                if (seqObj != null) {
+                    int seq = Integer.parseInt(String.valueOf(seqObj));
+                    if (seq > maxSeq) {
+                        maxSeq = seq;
+                    }
+                }
+            }
+
+            Map<String, Object> updateParam = new HashMap<>(lineParam);
+            updateParam.put("nextStatus", "COMPLETED");
+            updateParam.put("currLineSeq", maxSeq);
+            updateParam.put("currApproverId", "");
+            updateParam.put("currApproverNm", "");
+            if (valueOf(updateParam.get("userId")).isEmpty()) {
+                updateParam.put("userId", "SYSTEM");
+            }
+            if (valueOf(updateParam.get("pgmId")).isEmpty()) {
+                updateParam.put("pgmId", "AM11_RECONCILE");
+            }
+            am11Mapper.updateApprovalDocStatus(updateParam);
+
+            docMap.put("docStatus", "COMPLETED");
+            docMap.put("docStatusNm", "완료");
+            docMap.put("currLineSeq", maxSeq);
+            docMap.put("currApproverId", "");
+            docMap.put("currApproverNm", "");
+            logger.info("[AM 상태 자동 보정] 모든 결재선 완료 문서 COMPLETED 복구: docId={}, prevStatus={}",
+                    docMap.get("docId"), lockedStatus);
+            return true;
+        } catch (Exception e) {
+            logger.warn("[AM 상태 자동 보정] 실패(무시하고 진행): docId={}", docMap.get("docId"), e);
+            return false;
+        }
+    }
+
+    private boolean isAllApprovalLinesCompleted(List<Map<String, Object>> lineList) {
+        if (lineList == null || lineList.isEmpty()) {
+            return false;
+        }
+        boolean hasBindingLine = false;
+        for (Map<String, Object> line : lineList) {
+            String type = lineTypeOf(line);
+            String status = valueOf(line.get("lineStatus"));
+            if ("REJECTED".equals(status)) {
+                return false;
+            }
+            if ("APPR".equals(type) || "AGREE".equals(type)) {
+                hasBindingLine = true;
+                if (!"APPROVED".equals(status) && !"ARBIT".equals(status)) {
+                    return false;
+                }
+            } else if ("POST".equals(type)) {
+                if ("READY".equals(status) || "PENDING".equals(status)) {
+                    return false;
+                }
+            }
+        }
+        return hasBindingLine;
     }
 
     /** PENDING 구속 라인이 없고 첫 미승인 구속 라인이 READY인 교착 상태면 그 라인, 아니면 null. */
@@ -2583,6 +2686,7 @@ public class AM11SvcImpl implements AM11Svc {
             return resultMap;
         }
 
+        reconcileCompletedDocStatusIfNeeded(paramMap, docLock);
         String docStatus = (String) docLock.get("docStatus");
         if (!"REQUEST".equals(docStatus) && !"PROGRESS".equals(docStatus) && !"POST_PROGRESS".equals(docStatus)) {
             resultMap.put("resultCode", "500");
