@@ -376,6 +376,12 @@ function determineWorkTypeNm(row, matchedTrip, matchedVacation, matchedSubstWork
 		return '제외';
 	}
 
+	// 출장신청서가 있어도 휴일이고 근태내역·휴일대체근무가 없으면 '휴일'
+	if (matchedTrip && String(row.holidayYn || '').trim() === '휴일' && !matchedSubstWork
+		&& !String(row.inDttm || row.inTm || '').trim() && !String(row.outDttm || row.outTm || '').trim() && !Number(row.totWorkTm || 0)) {
+		return '휴일';
+	}
+
 	// 1. 출장 (설치시운전, 설치장애, A/S(무상), 기타출장)
 	if (matchedTrip) {
 		var tripTc = String(matchedTrip.tripTypeCds || matchedTrip.tripTypeCd || '').trim().toUpperCase();
