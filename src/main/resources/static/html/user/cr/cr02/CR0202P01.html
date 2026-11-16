@@ -3,10 +3,11 @@
 .truncate_multi_post {
 	width: 802px;
 	resize: none;
-	padding: 1px;
+	padding: 4px 6px;
 	border: solid 1px #e6e6e6;
 	border-radius: 5px;
-	display: -webkit-box;
+	display: block;
+	overflow-y: hidden;
 	word-wrap: break-word;
 	text-align: left;
 }
@@ -14,6 +15,74 @@
 	overflow-y: hidden;
 	resize: none;
 	height: auto;
+}
+/* 결재 조회모드 그리드 행 마우스 호버 시 상세 팝오버 툴팁 레이어 */
+.cr0202p01-info-popover {
+	position: fixed;
+	z-index: 999999;
+	display: none;
+	background: #ffffff;
+	border: 1px solid #3b62b1;
+	border-radius: 6px;
+	box-shadow: 0 4px 18px rgba(0, 0, 0, 0.22);
+	padding: 10px 14px;
+	min-width: 300px;
+	max-width: 460px;
+	max-height: 460px;
+	overflow-y: auto;
+	font-size: 12px;
+	color: #333333;
+	pointer-events: none;
+	line-height: 1.45;
+}
+.cr0202p01-info-popover .popover-title {
+	font-weight: bold;
+	border-bottom: 2px solid #3b62b1;
+	padding-bottom: 6px;
+	margin-bottom: 8px;
+	font-size: 13px;
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	gap: 8px;
+}
+.cr0202p01-info-popover .popover-badge {
+	font-size: 11px;
+	font-weight: bold;
+	color: #ffffff;
+	padding: 2px 7px;
+	border-radius: 3px;
+	white-space: nowrap;
+}
+.cr0202p01-info-popover .popover-item {
+	padding: 2.5px 0;
+	color: #444444;
+	word-break: break-all;
+}
+.cr0202p01-info-popover .popover-item b {
+	color: #222222;
+	display: inline-block;
+	min-width: 92px;
+	font-weight: 600;
+}
+.cr0202p01-info-popover .popover-box {
+	margin-top: 5px;
+	margin-bottom: 5px;
+	padding: 6px 9px;
+	background: #f8f9fa;
+	border-radius: 4px;
+	border-left: 3px solid #3b62b1;
+	white-space: pre-wrap;
+	word-break: break-all;
+	max-height: 120px;
+	overflow-y: auto;
+	color: #333333;
+	font-size: 11.5px;
+	line-height: 1.4;
+}
+.cr0202p01-info-popover .popover-divider {
+	margin: 6px 0;
+	border-top: 1px dashed #dadce0;
 }
 </style>
 
@@ -570,6 +639,9 @@
 	/* document.ready */
 	$(document).ready(function () {
 		setCommonSelect($(".popup_area select[data-kind]"));
+		$('#ordrsRmk').on('input change', autoResizeOrdrsRmkP01);
+		autoResizeOrdrsRmkP01();
+		bindCr0202P01GridRowPopover();
 		fileTrgtKey = modalStack.last().paramObj.fileTrgtKey;
 		$("#taskBtn").hide();
 		$('#fileUpBtn').hide();
@@ -2904,6 +2976,8 @@
 			changeTrnsDiv($('#trnsDiv').val());
 			changeSetEtc($('#dmsSendCndDiv').val(), 'dmsSendCndDiv');
 			changeSetEtc($('#ovsSendCndDiv').val(), 'ovsSendCndDiv');
+			autoResizeOrdrsRmkP01();
+			setTimeout(autoResizeOrdrsRmkP01, 50);
 
 			//수정시  로드 될떄 gridOrdrsPlan 그리드 데이터 불러오는 부분 (xml 파일에서 : resultInfoMap 해당 쿼리)
 			var pmntPlans = data.ordrsInfo.plans;
@@ -4672,6 +4746,201 @@
 		}
 
 		openSecondModal("/static/html/user/cr/cr02/CR0202P03.html", 1700, 850, "미정산잔액조회", paramObj);
+	}
+
+	function autoResizeOrdrsRmkP01() {
+		var el = $('#ordrsRmk')[0];
+		if (!el) return;
+		el.style.height = 'auto';
+		el.style.overflowY = 'hidden';
+		var targetH = Math.max(el.scrollHeight + 4, 72);
+		el.style.height = targetH + 'px';
+	}
+
+	/* =========================================================================
+	 * 결재 조회모드 수주상세 그리드(second-grid-modal) 행 마우스 호버 툴팁 팝오버
+	 * ========================================================================= */
+	function isCr0202P01HoverTooltipMode() {
+		if ($("[data-ax5grid='second-grid-modal']").length === 0) return false;
+		var curAction = (typeof actionType !== "undefined") ? actionType : "";
+		return (curAction !== "C" && curAction !== "U")
+			|| $("#actionOrdrsBtn").length === 0
+			|| $("#actionOrdrsBtn").is(":hidden")
+			|| (typeof jwt !== "undefined" && jwt && jwt.userId === "EMJ8105");
+	}
+
+	function bindCr0202P01GridRowPopover() {
+		$(document).off(".cr0202p01Popover");
+		var rowSelector = "[data-ax5grid='second-grid-modal'] [data-ax5grid-panel*='body'] tr[data-ax5grid-tr-data-index]";
+		$(document).on("mouseenter.cr0202p01Popover", rowSelector, function(e) {
+			var dindex = $(this).attr("data-ax5grid-tr-data-index");
+			showCr0202P01RowPopover(e, dindex);
+		});
+		$(document).on("mousemove.cr0202p01Popover", rowSelector, function(e) {
+			moveCr0202P01RowPopover(e);
+		});
+		$(document).on("mouseleave.cr0202p01Popover", rowSelector, function() {
+			hideCr0202P01RowPopover();
+		});
+		$(document).on("mouseleave.cr0202p01Popover", "[data-ax5grid='second-grid-modal']", function() {
+			hideCr0202P01RowPopover();
+		});
+		$(window).off(".cr0202p01Popover").on("scroll.cr0202p01Popover", function() {
+			hideCr0202P01RowPopover();
+		});
+		$("[data-ax5grid='second-grid-modal']").off(".cr0202p01Popover").on("wheel.cr0202p01Popover mousewheel.cr0202p01Popover", function() {
+			hideCr0202P01RowPopover();
+		});
+	}
+
+	function showCr0202P01RowPopover(e, dindex) {
+		if (!isCr0202P01HoverTooltipMode()) {
+			hideCr0202P01RowPopover();
+			return;
+		}
+		if (dindex === undefined || dindex === null || dindex === "") return;
+		if (!gridOrdrsDetail || !gridOrdrsDetail.list) return;
+		var item = gridOrdrsDetail.list[dindex];
+		if (!item || item.__isGrouping) return;
+
+		var $pop = $("#cr0202p01InfoPopover");
+		if ($pop.length === 0) {
+			$pop = $('<div id="cr0202p01InfoPopover" class="cr0202p01-info-popover"></div>');
+			$("body").append($pop);
+		}
+
+		var ordrsDtlDiv10Nm = getComboName(comboOdd1, { value: item.ordrsDtlDiv10 }) || item.ordrsDtlDiv10 || "-";
+		var cnfmVal = String(item.cnfmYn || "").trim();
+		var isUnconfirmed = (cnfmVal === "N" || cnfmVal === "미확정");
+		var cnfmLabel = isUnconfirmed ? "미확정" : "확정";
+		var badgeColor = isUnconfirmed ? "#d93025" : "#1a73e8";
+
+		var itemDivNm = getComboName(comboItemList, { value: item.itemDiv });
+		var div20Nm = getComboName(comboOdd2, { value: item.ordrsDtlDiv20 });
+		var div30Nm = getComboName(comboOdd3, { value: item.ordrsDtlDiv30 });
+		var mcTypeNm = getComboName(comboOdd4, { value: item.mctype });
+
+		var prcMach = pasIntChk(item.ordrsPrcMach);
+		var prcElcty = pasIntChk(item.ordrsPrcElcty);
+		var prcSum = prcMach + prcElcty;
+
+		var trgtMach = pasIntChk(item.trgtPchsPcostMach);
+		var trgtElcty = pasIntChk(item.trgtPchsPcostElcty);
+		var trgtSum = trgtMach + trgtElcty;
+		var inHousePrcsn = pasIntChk(item.trgtPchsPcostInHousePrcsn);
+		var machAfterDeduction = trgtMach - inHousePrcsn;
+
+		var html = '';
+		html += '<div class="popover-title" style="color: ' + badgeColor + '; border-bottom: 2px solid ' + badgeColor + ';">'
+			+ '  <span>' + escapeHtmlCr0202P01(item.eqpNm || "수주상세 정보") + '</span>'
+			+ '  <span class="popover-badge" style="background: ' + badgeColor + ';">' + escapeHtmlCr0202P01(ordrsDtlDiv10Nm + " · " + cnfmLabel) + '</span>'
+			+ '</div>';
+
+		if (item.salesCd || item.orgnSalesCd) {
+			var salesText = (item.salesCd || "-") + (item.orgnSalesCd ? " (원천: " + item.orgnSalesCd + ")" : "");
+			html += '<div class="popover-item"><b>Sales Code:</b> ' + escapeHtmlCr0202P01(salesText) + '</div>';
+		}
+
+		var typeParts = [];
+		if (item.prdtCd) typeParts.push("제품: " + item.prdtCd);
+		if (itemDivNm) typeParts.push("아이템: " + itemDivNm);
+		if (div20Nm) typeParts.push("작업: " + div20Nm);
+		if (div30Nm) typeParts.push("자체: " + div30Nm);
+		if (mcTypeNm) typeParts.push("기계: " + mcTypeNm);
+		if (item.devDiv) typeParts.push("개발: " + item.devDiv);
+		if (typeParts.length > 0) {
+			html += '<div class="popover-item"><b>구분:</b> ' + escapeHtmlCr0202P01(typeParts.join(" / ")) + '</div>';
+		}
+
+		var dudtStr = formatDateYmdCr0202P01(item.dudtIntendDt);
+		html += '<div class="popover-item"><b>납기예정일 / 수량:</b> ' + escapeHtmlCr0202P01((dudtStr || "-") + " / " + (item.ordrsQty != null && item.ordrsQty !== "" ? item.ordrsQty : "-")) + '</div>';
+
+		html += '<div class="popover-divider"></div>';
+		html += '<div class="popover-item"><b>수주목표가:</b> ' + escapeHtmlCr0202P01(addCommaStr(pasIntChk(item.estTrgtCost))) + '</div>';
+		html += '<div class="popover-item"><b>수주가:</b> 기계 ' + escapeHtmlCr0202P01(addCommaStr(prcMach)) + ' / 전기 ' + escapeHtmlCr0202P01(addCommaStr(prcElcty)) + ' / <b>합계 ' + escapeHtmlCr0202P01(addCommaStr(prcSum)) + '</b></div>';
+		html += '<div class="popover-item"><b>견적예상재료비:</b> ' + escapeHtmlCr0202P01(addCommaStr(pasIntChk(item.estEpctMatPrc))) + '</div>';
+		html += '<div class="popover-item"><b>작업계획공수:</b> 기계 ' + escapeHtmlCr0202P01(item.trgtMchMnr != null && item.trgtMchMnr !== "" ? item.trgtMchMnr : "0") + ' / 전기 ' + escapeHtmlCr0202P01(item.trgtElcMnr != null && item.trgtElcMnr !== "" ? item.trgtElcMnr : "0") + '</div>';
+		html += '<div class="popover-item"><b>목표구매원가:</b> 기계 ' + escapeHtmlCr0202P01(addCommaStr(trgtMach)) + ' / 전기 ' + escapeHtmlCr0202P01(addCommaStr(trgtElcty)) + ' / <b>합계 ' + escapeHtmlCr0202P01(addCommaStr(trgtSum)) + '</b></div>';
+		if (inHousePrcsn !== 0 || trgtMach !== 0) {
+			html += '<div class="popover-item"><b>자체가공 / 차감후:</b> ' + escapeHtmlCr0202P01(addCommaStr(inHousePrcsn)) + ' / ' + escapeHtmlCr0202P01(addCommaStr(machAfterDeduction)) + '</div>';
+		}
+
+		if (item.outtkClntNm || item.unsettledOrdrsNo || item.dtlRmk) {
+			html += '<div class="popover-divider"></div>';
+			if (item.outtkClntNm) {
+				html += '<div class="popover-item"><b>외주턴키:</b> ' + escapeHtmlCr0202P01(item.outtkClntNm) + '</div>';
+			}
+			if (item.unsettledOrdrsNo) {
+				var unsettledTxt = item.unsettledOrdrsNo + (item.unsettledOrdrsSeq ? " (순번: " + item.unsettledOrdrsSeq + ")" : "");
+				html += '<div class="popover-item"><b>정산상계처리:</b> ' + escapeHtmlCr0202P01(unsettledTxt) + '</div>';
+			}
+			if (item.dtlRmk) {
+				html += '<div class="popover-item"><b>비고:</b></div>';
+				html += '<div class="popover-box">' + escapeHtmlCr0202P01(item.dtlRmk) + '</div>';
+			}
+		}
+
+		$pop.html(html);
+		$pop.show();
+		positionCr0202P01Popover(e);
+	}
+
+	function moveCr0202P01RowPopover(e) {
+		positionCr0202P01Popover(e);
+	}
+
+	function positionCr0202P01Popover(e) {
+		var $pop = $("#cr0202p01InfoPopover");
+		if (!$pop.is(":visible")) return;
+
+		var mouseX = e.clientX || (e.originalEvent ? e.originalEvent.clientX : 0);
+		var mouseY = e.clientY || (e.originalEvent ? e.originalEvent.clientY : 0);
+
+		var popW = $pop.outerWidth() || 320;
+		var popH = $pop.outerHeight() || 220;
+		var winW = $(window).width();
+		var winH = $(window).height();
+
+		var posX = mouseX + 15;
+		var posY = mouseY + 15;
+
+		if (posX + popW > winW - 10) {
+			posX = mouseX - popW - 15;
+		}
+		if (posY + popH > winH - 10) {
+			posY = mouseY - popH - 15;
+		}
+		if (posX < 10) posX = 10;
+		if (posY < 10) posY = 10;
+
+		$pop.css({
+			"top": posY + "px",
+			"left": posX + "px"
+		});
+	}
+
+	function hideCr0202P01RowPopover() {
+		$("#cr0202p01InfoPopover").hide();
+	}
+
+	function formatDateYmdCr0202P01(val) {
+		if (!val) return "";
+		var dt = new Date(val);
+		if (isNaN(dt.getTime())) return String(val);
+		var y = dt.getFullYear();
+		var m = String(dt.getMonth() + 1).padStart(2, "0");
+		var d = String(dt.getDate()).padStart(2, "0");
+		return y + "-" + m + "-" + d;
+	}
+
+	function escapeHtmlCr0202P01(text) {
+		if (text === null || text === undefined) return "";
+		return String(text)
+			.replace(/&/g, "&amp;")
+			.replace(/</g, "&lt;")
+			.replace(/>/g, "&gt;")
+			.replace(/"/g, "&quot;")
+			.replace(/'/g, "&#039;");
 	}
 
 	</script>
