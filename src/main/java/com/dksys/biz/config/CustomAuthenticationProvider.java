@@ -34,6 +34,9 @@ public class CustomAuthenticationProvider implements AuthenticationProvider {
         map.put("id", username);
 
         User user = loginService.selectUserInfo(map);
+        if (user == null) {
+            throw new LoginFailureException("INVALID_USER_ID", null);
+        }
 
 //        System.out.println(">>> 입력 비밀번호: [" + password + "]");
 //        System.out.println(">>> DB 비밀번호: [" + user.getPassword() + "]");
