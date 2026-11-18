@@ -270,11 +270,13 @@
 							}
 							childGridView.target.repaint();   //수정내용 적용하기
 						} else if (this.key == "matrMno") {
-							//같은창을 계속 open 하는데 처리방법은?
-							childGridView.target.setValue(this.dindex, "matrUnitCd", '');
-							childGridView.target.setValue(this.dindex, "matrUnitCdNm", '');
-							childGridView.target.setValue(this.dindex, "matrCd", '');
-							childGridView.target.setValue(this.dindex, "pchsBomCnt", 0);
+							if (!matModalOpen) {
+								// 사용자가 형번/규격을 직접 수정한 경우 기존 자재코드 정보 초기화
+								childGridView.target.setValue(this.dindex, "matrUnitCd", '');
+								childGridView.target.setValue(this.dindex, "matrUnitCdNm", '');
+								childGridView.target.setValue(this.dindex, "matrCd", '');
+								childGridView.target.setValue(this.dindex, "pchsBomCnt", 0);
+							}
 						}
 
 						if (this.item.__selected__ == true) {
@@ -560,10 +562,15 @@
 									childGridView.target.repaint();
 									noErr = false;
 								} else if(data.resultList.length == 1 ) {	//1건 정상 검색처리스
-									childGridView.target.setValue(list.__index, 'matrCd', data.resultList[0].matrCd);
-									childGridView.target.setValue(list.__index, 'matrMno', data.resultList[0].matrSpec);
-									childGridView.target.setValue(list.__index, 'matrError', 'Y');
-									childGridView.target.setValue(list.__index, 'matrErrorText', '');
+									matModalOpen = true;
+									try {
+										childGridView.target.setValue(list.__index, 'matrMno', data.resultList[0].matrSpec);
+										childGridView.target.setValue(list.__index, 'matrCd', data.resultList[0].matrCd);
+										childGridView.target.setValue(list.__index, 'matrError', 'Y');
+										childGridView.target.setValue(list.__index, 'matrErrorText', '');
+									} finally {
+										matModalOpen = false;
+									}
 									childGridView.target.repaint();
 								} else {	//1건이상 검색시 선택이 필요함
 									var matrFound = data.resultList.some(function(obj) {
@@ -807,36 +814,39 @@
 			"coCd" : $('#coCd_S').val(),
 			"searchValue" : tempSearchValue.replace(/ /g, '')
 		}
-		matModalOpen = true;	//자재형변변경시 한번만 실행되게 강제하기위함
 		openThirdModal("/static/html/cmn/modal/multimatListSearch.html", 1400, 700, "자재 검색", paramObj, function (grid) {
 			const allItm = grid.target.getList("selected");
 			let index = 0;
-			for (const newRow of allItm) {
-				if (index) {
-					insertDetailGridRow();
-					const insertRow = childGridView.target.getList("selected")[0]
-					row = insertRow.__index;
-				}
-				// childGridView.target.setValue(0, "a", "A-1");
-				childGridView.target.setValue(row, "matrNm", newRow.matrNm);
-				childGridView.target.setValue(row, "matrCd", newRow.matrCd);
-				childGridView.target.setValue(row, "lowerUnit", newRow.matrUnitNm);
-				childGridView.target.setValue(row, "matrUnitCd", newRow.matrUnit);
-				childGridView.target.setValue(row, "matrUnitCdNm", newRow.matrUnitNm);
-				childGridView.target.setValue(row, "matrMat", newRow.matrMat);
-				childGridView.target.setValue(row, "matrMakrNm", newRow.matrMakrNm);
-				childGridView.target.setValue(row, "matrMno", newRow.matrSpec);
-				// childGridView.target.setValue(row, "matrSpec", newRow.matrSpec);
-				childGridView.target.setValue(row, "matrYn", "N");
-				if ($('[name="matrYn"]:checked').val() == "Y") {
-					childGridView.target.setValue(row, "lowerCd", newRow.matrCd);
-				}
-				index=1;
+			matModalOpen = true;	//자재형번 일괄 세팅 시 onDataChanged 초기화 방지
+			try {
+				for (const newRow of allItm) {
+					if (index) {
+						insertDetailGridRow();
+						const insertRow = childGridView.target.getList("selected")[0]
+						row = insertRow.__index;
+					}
+					// childGridView.target.setValue(0, "a", "A-1");
+					childGridView.target.setValue(row, "matrMno", newRow.matrSpec);
+					childGridView.target.setValue(row, "matrNm", newRow.matrNm);
+					childGridView.target.setValue(row, "matrCd", newRow.matrCd);
+					childGridView.target.setValue(row, "lowerUnit", newRow.matrUnitNm);
+					childGridView.target.setValue(row, "matrUnitCd", newRow.matrUnit);
+					childGridView.target.setValue(row, "matrUnitCdNm", newRow.matrUnitNm);
+					childGridView.target.setValue(row, "matrMat", newRow.matrMat);
+					childGridView.target.setValue(row, "matrMakrNm", newRow.matrMakrNm);
+					// childGridView.target.setValue(row, "matrSpec", newRow.matrSpec);
+					childGridView.target.setValue(row, "matrYn", "N");
+					if ($('[name="matrYn"]:checked').val() == "Y") {
+						childGridView.target.setValue(row, "lowerCd", newRow.matrCd);
+					}
+					index=1;
 
-				childGridView.target.setValue(row, 'matrError', 'Y');
-				childGridView.target.setValue(row, 'matrErrorText', '');
-			};
-			matModalOpen = false;	//자재형변변경시 한번만 실행되게 강제하기위함
+					childGridView.target.setValue(row, 'matrError', 'Y');
+					childGridView.target.setValue(row, 'matrErrorText', '');
+				};
+			} finally {
+				matModalOpen = false;
+			}
 		});
 	}
 
