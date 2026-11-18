@@ -5497,8 +5497,14 @@ var ETO_FLOW_PAGES = [
 	'CR0101M01', 'CR0301M01', 'CR0501M01', 'CR0701M01', 'CR0801M01', 'CR0901M01', 'CR1001M01',
 	'CR1101M01', 'CR1301M01', 'CR1801M01', 'CR5001M01', 'DW0201M01', 'DW0302M01', 'PM0101M01',
 	'QM0101M01', 'SM0101M01', 'SM0201M01', 'SM0701M01', 'SM1001M01', 'SM5001M02', 'SM6001M01',
-	'SM6101M01', 'TR0101M01', 'WB0601M01', 'WB2101M02'
+	'SM6101M01', 'TR0101M01', 'WB0601M01', 'WB2101M02',
+	'CM1001M01', 'CM1002M01', 'CM1003M01', 'CM1004M01', 'CM1005M01', 'WB2001M01', 'WB2401M01'
 ];
+
+function getFlowStorageKey() {
+	var userId = (typeof jwt !== 'undefined' && jwt && jwt.userId) ? jwt.userId : 'USER';
+	return 'GBS_FLOW_CONTEXT_' + userId;
+}
 
 function getCurrentFlowPgmId() {
 	var pathMatch = (window.location && window.location.pathname) ? window.location.pathname.match(/([A-Za-z0-9]+)\.html$/i) : null;
@@ -5511,6 +5517,12 @@ function getCurrentFlowPgmId() {
 function getFlowContext() {
 	try {
 		var raw = sessionStorage.getItem('GBS_FLOW_CONTEXT');
+		if (!raw) {
+			raw = localStorage.getItem(getFlowStorageKey());
+			if (raw) {
+				sessionStorage.setItem('GBS_FLOW_CONTEXT', raw);
+			}
+		}
 		return raw ? JSON.parse(raw) : null;
 	} catch (e) {
 		return null;
@@ -5524,8 +5536,12 @@ function setFlowContext(ordrsNo, histNo, clntNm) {
 		histNo: (histNo !== undefined && histNo !== null) ? String(histNo) : '0',
 		clntNm: clntNm || ''
 	};
+	var json = JSON.stringify(ctx);
 	try {
-		sessionStorage.setItem('GBS_FLOW_CONTEXT', JSON.stringify(ctx));
+		sessionStorage.setItem('GBS_FLOW_CONTEXT', json);
+	} catch (e) {}
+	try {
+		localStorage.setItem(getFlowStorageKey(), json);
 	} catch (e) {}
 	updateTopFlowBarUI(ctx);
 }
@@ -5534,6 +5550,7 @@ function updateTopFlowBarUI(ctx) {
 	ctx = ctx || getFlowContext();
 	var $bar = $('#topProcessFlowBar');
 	if (!$bar.length) return;
+	$bar.css('display', 'inline-flex');
 	if (ctx && ctx.ordrsNo) {
 		var shortText = ctx.ordrsNo + (ctx.histNo ? '-' + ctx.histNo : '');
 		var fullText = shortText + (ctx.clntNm ? ' (' + ctx.clntNm + ')' : '');
@@ -5561,16 +5578,26 @@ function jumpFlowStep(url, pgmId) {
 }
 
 function initTopFlowBar() {
-	var curPgm = getCurrentFlowPgmId();
 	var urlParam = typeof gfn_getParam === 'function' ? gfn_getParam() : {};
 	if (urlParam.ordrsNo) {
 		setFlowContext(urlParam.ordrsNo, urlParam.histNo, urlParam.clntNm);
 	}
 	var ctx = getFlowContext();
-	if (ETO_FLOW_PAGES.indexOf(curPgm) >= 0 || urlParam.flow === 'Y' || (ctx && ctx.ordrsNo)) {
-		$('#topProcessFlowBar').css('display', 'inline-flex');
-	}
+	$('#topProcessFlowBar').css('display', 'inline-flex');
 	updateTopFlowBarUI(ctx);
+
+	$(window).off('storage.topFlowBar').on('storage.topFlowBar', function(e) {
+		var evt = e.originalEvent || e;
+		if (!evt || evt.key !== getFlowStorageKey()) return;
+		var nextCtx = null;
+		try {
+			if (evt.newValue) {
+				sessionStorage.setItem('GBS_FLOW_CONTEXT', evt.newValue);
+				nextCtx = JSON.parse(evt.newValue);
+			}
+		} catch (err) {}
+		updateTopFlowBarUI(nextCtx || getFlowContext());
+	});
 }
 
 function applyFlowContext(callback) {

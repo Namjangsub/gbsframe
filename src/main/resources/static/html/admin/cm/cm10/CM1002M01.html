@@ -2187,8 +2187,19 @@ function toDoConfirm(row){
 				return;
 			}
 
-			// 이전에 보던 수주번호 복원 시도
+			// 이전에 보던 수주번호 복원 시도 (세션 -> 공용 로컬스토리지 컨텍스트 순)
 			var lastKey = sessionStorage.getItem('lastSelectedOrdrsKey');
+			if (!lastKey) {
+				try {
+					var flowCtx = (typeof getFlowContext === 'function') ? getFlowContext() : null;
+					if (flowCtx && flowCtx.ordrsNo) {
+						lastKey = flowCtx.ordrsNo + '|' + (flowCtx.histNo || '0') + '|' + (jwt.coCd || '');
+					} else {
+						var userIdKey = 'lastSelectedOrdrsKey_' + ((typeof jwt !== 'undefined' && jwt && jwt.userId) ? jwt.userId : 'USER');
+						lastKey = localStorage.getItem(userIdKey);
+					}
+				} catch (e) {}
+			}
 			var selectedIdx = 0;
 
 			$.each(list, function(idx, item) {
@@ -2220,9 +2231,16 @@ function toDoConfirm(row){
 		var coCd = tokens[2] || jwt.coCd;
 
 		sessionStorage.setItem('lastSelectedOrdrsKey', val);
+		try {
+			var userIdKey = 'lastSelectedOrdrsKey_' + ((typeof jwt !== 'undefined' && jwt && jwt.userId) ? jwt.userId : 'USER');
+			localStorage.setItem(userIdKey, val);
+		} catch (e) {}
 
 		var $opt = $('#taskFlowProjectSelect option:selected');
 		curTaskFlowProject = $opt.data('item') || { ordrsNo: ordrsNo, histNo: histNo, coCd: coCd };
+		if (typeof setFlowContext === 'function') {
+			setFlowContext(ordrsNo, histNo || '0', curTaskFlowProject.clntNm || '');
+		}
 
 		loadTaskFlowStepStatus(ordrsNo, histNo, coCd);
 	}
