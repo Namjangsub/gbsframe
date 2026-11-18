@@ -1920,6 +1920,7 @@ body {
 		var queue = [];
 		$.each(list, function(_, item) {
 			if (!item || !item.ordrsNo || !item.coCd) return;
+			if (item.wbsStatus && item.issTotCnt !== undefined) return;
 			var key = item.ordrsNo + '|' + item.histNo + '|' + item.coCd;
 			if (skipKey && key === skipKey) return;
 			if (etoProjectSummaryCache[key]) return;
@@ -1970,14 +1971,14 @@ body {
 		}
 	}
 
-	// 최근 수주 프로젝트 목록 로드 (searchValue/targetSalesCd 선택 시 자동 포커스)
+	// 최근 수주 프로젝트 목록 로드 (CM1003M01 전용 목록 요약 단독 쿼리: 1회 호출로 상태/문제 건수 수신)
 	function loadEtoProjectList(searchValue, targetSalesCd, allowSalesCdFallback) {
 		var coCd = (typeof jwt !== 'undefined' && jwt && jwt.coCd) ? jwt.coCd : "";
 		var paramObj = {
 			"coCd": coCd,
 			"searchValue": searchValue || ""
 		};
-		postAjax("/user/cm/cm10/selectTaskFlowProjectList", paramObj, null, function(data) {
+		postAjax("/user/cm/cm10/selectTaskFlowProjectSummaryList", paramObj, null, function(data) {
 			var list = data.resultList || [];
 			var $sel = $('#etoProjectSelect');
 
@@ -2013,7 +2014,9 @@ body {
 					var stType = String(item.wbsStatus || 'NONE').toUpperCase();
 					var stTheme = ETO_STATUS_THEME[stType] || ETO_STATUS_THEME.NONE;
 					var stText = stTheme.label;
-					if (stType === 'ONGOING_DELAY' && Number(item.wbsMaxDelayDays || 0) > 0) {
+					if (stType === 'NONE' && Number(item.salesCnt || 0) === 0) {
+						stText = 'WBS미등록';
+					} else if (stType === 'ONGOING_DELAY' && Number(item.wbsMaxDelayDays || 0) > 0) {
 						stText += '(+' + item.wbsMaxDelayDays + '일)';
 					}
 					applyOptionBadgeStyle($opt, baseText, { type: stType, text: stText }, item.issUncompCnt, item.issTotCnt);

@@ -74,6 +74,13 @@ public class CM10Ctr {
     	return "jsonView";
     }
 
+    @PostMapping(value = "/selectTaskFlowProjectSummaryList")
+    public String selectTaskFlowProjectSummaryList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+    	List<Map<String, Object>> resultList = cm10Svc.selectTaskFlowProjectSummaryList(paramMap);
+    	model.addAttribute("resultList", resultList);
+    	return "jsonView";
+    }
+
     @PostMapping(value = "/selectTaskFlowStepStatus")
     public String selectTaskFlowStepStatus(@RequestBody Map<String, String> paramMap, ModelMap model) {
     	Map<String, Object> result = cm10Svc.selectTaskFlowStepStatus(paramMap);

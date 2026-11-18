@@ -64,6 +64,11 @@ public class CM10SvcImpl implements CM10Svc {
 	}
 
 	@Override
+	public List<Map<String, Object>> selectTaskFlowProjectSummaryList(Map<String, String> paramMap) {
+		return cm10Mapper.selectTaskFlowProjectSummaryList(paramMap);
+	}
+
+	@Override
 	public Map<String, Object> selectTaskFlowStepStatus(Map<String, String> paramMap) {
 		return cm10Mapper.selectTaskFlowStepStatus(paramMap);
 	}

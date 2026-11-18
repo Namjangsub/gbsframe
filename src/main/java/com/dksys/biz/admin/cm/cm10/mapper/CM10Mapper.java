@@ -26,6 +26,8 @@ public interface CM10Mapper {
 
 	List<Map<String, Object>> selectTaskFlowProjectList(Map<String, String> paramMap);
 
+	List<Map<String, Object>> selectTaskFlowProjectSummaryList(Map<String, String> paramMap);
+
 	Map<String, Object> selectTaskFlowStepStatus(Map<String, String> paramMap);
 
 	List<Map<String, Object>> selectTaskFlowWbsSchedule(Map<String, String> paramMap);
