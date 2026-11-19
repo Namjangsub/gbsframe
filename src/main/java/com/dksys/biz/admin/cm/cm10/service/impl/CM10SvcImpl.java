@@ -74,6 +74,11 @@ public class CM10SvcImpl implements CM10Svc {
 	}
 
 	@Override
+	public Map<String, Object> selectTaskFlowStepStatusCm1002(Map<String, String> paramMap) {
+		return cm10Mapper.selectTaskFlowStepStatusCm1002(paramMap);
+	}
+
+	@Override
 	public List<Map<String, Object>> selectTaskFlowWbsSchedule(Map<String, String> paramMap) {
 		return cm10Mapper.selectTaskFlowWbsSchedule(paramMap);
 	}
@@ -81,5 +86,42 @@ public class CM10SvcImpl implements CM10Svc {
 	@Override
 	public List<Map<String, Object>> selectTaskFlowWbsIssueList(Map<String, String> paramMap) {
 		return cm10Mapper.selectTaskFlowWbsIssueList(paramMap);
+	}
+
+	@Override
+	public List<Map<String, Object>> selectTaskFlowCustomerSummaryList(Map<String, String> paramMap) {
+		return cm10Mapper.selectTaskFlowCustomerSummaryList(paramMap);
+	}
+
+	@Override
+	public List<Map<String, Object>> selectTaskFlowCustomerBaseList(Map<String, String> paramMap) {
+		return cm10Mapper.selectTaskFlowCustomerBaseList(paramMap);
+	}
+
+	@Override
+	public List<Map<String, Object>> selectTaskFlowCustomerSummaryBatch(Map<String, Object> paramMap) {
+		if (paramMap == null) {
+			return java.util.Collections.emptyList();
+		}
+		Object rawList = paramMap.get("clntCdList");
+		if (!(rawList instanceof List) || ((List<?>) rawList).isEmpty()) {
+			return java.util.Collections.emptyList();
+		}
+		return cm10Mapper.selectTaskFlowCustomerSummaryBatch(paramMap);
+	}
+
+	@Override
+	public List<Map<String, Object>> selectTaskFlowCustomerOrderList(Map<String, String> paramMap) {
+		return cm10Mapper.selectTaskFlowCustomerOrderList(paramMap);
+	}
+
+	@Override
+	public List<Map<String, Object>> selectTaskFlowCustomerWbsSchedule(Map<String, String> paramMap) {
+		return cm10Mapper.selectTaskFlowCustomerWbsSchedule(paramMap);
+	}
+
+	@Override
+	public List<Map<String, Object>> selectTaskFlowCustomerWbsIssueList(Map<String, String> paramMap) {
+		return cm10Mapper.selectTaskFlowCustomerWbsIssueList(paramMap);
 	}
 }

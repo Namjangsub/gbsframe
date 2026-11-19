@@ -88,6 +88,13 @@ public class CM10Ctr {
     	return "jsonView";
     }
 
+    @PostMapping(value = "/selectTaskFlowStepStatusCm1002")
+    public String selectTaskFlowStepStatusCm1002(@RequestBody Map<String, String> paramMap, ModelMap model) {
+    	Map<String, Object> result = cm10Svc.selectTaskFlowStepStatusCm1002(paramMap);
+    	model.addAttribute("result", result);
+    	return "jsonView";
+    }
+
     @PostMapping(value = "/selectTaskFlowWbsSchedule")
     public String selectTaskFlowWbsSchedule(@RequestBody Map<String, String> paramMap, ModelMap model) {
     	List<Map<String, Object>> resultList = cm10Svc.selectTaskFlowWbsSchedule(paramMap);
@@ -98,6 +105,48 @@ public class CM10Ctr {
     @PostMapping(value = "/selectTaskFlowWbsIssueList")
     public String selectTaskFlowWbsIssueList(@RequestBody Map<String, String> paramMap, ModelMap model) {
     	List<Map<String, Object>> resultList = cm10Svc.selectTaskFlowWbsIssueList(paramMap);
+    	model.addAttribute("resultList", resultList);
+    	return "jsonView";
+    }
+
+    @PostMapping(value = "/selectTaskFlowCustomerSummaryList")
+    public String selectTaskFlowCustomerSummaryList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+    	List<Map<String, Object>> resultList = cm10Svc.selectTaskFlowCustomerSummaryList(paramMap);
+    	model.addAttribute("resultList", resultList);
+    	return "jsonView";
+    }
+
+    @PostMapping(value = "/selectTaskFlowCustomerBaseList")
+    public String selectTaskFlowCustomerBaseList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+    	List<Map<String, Object>> resultList = cm10Svc.selectTaskFlowCustomerBaseList(paramMap);
+    	model.addAttribute("resultList", resultList);
+    	return "jsonView";
+    }
+
+    @PostMapping(value = "/selectTaskFlowCustomerSummaryBatch")
+    public String selectTaskFlowCustomerSummaryBatch(@RequestBody Map<String, Object> paramMap, ModelMap model) {
+    	List<Map<String, Object>> resultList = cm10Svc.selectTaskFlowCustomerSummaryBatch(paramMap);
+    	model.addAttribute("resultList", resultList);
+    	return "jsonView";
+    }
+
+    @PostMapping(value = "/selectTaskFlowCustomerOrderList")
+    public String selectTaskFlowCustomerOrderList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+    	List<Map<String, Object>> resultList = cm10Svc.selectTaskFlowCustomerOrderList(paramMap);
+    	model.addAttribute("resultList", resultList);
+    	return "jsonView";
+    }
+
+    @PostMapping(value = "/selectTaskFlowCustomerWbsSchedule")
+    public String selectTaskFlowCustomerWbsSchedule(@RequestBody Map<String, String> paramMap, ModelMap model) {
+    	List<Map<String, Object>> resultList = cm10Svc.selectTaskFlowCustomerWbsSchedule(paramMap);
+    	model.addAttribute("resultList", resultList);
+    	return "jsonView";
+    }
+
+    @PostMapping(value = "/selectTaskFlowCustomerWbsIssueList")
+    public String selectTaskFlowCustomerWbsIssueList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+    	List<Map<String, Object>> resultList = cm10Svc.selectTaskFlowCustomerWbsIssueList(paramMap);
     	model.addAttribute("resultList", resultList);
     	return "jsonView";
     }

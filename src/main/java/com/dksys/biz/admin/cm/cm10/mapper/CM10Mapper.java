@@ -30,8 +30,22 @@ public interface CM10Mapper {
 
 	Map<String, Object> selectTaskFlowStepStatus(Map<String, String> paramMap);
 
+	Map<String, Object> selectTaskFlowStepStatusCm1002(Map<String, String> paramMap);
+
 	List<Map<String, Object>> selectTaskFlowWbsSchedule(Map<String, String> paramMap);
 
 	List<Map<String, Object>> selectTaskFlowWbsIssueList(Map<String, String> paramMap);
+
+	List<Map<String, Object>> selectTaskFlowCustomerSummaryList(Map<String, String> paramMap);
+
+	List<Map<String, Object>> selectTaskFlowCustomerBaseList(Map<String, String> paramMap);
+
+	List<Map<String, Object>> selectTaskFlowCustomerSummaryBatch(Map<String, Object> paramMap);
+
+	List<Map<String, Object>> selectTaskFlowCustomerOrderList(Map<String, String> paramMap);
+
+	List<Map<String, Object>> selectTaskFlowCustomerWbsSchedule(Map<String, String> paramMap);
+
+	List<Map<String, Object>> selectTaskFlowCustomerWbsIssueList(Map<String, String> paramMap);
 
 }

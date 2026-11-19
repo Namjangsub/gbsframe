@@ -93,6 +93,38 @@ body {
 	flex-wrap: wrap;
 	gap: 8px;
 }
+/* 컨트롤 바 및 에디터 select / input 톤앤매너 통일 */
+.eto-page-wrapper select.form-control.input-sm,
+.eto-page-wrapper input.form-control.input-sm {
+	height: 30px;
+	padding: 0 8px;
+	background-color: #ffffff;
+	border: 1px solid #cbd5e1;
+	border-radius: 3px;
+	font-size: 12px;
+	line-height: 28px;
+	color: #1e293b;
+	box-shadow: none;
+	vertical-align: middle;
+	transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.eto-control-bar select.form-control.input-sm {
+	font-weight: 700;
+	padding-right: 6px;
+	cursor: pointer;
+}
+.eto-page-wrapper input.form-control.input-sm::placeholder {
+	color: #94a3b8;
+	font-weight: normal;
+}
+.eto-page-wrapper select.form-control.input-sm:hover,
+.eto-page-wrapper input.form-control.input-sm:hover,
+.eto-page-wrapper select.form-control.input-sm:focus,
+.eto-page-wrapper input.form-control.input-sm:focus {
+	border-color: #64748b;
+	box-shadow: 0 0 0 2px rgba(100, 116, 139, 0.12);
+	outline: none;
+}
 .eto-project-info {
 	display: flex;
 	align-items: center;
@@ -552,12 +584,15 @@ body {
 	<div class="eto-control-bar">
 		<div class="eto-control-row">
 			<div style="display: flex; align-items: center; flex-wrap: wrap; gap: 8px;">
-				<strong style="color: #2b3b4c; font-size: 13px;"><i class="fa fa-filter"></i> 기준 프로젝트:</strong>
-				<select id="etoProjectSelect" class="form-control input-sm" onchange="onEtoProjectChange(this.value)" style="width: 310px; font-weight: bold; color: #2b3b4c;">
+				<strong style="color: #2b3b4c; font-size: 13px;"><i class="fa fa-building"></i> 회사:</strong>
+				<select id="etoCoCdSelect" class="form-control input-sm" data-kind="CO" onchange="onEtoCoCdChange(this.value)" style="width: 115px;">
+				</select>
+				<strong style="color: #2b3b4c; font-size: 13px; margin-left: 4px;"><i class="fa fa-filter"></i> 기준 프로젝트:</strong>
+				<select id="etoProjectSelect" class="form-control input-sm" onchange="onEtoProjectChange(this.value)" style="width: 310px;">
 					<option value="">수주 프로젝트를 불러오는 중...</option>
 				</select>
 				<strong style="color: #1e5282; font-size: 13px; margin-left: 6px;"><i class="fa fa-cogs"></i> 특정 설비(SalesCd):</strong>
-				<select id="etoSalesCdSelect" class="form-control input-sm" onchange="onEtoSalesCdChange(this.value)" style="width: 270px; font-weight: bold; color: #1e5282;">
+				<select id="etoSalesCdSelect" class="form-control input-sm" onchange="onEtoSalesCdChange(this.value)" style="width: 270px; color: #1e5282;">
 					<option value="">전체 설비 (프로젝트 기준)</option>
 				</select>
 			</div>
@@ -762,12 +797,48 @@ body {
 	var modal = (typeof modal !== 'undefined' && modal) ? modal : ((typeof ax5 !== 'undefined' && ax5.ui && ax5.ui.modal) ? new ax5.ui.modal() : null);
 
 	$(document).ready(function() {
+		var urlParams = new URLSearchParams(window.location.search);
+		initEtoCoCdSelect(urlParams.get('coCd') || 'GUN');
 		loadUserAccessibleMenus();
 		loadUserEtoMapConfig();
 		loadEtoProjectList();
 		initWbIssueBadgeEvents();
 		initWbScheduleBadgeEvents();
 	});
+
+	function initEtoCoCdSelect(preferredCoCd) {
+		var $sel = $('#etoCoCdSelect');
+		if ($sel.length === 0) return;
+		$sel.empty();
+		if (typeof setCommonSelect === 'function') {
+			try {
+				setCommonSelect($sel);
+			} catch (e) {}
+		}
+		if ($sel.find('option').length === 0) {
+			$sel.append('<option value="GUN">건양ITT</option>');
+			$sel.append('<option value="TRN">트루넷</option>');
+		}
+		var target = preferredCoCd || 'GUN';
+		if ($sel.find('option[value="' + target + '"]').length > 0) {
+			$sel.val(target);
+		} else if ($sel.find('option[value="GUN"]').length > 0) {
+			$sel.val('GUN');
+		} else {
+			$sel.prop('selectedIndex', 0);
+		}
+	}
+
+	function getSelectedEtoCoCd() {
+		return $('#etoCoCdSelect').val() || 'GUN';
+	}
+
+	function onEtoCoCdChange() {
+		wbIssueCache = {};
+		$('#etoSearchInput').val('');
+		clearProjectInfo();
+		loadEtoProjectList("", "", false);
+	}
 
 	// 로그인 사용자가 접근 가능한 HTML 화면 목록 자동 조회
 	function loadUserAccessibleMenus() {
@@ -1182,7 +1253,7 @@ body {
 	// [5] 프로젝트 목록 및 SalesCd 연동 (CM1003M01 100% 동일)
 	// =========================================================================
 	function loadEtoProjectList(searchValue, targetSalesCd, allowSalesCdFallback) {
-		var coCd = (typeof jwt !== 'undefined' && jwt && jwt.coCd) ? jwt.coCd : "";
+		var coCd = getSelectedEtoCoCd();
 		var param = { coCd: coCd, searchValue: searchValue || "" };
 
 		postAjax("/user/cm/cm10/selectTaskFlowProjectList", param, null, function(data) {
@@ -1237,7 +1308,7 @@ body {
 		var tokens = val.split('|');
 		var ordrsNo = tokens[0];
 		var histNo  = tokens[1] || '0';
-		var coCd    = tokens[2] || (jwt ? jwt.coCd : '');
+		var coCd    = tokens[2] || getSelectedEtoCoCd();
 
 		var $opt = $('#etoProjectSelect option:selected');
 		var item = $opt.data('item') || { ordrsNo: ordrsNo, histNo: histNo, coCd: coCd };
@@ -1303,7 +1374,7 @@ body {
 	}
 
 	function onEtoSalesCdChange(salesCd) {
-		var coCd = curEtoProject ? curEtoProject.coCd : ((typeof jwt !== 'undefined' && jwt) ? jwt.coCd : "");
+		var coCd = curEtoProject ? curEtoProject.coCd : getSelectedEtoCoCd();
 		var ordrsNo = curEtoProject ? curEtoProject.ordrsNo : "";
 
 		if (salesCd) {
@@ -2257,7 +2328,7 @@ function getIssueTrafficLight(iss) {
 			return;
 		}
 		var fetchParam = {
-			coCd: targetCoCd || (jwt ? jwt.coCd : "GUN"),
+			coCd: targetCoCd || getSelectedEtoCoCd(),
 			ordrsNo: targetOrdrsNo || '',
 			salesCd: targetSalesCd || ''
 		};
@@ -2331,7 +2402,7 @@ function getIssueTrafficLight(iss) {
 			var ordrsNo = $badge.data('ordrs-no') || (curEtoProject ? curEtoProject.ordrsNo : "");
 			var step = $badge.data('step') || "";
 			var item = {
-				coCd: curEtoProject ? curEtoProject.coCd : (jwt ? jwt.coCd : ""),
+				coCd: curEtoProject ? curEtoProject.coCd : getSelectedEtoCoCd(),
 				salesCd: salesCd,
 				ordrsNo: ordrsNo,
 				clntNm: curEtoProject ? curEtoProject.clntNm : '',
@@ -2369,7 +2440,7 @@ function getIssueTrafficLight(iss) {
 			var step = $badge.data('step') || "";
 			hideWbIssuePopover();
 			openWbIssueModal({
-				coCd: curEtoProject ? curEtoProject.coCd : (jwt ? jwt.coCd : ""),
+				coCd: curEtoProject ? curEtoProject.coCd : getSelectedEtoCoCd(),
 				salesCd: salesCd,
 				ordrsNo: ordrsNo,
 				clntNm: curEtoProject ? curEtoProject.clntNm : '',
@@ -2428,7 +2499,7 @@ function getIssueTrafficLight(iss) {
 			positionWbIssuePopover($badge);
 
 			var fetchParam = {
-				"coCd"    : item.coCd || (jwt ? jwt.coCd : "GUN"),
+				"coCd"    : item.coCd || getSelectedEtoCoCd(),
 				"ordrsNo" : item.ordrsNo || (curEtoProject ? curEtoProject.ordrsNo : ''),
 				"salesCd" : item.salesCd || ''
 			};
@@ -2472,7 +2543,7 @@ function getIssueTrafficLight(iss) {
 		var clntNm = row.clntNm || (curEtoProject ? curEtoProject.clntNm : "");
 		var modalTitle = searchVal ? ("문제/이슈 관리 (" + searchVal + ")") : "문제/이슈 현황";
 		var paramObj = {
-			"coCd"        : row.coCd || (jwt ? jwt.coCd : "GUN"),
+			"coCd"        : row.coCd || getSelectedEtoCoCd(),
 			"searchValue" : searchVal,
 			"salesCd"     : row.salesCd || "",
 			"ordrsNo"     : row.ordrsNo || (curEtoProject ? curEtoProject.ordrsNo : ""),
@@ -2516,7 +2587,7 @@ function getIssueTrafficLight(iss) {
 			"actionType": "U",
 			"issNo": issNo,
 			"salesCd": salesCd || "",
-			"coCd": curEtoProject ? curEtoProject.coCd : (jwt ? jwt.coCd : "GUN")
+			"coCd": curEtoProject ? curEtoProject.coCd : getSelectedEtoCoCd()
 		};
 		var modalTitle = "WBS 문제 상세 및 조치 (" + issNo + ")";
 		var winWidth = $(window).width() || 1600;
@@ -2543,7 +2614,7 @@ function getIssueTrafficLight(iss) {
 		var selVal = $('#etoProjectSelect').val();
 		var ordrsNo = "";
 		var histNo = "";
-		var coCd = (typeof jwt !== 'undefined' && jwt && jwt.coCd) ? jwt.coCd : "";
+		var coCd = getSelectedEtoCoCd();
 
 		if (selVal) {
 			var tokens = selVal.split('|');
