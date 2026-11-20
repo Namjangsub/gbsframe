@@ -534,6 +534,78 @@ body {
 .wb-issue-popover .popover-issue-row:last-child {
 	border-bottom: none;
 }
+.wb-schedule-popover .eqp-mng-tag {
+	display: inline-flex;
+	align-items: center;
+	gap: 3px;
+	margin-left: 4px;
+	padding: 0 5px;
+	border-radius: 3px;
+	background: #f1f5f9;
+	border: 1px solid #cbd5e1;
+	color: #334155;
+	font-size: 10px;
+	font-weight: 600;
+	white-space: nowrap;
+}
+.wbs-mng-row {
+	display: flex;
+	align-items: center;
+	gap: 4px;
+	margin: 3px 0 6px 0;
+	padding: 2px 7px;
+	border-radius: 4px;
+	background: #f1f5f9;
+	border: 1px solid #e2e8f0;
+	font-size: 10.5px;
+	line-height: 1.35;
+	color: #334155;
+	max-width: 100%;
+	overflow: hidden;
+	text-align: left;
+	cursor: pointer;
+	transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+.wbs-mng-row:hover {
+	background: #e2e8f0;
+	border-color: #94a3b8;
+}
+.wbs-mng-row i {
+	font-size: 9.5px;
+	color: #64748b;
+	flex-shrink: 0;
+}
+.wbs-mng-row .wbs-mng-label {
+	color: #64748b;
+	font-weight: 600;
+	flex-shrink: 0;
+}
+.wbs-mng-row .wbs-mng-name {
+	color: #1e293b;
+	font-weight: 700;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+.wbs-mng-row.is-empty {
+	background: #f8fafc;
+	border-style: dashed;
+	border-color: #cbd5e1;
+	color: #94a3b8;
+}
+.wbs-mng-row.is-empty:hover {
+	background: #f1f5f9;
+	border-color: #94a3b8;
+}
+.wbs-mng-row.is-empty .wbs-mng-name {
+	color: #94a3b8;
+	font-weight: 500;
+}
+.branch-card .wbs-mng-row {
+	margin: 2px 0 5px 0;
+	padding: 1.5px 6px;
+	font-size: 10px;
+}
 .card-header-flex {
 	display: flex;
 	flex-direction: column;
@@ -1407,6 +1479,7 @@ body {
 		$('#infoIssueBox').hide();
 		$('#infoTopIssueSlot').empty();
 		$('.wbs-indicator-slot').empty();
+		$('[data-wbs-step]').children('.wbs-mng-row').remove();
 		$('#etoSalesCdSelect').empty().append('<option value="">전체 설비 (프로젝트 기준)</option>');
 	}
 
@@ -1449,6 +1522,42 @@ body {
 		{ step: "13", isFinal: true, pKey: "acptncDt", pFallback: "deDt", rKey: "acptncDt" }
 	];
 
+	function clearAllStepCardManagers() {
+		$('[data-wbs-step]').children('.wbs-mng-row').remove();
+	}
+
+	function renderStepCardManager($card, mngNames, isFinal, hasPlan, managerInfo) {
+		if (!$card || !$card.length) return;
+		$card.children('.wbs-mng-row').remove();
+		var hasMng = (mngNames && mngNames.length > 0);
+		if (!hasMng && !hasPlan) return;
+
+		var roleLabel = isFinal ? '총괄PM' : '담당';
+		var dispText = hasMng
+			? (mngNames.length === 1 ? mngNames[0] : (mngNames[0] + ' 외 ' + (mngNames.length - 1) + '명'))
+			: '미지정';
+
+		var html = '<div class="wbs-mng-row' + (hasMng ? '' : ' is-empty') + '">'
+		         + '<i class="fa fa-user"></i>'
+		         + '<span class="wbs-mng-label">' + roleLabel + '</span>'
+		         + '<span class="wbs-mng-name">' + escapeHtml(dispText) + '</span>'
+		         + '</div>';
+
+		$card.each(function() {
+			var $c = $(this);
+			var $mngEl = $(html);
+			if (managerInfo) {
+				$mngEl.data('scheduleInfo', managerInfo);
+			}
+			var $btnBox = $c.children('.card-btns, .branch-btns').first();
+			if ($btnBox.length) {
+				$btnBox.before($mngEl);
+			} else {
+				$c.append($mngEl);
+			}
+		});
+	}
+
 	function getStepWbsValues(wbs, sDef, isAllEnded) {
 		if (sDef.isFinal) {
 			var planDt = wbs[sDef.pKey] || (sDef.pFallback ? wbs[sDef.pFallback] : null);
@@ -1458,7 +1567,8 @@ body {
 				planDt: planDt,
 				rsltDt: rsltDt || (isAllEnded ? planDt : null),
 				compYn: compYn,
-				planClose: isAllEnded ? 'Y' : 'N'
+				planClose: isAllEnded ? 'Y' : 'N',
+				mngNm: $.trim(wbs.smrizeNm || '')
 			};
 		}
 
@@ -1470,8 +1580,9 @@ body {
 				var r = wbs[code + 'R'] || null;
 				var c = wbs[code + 'C'] || 'N';
 				var close = wbs[code + 'PClose'] || 'N';
+				var mng = $.trim(wbs[code + 'MngNm'] || '');
 				if (p || r) {
-					selected = { planDt: p, rsltDt: r, compYn: c, planClose: close };
+					selected = { planDt: p, rsltDt: r, compYn: c, planClose: close, mngNm: mng };
 					break;
 				}
 			}
@@ -1481,8 +1592,19 @@ body {
 					planDt: wbs[defCode + 'P'] || null,
 					rsltDt: wbs[defCode + 'R'] || null,
 					compYn: wbs[defCode + 'C'] || 'N',
-					planClose: wbs[defCode + 'PClose'] || 'N'
+					planClose: wbs[defCode + 'PClose'] || 'N',
+					mngNm: $.trim(wbs[defCode + 'MngNm'] || '')
 				};
+			}
+
+			if (selected && !selected.mngNm) {
+				for (var m = 0; m < sDef.codes.length; m++) {
+					var altMng = $.trim(wbs[sDef.codes[m] + 'MngNm'] || '');
+					if (altMng) {
+						selected.mngNm = altMng;
+						break;
+					}
+				}
 			}
 
 			if (selected && selected.planDt && !selected.rsltDt) {
@@ -1508,7 +1630,7 @@ body {
 		}
 
 		if (sDef.fallbackKey && (!selected || !selected.planDt)) {
-			if (!selected) selected = { planDt: null, rsltDt: null, compYn: 'N', planClose: 'N' };
+			if (!selected) selected = { planDt: null, rsltDt: null, compYn: 'N', planClose: 'N', mngNm: '' };
 			if (!selected.planDt) selected.planDt = wbs[sDef.fallbackKey] || null;
 		}
 
@@ -1598,6 +1720,7 @@ body {
 
 	function renderWbsScheduleIndicators(wbs) {
 		$('.wbs-indicator-slot .wbs-badge[data-badge-type="schedule"]').remove();
+		clearAllStepCardManagers();
 
 		var isAllEnded = (wbs.endYn === 'Y');
 		var ongoingDelayCount = 0;
@@ -1611,10 +1734,25 @@ body {
 			var rsltDt = vals.rsltDt;
 			var compYn = vals.compYn;
 			var planClose = vals.planClose;
+			var mngNm = vals.mngNm || '';
 
 			var st = evalWbsStepStatus(planDt, rsltDt, compYn, isAllEnded, planClose);
+			var $card = $('[data-wbs-step="' + sDef.step + '"]');
+			renderStepCardManager($card, mngNm ? [mngNm] : [], !!sDef.isFinal, !!planDt, {
+				mode: 'manager',
+				scope: 'single',
+				step: sDef.step,
+				isFinal: !!sDef.isFinal,
+				salesCd: wbs.salesCd,
+				eqpNm: wbs.eqpNm,
+				ordrsNo: wbs.ordrsNo || (curEtoProject ? curEtoProject.ordrsNo : ''),
+				mngNames: mngNm ? [mngNm] : [],
+				planDt: planDt,
+				rsltDt: rsltDt,
+				st: st
+			});
 
-			var $slot = $('[data-wbs-step="' + sDef.step + '"]').find('.wbs-indicator-slot');
+			var $slot = $card.find('.wbs-indicator-slot');
 			if ($slot.length) {
 				$slot.find('.wbs-badge[data-badge-type="schedule"]').remove();
 
@@ -1640,6 +1778,8 @@ body {
 						ordrsNo: wbs.ordrsNo || (curEtoProject ? curEtoProject.ordrsNo : ''),
 						planDt: planDt,
 						rsltDt: rsltDt,
+						mngNm: mngNm,
+						isFinal: !!sDef.isFinal,
 						badgeText: st.text,
 						st: st
 					});
@@ -1676,6 +1816,7 @@ body {
 
 	function renderProjectWbsScheduleIndicators(wbsList) {
 		$('.wbs-indicator-slot .wbs-badge[data-badge-type="schedule"]').remove();
+		clearAllStepCardManagers();
 
 		var totalEqpCount = wbsList.length;
 		var totalOngoingDelaySteps = 0;
@@ -1690,6 +1831,8 @@ body {
 			var maxStepDelay = 0;
 			var minDiff = 9999;
 			var eqpRows = [];
+			var mngNames = [];
+			var mngSeen = {};
 
 			$.each(wbsList, function(_, row) {
 				var isAllEnded = (row.endYn === 'Y');
@@ -1698,14 +1841,21 @@ body {
 				var rsltDt = vals.rsltDt;
 				var compYn = vals.compYn;
 				var planClose = vals.planClose;
+				var mngNm = vals.mngNm || '';
 
 				var st = evalWbsStepStatus(planDt, rsltDt, compYn, isAllEnded, planClose);
+
+				if (mngNm && !mngSeen[mngNm]) {
+					mngSeen[mngNm] = true;
+					mngNames.push(mngNm);
+				}
 
 				eqpRows.push({
 					salesCd: row.salesCd,
 					eqpNm: row.eqpNm,
 					planDt: planDt,
 					rsltDt: rsltDt,
+					mngNm: mngNm,
 					st: st
 				});
 
@@ -1730,7 +1880,19 @@ body {
 
 			var validEqpCount = totalEqpCount - noneCnt;
 			var totalCompleted = compOnTimeCnt + compDelayCnt;
-			var $slot = $('[data-wbs-step="' + sDef.step + '"]').find('.wbs-indicator-slot');
+			var $card = $('[data-wbs-step="' + sDef.step + '"]');
+			renderStepCardManager($card, mngNames, !!sDef.isFinal, validEqpCount > 0, {
+				mode: 'manager',
+				scope: 'project',
+				step: sDef.step,
+				isFinal: !!sDef.isFinal,
+				ordrsNo: curEtoProject ? curEtoProject.ordrsNo : '',
+				totalEqpCount: totalEqpCount,
+				mngNames: mngNames,
+				eqpRows: eqpRows
+			});
+
+			var $slot = $card.find('.wbs-indicator-slot');
 			if ($slot.length) {
 				$slot.find('.wbs-badge[data-badge-type="schedule"]').remove();
 
@@ -1792,6 +1954,8 @@ body {
 						maxStepDelay: maxStepDelay,
 						minDiff: minDiff,
 						badgeText: badgeText,
+						mngNames: mngNames,
+						isFinal: !!sDef.isFinal,
 						eqpRows: eqpRows
 					});
 					$(this).prepend($badgeEl);
@@ -1825,6 +1989,7 @@ body {
 
 	function renderEmptyWbsScheduleIndicators(mode, salesCdVal, ordrsNo, eqpNm) {
 		$('.wbs-indicator-slot .wbs-badge[data-badge-type="schedule"]').remove();
+		clearAllStepCardManagers();
 		var totalEqpCount = (mode === 'project' && typeof curProjectSalesList !== 'undefined' && curProjectSalesList) ? curProjectSalesList.length : (mode === 'single' ? 1 : 0);
 		var noneSt = evalWbsStepStatus(null);
 
@@ -1967,7 +2132,84 @@ body {
 		$pop.css({ left: Math.round(left) + "px", top: Math.round(top) + "px" });
 	}
 
+	function buildWbManagerPopoverHtml(info) {
+		var stepName = WBS_STEP_NAMES[info.step] || ("공정 " + info.step);
+		var roleLabel = info.isFinal ? '총괄PM' : '일정 담당자';
+		var mngNames = info.mngNames || [];
+		var hasMng = mngNames.length > 0;
+		var headerColor = hasMng ? "#1e40af" : "#64748b";
+		var badgeText = hasMng
+			? (info.scope === 'single' ? roleLabel : (roleLabel + ' ' + mngNames.length + '명'))
+			: '미지정';
+
+		var html = '';
+		html += '<div class="popover-title" style="border-bottom-color: ' + headerColor + '; color: ' + headerColor + ';">';
+		html += '  <span><i class="fa fa-user" style="margin-right: 5px;"></i>' + escapeHtml(stepName) + '</span>';
+		html += '  <span class="popover-badge" style="background: ' + headerColor + ';">' + escapeHtml(badgeText) + '</span>';
+		html += '</div>';
+
+		if (info.scope === 'single') {
+			html += '<div class="popover-item"><b>대상 설비:</b> ' + escapeHtml(info.salesCd || '') + (info.eqpNm ? ' (' + escapeHtml(info.eqpNm) + ')' : '') + '</div>';
+			if (info.ordrsNo) html += '<div class="popover-item"><b>수주번호:</b> ' + escapeHtml(info.ordrsNo) + '</div>';
+			html += '<div class="popover-item"><b>' + roleLabel + ':</b> ' + (hasMng ? '<span style="color:#1e293b; font-weight:bold;">' + escapeHtml(mngNames[0]) + '</span>' : '<span style="color:#94a3b8;">미지정</span>') + '</div>';
+			html += '<div class="popover-box" style="border-left-color: ' + headerColor + ';">';
+			html += '  <div style="display:flex; justify-content:space-between; align-items:center; gap:8px;">';
+			html += '    <span><b>계획:</b> ' + (info.planDt ? escapeHtml(info.planDt) : '<span style="color:#94a3b8;">미등록</span>') + '</span>';
+			html += '    <span><b>실적:</b> ' + (info.rsltDt ? '<span style="color:#16a34a; font-weight:bold;">' + escapeHtml(info.rsltDt) + '</span>' : '<span style="color:#94a3b8;">-</span>') + '</span>';
+			if (info.st) {
+				html += '    <span class="wbs-badge ' + info.st.cls + '" style="font-size:9.5px; padding:0 5px;">' + escapeHtml(info.st.text) + '</span>';
+			}
+			html += '  </div>';
+			html += '</div>';
+			return html;
+		}
+
+		html += '<div class="popover-item"><b>수주 프로젝트:</b> ' + escapeHtml(info.ordrsNo || '') + ' (총 ' + (info.totalEqpCount || 0) + '대 설비)</div>';
+
+		if (hasMng && info.eqpRows && info.eqpRows.length > 0) {
+			var countMap = {};
+			$.each(info.eqpRows, function(_, r) {
+				if (r.mngNm) countMap[r.mngNm] = (countMap[r.mngNm] || 0) + 1;
+			});
+			html += '<div class="popover-item" style="display:flex; flex-wrap:wrap; align-items:center; gap:4px; margin-top:4px;"><b>' + roleLabel + ':</b>';
+			$.each(mngNames, function(_, nm) {
+				var cnt = countMap[nm] || 0;
+				html += '<span class="eqp-mng-tag" style="margin-left:0;"><i class="fa fa-user"></i>' + escapeHtml(nm) + (cnt > 1 ? ' (' + cnt + '대)' : '') + '</span>';
+			});
+			html += '</div>';
+		} else {
+			html += '<div class="popover-item"><b>' + roleLabel + ':</b> <span style="color:#94a3b8;">미지정</span></div>';
+		}
+
+		if (info.eqpRows && info.eqpRows.length > 0) {
+			html += '<div style="margin-top:6px; font-weight:bold; color:#334155; font-size:11px;">설비별 담당자 현황:</div>';
+			html += '<div style="max-height:175px; overflow-y:auto; margin-top:3px; border:1px solid #e2e8f0; border-radius:4px; padding:3px 6px; background:#fff;">';
+			$.each(info.eqpRows, function(_, r) {
+				html += '<div class="eqp-status-row" style="gap:6px;">';
+				html += '  <span><b>' + escapeHtml(r.salesCd || '') + '</b>' + (r.eqpNm ? ' <span style="color:#64748b;">(' + escapeHtml(r.eqpNm) + ')</span>' : '') + '</span>';
+				html += '  <span style="display:inline-flex; align-items:center; gap:4px; flex-shrink:0;">';
+				if (r.mngNm) {
+					html += '    <span class="eqp-mng-tag" style="margin-left:0;"><i class="fa fa-user"></i>' + escapeHtml(r.mngNm) + '</span>';
+				} else {
+					html += '    <span class="eqp-mng-tag" style="margin-left:0; background:#f8fafc; color:#94a3b8; border-style:dashed;">미지정</span>';
+				}
+				if (r.st && r.st.type === 'NONE') {
+					html += '    <span class="wbs-badge wbs-badge-gray" style="font-size:9px; padding:0 5px; color:#94a3b8;">계획없음</span>';
+				} else if (r.st) {
+					html += '    <span class="wbs-badge ' + r.st.cls + '" style="font-size:9px; padding:0 5px;">' + escapeHtml(r.st.text) + '</span>';
+				}
+				html += '  </span>';
+				html += '</div>';
+			});
+			html += '</div>';
+		}
+		return html;
+	}
+
 	function buildWbSchedulePopoverHtml(info) {
+		if (info.mode === 'manager') {
+			return buildWbManagerPopoverHtml(info);
+		}
 		if (info.mode === 'single_top') {
 			var html = '';
 			html += '<div class="popover-title" style="border-bottom-color: #2563eb; color: #2563eb;">';
@@ -2037,6 +2279,7 @@ body {
 			if (info.ordrsNo) {
 				html += '<div class="popover-item"><b>수주번호:</b> ' + escapeHtml(info.ordrsNo) + '</div>';
 			}
+			html += '<div class="popover-item"><b>' + (info.isFinal ? '총괄PM' : '일정 담당자') + ':</b> ' + (info.mngNm ? '<span style="color:#1e293b; font-weight:bold;">' + escapeHtml(info.mngNm) + '</span>' : '<span style="color:#94a3b8;">미지정</span>') + '</div>';
 			var rsltTextHtml = '';
 			if (info.rsltDt) {
 				rsltTextHtml = '<span style="color:#16a34a; font-weight:bold;">' + escapeHtml(info.rsltDt) + '</span>';
@@ -2097,6 +2340,7 @@ body {
 				eqpSubTitle = '계획 수립 ' + info.validEqpCount + '대 / 전체 ' + info.totalEqpCount + '대';
 			}
 			html += '<div class="popover-item"><b>수주 프로젝트:</b> ' + escapeHtml(info.ordrsNo || '') + ' (' + eqpSubTitle + ')</div>';
+			html += '<div class="popover-item"><b>' + (info.isFinal ? '총괄PM' : '일정 담당자') + ':</b> ' + ((info.mngNames && info.mngNames.length > 0) ? '<span style="color:#1e293b; font-weight:bold;">' + escapeHtml(info.mngNames.join(', ')) + '</span>' : '<span style="color:#94a3b8;">미지정</span>') + '</div>';
 
 			// 요약 상태 카운트 4분할 박스
 			html += '<div style="display:flex; gap:4px; margin: 6px 0;">';
@@ -2124,7 +2368,7 @@ body {
 				html += '<div style="max-height:160px; overflow-y:auto; margin-top:3px; border:1px solid #e2e8f0; border-radius:4px; padding:3px 6px; background:#fff;">';
 				$.each(info.eqpRows, function(_, r) {
 					html += '<div class="eqp-status-row">';
-					html += '  <span><b>' + escapeHtml(r.salesCd) + '</b>' + (r.eqpNm ? ' <span style="color:#64748b;">(' + escapeHtml(r.eqpNm) + ')</span>' : '') + '</span>';
+					html += '  <span><b>' + escapeHtml(r.salesCd) + '</b>' + (r.eqpNm ? ' <span style="color:#64748b;">(' + escapeHtml(r.eqpNm) + ')</span>' : '') + (r.mngNm ? ' <span class="eqp-mng-tag"><i class="fa fa-user"></i>' + escapeHtml(r.mngNm) + '</span>' : '') + '</span>';
 					if (r.st.type === 'NONE') {
 						html += '  <span class="wbs-badge wbs-badge-gray" style="font-size:9px; padding:0 5px; color:#94a3b8;">계획없음</span>';
 					} else {
@@ -2140,14 +2384,14 @@ body {
 	}
 
 	function initWbScheduleBadgeEvents() {
-		$(document).on("mouseenter", ".wbs-badge[data-badge-type='schedule']", function(e) {
+		$(document).on("mouseenter", ".wbs-badge[data-badge-type='schedule'], .wbs-mng-row", function(e) {
 			showWbSchedulePopover($(this));
 		});
-		$(document).on("mouseleave", ".wbs-badge[data-badge-type='schedule']", function(e) {
+		$(document).on("mouseleave", ".wbs-badge[data-badge-type='schedule'], .wbs-mng-row", function(e) {
 			scheduleHideWbSchedulePopover(200);
 		});
 		$(document).on("mousedown", function(e) {
-			if ($(e.target).closest("#wbSchedulePopover, .wbs-badge[data-badge-type='schedule']").length === 0) {
+			if ($(e.target).closest("#wbSchedulePopover, .wbs-badge[data-badge-type='schedule'], .wbs-mng-row").length === 0) {
 				hideWbSchedulePopover();
 			}
 		});
