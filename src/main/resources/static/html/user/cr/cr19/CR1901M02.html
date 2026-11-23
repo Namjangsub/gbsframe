@@ -44,6 +44,31 @@
 			background-color: #f2b9ab!important;
 			background-image: none !important;
 		}
+		#main_area .btn-group {
+			width: 100%;
+		}
+		#main_area button.multiselect.dropdown-toggle {
+			font-size: 12px;
+			padding: 2px 8px;
+			height: 24px;
+			width: 100%;
+			color: #333;
+			background: #ffffff;
+			border: 1px solid #ccc;
+			border-radius: 3px;
+			text-align: left;
+			line-height: 18px;
+		}
+		#main_area button.multiselect.dropdown-toggle .caret {
+			float: right;
+			margin-top: 7px;
+		}
+		#main_area ul.multiselect-container.dropdown-menu {
+			font-size: 12px;
+			max-height: 320px;
+			overflow-y: auto;
+			z-index: 1050;
+		}
 	</style>
 <head>
 <meta charset="utf-8">
@@ -70,10 +95,12 @@
 <link rel="stylesheet" href="/static/css/main.css">
 <link rel="stylesheet" href="/static/css/sub.css">
 <link rel="stylesheet" href="/static/css/common.css">
+<link rel="stylesheet" href="/static/bootstrap/css/bootstrap-multiselect.css">
 
 <script src="/static/js/jquery-latest.min.js"></script>
 <script src="/static/js/jquery.serializeObject.js"></script>
 <script src="/static/bootstrap/js/bootstrap.min.js"></script>
+<script src="/static/bootstrap/js/bootstrap-multiselect.min.js"></script>
 <script src="/static/bootstrap/js/bootstrap-datepicker.min.js"></script>
 <script src="/static/bootstrap/js/bootstrap-datepicker.ko.min.js"></script>
 <script src="/static/js/moment/moment-with-locales.js"></script>
@@ -115,8 +142,8 @@
 		<!-- 검색조건 -->
 		<div class="contents search">
 			<div class="">
-				<!-- 테이블 인풋 4분할 -->
-				<table class="table_input type04">
+				<!-- 테이블 인풋 5분할 -->
+				<table class="table_input type05">
 					<!-- 검색조건 1행 -->
 					<tr>
 						<th class="hit">회사</th>
@@ -139,9 +166,7 @@
 						</td>
 						<th>수주구분</th>
 						<td>
-							<select id="ordrsDiv_S" name="ordrsDiv_S" data-kind="ORDRSDIV" data-search="ordrsDiv">
-								<option value="">전체</option>
-							</select>
+							<select id="ordrsDiv_S" name="ordrsDiv_S" data-kind="ORDRSDIV" data-search="ordrsDiv" multiple="multiple"></select>
 						</td>
 						<th>수금완료</th>
 						<td>
@@ -150,6 +175,10 @@
 								<option value="Y">완료</option>
 								<option value="N" selected>미완료</option>
 							</select>
+						</td>
+						<th>계약문서</th>
+						<td>
+							<select id="ctrtDoc_S" name="ctrtDoc_S" data-kind="CONTRACTDIV" data-search="ctrtDoc" multiple="multiple"></select>
 						</td>
 					</tr>
 
@@ -187,6 +216,8 @@
 								<a onclick="openUserTree();"><i class="i_search_w"></i></a>
 							</div>
 						</td>
+						<th></th>
+						<td></td>
 <!-- 						<th>계약명</th> -->
 <!-- 						<td> -->
 <!-- 							<input type="text" id="ctrtNm_S" name="ctrtNm_S" data-search="ctrtNm" onkeyup="event.keyCode == 13 ? DataSearch() : '' "> -->
@@ -433,7 +464,8 @@
 			if (inputValidation($('input[required]'))) {
 				var formData = {};
 				$.each($('[data-search]'), function(idx, elem){
-					formData[$(elem).data("search")] = $(elem).val();
+					var val = $(elem).val();
+					formData[$(elem).data("search")] = Array.isArray(val) ? val.join(",") : val;
 				});
 				formData["yyyymm"]    = $("#yyyymm_S").val().replace(/\-/g, '');
 				formData["pageNo"]    = _pageNo + 1;
@@ -590,6 +622,22 @@
 		mainDefaultLoad("영업관리", "연간 수주 및 미수금 통합관리"); // 페이지 타이틀 설정
 		setCommonSelect($("#main_area select[data-kind]")); // 공통코드 set
 
+		// 멀티선택(수주구분, 계약문서) 초기화
+		var multiSelectOpt = {
+			includeSelectAllOption: true,
+			selectAllText: '전체선택',
+			nonSelectedText: '전체',
+			allSelectedText: '전체',
+			nSelectedText: '개 선택',
+			numberDisplayed: 2,
+			buttonWidth: '100%',
+			onChange: function() { DataSearch(); },
+			onSelectAll: function() { DataSearch(); },
+			onDeselectAll: function() { DataSearch(); }
+		};
+		$('#ordrsDiv_S').multiselect(multiSelectOpt);
+		$('#ctrtDoc_S').multiselect(multiSelectOpt);
+
 		//회사 기본값지정
 		$("#coCd_S").val(jwt.coCd);
 		setByCoCd($("#coCd_S").val());
@@ -628,7 +676,7 @@
 		excelView.initView();
 		
 		// 검색조건 이벤트 bind
-  		$('[data-search]').on("change", function(){
+  		$('[data-search]').not('#ordrsDiv_S, #ctrtDoc_S').on("change", function(){
   			DataSearch();
   		});
 		
@@ -648,7 +696,9 @@
 	// 초기화 버튼
 	function initSearch() {
 		$('[data-search]').off("change");	//바인딩기능 오프
-		$('.contents.search select, .contents.search input').val("");
+		$('.contents.search select, .contents.search input').not('#ordrsDiv_S, #ctrtDoc_S').val("");
+		$('#ordrsDiv_S').multiselect('deselectAll', false).multiselect('updateButtonText');
+		$('#ctrtDoc_S').multiselect('deselectAll', false).multiselect('updateButtonText');
 		// 회사 선택 상자 값 설정
 		$("#coCd_S").val(jwt.coCd);
 
@@ -662,7 +712,7 @@
 		$('#yyyymm_S').val(strYyyymm);
 		
 		// 검색조건 이벤트 bind
-		$('[data-search]').on("change", function(){
+		$('[data-search]').not('#ordrsDiv_S, #ctrtDoc_S').on("change", function(){
 			gridView.setData(0);
 		});
 
@@ -693,7 +743,8 @@
 	function excelDown() {
 		var formData = {};
 		$.each($('[data-search]'), function(idx, elem){
-			formData[$(elem).data("search")] = $(elem).val();
+			var val = $(elem).val();
+			formData[$(elem).data("search")] = Array.isArray(val) ? val.join(",") : val;
 		});
 		formData["yyyymm"]    = $("#yyyymm_S").val().replace(/\-/g, '');
 		formData["pageNo"]    = 1;
@@ -858,12 +909,15 @@
     		fileName = "CR1901R02.jrf";
     		titl =  $("#closeYm").val()+"_세금계산서 발행 및 수금계획대 실적(월말출력)";
     	} 
+		var ordrsDivVal = $("#ordrsDiv_S").val();
+		var ordrsDivStr = Array.isArray(ordrsDivVal) ? ordrsDivVal.join(",") : (ordrsDivVal || "");
+		var ordrsDivNmStr = $("#ordrsDiv_S option:selected").map(function() { return $(this).text(); }).get().join(", ") || "전체";
 		let arg =  "coCd#" + $("#coCd_S").val() 
 				+ "#closeYm#" + $("#yyyymm_S").val().replace(/\-/g, '') 
 				+ "#useYn#" + $("#useYn_S").val() 
 				+ "#ordrsClntNm#" +  $("#ordrsClntNm_S").val() 
-				+ "#ordrsDiv#" +  $("#ordrsDiv_S").val() 
-				+ "#ordrsDivNm#" +  $("#ordrsDiv_S").find("option:selected").text()
+				+ "#ordrsDiv#" +  ordrsDivStr 
+				+ "#ordrsDivNm#" +  ordrsDivNmStr
 				+ "#searchIdNm#" +  $("#searchidnm_S").val() 
 				+ "#";
 		callReport(fileName, arg, "1050", "700", titl);
