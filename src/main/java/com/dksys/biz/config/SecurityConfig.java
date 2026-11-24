@@ -60,6 +60,7 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
 	            // 1) 화이트리스트를 **먼저** 선언
 	            .antMatchers("/", "/oauth/**", "/login", "/customLogout", "/error", "/static/**", "/download/**", "/s/**", "/favicon.ico", "/index.html","/admin/cm/cm08/ubiReportImage").permitAll()
 	            // 2) 그 뒤에 개별 규칙
+	            .antMatchers("/api/pdm/**").hasAuthority(AccessTokenValidationFilter.PDM_LOOKUP_AUTHORITY)
 	            .antMatchers("/static/html/cmn/modal/**").authenticated()
 	            // PDF 변환 API 는 인증 필요
 	            .antMatchers(HttpMethod.GET,

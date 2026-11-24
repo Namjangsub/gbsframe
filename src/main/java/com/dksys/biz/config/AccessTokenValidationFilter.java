@@ -2,6 +2,7 @@ package com.dksys.biz.config;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -18,6 +19,8 @@ import java.util.HashMap;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.env.Environment;
+import org.springframework.core.env.Profiles;
 import org.springframework.http.ResponseCookie;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
@@ -34,6 +37,7 @@ import org.springframework.util.AntPathMatcher;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import com.dksys.biz.main.service.LoginService;
+import com.dksys.biz.integration.pdm.PdmLookupCtr;
 import com.dksys.biz.auth.service.ClientCertService;
 import com.dksys.biz.auth.service.DnParser;
 
@@ -43,6 +47,18 @@ import io.jsonwebtoken.Jwts;
 
 @Component
 public class AccessTokenValidationFilter extends OncePerRequestFilter {
+
+    static final String PDM_LOOKUP_AUTHORITY = "PDM_LOOKUP";
+    static final String PDM_API_KEY_HEADER = "X-API-Key";
+
+    @Value("${PDM_ALLOWED_IPS:}")
+    private String pdmAllowedIps;
+
+    @Value("${PDM_API_KEY:}")
+    private String pdmApiKey;
+
+    @Autowired
+    private Environment environment;
 
     @Value("${security.jwt.signing-key}")
     private String signingKey;
@@ -165,6 +181,39 @@ public class AccessTokenValidationFilter extends OncePerRequestFilter {
 //        System.out.println("▶ Request Cookie: " + request.getHeader("Cookie"));
         if (shouldNotFilter(request)) {             // 화이트리스트면 패스
             chain.doFilter(request, response);
+            return;
+        }
+
+        String path = normalizedPath(request);
+        if ("POST".equals(request.getMethod())
+                && (PdmLookupCtr.MATERIAL_SEARCH_PATH.equals(path)
+                    || PdmLookupCtr.PURCHASE_BOM_STATUS_PATH.equals(path))) {
+            String remoteAddr = request.getRemoteAddr();
+            boolean allowed = Arrays.stream(pdmAllowedIps.split(","))
+                    .map(String::trim)
+                    .anyMatch(remoteAddr::equals);
+            // 로컬 개발에서는 같은 PC에서 보내는 요청을 바로 테스트할 수 있다.
+            allowed = allowed || (pdmAllowedIps.trim().isEmpty()
+                    && environment.acceptsProfiles(Profiles.of("local & !prod"))
+                    && isLoopbackAddress(remoteAddr) && isLoopbackAddress(request.getLocalAddr()));
+            if (!allowed) {
+                reject(response, HttpServletResponse.SC_FORBIDDEN,
+                        "PDM_IP_NOT_ALLOWED", "허용된 PDM 서버에서만 조회할 수 있습니다.");
+                return;
+            }
+            if (!isPdmApiKeyValid(request)) {
+                reject(response, HttpServletResponse.SC_UNAUTHORIZED,
+                        "PDM_API_KEY_INVALID", "유효한 PDM API Key가 필요합니다.");
+                return;
+            }
+            Authentication pdmAuthentication = new UsernamePasswordAuthenticationToken(
+                    "pdm", null, AuthorityUtils.createAuthorityList(PDM_LOOKUP_AUTHORITY));
+            SecurityContextHolder.getContext().setAuthentication(pdmAuthentication);
+            try {
+                chain.doFilter(request, response);
+            } finally {
+                SecurityContextHolder.clearContext();
+            }
             return;
         }
         
@@ -536,8 +585,12 @@ public class AccessTokenValidationFilter extends OncePerRequestFilter {
 
 
     private void reject(HttpServletResponse response, String errCode, String message) throws IOException {
+        reject(response, HttpServletResponse.SC_UNAUTHORIZED, errCode, message);
+    }
+
+    private void reject(HttpServletResponse response, int status, String errCode, String message) throws IOException {
     	response.reset();
-        response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+        response.setStatus(status);
         response.setContentType("application/json;charset=UTF-8");
         response.setHeader("X-ERR-CODE", errCode);
         response.getWriter().write("{\"error\": \"" + message + "\"}");
@@ -631,9 +684,28 @@ public class AccessTokenValidationFilter extends OncePerRequestFilter {
 
 	private boolean isLocalOrLoopback(HttpServletRequest request) {
 	    String remoteAddr = request.getRemoteAddr();
-	    return "127.0.0.1".equals(remoteAddr)
-	            || "0:0:0:0:0:0:0:1".equals(remoteAddr)
-	            || "::1".equals(remoteAddr)
-	            || remoteAddr.equals(request.getLocalAddr());
+	    return isLoopbackAddress(remoteAddr) || remoteAddr.equals(request.getLocalAddr());
 	}
+
+    private static boolean isLoopbackAddress(String address) {
+        return "127.0.0.1".equals(address) || "::1".equals(address) || "0:0:0:0:0:0:0:1".equals(address);
+    }
+
+    private boolean isPdmApiKeyValid(HttpServletRequest request) {
+        String configuredKey = pdmApiKey == null ? "" : pdmApiKey.trim();
+        if (configuredKey.isEmpty()) {
+            return false;
+        }
+        String requestKey = request.getHeader(PDM_API_KEY_HEADER);
+        if (requestKey == null) {
+            return false;
+        }
+        String trimmedRequestKey = requestKey.trim();
+        if (trimmedRequestKey.isEmpty()) {
+            return false;
+        }
+        return MessageDigest.isEqual(
+                configuredKey.getBytes(StandardCharsets.UTF_8),
+                trimmedRequestKey.getBytes(StandardCharsets.UTF_8));
+    }
 }
