@@ -248,14 +248,16 @@
 				     FULL OUTER JOIN un_plan B ON A.SALES_CD = B.SALES_CD
 			)
 			,w0 AS (
-				SELECT  S0.CO_CD, S0.SALES_CD,
-				        COUNT(W.FILE_TRGT_KEY) AS problem_count,
-				        SUM(CASE WHEN W.REQ_NO IS NULL AND W.ISS_STS != 'ISSSTS03' THEN 1
-				                 WHEN Q.REQ_ST != 'REQST03' THEN 1
-				                 ELSE 0 END) AS problem_uncomplete
+				SELECT  /*+ MATERIALIZE */
+				        S0.CO_CD, S0.SALES_CD,
+				        COUNT(*) AS problem_count,
+				        SUM(CASE WHEN DECODE(W.REQ_NO, NULL, W.ISS_STS, NVL(Q.REQ_ST, W.ISS_STS)) IN ('ISSSTS03', 'REQST03')
+				                 THEN 0
+				                 ELSE 1
+				            END) AS problem_uncomplete
 				FROM sales S0
 				JOIN TB_WB24M02 W ON W.CO_CD = S0.CO_CD AND W.SALES_CD = S0.SALES_CD
-				JOIN TB_QM01M01 Q ON Q.REQ_NO = W.REQ_NO
+				LEFT OUTER JOIN TB_QM01M01 Q ON Q.REQ_NO = W.REQ_NO
 				GROUP BY S0.CO_CD, S0.SALES_CD
 			)
 			-- level2 plan 등록건수
@@ -433,7 +435,7 @@
             TO_CHAR(ST.WBS_RSLTSE_DT, 'YYYY-MM-DD')  		AS ACT_END,		--실적 시작일
             ST.WBS_RSLTS_CNTS 								AS MEMO,			--메모
 			NVL(W0.PROBLEM_COUNT, 0)						AS PROBLEM_COUNT,
-			NVL(W0.PROBLEM_UNCOMPLETE, 0)					AS PROBLEM_UNCOMPLETE,PROBLEM_UNCOMPLETE,
+			NVL(W0.PROBLEM_UNCOMPLETE, 0)					AS PROBLEM_UNCOMPLETE,
 			NVL(UN.UN_COMPLETED, 0) 						AS UN_COMPLETED,
 			NVL(LP.NOT_WBSCODE_COUNT, 0)					AS NOT_WBSCODE_COUNT,
 			upr.total_un_cnt,

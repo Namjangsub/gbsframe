@@ -5538,8 +5538,8 @@ var ETO_FLOW_PAGES = [
 	'CR0101M01', 'CR0301M01', 'CR0501M01', 'CR0701M01', 'CR0801M01', 'CR0901M01', 'CR1001M01',
 	'CR1101M01', 'CR1301M01', 'CR1801M01', 'CR5001M01', 'DW0201M01', 'DW0302M01', 'PM0101M01',
 	'QM0101M01', 'SM0101M01', 'SM0201M01', 'SM0701M01', 'SM1001M01', 'SM5001M02', 'SM6001M01',
-	'SM6101M01', 'TR0101M01', 'WB0601M01', 'WB2101M02',
-	'CM1001M01', 'CM1002M01', 'CM1003M01', 'CM1004M01', 'CM1005M01', 'WB2001M01', 'WB2401M01'
+	'SM6101M01', 'TR0101M01', 'WB0601M01', 'WB0701M01', 'WB2101M02',
+	'CM1001M01', 'CM1002M01', 'CM1003M01', 'CM1004M01', 'CM1005M01', 'CM1006M01', 'WB2001M01', 'WB2401M01'
 ];
 
 function getFlowStorageKey() {
@@ -5570,12 +5570,48 @@ function getFlowContext() {
 	}
 }
 
-function setFlowContext(ordrsNo, histNo, clntNm) {
+function getFlowUrlParams() {
+	if (typeof gfn_getParam === 'function') {
+		return gfn_getParam() || {};
+	}
+	var params = {};
+	try {
+		var search = (window.location && window.location.search) ? window.location.search : '';
+		if (!search) return params;
+		if (typeof URLSearchParams === 'function') {
+			var sp = new URLSearchParams(search);
+			sp.forEach(function(value, key) {
+				params[key] = value;
+			});
+			return params;
+		}
+		var query = search.charAt(0) === '?' ? search.substring(1) : search;
+		if (!query) return params;
+		var pairs = query.split('&');
+		for (var i = 0; i < pairs.length; i++) {
+			if (!pairs[i]) continue;
+			var idx = pairs[i].indexOf('=');
+			var key = idx >= 0 ? pairs[i].substring(0, idx) : pairs[i];
+			var val = idx >= 0 ? pairs[i].substring(idx + 1) : '';
+			try {
+				key = decodeURIComponent(key.replace(/\+/g, ' '));
+				val = decodeURIComponent(val.replace(/\+/g, ' '));
+			} catch (e) {}
+			if (key) params[key] = val;
+		}
+	} catch (e) {}
+	return params;
+}
+
+function setFlowContext(ordrsNo, histNo, clntNm, coCd) {
 	if (!ordrsNo) return;
+	var prev = getFlowContext();
+	var sameOrdrs = !!(prev && prev.ordrsNo && String(prev.ordrsNo) === String(ordrsNo));
 	var ctx = {
 		ordrsNo: String(ordrsNo),
-		histNo: (histNo !== undefined && histNo !== null) ? String(histNo) : '0',
-		clntNm: clntNm || ''
+		histNo: (histNo !== undefined && histNo !== null && histNo !== '') ? String(histNo) : (sameOrdrs && prev.histNo ? String(prev.histNo) : '0'),
+		clntNm: clntNm || (sameOrdrs && prev.clntNm ? prev.clntNm : ''),
+		coCd: coCd || (sameOrdrs && prev.coCd ? prev.coCd : '')
 	};
 	var json = JSON.stringify(ctx);
 	try {
@@ -5613,15 +5649,19 @@ function jumpFlowStep(url, pgmId) {
 	var targetUrl = url;
 	if (ctx && ctx.ordrsNo) {
 		var sep = targetUrl.indexOf('?') >= 0 ? '&' : '?';
-		targetUrl += sep + 'ordrsNo=' + encodeURIComponent(ctx.ordrsNo) + '&histNo=' + encodeURIComponent(ctx.histNo || '0') + '&flow=Y';
+		targetUrl += sep + 'ordrsNo=' + encodeURIComponent(ctx.ordrsNo) + '&histNo=' + encodeURIComponent(ctx.histNo || '0');
+		if (ctx.coCd) {
+			targetUrl += '&coCd=' + encodeURIComponent(ctx.coCd);
+		}
+		targetUrl += '&flow=Y';
 	}
 	location.href = targetUrl;
 }
 
 function initTopFlowBar() {
-	var urlParam = typeof gfn_getParam === 'function' ? gfn_getParam() : {};
+	var urlParam = getFlowUrlParams();
 	if (urlParam.ordrsNo) {
-		setFlowContext(urlParam.ordrsNo, urlParam.histNo, urlParam.clntNm);
+		setFlowContext(urlParam.ordrsNo, urlParam.histNo, urlParam.clntNm, urlParam.coCd);
 	}
 	var ctx = getFlowContext();
 	$('#topProcessFlowBar').css('display', 'inline-flex');
@@ -5641,17 +5681,104 @@ function initTopFlowBar() {
 	});
 }
 
-function applyFlowContext(callback) {
-	var urlParam = typeof gfn_getParam === 'function' ? gfn_getParam() : {};
+function applyFlowContext(callback, options) {
+	var opts = options || {};
+	var urlParam = getFlowUrlParams();
+	var isUrlFlow = (urlParam.flow === 'Y' || !!urlParam.ordrsNo || !!urlParam.salesCd || !!urlParam.clntNm || !!urlParam.clntPjt || !!urlParam.pchsClntNm || !!urlParam.prdtCd || !!urlParam.prdtNm || !!urlParam.matrCd || !!urlParam.matrNm);
 	var ctx = getFlowContext();
+
+	if (opts.onlyOnUrlFlow && !isUrlFlow) {
+		return null;
+	}
+
 	var ordrsNo = urlParam.ordrsNo || (ctx ? ctx.ordrsNo : '');
 	var histNo = urlParam.histNo || (ctx ? ctx.histNo : '');
-	if (ordrsNo) {
-		if ($('#ordrsNo_S').length) $('#ordrsNo_S').val(ordrsNo);
-		if (typeof callback === 'function') {
-			callback(ordrsNo, histNo);
+	var coCd = urlParam.coCd || (isUrlFlow && ctx ? (ctx.coCd || '') : '');
+	var salesCd = urlParam.salesCd || '';
+	var clntNm = urlParam.clntNm || (isUrlFlow && ctx ? (ctx.clntNm || '') : '');
+	var clntPjt = urlParam.clntPjt || '';
+	var clntPjtNm = urlParam.clntPjtNm || '';
+	var pchsClntNm = urlParam.pchsClntNm || '';
+	var prdtCd = urlParam.prdtCd || '';
+	var prdtNm = urlParam.prdtNm || '';
+	var matrCd = urlParam.matrCd || '';
+	var matrNm = urlParam.matrNm || '';
+	var searchValue = urlParam.searchValue || '';
+
+	if (!ordrsNo && !salesCd && !clntNm && !clntPjt && !coCd && !pchsClntNm && !prdtCd && !prdtNm && !matrCd && !matrNm && !searchValue) {
+		return null;
+	}
+
+	if (coCd && opts.bindCoCd !== false) {
+		var $coSel = $(opts.coCdSelector || '#coCd_S');
+		if ($coSel.length && $coSel.find('option[value="' + coCd + '"]').length > 0) {
+			$coSel.val(coCd);
 		}
 	}
+
+	var boundOrdrs = false;
+	if (ordrsNo && opts.bindOrdrsNo !== false) {
+		var $ordrsInput = $(opts.ordrsNoSelector || '#ordrsNo_S');
+		if ($ordrsInput.length) {
+			$ordrsInput.val(ordrsNo);
+			boundOrdrs = true;
+		}
+	}
+
+	if (opts.bindSalesCd !== false) {
+		var $salesInput = $(opts.salesCdSelector || '#salesCd_S');
+		if ($salesInput.length) {
+			var targetSales = salesCd || ((!boundOrdrs && !opts.exactSalesCdOnly) ? ordrsNo : '');
+			if (targetSales) {
+				$salesInput.val(targetSales);
+			}
+		}
+	}
+
+	if (opts.bindClntNm && clntNm) {
+		var $clntInput = $(opts.clntNmSelector || '#ordrsClntNm_S');
+		if ($clntInput.length) {
+			$clntInput.val(clntNm);
+		}
+	}
+
+	if (opts.clearEndYn && isUrlFlow) {
+		var $endSel = $(opts.endYnSelector || '#endYn_S');
+		if ($endSel.length && $endSel.find('option[value=""]').length > 0) {
+			$endSel.val('');
+		}
+	}
+
+	if (opts.widenDateRange && isUrlFlow && typeof moment === 'function') {
+		var fmt = opts.dateFormat || 'YYYY-MM-DD';
+		var fromVal = moment().subtract(opts.widenYearsBack || 10, 'years').startOf('year').format(fmt);
+		var toVal = moment().add(opts.widenYearsForward || 1, 'years').endOf('year').format(fmt);
+		if (opts.dateFromSelector && $(opts.dateFromSelector).length) $(opts.dateFromSelector).val(fromVal);
+		if (opts.dateToSelector && $(opts.dateToSelector).length) $(opts.dateToSelector).val(toVal);
+	}
+
+	var flowInfo = {
+		ordrsNo: ordrsNo,
+		histNo: histNo,
+		coCd: coCd,
+		salesCd: salesCd,
+		clntNm: clntNm,
+		clntPjt: clntPjt,
+		clntPjtNm: clntPjtNm,
+		pchsClntNm: pchsClntNm,
+		prdtCd: prdtCd,
+		prdtNm: prdtNm,
+		matrCd: matrCd,
+		matrNm: matrNm,
+		searchValue: searchValue,
+		flow: urlParam.flow || '',
+		fromUrl: isUrlFlow
+	};
+
+	if (typeof callback === 'function') {
+		callback(ordrsNo, histNo, flowInfo);
+	}
+	return flowInfo;
 }
 
 var _gbsTeamsEmailCache = {};

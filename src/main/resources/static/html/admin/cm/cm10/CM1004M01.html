@@ -828,7 +828,7 @@ body {
 
 		// Phase 3. 수주
 		{ id: "c3_1", phaseNo: 3, cardType: "branch", cardEn: "Customer Approves Quotation", cardKr: "고객 견적 승인 및 계약 조건 합의", btns: [] },
-		{ id: "c3_2", phaseNo: 3, cardType: "card", cardEn: "Create Sales Order", cardKr: "수주 계약 체결 및 전자결재 승인", btns: [ { pgmNm: "수주목표원가 결재", pgmId: "CR0201M01", url: "/static/html/user/cr/cr02/CR0201M01.html", fullWidth: true }, { pgmNm: "PFU등록", pgmId: "CR5001M01", url: "/static/html/user/cr/cr50/CR5001M01.html" }, { pgmNm: "수주계약서등록", pgmId: "CR0201M01", url: "/static/html/user/cr/cr02/CR0201M01.html", fullWidth: true } ] },
+		{ id: "c3_2", phaseNo: 3, cardType: "card", cardEn: "Create Sales Order", cardKr: "수주 계약 체결 및 전자결재 승인", btns: [ { pgmNm: "수주목표원가 결재", pgmId: "CR0201M01", url: "/static/html/user/cr/cr02/CR0201M01.html", fullWidth: true }, { pgmNm: "PFU등록", pgmId: "CR5001M01", url: "/static/html/user/cr/cr50/CR5001M01.html" }, { pgmNm: "WBS일정확정(NEW)", pgmId: "WB0701M01", url: "/static/html/user/wb/wb07/WB0701M01.html" }, { pgmNm: "수주계약서등록", pgmId: "CR0201M01", url: "/static/html/user/cr/cr02/CR0201M01.html", fullWidth: true } ] },
 		{ id: "c3_3", phaseNo: 3, cardType: "card", cardEn: "Redefine Costs and Planning", cardKr: "사양변경 시 차수관리 (histNo UP)", btns: [ { pgmNm: "변경원가결재 (차수관리)", pgmId: "CR0201M01", url: "/static/html/user/cr/cr02/CR0201M01.html", fullWidth: true } ] },
 
 		// Phase 4. 실행
@@ -871,10 +871,25 @@ body {
 
 	$(document).ready(function() {
 		var urlParams = new URLSearchParams(window.location.search);
-		initEtoCoCdSelect(urlParams.get('coCd') || 'GUN');
+		var flowCtx = (typeof getFlowContext === 'function') ? getFlowContext() : null;
+		var urlOrdrsNo = $.trim(urlParams.get('ordrsNo') || '');
+		var urlHistNo = $.trim(urlParams.get('histNo') || '');
+		var urlSalesCd = $.trim(urlParams.get('salesCd') || '');
+		var pinnedKw = $.trim(sessionStorage.getItem('etoPinnedSearchKeyword') || '');
+
+		initEtoCoCdSelect(urlParams.get('coCd') || (flowCtx && flowCtx.coCd) || 'GUN');
 		loadUserAccessibleMenus();
 		loadUserEtoMapConfig();
-		loadEtoProjectList();
+
+		var targetOrdrsNo = urlOrdrsNo || (flowCtx && flowCtx.ordrsNo ? String(flowCtx.ordrsNo) : '');
+		var targetHistNo = urlOrdrsNo ? urlHistNo : (flowCtx && flowCtx.histNo ? String(flowCtx.histNo) : '');
+		var usePinned = !!(pinnedKw && (!urlOrdrsNo || pinnedKw === urlOrdrsNo || urlOrdrsNo.indexOf(pinnedKw) > -1));
+		if (usePinned) {
+			$('#etoSearchInput').val(pinnedKw);
+			loadEtoProjectList(pinnedKw, urlSalesCd, true, targetOrdrsNo, targetHistNo);
+		} else {
+			loadEtoProjectList("", urlSalesCd, false, targetOrdrsNo, targetHistNo);
+		}
 		initWbIssueBadgeEvents();
 		initWbScheduleBadgeEvents();
 	});
@@ -908,6 +923,7 @@ body {
 
 	function onEtoCoCdChange() {
 		wbIssueCache = {};
+		try { sessionStorage.removeItem('etoPinnedSearchKeyword'); } catch (e) {}
 		$('#etoSearchInput').val('');
 		clearProjectInfo();
 		loadEtoProjectList("", "", false);
@@ -1326,13 +1342,31 @@ body {
 	// =========================================================================
 	// [5] 프로젝트 목록 및 SalesCd 연동 (CM1003M01 100% 동일)
 	// =========================================================================
-	function loadEtoProjectList(searchValue, targetSalesCd, allowSalesCdFallback) {
+	function loadEtoProjectList(searchValue, targetSalesCd, allowSalesCdFallback, preferredOrdrsNo, preferredHistNo) {
 		var coCd = getSelectedEtoCoCd();
 		var param = { coCd: coCd, searchValue: searchValue || "" };
 
 		postAjax("/user/cm/cm10/selectTaskFlowProjectList", param, null, function(data) {
 			var list = data.resultList || [];
 			var $sel = $('#etoProjectSelect');
+
+			// 전달된 수주번호가 최근 30건 목록에 없으면 해당 수주번호로 직접 재조회해 유지
+			if (!searchValue && preferredOrdrsNo) {
+				var found = false;
+				for (var fi = 0; fi < list.length; fi++) {
+					if (list[fi] && String(list[fi].ordrsNo) === String(preferredOrdrsNo)) {
+						found = true;
+						break;
+					}
+				}
+				if (!found) {
+					$('#etoSearchInput').val(preferredOrdrsNo);
+					try { sessionStorage.setItem('etoPinnedSearchKeyword', preferredOrdrsNo); } catch (e) {}
+					loadEtoProjectList(preferredOrdrsNo, targetSalesCd, false, preferredOrdrsNo, preferredHistNo);
+					return;
+				}
+			}
+
 			$sel.empty();
 
 			if (list.length === 0) {
@@ -1342,6 +1376,8 @@ body {
 			}
 
 			$sel.append('<option value="">-- 수주 프로젝트를 선택하세요 (최근 30건) --</option>');
+			var matchedVal = '';
+			var matchPriority = 0;
 			$.each(list, function(idx, item) {
 				var optVal = item.ordrsNo + '|' + (item.histNo || '0') + '|' + (item.coCd || '');
 				var optText = '[' + item.ordrsNo + '-' + (item.histNo || '0') + '] '
@@ -1349,18 +1385,31 @@ body {
 				            + (item.ctrtNm || item.clntPjtNm || '계약명미상');
 				var $opt = $('<option>').val(optVal).text(optText).data('item', item);
 				$sel.append($opt);
-			});
-
-			try {
-				var savedCtx = sessionStorage.getItem('GBS:taskFlowContext');
-				if (savedCtx && !searchValue) {
-					var parsed = JSON.parse(savedCtx);
-					if (parsed.ordrsNo) {
-						var targetVal = parsed.ordrsNo + '|' + (parsed.histNo || '0') + '|' + (parsed.coCd || coCd);
-						$sel.val(targetVal);
+				if (preferredOrdrsNo && String(item.ordrsNo) === String(preferredOrdrsNo)) {
+					if (preferredHistNo !== undefined && preferredHistNo !== null && preferredHistNo !== '' && String(item.histNo || '0') === String(preferredHistNo)) {
+						matchedVal = optVal;
+						matchPriority = 2;
+					} else if (matchPriority < 1) {
+						matchedVal = optVal;
+						matchPriority = 1;
 					}
 				}
-			} catch (e) {}
+			});
+
+			if (matchedVal) {
+				$sel.val(matchedVal);
+			} else {
+				try {
+					var savedCtx = sessionStorage.getItem('GBS:taskFlowContext');
+					if (savedCtx && !searchValue) {
+						var parsed = JSON.parse(savedCtx);
+						if (parsed.ordrsNo) {
+							var targetVal = parsed.ordrsNo + '|' + (parsed.histNo || '0') + '|' + (parsed.coCd || coCd);
+							$sel.val(targetVal);
+						}
+					}
+				} catch (e) {}
+			}
 
 			if (!$sel.val() && list.length > 0) {
 				$sel.prop('selectedIndex', 1);
@@ -1439,11 +1488,16 @@ body {
 
 	function searchEtoContext() {
 		var kw = $.trim($('#etoSearchInput').val());
+		try {
+			if (kw) sessionStorage.setItem('etoPinnedSearchKeyword', kw);
+			else sessionStorage.removeItem('etoPinnedSearchKeyword');
+		} catch (e) {}
 		loadEtoProjectList(kw, "", true);
 	}
 
 	function resetEtoSearch() {
 		$('#etoSearchInput').val('');
+		try { sessionStorage.removeItem('etoPinnedSearchKeyword'); } catch (e) {}
 		loadEtoProjectList("", "", false);
 	}
 
@@ -2875,11 +2929,28 @@ function getIssueTrafficLight(iss) {
 		var salesCd = $('#etoSalesCdSelect').val() || "";
 
 		var targetUrl = url;
+		var sep = targetUrl.indexOf('?') > -1 ? '&' : '?';
+		var clntNmParam = ($('#infoClntNm').text() && $('#infoClntNm').text() !== '-') ? $('#infoClntNm').text().trim() : (typeof curEtoProject !== 'undefined' && curEtoProject && curEtoProject.clntNm ? curEtoProject.clntNm : '');
+		var clntPjtParam = (typeof curEtoProject !== 'undefined' && curEtoProject && curEtoProject.clntPjt) ? curEtoProject.clntPjt : '';
+		var clntPjtNmParam = ($('#infoClntPjtNm').text() && $('#infoClntPjtNm').text() !== '-') ? $('#infoClntPjtNm').text().trim() : (typeof curEtoProject !== 'undefined' && curEtoProject && curEtoProject.clntPjtNm ? curEtoProject.clntPjtNm : '');
 		if (ordrsNo) {
-			var sep = targetUrl.indexOf('?') > -1 ? '&' : '?';
-			targetUrl += sep + 'ordrsNo=' + encodeURIComponent(ordrsNo) + '&histNo=' + encodeURIComponent(histNo) + '&coCd=' + encodeURIComponent(coCd);
+			targetUrl += sep + 'ordrsNo=' + encodeURIComponent(ordrsNo) + '&histNo=' + encodeURIComponent(histNo) + '&coCd=' + encodeURIComponent(coCd) + '&flow=Y';
 			if (salesCd) {
 				targetUrl += '&salesCd=' + encodeURIComponent(salesCd);
+			}
+			if (clntNmParam) {
+				targetUrl += '&clntNm=' + encodeURIComponent(clntNmParam);
+			}
+			if (clntPjtParam) {
+				targetUrl += '&clntPjt=' + encodeURIComponent(clntPjtParam);
+			}
+			if (clntPjtNmParam) {
+				targetUrl += '&clntPjtNm=' + encodeURIComponent(clntPjtNmParam);
+			}
+		} else {
+			targetUrl += sep + 'flow=Y';
+			if (coCd) {
+				targetUrl += '&coCd=' + encodeURIComponent(coCd);
 			}
 		}
 

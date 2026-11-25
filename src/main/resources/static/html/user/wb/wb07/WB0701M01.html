@@ -1130,7 +1130,7 @@ onkeyup="(event.keyCode == 8 || event.keyCode == 46) ? ordrsClntCd_S.value = '' 
 			  const pu = Number(r.problemUncomplete ?? r.problem_uncomplete ?? r.PROBLEM_UNCOMPLETE ?? r["PROBLEM_UNCOMPLETE"] ?? 0) || 0;
 			  const uc = Number(r.unCompleted ?? r.un_completed ?? r.UN_COMPLETED ?? r["UN_COMPLETED"] ?? 0) || 0;
 
-			  const problemText = (pc === 0 && pu === 0) ? "" : `${pc}(${pu})`;
+			  const problemText = (pc === 0 && pu === 0) ? "" : `${pu}/${pc}`;
 			  const problemCls = (pu > 0) ? "is-bad" : "";
 
 			  // [MOD] SCHEDULE_STATUS 제거 대응: uc(지연건수) 기반으로 상태 결정
@@ -1858,7 +1858,12 @@ onkeyup="(event.keyCode == 8 || event.keyCode == 46) ? ordrsClntCd_S.value = '' 
               <div class="timeline-canvas ${zebraCls}"></div>
             </div>
             <div class="pane-right">
-              <div class="cell c-problem ${escapeHtml(r.problemCls || '')}">${escapeHtml(r.problemText || '')}</div>
+              <div class="cell c-problem ${escapeHtml(r.problemCls || '')} ${r.problemText ? 'has-problem' : ''}"
+                   data-salescd="${escapeHtml(r.salesCd || '')}"
+                   data-ordrsno="${escapeHtml(r.ordrsNo || '')}"
+                   data-cocd="${escapeHtml(r.coCd || '')}"
+                   data-problem-count="${Number(r.problemCount || 0) || 0}"
+                   data-problem-uncomplete="${Number(r.problemUncomplete || 0) || 0}">${getWbProblemBadgeHtml(r.problemCount, r.problemUncomplete)}</div>
               <div class="remarks" data-remarks="${safeRemarks}"
                    data-sjfiletrgtkey="${escapeHtml(r.sjFileTrgtKey || '')}"
                    data-salescd="${escapeHtml(r.salesCd || '')}"
@@ -4076,12 +4081,31 @@ onkeyup="(event.keyCode == 8 || event.keyCode == 46) ? ordrsClntCd_S.value = '' 
       $cell.find('.remark-history-text').each(function(){ this.cellScroll = setupCellTextScroll(this); });
     }
 
+    var REMARK_HISTORY_HIDE_TIMER = null;
+
+    function clearRemarkHistoryHideTimer(){
+      if(REMARK_HISTORY_HIDE_TIMER){
+        clearTimeout(REMARK_HISTORY_HIDE_TIMER);
+        REMARK_HISTORY_HIDE_TIMER = null;
+      }
+    }
+
+    function scheduleCloseRemarkHistoryPopover(delayMs){
+      clearRemarkHistoryHideTimer();
+      REMARK_HISTORY_HIDE_TIMER = setTimeout(function(){
+        REMARK_HISTORY_HIDE_TIMER = null;
+        closeRemarkHistoryPopover();
+      }, delayMs || 250);
+    }
+
     function closeRemarkHistoryPopover(){
+      clearRemarkHistoryHideTimer();
       REMARK_HISTORY_REQUEST_TOKEN++;
       const popover = document.getElementById("remarkHistoryPopover");
       if(!popover) return;
       popover.classList.remove("is-open");
       popover.setAttribute("aria-hidden", "true");
+      popover.removeAttribute("data-active-key");
     }
 
     function positionRemarkHistoryPopover(triggerEl){
@@ -4129,6 +4153,7 @@ onkeyup="(event.keyCode == 8 || event.keyCode == 46) ? ordrsClntCd_S.value = '' 
     }
 
     function openRemarkHistoryPopover(triggerEl){
+      clearRemarkHistoryHideTimer();
       const $cell = $(triggerEl).closest(".remarks");
       const sjFileTrgtKey = String($cell.attr("data-sjfiletrgtkey") || "");
       const salesCd = String($cell.attr("data-salescd") || "");
@@ -4136,8 +4161,13 @@ onkeyup="(event.keyCode == 8 || event.keyCode == 46) ? ordrsClntCd_S.value = '' 
 
       const popover = document.getElementById("remarkHistoryPopover");
       if(!popover) return;
+      if(popover.classList.contains("is-open") && popover.getAttribute("data-active-key") === sjFileTrgtKey){
+        positionRemarkHistoryPopover(triggerEl);
+        return;
+      }
 
       const requestToken = ++REMARK_HISTORY_REQUEST_TOKEN;
+      popover.setAttribute("data-active-key", sjFileTrgtKey);
       $("#remarkHistoryTitle").text("비고 변경 이력 · " + (salesCd || sjFileTrgtKey));
       $("#remarkHistoryRows").empty().append(
         $("<div>").addClass("remark-history-state").text("이력을 조회 중입니다.")
@@ -4154,6 +4184,22 @@ onkeyup="(event.keyCode == 8 || event.keyCode == 46) ? ordrsClntCd_S.value = '' 
     }
 
     function bindRemarkHistoryEvents($wbs){
+      $wbs.off("mouseenter.remarkHistory").on("mouseenter.remarkHistory", ".remark-history-trigger", function(){
+        openRemarkHistoryPopover(this);
+      });
+
+      $wbs.off("mouseleave.remarkHistory").on("mouseleave.remarkHistory", ".remark-history-trigger", function(){
+        scheduleCloseRemarkHistoryPopover(300);
+      });
+
+      $("#remarkHistoryPopover")
+        .off("mouseenter.remarkHistory")
+        .on("mouseenter.remarkHistory", clearRemarkHistoryHideTimer)
+        .off("mouseleave.remarkHistory")
+        .on("mouseleave.remarkHistory", function(){
+          scheduleCloseRemarkHistoryPopover(200);
+        });
+
       $wbs.off("click.remarkHistory").on("click.remarkHistory", ".remark-history-trigger", function(event){
         event.preventDefault();
         event.stopImmediatePropagation();
@@ -4173,6 +4219,320 @@ onkeyup="(event.keyCode == 8 || event.keyCode == 46) ? ordrsClntCd_S.value = '' 
 
       $(window).off("resize.remarkHistory").on("resize.remarkHistory", closeRemarkHistoryPopover);
       $("#wbsScroll").off("scroll.remarkHistory").on("scroll.remarkHistory", closeRemarkHistoryPopover);
+    }
+
+    /*****************************************************
+    *  문제/이슈 호버 팝오버 (WB2101M03 동일 기능)
+    ******************************************************/
+    var wbIssueCache = {};
+    var wbCurrentPopoverItem = null;
+    var wbCurrentProblemEl = null;
+    var wbIssuePopoverHideTimer = null;
+
+    function clearWbIssuePopoverTimer(){
+      if(wbIssuePopoverHideTimer){
+        clearTimeout(wbIssuePopoverHideTimer);
+        wbIssuePopoverHideTimer = null;
+      }
+    }
+
+    function scheduleHideWbIssuePopover(delayMs){
+      clearWbIssuePopoverTimer();
+      wbIssuePopoverHideTimer = setTimeout(function(){
+        wbIssuePopoverHideTimer = null;
+        hideWbIssuePopover();
+      }, delayMs || 200);
+    }
+
+    function hideWbIssuePopover(){
+      clearWbIssuePopoverTimer();
+      $("#wbIssuePopover").hide();
+    }
+
+    function getWbProblemBadgeHtml(problemCount, problemUncomplete){
+      var tot = Number(problemCount || 0) || 0;
+      var uncomp = Number(problemUncomplete || 0) || 0;
+      if(tot <= 0 && uncomp <= 0) return "";
+      var cls = uncomp > 0 ? "badge-issue-has-unresolved" : "badge-issue-all-resolved";
+      return '<span class="badge-issue ' + cls + '" data-badge-type="issue" title="문제/이슈 ' + uncomp + '/' + tot + '">'
+           + uncomp + '/' + tot
+           + '</span>';
+    }
+
+    function getWbIssueItemFromProblemCell($cell){
+      if(!$cell || $cell.length === 0) return null;
+      var $row = $cell.closest(".wbs-row.data-row");
+      var salesCd = String($cell.attr("data-salescd") || $row.attr("data-salescd") || "").trim();
+      var ordrsNo = String($cell.attr("data-ordrsno") || $row.attr("data-ordrsno") || "").trim();
+      if(!salesCd && !ordrsNo) return null;
+
+      var matched = null;
+      if(typeof STATE !== "undefined" && STATE && Array.isArray(STATE.rows)){
+        for(var i = 0; i < STATE.rows.length; i++){
+          var row = STATE.rows[i];
+          if(!row || row.type === "group" || row.type === "total" || row.type === "summary") continue;
+          if(salesCd && String(row.salesCd || "").trim() === salesCd){
+            matched = row;
+            break;
+          }
+          if(!salesCd && ordrsNo && String(row.ordrsNo || "").trim() === ordrsNo){
+            matched = row;
+            break;
+          }
+        }
+      }
+
+      var totCnt = Number($cell.attr("data-problem-count") || (matched && matched.problemCount) || 0) || 0;
+      var uncompCnt = Number($cell.attr("data-problem-uncomplete") || (matched && matched.problemUncomplete) || 0) || 0;
+      if(totCnt <= 0 && uncompCnt <= 0 && $.trim($cell.text()) === "") return null;
+
+      return {
+        coCd: String($cell.attr("data-cocd") || (matched && matched.coCd) || $("#coCd_S").val() || (typeof jwt !== "undefined" && jwt ? jwt.coCd : "") || "GUN"),
+        salesCd: salesCd,
+        ordrsNo: ordrsNo || (matched && matched.ordrsNo) || "",
+        clntNm: (matched && matched.clntNm) || "",
+        clntPjtNm: (matched && matched.clntPjtNm) || "",
+        eqpNm: (matched && matched.eqpNm) || "",
+        sjNm: (matched && (matched.sjNm || matched.eqpNm)) || "",
+        issueTotCnt: totCnt,
+        issueUncompCnt: uncompCnt
+      };
+    }
+
+    function bindWbIssuePopoverEvents(){
+      var selector = ".wbs-row.data-row .cell.c-problem.has-problem";
+
+      $(document).off("mouseenter.wbIssue", selector).on("mouseenter.wbIssue", selector, function(e){
+        clearWbIssuePopoverTimer();
+        var $cell = $(this);
+        var item = getWbIssueItemFromProblemCell($cell);
+        showWbIssuePopover(e, item, $cell);
+      });
+
+      $(document).off("mouseleave.wbIssue", selector).on("mouseleave.wbIssue", selector, function(){
+        scheduleHideWbIssuePopover(300);
+      });
+
+      $(document).off("mouseenter.wbIssuePop", "#wbIssuePopover").on("mouseenter.wbIssuePop", "#wbIssuePopover", function(){
+        clearWbIssuePopoverTimer();
+      });
+
+      $(document).off("mouseleave.wbIssuePop", "#wbIssuePopover").on("mouseleave.wbIssuePop", "#wbIssuePopover", function(){
+        scheduleHideWbIssuePopover(200);
+      });
+
+      $(document).off("mousedown.wbIssue").on("mousedown.wbIssue", function(e){
+        if($(e.target).closest("#wbIssuePopover, " + selector).length === 0){
+          hideWbIssuePopover();
+        }
+      });
+
+      $(document).off("click.wbIssue", selector).on("click.wbIssue", selector, function(e){
+        e.stopPropagation();
+        var $cell = $(this);
+        var item = getWbIssueItemFromProblemCell($cell);
+        hideWbIssuePopover();
+        if(item){
+          openWbIssueModal(item);
+        }
+      });
+
+      $(document).off("click.wbIssuePop", "#wbIssuePopover .popover-box.clickable").on("click.wbIssuePop", "#wbIssuePopover .popover-box.clickable", function(e){
+        e.stopPropagation();
+        var targetItem = wbCurrentPopoverItem;
+        hideWbIssuePopover();
+        if(targetItem){
+          openWbIssueModal(targetItem);
+        }
+      });
+
+      $(document).off("wheel.wbIssue mousewheel.wbIssue DOMMouseScroll.wbIssue").on("wheel.wbIssue mousewheel.wbIssue DOMMouseScroll.wbIssue", function(e){
+        var $pop = $("#wbIssuePopover");
+        if($pop.length === 0 || !$pop.is(":visible")) return;
+        if($(e.target).closest("#wbIssuePopover").length > 0){
+          e.stopPropagation();
+          return;
+        }
+        hideWbIssuePopover();
+      });
+
+      $(window).off("scroll.wbIssue resize.wbIssue").on("scroll.wbIssue resize.wbIssue", hideWbIssuePopover);
+      $("#wbsScroll").off("scroll.wbIssue").on("scroll.wbIssue", hideWbIssuePopover);
+    }
+
+    function showWbIssuePopover(e, item, $target){
+      if(!item) return;
+      wbCurrentPopoverItem = item;
+      wbCurrentProblemEl = $target;
+
+      var $pop = $("#wbIssuePopover");
+      if($pop.length === 0){
+        $pop = $('<div id="wbIssuePopover" class="wb-issue-popover"></div>');
+        $("body").append($pop);
+      }
+
+      var salesCd = item.salesCd || "";
+      var ordrsNo = item.ordrsNo || "";
+      var searchVal = salesCd || ordrsNo;
+      var targetKey = (item.coCd || "") + "_" + searchVal;
+
+      if(wbIssueCache[targetKey]){
+        var cachedIssues = wbIssueCache[targetKey];
+        var html = buildWbIssuePopoverHtml(item, cachedIssues, false);
+        $pop.html(html).show();
+        positionWbIssuePopover($target);
+      } else {
+        var htmlLoading = buildWbIssuePopoverHtml(item, null, true);
+        $pop.html(htmlLoading).show();
+        positionWbIssuePopover($target);
+
+        var fetchParam = {
+          "coCd"      : item.coCd || $("#coCd_S").val() || (typeof jwt !== "undefined" && jwt ? jwt.coCd : "") || "GUN",
+          "salesCd"   : searchVal,
+          "reqDtFrom" : "20200101",
+          "reqDtTo"   : "20991231",
+          "pageNo"    : 1,
+          "recordCnt" : 99999999,
+          "issSts"    : ""
+        };
+        postAjax("/user/pm/pm01/selectAllIssueWorkList", fetchParam, null, function(data){
+          var resList = (data && data.result) ? data.result : [];
+          if(salesCd){
+            var upper = salesCd.toUpperCase();
+            resList = resList.filter(function(x){
+              return !x.salesCd || x.salesCd.toUpperCase().indexOf(upper) >= 0;
+            });
+          }
+          wbIssueCache[targetKey] = resList;
+          if($pop.is(":visible") && wbCurrentPopoverItem === item){
+            var newHtml = buildWbIssuePopoverHtml(item, resList, false);
+            $pop.html(newHtml);
+            positionWbIssuePopover($target);
+          }
+        }, false);
+      }
+    }
+
+    function positionWbIssuePopover($target){
+      var $pop = $("#wbIssuePopover");
+      if($pop.length === 0 || !$pop.is(":visible")) return;
+      if($target && $target.length > 0 && $target[0].getBoundingClientRect){
+        var rect = $target[0].getBoundingClientRect();
+        var popWidth = $pop.outerWidth() || 360;
+        var popHeight = $pop.outerHeight() || 200;
+        var winWidth = $(window).width();
+        var winHeight = $(window).height();
+
+        var left = rect.left + (rect.width / 2) - (popWidth / 2);
+        if(left + popWidth > winWidth - 10) left = winWidth - popWidth - 10;
+        if(left < 10) left = 10;
+
+        var top = rect.bottom + 8;
+        if(top + popHeight > winHeight - 10){
+          top = rect.top - popHeight - 8;
+        }
+        $pop.css({ left: Math.round(left) + "px", top: Math.round(top) + "px" });
+      }
+    }
+
+    function getIssueTrafficLight(iss){
+      var sts = String(iss.issSts || iss.reqSt || "").trim();
+      if(sts === "ISSSTS03" || sts === "REQST03" || iss.issStsNm === "조치완료" || iss.issStsNm === "완료"){
+        return { color: "#2563eb", bg: "#dbeafe", text: "#1e40af", label: "완료" };
+      }
+      if(sts === "ISSSTS02" || sts === "REQST02" || iss.issStsNm === "처리중"){
+        return { color: "#f59e0b", bg: "#fef3c7", text: "#92400e", label: "처리중" };
+      }
+      return { color: "#dc2626", bg: "#fee2e2", text: "#991b1b", label: "발생" };
+    }
+
+    function buildWbIssuePopoverHtml(item, issues, isLoading){
+      var uncompIss = 0;
+      if(issues){
+        uncompIss = issues.filter(function(x){
+          return x.issSts !== "ISSSTS03" && x.issSts !== "REQST03";
+        }).length;
+      } else {
+        uncompIss = parseInt(item.issueUncompCnt, 10) || 0;
+      }
+      var hasUnresolved = uncompIss > 0;
+      var themeColor = hasUnresolved ? "#d9534f" : "#2563eb";
+      var badgeText = hasUnresolved ? ("미완료 " + uncompIss + "건") : "전체 완료";
+
+      var html = "";
+      html += '<div class="popover-title" style="border-bottom-color: ' + themeColor + '; color: ' + themeColor + ';">'
+            + '  <span><i class="fas fa-exclamation-triangle" style="margin-right: 5px;"></i>문제/이슈 현황</span>'
+            + '  <span class="popover-badge" style="background: ' + themeColor + ';">' + badgeText + '</span>'
+            + '</div>';
+
+      if(item.salesCd){
+        html += '<div class="popover-item"><b>Sales Code:</b> ' + escapeHtml(item.salesCd) + '</div>';
+      }
+      if(item.clntNm || item.clntPjtNm){
+        html += '<div class="popover-item"><b>고객사/PJT:</b> ' + escapeHtml(item.clntNm || "") + (item.clntPjtNm ? " [" + escapeHtml(item.clntPjtNm) + "]" : "") + '</div>';
+      }
+      if(item.sjNm || item.eqpNm){
+        html += '<div class="popover-item"><b>과제명:</b> ' + escapeHtml(item.sjNm || item.eqpNm || "") + '</div>';
+      }
+
+      if(isLoading){
+        html += '<div class="popover-box" style="text-align: center; color: #666;">'
+              + '  <i class="fa fa-spinner fa-spin" style="margin-right: 5px;"></i>문제 상세내역 조회 중...'
+              + '</div>';
+      } else if(issues && issues.length > 0){
+        html += '<div style="margin-top: 8px; font-weight: bold; font-size: 11.5px; color: #1e293b;">'
+              + '  <i class="fas fa-list-alt" style="margin-right:4px; color:' + themeColor + ';"></i>등록된 문제 내역 (전체 ' + issues.length + '건)'
+              + '</div>';
+        html += '<div class="popover-box" style="border-left-color: ' + themeColor + '; max-height: 220px; overflow-y: auto;">';
+
+        var sortedIssues = issues.slice().sort(function(a, b){
+          var aUncomp = (a.issSts !== "ISSSTS03" && a.issSts !== "REQST03") ? 0 : 1;
+          var bUncomp = (b.issSts !== "ISSSTS03" && b.issSts !== "REQST03") ? 0 : 1;
+          return aUncomp - bUncomp;
+        });
+
+        for(var i = 0; i < sortedIssues.length; i++){
+          var iss = sortedIssues[i];
+          var traffic = getIssueTrafficLight(iss);
+          var occDate = iss.workRptDt || iss.creatDttm || "-";
+          var actor = (iss.actIdNm || iss.workRptIdNm || "-") + (iss.actDeptNm ? " (" + iss.actDeptNm + ")" : "");
+          var title = iss.issueTitle || iss.issSj || iss.workRptRmk || "내용 없음";
+
+          html += '<div class="popover-issue-row">'
+                + '  <div style="display:flex; justify-content:space-between; align-items:center;">'
+                + '    <span style="display:inline-block; padding:1px 5px; font-size:9.5px; font-weight:bold; border-radius:3px; background:' + traffic.bg + '; color:' + traffic.text + '; border:1px solid ' + traffic.color + ';">' + traffic.label + '</span>'
+                + '    <span style="font-size:10px; color:#888;">' + escapeHtml(occDate) + ' | ' + escapeHtml(actor) + '</span>'
+                + '  </div>'
+                + '  <div style="margin-top:3px; font-weight:600; color:#1e293b; word-break:break-all;">' + escapeHtml(title) + '</div>'
+                + (iss.wbsRsltseDt ? '<div style="font-size:10px; color:#2563eb; margin-top:1px;">완료일: ' + escapeHtml(iss.wbsRsltseDt) + '</div>' : '')
+                + '</div>';
+        }
+        html += '</div>';
+      } else {
+        html += '<div class="popover-box" style="text-align: center; color: #888;">등록된 문제가 없습니다.</div>';
+      }
+
+      html += '<div class="popover-box clickable" style="border-left-color: ' + themeColor + '; margin-top: 6px; text-align: center; color: ' + themeColor + '; font-weight: bold;">'
+            + '  <i class="fa fa-mouse-pointer" style="margin-right: 4px;"></i>문제 숫자 또는 여기를 클릭하면 문제/이슈 팝업이 열립니다.'
+            + '</div>';
+
+      return html;
+    }
+
+    function openWbIssueModal(row){
+      if(!row) return;
+      var searchVal = row.salesCd || row.ordrsNo || "";
+      var clntNm = row.clntNm || row.ordrsClntNm || "";
+      var modalTitle = searchVal ? ("Sales Code 검색 (" + searchVal + ")") : "문제/이슈 현황";
+      var paramObj = {
+        "coCd"        : $("#coCd_S").val() || row.coCd || (typeof jwt !== "undefined" && jwt ? jwt.coCd : "") || "GUN",
+        "searchValue" : searchVal,
+        "salesCd"     : row.salesCd || "",
+        "ordrsNo"     : row.ordrsNo || "",
+        "clntNm"      : clntNm
+      };
+      window.openModal("/static/html/cmn/modal/ordrsIssueList.html", 1700, $("body").height() - 40, modalTitle, paramObj, function(grid){
+      });
     }
 
     function bindRemarks(){
@@ -5631,8 +5991,16 @@ onkeyup="(event.keyCode == 8 || event.keyCode == 46) ? ordrsClntCd_S.value = '' 
       $("#endYn_S").val($("#endYn_S").val() || "N");
       toggleOrdrsDtSearch();
 
+      // [ETO 글로벌 플로우] URL 파라미터(ordrsNo/salesCd/coCd/flow=Y) 자동 바인딩
+      if (typeof applyFlowContext === 'function') {
+        applyFlowContext(function() {
+          if (typeof toggleOrdrsDtSearch === 'function') toggleOrdrsDtSearch();
+        }, { onlyOnUrlFlow: true, clearEndYn: true });
+      }
+
       // 최초 조회
       bindGanttResizeHandler();
+      bindWbIssuePopoverEvents();
       syncGanttLayout();
       searchData(false); // auto-Zoom 체크에 따라 내부에서 판단
 
