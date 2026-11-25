@@ -286,10 +286,16 @@ function pm51SequentialNotice(list, colSpan) {
 	// 같은 결재선의 앞 순번 판정은 문서번호+결재구분으로 전체를 다시 조회해서 수행한다.
 	var ownRows = pm51FetchApprovalLine(myRow.todoNo, myRow.todoDiv2CodeId);
 	if (ownRows.length === 0) ownRows = list;
-	$.each(pm51PendingRowsAsc(ownRows, Number(myRow.sanctnSn || 0)), function(idx, row) {
+	var mySn = Number(myRow.sanctnSn || 0);
+	$.each(pm51PendingRowsAsc(ownRows, mySn), function(idx, row) {
+		var sn = Number(row.sanctnSn || 0);
 		// 관리부서(1번 최정민, 2번 이영만)는 병행 결재가 가능하므로,
 		// 2번 결재자(이영만)에게는 1번(최정민) 미결을 차단 사유로 잡지 않는다.
-		if (isMngApprover && Number(myRow.sanctnSn || 0) === 2 && Number(row.sanctnSn || 0) === 1) {
+		if (isMngApprover && mySn === 2 && sn === 1) {
+			return true;
+		}
+		// 같은 병렬 단계(헤드 + 연속 AGREE) 멤버는 상호 차단하지 않는다.
+		if (isWb20SameParallelStep(ownRows, mySn, sn)) {
 			return true;
 		}
 		pendingList.push({ lineNm: isMngApprover ? '관리부서' : '신청부서', row: row });
@@ -337,11 +343,40 @@ function pm51FetchApprovalLine(todoNo, todoDiv2CodeId) {
 	return rows;
 }
 
-// 미결(sanctnSttus!=='Y') 결재행을 순번 오름차순으로 반환. maxSn을 주면 그 순번보다 앞선 행만 대상으로 한다.
+// 동일 병렬 결재 단계(헤드 APPR/AGREE + 연속 AGREE, 중간 COOP/REF 건너뜀) 판정 - 서버 ApprovalLineRules.isSameStep과 동일
+function isWb20SameParallelStep(rows, snA, snB) {
+	if (!rows || !rows.length || !snA || !snB) return false;
+	var sorted = rows.slice().sort(function(a, b) { return Number(a.sanctnSn || 0) - Number(b.sanctnSn || 0); });
+	var bindingStep = -1, lastBinding = null, stepA = -1, stepB = -2;
+	for (var i = 0; i < sorted.length; i++) {
+		var t = $.trim(sorted[i].lineType || '') || 'APPR';
+		if (t === 'REFERENCE') t = 'REF';
+		var sn = Number(sorted[i].sanctnSn || 0);
+		if (t === 'COOP' || t === 'REF') {
+			var skipId = -1 - i;
+			if (stepA < 0 && sn === snA) stepA = skipId;
+			if (stepB < 0 && sn === snB) stepB = skipId;
+			continue;
+		}
+		var isBindPrev = (lastBinding === 'APPR' || lastBinding === 'AGREE');
+		if (!(t === 'AGREE' && lastBinding !== null && isBindPrev)) {
+			bindingStep++;
+		}
+		if (stepA < 0 && sn === snA) stepA = bindingStep;
+		if (stepB < 0 && sn === snB) stepB = bindingStep;
+		lastBinding = t;
+	}
+	return stepA >= 0 && stepA === stepB;
+}
+
+// 미결(sanctnSttus!=='Y') 구속 결재행을 순번 오름차순으로 반환. maxSn을 주면 그 순번보다 앞선 행만 대상으로 한다.
+// 비구속 라인(COOP/POST/REF/REFERENCE)은 선행 차단에 포함하지 않는다.
 function pm51PendingRowsAsc(rows, maxSn) {
 	var pending = [];
 	$.each(rows || [], function(idx, row) {
 		if (row.sanctnSttus == 'Y') return;
+		var lt = $.trim(row.lineType || '') || 'APPR';
+		if (lt === 'COOP' || lt === 'POST' || lt === 'REF' || lt === 'REFERENCE') return;
 		var sn = Number(row.sanctnSn || 0);
 		if (!sn) return;
 		if (maxSn && sn >= maxSn) return;
@@ -420,7 +455,7 @@ function Approval(htmlParam, param, popParam) {
 			    	<table id="appLine" style="border: 1px solid #dbdbdb; border-collapse: collapse" >
 			    		<colgroup>
 			    			<col width="8%">
-			    			<col width="10%">
+			    			<col width="17%">
 			    			<col width="8%">
 			    			<col width="*%">
 			    			<col width="10%">
@@ -485,6 +520,7 @@ function Approval(htmlParam, param, popParam) {
 							//html = html.replace(/@@item1@@/gi, (idx+1));		//순번
 							html = html.replace(/@@item1@@/gi, data.sanctnSn);		//순번
 							html = html.replace(/@@item2@@/gi, data.todoNm);		//결재자명
+							html = html.replace(/@@chatBtn@@/gi, typeof buildTeamsChatBtnHtml === 'function' ? buildTeamsChatBtnHtml(data.todoId, data.todoNm) : '');
 							var todoCfOpn = data.todoCfOpn;
 							if( typeof(todoCfOpn)== "undefined" || todoCfOpn=="" ) todoCfOpn = "";
 							html = html.replace(/@@item4@@/gi, todoCfOpn);		//결재의견
@@ -497,7 +533,7 @@ function Approval(htmlParam, param, popParam) {
 										// 관리부서(TODODIV2191/2201) 결재선에서 1번(최정민)과 2번(이영만)은 병행 결재이므로
 										// 2번 결재자(이영만)도 1번 승인 여부와 관계없이 바로 결재할 수 있다.
 										var isMngLine1or2 = (data.todoDiv2CodeId === "TODODIV2191" || data.todoDiv2CodeId === "TODODIV2201") && (data.sanctnSn == "1" || data.sanctnSn == "2");
-										if( data.sanctnSn == "1" || data.preSttus=="Y" || isMngLine1or2) {
+										if( data.sanctnSn == "1" || data.preSttus=="Y" || typeof(data.preSttus)=="undefined" || isMngLine1or2) {
 											applyBtn = true;
 										}
 									//결재가 1건일 경우
@@ -555,8 +591,8 @@ function Approval(htmlParam, param, popParam) {
 							let editable = false; // 투입공수 입력여부 플래그
 							// 본인결재건이면서 팀장일때
 							if (applyBtn && (data.deptTeamManager === 'TEAM01' || data.teamManager === '평가' || data.teamManager === 'Y') && jwt.userId === data.todoId && ['GUN30', 'GUN40', 'TRN50', 'GUN60', 'GUN70'].includes(jwt.deptId.slice(0, 5))) {
-								if  ((data.todoDiv2CodeId === 'TODODIV2020' && (sameTimeResultChk === 'Y' || data.sameTimeResult == 'Y') && !['COBTP01','COBTP04','COBTP06','COBTP08','COBTP09'].includes(data.partCd))
-									|| (data.todoDiv2CodeId === 'TODODIV2090') || (data.todoDiv2CodeId === 'TODODIV2030' && !['COBTP01','COBTP04','COBTP06','COBTP08','COBTP09'].includes(data.partCd))){
+								if  ((data.todoDiv2CodeId === 'TODODIV2020' && (sameTimeResultChk === 'Y' || data.sameTimeResult == 'Y') && !['COBTP00','COBTP01','COBTP04','COBTP06','COBTP08','COBTP09'].includes(data.partCd))
+									|| (data.todoDiv2CodeId === 'TODODIV2090') || (data.todoDiv2CodeId === 'TODODIV2030' && !['COBTP00','COBTP01','COBTP04','COBTP06','COBTP08','COBTP09'].includes(data.partCd))){
 									editable = true;
 								}
 							}
@@ -650,7 +686,7 @@ function Approval(htmlParam, param, popParam) {
 		var html = `
     		<tr data-dept-id="@@deptId@@" data-todoKey="@@todoKey@@" style="border-bottom:1px solid #dbdbdb;">
     			<td class="appTd">@@item1@@</td>
-    			<td class="appTd">@@bold@@@@item2@@</font></td>
+    			<td class="appTd">@@bold@@@@item2@@</font>@@chatBtn@@</td>
     			<td class="appTd">@@item3@@</td>
     			<td class="appTd" style='text-align:left; padding-left:5px; height:25px;'><textarea type='text' name='todoCfOpn' class="form-control" readonly="readonly">@@item4@@</textarea></td>
     			<td class="appTd">@@item5@@</td>
@@ -699,12 +735,16 @@ function Approval(htmlParam, param, popParam) {
 			}
         }
 
-		// 발주요청서,문제조치의 평가 결재자는 결재 전에 근본원인과 예방대책을 함께 저장한다.
-		const rootCauseTodoTypes = ['TODODIV2020', 'TODODIV2030', 'TODODIV2090'];
-		if (this.applyBtn && rootCauseTodoTypes.includes(this.param.todoDiv2CodeId) && this.param.teamManager == '평가') {
-			const normalOrderFlag = ['COBTP01', 'COBTP04', 'COBTP06', 'COBTP08', 'COBTP09'].includes($('#partCd').val());
+		const checkRequired = function($list) {
+			return (typeof validateRequiredFields === 'function') ? validateRequiredFields($list) : inputValidation($list);
+		};
+		// 발주요청서(결과일괄등록),결과등록,문제조치의 평가 결재자는 결재 전에 근본원인과 예방대책을 함께 저장한다.
+		const isQm2020SameTime = (this.param.todoDiv2CodeId === 'TODODIV2020' && (this.param.sameTimeResultChk === 'Y' || $('#popFormQ01 #sameTimeResult').val() === 'Y'));
+		const rootCauseTodoTypes = ['TODODIV2030', 'TODODIV2090'];
+		if (this.applyBtn && (isQm2020SameTime || rootCauseTodoTypes.includes(this.param.todoDiv2CodeId)) && this.param.teamManager == '평가') {
+			const normalOrderFlag = ['COBTP00', 'COBTP01', 'COBTP04', 'COBTP06', 'COBTP08', 'COBTP09'].includes($('#partCd').val());
 			if (this.param.todoDiv2CodeId === 'TODODIV2090' || !normalOrderFlag) {
-				if (!inputValidation($('.popup_area [required]'))) {
+				if (!checkRequired($('.popup_area [required]'))) {
 					return false;
 				}
 				if (!$('input[name="FDMTSOLUT"]:checked').val()) {
@@ -726,7 +766,7 @@ function Approval(htmlParam, param, popParam) {
 			}
 		}
 
-		if (!inputValidation($('.popup_area [required]'))) {
+		if (!checkRequired($('.popup_area [required]'))) {
 			return false;
 		}
 		var confirmYn = false;

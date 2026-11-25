@@ -105,7 +105,7 @@ var approvalWorkingGrid; //팝업화면에서 결재정보 저장용
 
 						if (approvalWorkingGrid.teamManager == '평가') {
 							//발주요청처리결과화면이면
-							if (params.fileTrgtTyp == 'QM0101P03' || params.fileTrgtTyp == 'QM0101P01') {
+							if (params.fileTrgtTyp == 'QM0101P03' || (params.fileTrgtTyp == 'QM0101P01' && $('#popFormQ01 #sameTimeResult').val() === 'Y')) {
 								$('#measRst').attr('readonly', false).css({'background-color': '#ffffff', 'color': '#00000'});
 								$('#resltRst').attr('readonly', false).css({'background-color': '#ffffff', 'color': '#00000'});
 								$('.teamManagerApproval').removeClass('no-click');
@@ -156,9 +156,9 @@ var approvalWorkingGrid; //팝업화면에서 결재정보 저장용
 								
 								if (approvalWorkingGrid.teamManager == '평가') {
 									//발주요청처리결과화면이면 수정 가능하게 속성 변경 처리
-									if (params.fileTrgtTyp == 'QM0101P03' || params.fileTrgtTyp == 'QM0101P01') {
+									if (params.fileTrgtTyp == 'QM0101P03' || (params.fileTrgtTyp == 'QM0101P01' && $('#popFormQ01 #sameTimeResult').val() === 'Y')) {
 										const currFormId = (params.fileTrgtTyp == 'QM0101P03') ? '#popForm2' : '#popFormQ01';
-										const issCheck = !['COBTP01', 'COBTP04', 'COBTP06', 'COBTP08', 'COBTP09'].includes($(currFormId + " #partCd").val());	// 정상건인지 문제건인지 체크
+										const issCheck = !['COBTP00', 'COBTP01', 'COBTP04', 'COBTP06', 'COBTP08', 'COBTP09'].includes($(currFormId + " #partCd").val());	// 정상건인지 문제건인지 체크
 										if (issCheck && data.resultList[0].teamManagerCheck == 'Y') {
 											$(currFormId + ' #FDMTSOLUT-radioButtonContainer').closest('td').prev('th').addClass('hit');
 											$(currFormId + ' #fdmtSolutCnt').closest('td').prev('th').addClass('hit');
@@ -830,9 +830,10 @@ var approvalWorkingGrid; //팝업화면에서 결재정보 저장용
  		// 2. 발주에서 결과 처리할때 발행자 기준으로 해당 팀장 여부 확인
 		// 3. 정상발주 제외일때만 유효성 체크
 		// 4. 문제조치는 팀장 결재시 유효성 체크
-		if (((row.todoDiv2CodeId === "TODODIV2020") || (row.todoDiv2CodeId === "TODODIV2030") || (row.todoDiv2CodeId === "TODODIV2090")) && approvalWorkingGrid.teamManager == '평가' ) {
-			if ((row.todoDiv2CodeId === "TODODIV2020") || (row.todoDiv2CodeId === "TODODIV2030")) {
-				if (!['COBTP01', 'COBTP04', 'COBTP06', 'COBTP08', 'COBTP09'].includes($("#partCd").val())) {
+		const isQm2020SameTime = (row.todoDiv2CodeId === "TODODIV2020" && $('#popFormQ01 #sameTimeResult').val() === 'Y');
+		if ((isQm2020SameTime || (row.todoDiv2CodeId === "TODODIV2030") || (row.todoDiv2CodeId === "TODODIV2090")) && approvalWorkingGrid.teamManager == '평가' ) {
+			if (isQm2020SameTime || (row.todoDiv2CodeId === "TODODIV2030")) {
+				if (!['COBTP00', 'COBTP01', 'COBTP04', 'COBTP06', 'COBTP08', 'COBTP09'].includes($("#partCd").val())) {
 					if (!inputValidation($('.popup_area [required]'))) {
 						return false;
 					}
@@ -902,6 +903,7 @@ var approvalWorkingGrid; //팝업화면에서 결재정보 저장용
 				todoKey: row.todoKey,
 				todoDiv2CodeId: row.todoDiv2CodeId,
 				coCd: row.coCd || jwt.coCd || "GUN",
+				histNo: row.etcField2 || "",
 				userId: jwt.userId
 			};
 			try {

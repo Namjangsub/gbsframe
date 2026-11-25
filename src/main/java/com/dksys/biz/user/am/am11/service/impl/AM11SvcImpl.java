@@ -10,6 +10,7 @@ import java.util.Set;
 import java.io.Reader;
 import java.sql.Clob;
 import java.lang.reflect.Method;
+import java.math.BigDecimal;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -63,6 +64,18 @@ public class AM11SvcImpl implements AM11Svc {
     @Autowired(required = false)
     private com.dksys.biz.user.pm.pm08.service.PM08Svc pm08Svc;
 
+    @Autowired(required = false)
+    private com.dksys.biz.user.qm.qm01.mapper.QM01Mapper qm01Mapper;
+
+    @Autowired(required = false)
+    private com.dksys.biz.user.wb.wb24.mapper.WB24Mapper wb24Mapper;
+
+    @Autowired(required = false)
+    private com.dksys.biz.user.qm.qm01.service.impl.QualityAmSyncAdapter qualityAmSyncAdapter;
+
+    @Autowired(required = false)
+    private com.dksys.biz.user.wb.wb24.service.impl.WbsIssueAmSyncAdapter wbsIssueAmSyncAdapter;
+
     @Override
     public Map<String, Object> selectApprovalDocDetail(Map<String, Object> paramMap) {
         Map<String, Object> resultMap = new HashMap<>();
@@ -92,23 +105,16 @@ public class AM11SvcImpl implements AM11Svc {
         // 모든 구속/후결 결재선이 완료된 문서가 진행중 상태로 남아있으면 COMPLETED로 즉시 자동 보정
         reconcileCompletedDocStatusIfNeeded(paramMap, docInfo);
 
-        // 방안 A (협조 비구속 병렬): 진행 중 문서의 READY 협조(COOP) 라인은 즉시 PENDING으로 개방 보정
+        // 협조(COOP) 순번 도래 보정: 선행 구속(APPR/AGREE) 결재가 모두 끝난 READY 협조 라인만 PENDING으로 개방
         String currentDocStatus = (String) docInfo.get("docStatus");
-        if ("REQUEST".equals(currentDocStatus) || "PROGRESS".equals(currentDocStatus) || "POST_PROGRESS".equals(currentDocStatus)) {
+        if ("REQUEST".equals(currentDocStatus) || "PROGRESS".equals(currentDocStatus)
+                || "POST_PROGRESS".equals(currentDocStatus) || "COMPLETED".equals(currentDocStatus)) {
             if (lineList != null) {
-                for (Map<String, Object> line : lineList) {
-                    String lType = lineTypeOf(line);
-                    String lStatus = (String) line.get("lineStatus");
-                    if ("COOP".equals(lType) && "READY".equals(lStatus)) {
-                        Map<String, Object> updateParam = new HashMap<>(paramMap);
-                        updateParam.put("nextLineSeq", line.get("lineSeq"));
-                        if (updateParam.get("pgmId") == null) {
-                            updateParam.put("pgmId", "AM11_DETAIL");
-                        }
-                        am11Mapper.updateNextLinePending(updateParam);
-                        line.put("lineStatus", "PENDING");
-                    }
+                Map<String, Object> coopOpenParam = new HashMap<>(paramMap);
+                if (coopOpenParam.get("pgmId") == null) {
+                    coopOpenParam.put("pgmId", "AM11_DETAIL");
                 }
+                openEligibleCoopLines(lineList, coopOpenParam);
             }
         }
 
@@ -123,6 +129,18 @@ public class AM11SvcImpl implements AM11Svc {
         if (!"CR02".equals(String.valueOf(docInfo.get("erpBizType")))
                 && !reconcileBindingCursor(paramMap, docInfo).isEmpty()) {
             lineList = am11Mapper.selectApprovalLineList(paramMap);
+        }
+
+        String erpBizTypeStr = String.valueOf(docInfo.get("erpBizType"));
+        if ("WB24".equals(erpBizTypeStr) || "QM01".equals(erpBizTypeStr)) {
+            Map<String, String> actMhRow = findActMhRequiredRow(docInfo, lineList, userId);
+            docInfo.put("wb24ActMhInputRequired", actMhRow != null ? "Y" : "N");
+            if (actMhRow != null) {
+                docInfo.put("wb24ActMhDefault", valueOf(actMhRow.get("actMh")));
+            }
+        }
+        if ("WB24".equals(erpBizTypeStr) || "QM01".equals(erpBizTypeStr)) {
+            enrichBizCoachingEditInfo(docInfo, lineList, userId);
         }
 
         // 2. 문서 열람(읽음) 이력 자동 기록 (권한이 검증된 경우만)
@@ -271,7 +289,8 @@ public class AM11SvcImpl implements AM11Svc {
         String erpBizType = String.valueOf(paramMap.get("erpBizType"));
         boolean wb20Linked = "WB20".equals(erpBizType) || "PM07".equals(erpBizType)
                 || "PM08".equals(erpBizType) || "PM51".equals(erpBizType)
-                || "PM52".equals(erpBizType) || "CR02".equals(erpBizType);
+                || "PM52".equals(erpBizType) || "CR02".equals(erpBizType)
+                || "WB24".equals(erpBizType) || "QM01".equals(erpBizType);
         if (wb20Linked) {
             for (Map<String, Object> line : lineList) {
                 if (line.get("wb20TodoNo") == null || String.valueOf(line.get("wb20TodoNo")).trim().isEmpty()
@@ -317,45 +336,81 @@ public class AM11SvcImpl implements AM11Svc {
 
         // 1차 결재자 알림은 ApprovalNotificationEventListener(SUBMIT, 템플릿 10009)가 발송하므로 평문 중복 적재 제외
 
-        // 상신 즉시 열린 협조(COOP) 대상자에게 1차 결재자와 별도로 알림을 보낸다.
-        // 휴가신청은 승인된 10009 템플릿을 사용하는 이벤트로 전달한다.
-        if (!completedBySource) {
-            try {
-                Map<String, Object> coopQuery = new HashMap<>(paramMap);
-                coopQuery.put("docId", docId);
-                List<Map<String, Object>> savedLines = am11Mapper.selectApprovalLineList(coopQuery);
-                if (savedLines != null) {
-                    Object firstReceiverId = paramMap.get("currApproverId"); // 위에서 이미 알림 발송한 1차 수신자
-                    for (Map<String, Object> savedLine : savedLines) {
-                        // 1차 수신자와 동일인이면 중복 발송 방지
-                        if (firstReceiverId != null && firstReceiverId.equals(savedLine.get("approverId"))) {
+        // 상신 시 열린 추가 결재자(병렬 AGREE) 및 순번 도래 협조(COOP) 대상자에게 알림을 보낸다.
+        List<String> initialBindingReceiverIds = new ArrayList<>();
+        if (paramMap.get("currApproverId") != null && !String.valueOf(paramMap.get("currApproverId")).trim().isEmpty()) {
+            initialBindingReceiverIds.add(String.valueOf(paramMap.get("currApproverId")).trim());
+        }
+        List<String> initialCoopReceiverIds = new ArrayList<>();
+        try {
+            Map<String, Object> savedQuery = new HashMap<>(paramMap);
+            savedQuery.put("docId", docId);
+            List<Map<String, Object>> savedLines = am11Mapper.selectApprovalLineList(savedQuery);
+            if (savedLines != null) {
+                Object firstReceiverId = paramMap.get("currApproverId"); // 위에서 이미 SUBMIT 이벤트로 발송한 1차 수신자
+                for (Map<String, Object> savedLine : savedLines) {
+                    if (!"PENDING".equals(savedLine.get("lineStatus"))) {
+                        continue;
+                    }
+                    String savedType = lineTypeOf(savedLine);
+                    String savedApproverId = savedLine.get("approverId") == null ? "" : String.valueOf(savedLine.get("approverId")).trim();
+                    if (savedApproverId.isEmpty()) {
+                        continue;
+                    }
+                    if ("COOP".equals(savedType)) {
+                        initialCoopReceiverIds.add(savedApproverId);
+                    } else if (("APPR".equals(savedType) || "AGREE".equals(savedType)) && !initialBindingReceiverIds.contains(savedApproverId)) {
+                        initialBindingReceiverIds.add(savedApproverId);
+                    }
+
+                    // 1차 수신자(currApproverId)와 동일인이면 SUBMIT 이벤트와 중복 발송 방지
+                    if (firstReceiverId != null && String.valueOf(firstReceiverId).equals(savedApproverId)) {
+                        continue;
+                    }
+
+                    if ("COOP".equals(savedType)) {
+                        if ("PM07".equals(paramMap.get("erpBizType"))) {
+                            Map<String, Object> coopExtra = new HashMap<>(paramMap);
+                            if (savedLine.get("wb20TodoNo") != null) coopExtra.put("wb20TodoNo", savedLine.get("wb20TodoNo"));
+                            if (savedLine.get("wb20Div2CodeId") != null) coopExtra.put("todoDiv2CodeId", savedLine.get("wb20Div2CodeId"));
+                            eventPublisher.publishEvent(new ApprovalEvent(
+                                "COOP_REQUEST", docId, (String) paramMap.get("docNo"), (String) paramMap.get("docTitle"),
+                                (String) paramMap.get("draUserId"), (String) paramMap.get("draUserNm"),
+                                savedApproverId, (String) savedLine.get("approverNm"),
+                                coopExtra
+                            ));
                             continue;
                         }
-                        if ("COOP".equals(lineTypeOf(savedLine)) && "PENDING".equals(savedLine.get("lineStatus"))) {
-                            if ("PM07".equals(paramMap.get("erpBizType"))) {
-                                eventPublisher.publishEvent(new ApprovalEvent(
-                                    "COOP_REQUEST", docId, (String) paramMap.get("docNo"), (String) paramMap.get("docTitle"),
-                                    (String) paramMap.get("draUserId"), (String) paramMap.get("draUserNm"),
-                                    (String) savedLine.get("approverId"), (String) savedLine.get("approverNm"),
-                                    paramMap
-                                ));
-                                continue;
-                            }
-                            Map<String, Object> coopNotif = new HashMap<>();
-                            coopNotif.put("docId", docId);
-                            coopNotif.put("eventType", "SUBMIT");
-                            coopNotif.put("receiverId", savedLine.get("approverId"));
-                            coopNotif.put("receiverNm", savedLine.get("approverNm"));
-                            coopNotif.put("notifChannel", "KAKAO");
-                            coopNotif.put("notifTitle", "[" + paramMap.get("docNo") + "] 협조 요청 문서가 도착했습니다");
-                            coopNotif.put("notifMsg", paramMap.get("draUserNm") + "님이 협조(의견)를 요청하였습니다: " + paramMap.get("docTitle"));
-                            enqueueApprovalNotification(coopNotif, paramMap);
-                        }
+                        Map<String, Object> coopNotif = new HashMap<>();
+                        coopNotif.put("docId", docId);
+                        coopNotif.put("eventType", "SUBMIT");
+                        coopNotif.put("receiverId", savedApproverId);
+                        coopNotif.put("receiverNm", savedLine.get("approverNm"));
+                        coopNotif.put("notifChannel", "KAKAO");
+                        coopNotif.put("notifTitle", "[" + paramMap.get("docNo") + "] 협조 요청 문서가 도착했습니다");
+                        coopNotif.put("notifMsg", paramMap.get("draUserNm") + "님이 협조(의견)를 요청하였습니다: " + paramMap.get("docTitle"));
+                        Map<String, Object> lineSource = new HashMap<>(paramMap);
+                        if (savedLine.get("wb20TodoNo") != null) lineSource.put("wb20TodoNo", savedLine.get("wb20TodoNo"));
+                        if (savedLine.get("wb20Div2CodeId") != null) lineSource.put("todoDiv2CodeId", savedLine.get("wb20Div2CodeId"));
+                        enqueueApprovalNotification(coopNotif, lineSource);
+                    } else if (!completedBySource && ("APPR".equals(savedType) || "AGREE".equals(savedType))) {
+                        Map<String, Object> agreeNotif = new HashMap<>();
+                        agreeNotif.put("docId", docId);
+                        agreeNotif.put("eventType", "SUBMIT");
+                        agreeNotif.put("receiverId", savedApproverId);
+                        agreeNotif.put("receiverNm", savedLine.get("approverNm"));
+                        agreeNotif.put("notifChannel", "KAKAO");
+                        agreeNotif.put("notifTitle", "[" + paramMap.get("docNo") + "] 결재 대기 문서가 도착했습니다");
+                        agreeNotif.put("notifMsg", paramMap.get("draUserNm") + "님이 결재를 상신하였습니다: " + paramMap.get("docTitle"));
+                        Map<String, Object> lineSource = new HashMap<>(paramMap);
+                        if (savedLine.get("wb20TodoNo") != null) lineSource.put("wb20TodoNo", savedLine.get("wb20TodoNo"));
+                        if (savedLine.get("wb20Div2CodeId") != null) lineSource.put("todoDiv2CodeId", savedLine.get("wb20Div2CodeId"));
+                        enqueueApprovalNotification(agreeNotif, lineSource);
                     }
                 }
-            } catch (Exception ne) {
-                logger.warn("상신 협조 알림 등록 경고: docId={}", docId, ne);
             }
+        } catch (Exception ne) {
+            logger.warn("상신 병렬/협조 알림 등록 경고: docId={}", docId, ne);
         }
 
         // 비동기 알림 이벤트 발행 (Commit 후 실행)
@@ -366,14 +421,13 @@ public class AM11SvcImpl implements AM11Svc {
             paramMap
         ));
 
-        // SSE 알림 및 카운트 갱신 트리거 (상신 완료 시 첫 결재자에게 툴팁 전송)
+        // SSE 알림 및 카운트 갱신 트리거 (상신 완료 시 1차 병렬 결재자 전원에게 툴팁 전송)
         if (sseNotificationService != null) {
             try {
                 String coCd = String.valueOf(paramMap.get("coCd") != null ? paramMap.get("coCd") : "GUN");
-                String firstApproverId = (String) paramMap.get("currApproverId");
                 String draUserId = (String) paramMap.get("draUserId");
 
-                if (firstApproverId != null && !firstApproverId.isEmpty()) {
+                if (!initialBindingReceiverIds.isEmpty()) {
                     Map<String, Object> notiInfo = new HashMap<>();
                     notiInfo.put("senderNm", senderNameResolver.resolveSenderNm((String) paramMap.get("draUserNm"), null, draUserId));
                     notiInfo.put("senderId", draUserId);
@@ -383,12 +437,19 @@ public class AM11SvcImpl implements AM11Svc {
                     notiInfo.put("todoNo", paramMap.get("erpBizKey"));
                     notiInfo.put("actionType", "NEW_APPROVAL");
 
+                    List<String> relatedIds = new ArrayList<>(initialBindingReceiverIds);
+                    relatedIds.add(draUserId);
+                    relatedIds.addAll(initialCoopReceiverIds);
                     sseNotificationService.triggerSequentialApprovalNoti(
                         coCd,
-                        firstApproverId,
+                        initialBindingReceiverIds,
                         notiInfo,
-                        draUserId
+                        relatedIds.toArray(new String[0])
                     );
+                } else if (!initialCoopReceiverIds.isEmpty()) {
+                    List<String> relatedIds = new ArrayList<>(initialCoopReceiverIds);
+                    relatedIds.add(draUserId);
+                    sseNotificationService.triggerCountUpdate(coCd, relatedIds.toArray(new String[0]));
                 } else {
                     sseNotificationService.triggerCountUpdate(coCd, draUserId);
                 }
@@ -443,16 +504,19 @@ public class AM11SvcImpl implements AM11Svc {
 
         reconcileCompletedDocStatusIfNeeded(paramMap, docLock);
         String docStatus = (String) docLock.get("docStatus");
-        if (!"REQUEST".equals(docStatus) && !"PROGRESS".equals(docStatus) && !"POST_PROGRESS".equals(docStatus)) {
+        boolean completedDoc = "COMPLETED".equals(docStatus);
+        if (!"REQUEST".equals(docStatus) && !"PROGRESS".equals(docStatus) && !"POST_PROGRESS".equals(docStatus) && !completedDoc) {
             resultMap.put("resultCode", "500");
             resultMap.put("resultMessage", "진행 중인 결재 문서가 아닙니다. (현재 상태: " + docStatus + ")");
             return resultMap;
         }
 
-        if ("CR02".equals(String.valueOf(docLock.get("erpBizType")))) {
-            reconcileCr02CurrentApprovalStage(paramMap, docLock, userId);
-        } else {
-            reconcileBindingCursor(paramMap, docLock);
+        if (!completedDoc) {
+            if ("CR02".equals(String.valueOf(docLock.get("erpBizType")))) {
+                reconcileCr02CurrentApprovalStage(paramMap, docLock, userId);
+            } else {
+                reconcileBindingCursor(paramMap, docLock);
+            }
         }
 
         if (!isCurrentApprovalActor(paramMap, docLock)) {
@@ -523,8 +587,13 @@ public class AM11SvcImpl implements AM11Svc {
 
         int actingSeq = Integer.parseInt(String.valueOf(actingLine.get("lineSeq")));
         String actingType = lineTypeOf(actingLine);
+        if (completedDoc && !"COOP".equals(actingType)) {
+            resultMap.put("resultCode", "500");
+            resultMap.put("resultMessage", "진행 중인 결재 문서가 아닙니다. (현재 상태: " + docStatus + ")");
+            return resultMap;
+        }
         String approverId = (String) actingLine.get("approverId");
-        if ("PM08".equals(valueOf(docLock.get("erpBizType")))) {
+        if ("PM08".equals(valueOf(docLock.get("erpBizType"))) && !"COOP".equals(actingType)) {
             Map<String, Object> managerParam = new HashMap<>();
             managerParam.put("approverId", approverId);
             managerParam.put("draUserId", docLock.get("draUserId"));
@@ -532,6 +601,20 @@ public class AM11SvcImpl implements AM11Svc {
                     && (apprOpinion == null || apprOpinion.trim().isEmpty())) {
                 resultMap.put("resultCode", "500");
                 resultMap.put("resultMessage", "신청자의 팀장 결재는 결재처리 의견을 입력해야 합니다.");
+                return resultMap;
+            }
+        }
+
+        // WB24/QM01 업무별 승인 추가값 검증·수집 (협조(COOP) 비구속 확인은 제외)
+        Map<String, String> bizApprovalExtra;
+        if ("COOP".equals(actingType)) {
+            bizApprovalExtra = Collections.emptyMap();
+        } else {
+            try {
+                bizApprovalExtra = buildBizApprovalExtra(docLock, actingLine, userId, paramMap);
+            } catch (IllegalArgumentException e) {
+                resultMap.put("resultCode", "500");
+                resultMap.put("resultMessage", e.getMessage());
                 return resultMap;
             }
         }
@@ -578,12 +661,12 @@ public class AM11SvcImpl implements AM11Svc {
         actingLine.put("lineStatus", "APPROVED");
 
         // AM에서 결재한 동일 결재자 행만 WB20 원본문서에 즉시 반영한다.
-        if ("WB20".equals(docLock.get("erpBizType")) || "PM07".equals(docLock.get("erpBizType")) || "PM51".equals(docLock.get("erpBizType")) || "PM52".equals(docLock.get("erpBizType")) || "PM08".equals(docLock.get("erpBizType")) || "CR02".equals(docLock.get("erpBizType"))) {
+        if ("WB20".equals(docLock.get("erpBizType")) || "PM07".equals(docLock.get("erpBizType")) || "PM51".equals(docLock.get("erpBizType")) || "PM52".equals(docLock.get("erpBizType")) || "PM08".equals(docLock.get("erpBizType")) || "CR02".equals(docLock.get("erpBizType")) || "WB24".equals(docLock.get("erpBizType")) || "QM01".equals(docLock.get("erpBizType"))) {
             Map<String, Object> wb20Param = new HashMap<>(paramMap);
             wb20Param.put("erpBizKey", docLock.get("erpBizKey"));
             wb20Param.put("todoId", approverId);
             wb20Param.put("apprOpinion", apprOpinion);
-            executeLinkedWb20Approval(docLock, actingLine, approverId, actingSeq, userId, apprOpinion);
+            executeLinkedWb20Approval(docLock, actingLine, approverId, actingSeq, userId, apprOpinion, bizApprovalExtra);
             paramMap.put("linkedWb20", true);
         }
 
@@ -626,6 +709,7 @@ public class AM11SvcImpl implements AM11Svc {
                 int pendingBindingCount = am11Mapper.selectPendingBindingLineCount(paramMap);
                 if (pendingBindingCount == 0) {
                     nextDocStatus = "COMPLETED";
+                    openedLines = openEligibleCoopLines(lineList, paramMap);
                     Map<String, Object> docStatusParam = new HashMap<>(paramMap);
                     docStatusParam.put("nextStatus", nextDocStatus);
                     docStatusParam.put("currLineSeq", actingSeq);
@@ -662,10 +746,12 @@ public class AM11SvcImpl implements AM11Svc {
                 for (Map<String, Object> line : lineList) {
                     int seq = Integer.parseInt(String.valueOf(line.get("lineSeq")));
                     String type = lineTypeOf(line);
-                    if (seq > stepHeadSeq && "AGREE".equals(type)) {
-                        stepMembers.add(line);
-                    } else if (seq > stepHeadSeq) {
-                        break;
+                    if (seq > stepHeadSeq) {
+                        if ("AGREE".equals(type)) {
+                            stepMembers.add(line);
+                        } else if (!isNonBindingStepSkipType(type)) {
+                            break;
+                        }
                     }
                 }
             }
@@ -689,8 +775,10 @@ public class AM11SvcImpl implements AM11Svc {
             }
 
             if (!allApproved) {
-                // 미승인 라인 남음: PROGRESS 유지, 단계 헤드로 currLineSeq 보존
+                // 미승인 라인 남음: PROGRESS 유지, 아직 PENDING인 첫 단계 멤버로 포인터 이동(기승인 헤드가 대기함에 남지 않도록)
                 nextDocStatus = "PROGRESS";
+                // 순번 기준 협조 개방: 방금 승인된 라인 뒤에 있고 이후 미승인 구속 라인이 없는 COOP를 즉시 PENDING으로 개방
+                openedLines = openEligibleCoopLines(lineList, paramMap);
                 if (logger.isInfoEnabled()) {
                     StringBuilder stepInfo = new StringBuilder();
                     for (Map<String, Object> member : stepMembers) {
@@ -699,12 +787,19 @@ public class AM11SvcImpl implements AM11Svc {
                     }
                     logger.info("결재 단계 잔여 대기 판정: docId={}, actingSeq={}, stepHeadSeq={}, members={}", docId, actingSeq, stepHeadSeq, stepInfo);
                 }
+                Map<String, Object> nextPendingMember = stepHeadLine;
+                for (Map<String, Object> member : stepMembers) {
+                    if ("PENDING".equals(member.get("lineStatus"))) {
+                        nextPendingMember = member;
+                        break;
+                    }
+                }
                 resultMap.put("resultMessage", "처리되었습니다. 잔여 결재/합의자 대기 중입니다.");
                 Map<String, Object> docStatusParam = new HashMap<>(paramMap);
                 docStatusParam.put("nextStatus", nextDocStatus);
-                docStatusParam.put("currLineSeq", stepHeadSeq);
-                docStatusParam.put("currApproverId", stepHeadLine.get("approverId"));
-                docStatusParam.put("currApproverNm", stepHeadLine.get("approverNm"));
+                docStatusParam.put("currLineSeq", nextPendingMember.get("lineSeq"));
+                docStatusParam.put("currApproverId", nextPendingMember.get("approverId"));
+                docStatusParam.put("currApproverNm", nextPendingMember.get("approverNm"));
                 am11Mapper.updateApprovalDocStatus(docStatusParam);
             } else {
                 // 단계 멤버 전부 APPROVED: 다음 단계 탐색
@@ -731,19 +826,7 @@ public class AM11SvcImpl implements AM11Svc {
                     nextDocStatus = "PROGRESS";
                     int nextSeq = Integer.parseInt(String.valueOf(nextLine.get("lineSeq")));
 
-                    // COOP 개방: 잔여 READY COOP을 PENDING으로 (비구속 병렬)
-                    for (Map<String, Object> line : lineList) {
-                        int seq = Integer.parseInt(String.valueOf(line.get("lineSeq")));
-                        String type = lineTypeOf(line);
-                        String status = (String) line.get("lineStatus");
-                        if ("COOP".equals(type) && "READY".equals(status)) {
-                            Map<String, Object> updateParam = new HashMap<>(paramMap);
-                            updateParam.put("nextLineSeq", seq);
-                            am11Mapper.updateNextLinePending(updateParam);
-                            line.put("lineStatus", "PENDING");
-                        }
-                    }
-
+                    // openStepAt이 다음 구속 단계(APPR+연속 AGREE)와 순번 도래 협조(COOP)를 함께 개방한다.
                     openedLines = openStepAt(docId, nextSeq, lineList, paramMap);
 
                     Map<String, Object> docStatusParam = new HashMap<>(paramMap);
@@ -773,19 +856,6 @@ public class AM11SvcImpl implements AM11Svc {
                             nextDocStatus = "POST_PROGRESS";
                             int postSeq = Integer.parseInt(String.valueOf(nextPostLine.get("lineSeq")));
 
-                            // COOP 개방: 잔여 READY COOP을 PENDING으로 (비구속 병렬)
-                            for (Map<String, Object> line : lineList) {
-                                int seq = Integer.parseInt(String.valueOf(line.get("lineSeq")));
-                                String type = lineTypeOf(line);
-                                String status = (String) line.get("lineStatus");
-                                if ("COOP".equals(type) && "READY".equals(status)) {
-                                    Map<String, Object> updateParam = new HashMap<>(paramMap);
-                                    updateParam.put("nextLineSeq", seq);
-                                    am11Mapper.updateNextLinePending(updateParam);
-                                    line.put("lineStatus", "PENDING");
-                                }
-                            }
-
                             openedLines = openStepAt(docId, postSeq, lineList, paramMap);
 
                             Map<String, Object> docStatusParam = new HashMap<>(paramMap);
@@ -797,6 +867,7 @@ public class AM11SvcImpl implements AM11Svc {
                             resultMap.put("resultMessage", "승인 완료되었습니다. 사후결재(후결) 단계로 전환되었습니다.");
                         } else {
                             nextDocStatus = "COMPLETED";
+                            openedLines = openEligibleCoopLines(lineList, paramMap);
                             Map<String, Object> docStatusParam = new HashMap<>(paramMap);
                             docStatusParam.put("nextStatus", nextDocStatus);
                             docStatusParam.put("currLineSeq", stepMaxSeq);
@@ -823,10 +894,10 @@ public class AM11SvcImpl implements AM11Svc {
         writeAudit(paramMap, docLock, isDelegate ? "DELEGATE" : "APPROVE", isDelegate ? "대결 승인" : "결재 승인");
 
         // 6. ERP 사후처리 및 알림 큐/이벤트 발행
-        // 본문 승인 완료 시점(일반 결재 완료 시) 또는 최종 완료 시점에 ERP 사후처리 실행
+        // 본문 승인 완료 시점(일반 결재 완료 시) 또는 최종 완료 시점에 ERP 사후처리 실행 (이미 COMPLETED인 문서의 후행 COOP 확인 시 재실행 방지)
         boolean pm08Document = "PM08".equals(docLock.get("erpBizType"));
-        if (pm08Document ? "COMPLETED".equals(nextDocStatus)
-                : !"POST_PROGRESS".equals(docStatus) && ("COMPLETED".equals(nextDocStatus) || "POST_PROGRESS".equals(nextDocStatus))) {
+        if (!"COMPLETED".equals(docStatus) && (pm08Document ? "COMPLETED".equals(nextDocStatus)
+                : !"POST_PROGRESS".equals(docStatus) && ("COMPLETED".equals(nextDocStatus) || "POST_PROGRESS".equals(nextDocStatus)))) {
             String erpBizType = (docInfo != null) ? (String) docInfo.get("erpBizType") : null;
             try {
                 postProcessorRegistry.processCompleted(erpBizType, docInfo, paramMap);
@@ -875,8 +946,41 @@ public class AM11SvcImpl implements AM11Svc {
                 "COMPLETE", docId, (String) docLock.get("docNo"), (String) paramMap.get("docTitle"),
                 (String) docLock.get("draUserId"), docInfo != null ? (String) docInfo.get("draUserNm") : "", "", "", paramMap
             ));
+
+            // 최종 승인 시점에 순번이 도래하여 새로 열린 후행 협조(COOP)가 있으면 알림 발송
+            if (!openedLines.isEmpty()) {
+                try {
+                    for (Map<String, Object> line : openedLines) {
+                        if (!"COOP".equals(lineTypeOf(line))) {
+                            continue;
+                        }
+                        Map<String, Object> lineSource = new HashMap<>(paramMap);
+                        if (line.get("wb20TodoNo") != null) lineSource.put("wb20TodoNo", line.get("wb20TodoNo"));
+                        if (line.get("wb20Div2CodeId") != null) lineSource.put("todoDiv2CodeId", line.get("wb20Div2CodeId"));
+                        if ("PM07".equals(docLock.get("erpBizType"))) {
+                            eventPublisher.publishEvent(new ApprovalEvent(
+                                "COOP_REQUEST", docId, (String) docLock.get("docNo"), (String) paramMap.get("docTitle"),
+                                (String) docLock.get("draUserId"), docInfo != null ? (String) docInfo.get("draUserNm") : "",
+                                (String) line.get("approverId"), (String) line.get("approverNm"), lineSource
+                            ));
+                            continue;
+                        }
+                        Map<String, Object> coopNotif = new HashMap<>();
+                        coopNotif.put("docId", docId);
+                        coopNotif.put("eventType", "APPROVE_NEXT");
+                        coopNotif.put("receiverId", line.get("approverId"));
+                        coopNotif.put("receiverNm", line.get("approverNm"));
+                        coopNotif.put("notifChannel", "KAKAO");
+                        coopNotif.put("notifTitle", "[" + docLock.get("docNo") + "] 협조 요청 문서가 도착했습니다");
+                        coopNotif.put("notifMsg", "협조(의견) 요청이 도착했습니다. 문서를 확인하여 협조 의견을 등록해 주십시오.");
+                        enqueueApprovalNotification(coopNotif, lineSource);
+                    }
+                } catch (Exception ne) {
+                    logger.warn("완료 시점 후행 협조 알림 적재 경고: docId={}", docId, ne);
+                }
+            }
         } else if (!openedLines.isEmpty() && ("PROGRESS".equals(nextDocStatus) || "POST_PROGRESS".equals(nextDocStatus))) {
-            // openStepAt이 반환한 라인들(AGREE 런 또는 단건)에 대해 알림 발행
+            // openStepAt이 반환한 라인들(AGREE 런 또는 단건 + 순번 도래 COOP)에 대해 알림 발행
             String notifTitle, notifMsg;
             if ("POST_PROGRESS".equals(nextDocStatus)) {
                 notifTitle = "[" + docLock.get("docNo") + "] 사후결재(후결) 요청 문서가 도착했습니다";
@@ -894,6 +998,17 @@ public class AM11SvcImpl implements AM11Svc {
                     if (!isCoopLine && firstApproverId != null && firstApproverId.equals(line.get("approverId"))) {
                         continue;
                     }
+                    Map<String, Object> lineSource = new HashMap<>(paramMap);
+                    if (line.get("wb20TodoNo") != null) lineSource.put("wb20TodoNo", line.get("wb20TodoNo"));
+                    if (line.get("wb20Div2CodeId") != null) lineSource.put("todoDiv2CodeId", line.get("wb20Div2CodeId"));
+                    if (isCoopLine && "PM07".equals(docLock.get("erpBizType"))) {
+                        eventPublisher.publishEvent(new ApprovalEvent(
+                            "COOP_REQUEST", docId, (String) docLock.get("docNo"), (String) paramMap.get("docTitle"),
+                            (String) docLock.get("draUserId"), docInfo != null ? (String) docInfo.get("draUserNm") : "",
+                            (String) line.get("approverId"), (String) line.get("approverNm"), lineSource
+                        ));
+                        continue;
+                    }
                     Map<String, Object> notifParam = new HashMap<>();
                     notifParam.put("docId", docId);
                     notifParam.put("eventType", "APPROVE_NEXT");
@@ -905,14 +1020,14 @@ public class AM11SvcImpl implements AM11Svc {
                             ? "[" + docLock.get("docNo") + "] 협조 요청 문서가 도착했습니다" : notifTitle);
                     notifParam.put("notifMsg", isCoopLine
                             ? "협조(의견) 요청이 도착했습니다. 문서를 확인하여 협조 의견을 등록해 주십시오." : notifMsg);
-                    enqueueApprovalNotification(notifParam, paramMap);
+                    enqueueApprovalNotification(notifParam, lineSource);
                 }
             } catch (Exception ne) {
                 logger.warn("개별 결재자 알림 큐 적재 경고: docId={}", docId, ne);
             }
 
-            // Event: 첫 라인 기준으로 발행
-            if (!openedLines.isEmpty()) {
+            // Event: 구속 단계(또는 POST)가 새로 열린 경우 첫 라인 기준으로 발행 (COOP 단독 개방 시 중복 요청 방지)
+            if (!openedLines.isEmpty() && !"COOP".equals(lineTypeOf(openedLines.get(0)))) {
                 Map<String, Object> firstLine = openedLines.get(0);
                 paramMap.put("currLineSeq", firstLine.get("lineSeq"));
                 if (firstLine.get("wb20Div2CodeId") != null) {
@@ -954,24 +1069,34 @@ public class AM11SvcImpl implements AM11Svc {
             try {
                 String coCd = String.valueOf(paramMap.get("coCd") != null ? paramMap.get("coCd") : "GUN");
                 String draUserId = (String) docLock.get("draUserId");
-                String nextApproverId = null;
+                List<String> nextBindingApproverIds = new ArrayList<>();
+                List<String> relatedSseIds = new ArrayList<>();
+                relatedSseIds.add(userId);
+                if (draUserId != null && !draUserId.isEmpty() && !relatedSseIds.contains(draUserId)) {
+                    relatedSseIds.add(draUserId);
+                }
 
                 if (!openedLines.isEmpty()) {
                     for (Map<String, Object> line : openedLines) {
                         String lType = lineTypeOf(line);
-                        if (!"REF".equals(lType) && !"COOP".equals(lType)) {
-                            nextApproverId = (String) line.get("approverId");
-                            break;
+                        String lApproverId = valueOf(line.get("approverId"));
+                        if (lApproverId.isEmpty()) continue;
+                        if (!relatedSseIds.contains(lApproverId)) {
+                            relatedSseIds.add(lApproverId);
+                        }
+                        if (!"REF".equals(lType) && !"COOP".equals(lType) && !nextBindingApproverIds.contains(lApproverId)) {
+                            nextBindingApproverIds.add(lApproverId);
                         }
                     }
-                    if (nextApproverId == null) {
-                        nextApproverId = (String) openedLines.get(0).get("approverId");
+                } else if (nextLine != null && !valueOf(nextLine.get("approverId")).isEmpty()) {
+                    String nextId = valueOf(nextLine.get("approverId"));
+                    nextBindingApproverIds.add(nextId);
+                    if (!relatedSseIds.contains(nextId)) {
+                        relatedSseIds.add(nextId);
                     }
-                } else if (nextLine != null) {
-                    nextApproverId = (String) nextLine.get("approverId");
                 }
 
-                if (nextApproverId != null) {
+                if (!nextBindingApproverIds.isEmpty()) {
                     Map<String, Object> notiInfo = new HashMap<>();
                     String senderId = docLock.get("draUserId") != null ? String.valueOf(docLock.get("draUserId")) : userId;
                     notiInfo.put("senderNm", senderNameResolver.resolveSenderNm(docInfo != null ? (String) docInfo.get("draUserNm") : null, null, senderId));
@@ -984,14 +1109,13 @@ public class AM11SvcImpl implements AM11Svc {
 
                     sseNotificationService.triggerSequentialApprovalNoti(
                         coCd,
-                        nextApproverId,
+                        nextBindingApproverIds,
                         notiInfo,
-                        userId,
-                        draUserId
+                        relatedSseIds.toArray(new String[0])
                     );
                 } else {
-                    // 최종 완료 또는 대기 결재자 없음: 관련자 건수만 조용히 갱신
-                    sseNotificationService.triggerCountUpdate(coCd, userId, draUserId);
+                    // 최종 완료(또는 후행 COOP만 개방) / 대기 결재자 없음: 관련자 건수 갱신
+                    sseNotificationService.triggerCountUpdate(coCd, relatedSseIds.toArray(new String[0]));
                 }
             } catch (Exception sseEx) {
                 logger.warn("AM 승인 후 SSE 알림 트리거 실패 (비구속 예외 방어): docId={}", docId, sseEx);
@@ -1007,6 +1131,9 @@ public class AM11SvcImpl implements AM11Svc {
         String docId = (String) paramMap.get("docId");
         String userId = (String) paramMap.get("userId");
         String apprOpinion = (String) paramMap.get("apprOpinion");
+        if (paramMap.get("pgmId") == null || String.valueOf(paramMap.get("pgmId")).trim().isEmpty()) {
+            paramMap.put("pgmId", "AM11_REJECT");
+        }
 
         if (apprOpinion == null || apprOpinion.trim().isEmpty()) {
             resultMap.put("resultCode", "500");
@@ -1039,6 +1166,7 @@ public class AM11SvcImpl implements AM11Svc {
         // 결재선 목록 및 현재자(acting line) 판정
         List<Map<String, Object>> lineList = am11Mapper.selectApprovalLineList(paramMap);
         Map<String, Object> actingLine = null;
+        boolean isDelegate = false;
 
         // 1차: 직접 소유
         for (Map<String, Object> line : lineList) {
@@ -1064,6 +1192,7 @@ public class AM11SvcImpl implements AM11Svc {
                     Map<String, Object> activeDeleg = am11Mapper.selectActiveDelegation(delegParam);
                     if (activeDeleg != null) {
                         actingLine = line;
+                        isDelegate = true;
                         break;
                     }
                 }
@@ -1086,10 +1215,27 @@ public class AM11SvcImpl implements AM11Svc {
             return resultMap;
         }
 
-        // 결재선 반려 업데이트
+        // 결재선 반려 업데이트 (대결 시 실제 반려자 스냅샷 포함)
         Map<String, Object> updateLineParam = new HashMap<>(paramMap);
         updateLineParam.put("lineSeq", actingSeq);
         updateLineParam.put("lineStatus", "REJECTED");
+        String actualRejecterNm = valueOf(paramMap.get("userNm"));
+        if (isDelegate) {
+            updateLineParam.put("delegateYn", "Y");
+            updateLineParam.put("actualUserId", userId);
+            Map<String, Object> actualOrg = am11Mapper.selectUserOrgSnapshot(userId);
+            if (actualOrg != null) {
+                if (actualRejecterNm.isEmpty()) {
+                    actualRejecterNm = valueOf(actualOrg.get("userNm"));
+                }
+                updateLineParam.put("actualUserNm", actualRejecterNm);
+                updateLineParam.put("actualDeptId", actualOrg.get("deptId"));
+                updateLineParam.put("actualDeptNm", actualOrg.get("deptNm"));
+                updateLineParam.put("actualLevelNm", actualOrg.get("levelNm"));
+            } else {
+                updateLineParam.put("actualUserNm", actualRejecterNm);
+            }
+        }
         am11Mapper.updateApprovalLineStatus(updateLineParam);
 
         // lineType 분기
@@ -1114,9 +1260,14 @@ public class AM11SvcImpl implements AM11Svc {
                 String erpBizKey = valueOf(docLock.get("erpBizKey"));
                 String coCd = valueOf(docLock.get("coCd"));
                 if (!erpBizKey.isEmpty() && !coCd.isEmpty()) {
+                    String actingWbDiv1 = valueOf(actingLine.get("wb20Div1CodeId"));
+                    String actingWbDiv2 = valueOf(actingLine.get("wb20Div2CodeId"));
                     Map<String, String> wbQuery = new HashMap<>();
                     wbQuery.put("todoNo", erpBizKey);
                     wbQuery.put("coCd", coCd);
+                    if (!actingWbDiv2.isEmpty()) {
+                        wbQuery.put("todoDiv2CodeId", actingWbDiv2);
+                    }
                     // ETC_FIELD2(차수)는 CR02에서만 사용되므로 CR02 문서일 때만 histNo로 한정한다.
                     String docHistNo = valueOf(docLock.get("histNo"));
                     if ("CR02".equals(valueOf(docLock.get("erpBizType"))) && !docHistNo.isEmpty()) {
@@ -1128,10 +1279,8 @@ public class AM11SvcImpl implements AM11Svc {
                     // WB20 라인의 식별 기준은 TODO_DIV2_CODE_ID + TODO_ID + TODO_NO + ETC_FIELD2(histNo)이다.
                     // TODO_KEY는 수정 시 바뀔 수 있어 고유키로 쓰지 않는다(AM에 보관된 값이 stale해질 수 있음).
                     // TODO_NO/ETC_FIELD2는 위 조회(wbQuery)로 한정하고, 여기서는 단계(DIV2)+결재자(TODO_ID)로 특정한다.
-                    String actingWbDiv1 = valueOf(actingLine.get("wb20Div1CodeId"));
-                    String actingWbDiv2 = valueOf(actingLine.get("wb20Div2CodeId"));
                     for (Map<String, String> row : wbLines) {
-                        if (!(approverIdStr.equals(row.get("todoId")) || userId.equals(row.get("todoId")))
+                        if (!(approverIdStr.equalsIgnoreCase(row.get("todoId")) || userId.equalsIgnoreCase(row.get("todoId")))
                                 || "Y".equals(row.get("sanctnSttus"))) {
                             continue;
                         }
@@ -1177,7 +1326,11 @@ public class AM11SvcImpl implements AM11Svc {
             paramMap.put("nextStatus", "REJECTED");
             paramMap.put("actOpinion", apprOpinion);
             paramMap.put("rejectOpinion", apprOpinion);
-            paramMap.put("rejectUserNm", valueOf(actingLine.get("approverNm")));
+            String rejectUserNm = valueOf(actingLine.get("approverNm"));
+            if (isDelegate && !actualRejecterNm.isEmpty()) {
+                rejectUserNm = actualRejecterNm + " (대결: " + rejectUserNm + ")";
+            }
+            paramMap.put("rejectUserNm", rejectUserNm);
             am11Mapper.insertApprovalHist(paramMap);
             writeAudit(paramMap, docLock, "REJECT", "결재 반려: " + ApprovalSecurityUtil.maskSensitiveData(apprOpinion));
 
@@ -1187,14 +1340,8 @@ public class AM11SvcImpl implements AM11Svc {
             postProcessorRegistry.processRejected(erpBizType, docInfo, paramMap);
 
             // Fix C: 반려 통지 식별자 보강 (enqueue 스킵된 경우 이벤트만 수신되도록)
-            if (paramMap.get("todoNo") == null || valueOf(paramMap.get("todoNo")).isEmpty()) {
-                paramMap.put("todoNo", valueOf(docLock.get("erpBizKey")));
-            }
-            if (paramMap.get("todoDiv2CodeId") == null || valueOf(paramMap.get("todoDiv2CodeId")).isEmpty()) {
-                if (actingLine != null && actingLine.get("wb20Div2CodeId") != null) {
-                    paramMap.put("todoDiv2CodeId", valueOf(actingLine.get("wb20Div2CodeId")));
-                }
-            }
+            copyApprovalNotificationMetadata(paramMap, docLock, docInfo,
+                    actingLine != null ? actingLine.get("wb20Div2CodeId") : null);
 
             eventPublisher.publishEvent(new ApprovalEvent(
                 "REJECT", docId, (String) docLock.get("docNo"), docInfo != null ? (String) docInfo.get("docTitle") : "",
@@ -1233,6 +1380,15 @@ public class AM11SvcImpl implements AM11Svc {
         return String.valueOf(val).trim();
     }
 
+    private boolean isRefLineType(String lineType) {
+        return "REF".equals(lineType) || "REFERENCE".equals(lineType);
+    }
+
+    /** 병렬 단계(APPR+연속 AGREE) 경계를 끊지 않고 건너뛰는 비구속 라인 유형 여부. */
+    private boolean isNonBindingStepSkipType(String lineType) {
+        return "COOP".equals(lineType) || "REF".equals(lineType) || "REFERENCE".equals(lineType);
+    }
+
     /**
      * 결재 진행 이력 판정: 구속(APPR/AGREE) 라인 중 처리완료(APPROVED/REJECTED/ARBIT)가 하나라도 있으면 true.
      * 커서 위치(currLineSeq)로 판정하면 앞쪽 COOP/REF 라인만으로도 진행으로 오인하므로 라인 상태로 판단한다.
@@ -1255,19 +1411,57 @@ public class AM11SvcImpl implements AM11Svc {
         return "APPROVED".equals(status) || "REJECTED".equals(status) || "ARBIT".equals(status);
     }
 
-    /** fromIdx 이후 첫 구속(APPR/AGREE) 라인 인덱스. 없으면 lineList.size(). */
+    /** fromIdx 이후 첫 미승인 구속(APPR/AGREE) 라인 인덱스. 없으면 lineList.size(). */
     private int firstBindingIndex(List<Map<String, Object>> lineList, int fromIdx) {
         for (int i = Math.max(0, fromIdx); i < lineList.size(); i++) {
-            String t = lineTypeOf(lineList.get(i));
+            Map<String, Object> line = lineList.get(i);
+            if ("Y".equals(line.get("sourceApproved"))) continue;
+            String t = lineTypeOf(line);
             if ("APPR".equals(t) || "AGREE".equals(t)) return i;
         }
         return lineList.size();
     }
 
     /**
+     * 순번이 도래한 READY 협조(COOP) 라인만 PENDING으로 개방한다.
+     * - 앞선 순번에 미완료 구속 라인(APPR/AGREE: READY 또는 PENDING)이 남아 있으면 이후 COOP는 READY를 유지한다.
+     * - 선행 구속 결재가 모두 완료(APPROVED/ARBIT/REJECTED)되어 권한이 넘어온 COOP는 비구속으로 열리며 다음 결재와 함께 진행된다.
+     */
+    private List<Map<String, Object>> openEligibleCoopLines(List<Map<String, Object>> lineList, Map<String, Object> paramMap) {
+        if (lineList == null || lineList.isEmpty()) {
+            return Collections.emptyList();
+        }
+        List<Map<String, Object>> ordered = new ArrayList<>(lineList);
+        ordered.sort((left, right) -> Integer.compare(
+                Integer.parseInt(String.valueOf(left.get("lineSeq"))),
+                Integer.parseInt(String.valueOf(right.get("lineSeq")))));
+
+        List<Map<String, Object>> newlyOpenedCoop = new ArrayList<>();
+        for (Map<String, Object> line : ordered) {
+            String type = lineTypeOf(line);
+            String status = valueOf(line.get("lineStatus"));
+            if ("APPR".equals(type) || "AGREE".equals(type)) {
+                if (!"APPROVED".equals(status) && !"ARBIT".equals(status) && !"REJECTED".equals(status)) {
+                    break;
+                }
+                continue;
+            }
+            if ("COOP".equals(type) && "READY".equals(status)) {
+                Map<String, Object> updateParam = new HashMap<>(paramMap);
+                updateParam.put("nextLineSeq", line.get("lineSeq"));
+                am11Mapper.updateNextLinePending(updateParam);
+                line.put("lineStatus", "PENDING");
+                newlyOpenedCoop.add(line);
+            }
+        }
+        return newlyOpenedCoop;
+    }
+
+    /**
      * openStepAt: 단계 오픈 헬퍼
-     * - AGREE 라인이면 런(연속 AGREE들) 전체의 READY를 PENDING으로
-     * - 아니면 단건 nextLineSeq만 PENDING으로
+     * - APPR/AGREE 라인이면 런(헤드 + 뒤따르는 연속 AGREE들) 전체의 READY를 PENDING으로
+     * - 그 외(POST 등)이면 단건 headSeq만 PENDING으로
+     * - 추가로 선행 구속 결재가 끝난(권한이 도래한) READY COOP를 함께 PENDING으로 개방
      * 실제로 PENDING 설정한 라인들 반환 (알림 루프용)
      */
     private List<Map<String, Object>> openStepAt(String docId, int headSeq, List<Map<String, Object>> lineList, Map<String, Object> paramMap) {
@@ -1290,15 +1484,17 @@ public class AM11SvcImpl implements AM11Svc {
             List<Map<String, Object>> step = new ArrayList<>();
             step.add(headLine);
 
-            // headSeq 다음부터 연속 AGREE 탐색
+            // headSeq 다음부터 연속 AGREE 탐색 (중간 COOP/REF는 단계 경계를 끊지 않고 건너뜀)
             for (Map<String, Object> line : lineList) {
                 int seq = Integer.parseInt(String.valueOf(line.get("lineSeq")));
                 String type = lineTypeOf(line);
 
-                if (seq > headSeq && "AGREE".equals(type)) {
-                    step.add(line);
-                } else if (seq > headSeq) {
-                    break;  // AGREE 아닌 라인: 단계 종료
+                if (seq > headSeq) {
+                    if ("AGREE".equals(type)) {
+                        step.add(line);
+                    } else if (!isNonBindingStepSkipType(type)) {
+                        break;  // APPR/POST 등 비-AGREE 구속/후결 라인: 단계 종료
+                    }
                 }
             }
 
@@ -1313,22 +1509,8 @@ public class AM11SvcImpl implements AM11Svc {
                 }
             }
 
-            // 모든 READY COOP도 함께 개방 (비구속 병렬)
-            // 이번 호출에서 READY→PENDING으로 새로 전환된 COOP만 알림 대상(newlyOpenedCoop)에 포함한다.
-            // (이미 PENDING인 COOP은 상신 시점에 알림이 발송되었으므로 중복 발송 방지)
-            List<Map<String, Object>> newlyOpenedCoop = new ArrayList<>();
-            for (Map<String, Object> line : lineList) {
-                int seq = Integer.parseInt(String.valueOf(line.get("lineSeq")));
-                String type = lineTypeOf(line);
-                String status = (String) line.get("lineStatus");
-                if ("COOP".equals(type) && "READY".equals(status)) {
-                    Map<String, Object> updateParam = new HashMap<>(paramMap);
-                    updateParam.put("nextLineSeq", seq);
-                    am11Mapper.updateNextLinePending(updateParam);
-                    line.put("lineStatus", "PENDING");
-                    newlyOpenedCoop.add(line);
-                }
-            }
+            // 선행 구속 결재가 모두 끝난 순번 도래 COOP만 개방
+            List<Map<String, Object>> newlyOpenedCoop = openEligibleCoopLines(lineList, paramMap);
 
             // 반환: 구속 단계(결재+합의)를 앞에, 새로 열린 협조를 뒤에 둔다.
             // 호출부의 openedLines.get(0)(이벤트 기준 라인)이 협조로 바뀌지 않도록 순서 유지.
@@ -1336,12 +1518,21 @@ public class AM11SvcImpl implements AM11Svc {
             opened.addAll(newlyOpenedCoop);
             return opened;
         } else {
-            // 단건: headSeq 라인만 PENDING으로 (POST, COOP, 기타)
-            Map<String, Object> updateParam = new HashMap<>(paramMap);
-            updateParam.put("nextLineSeq", headSeq);
-            am11Mapper.updateNextLinePending(updateParam);
-            headLine.put("lineStatus", "PENDING");
-            return Collections.singletonList(headLine);
+            // 단건: headSeq 라인만 PENDING으로 (POST, COOP, 기타) + 순번 도래 COOP 개방
+            if ("READY".equals(valueOf(headLine.get("lineStatus")))) {
+                Map<String, Object> updateParam = new HashMap<>(paramMap);
+                updateParam.put("nextLineSeq", headSeq);
+                am11Mapper.updateNextLinePending(updateParam);
+                headLine.put("lineStatus", "PENDING");
+            }
+            List<Map<String, Object>> opened = new ArrayList<>();
+            opened.add(headLine);
+            for (Map<String, Object> coop : openEligibleCoopLines(lineList, paramMap)) {
+                if (!String.valueOf(headSeq).equals(String.valueOf(coop.get("lineSeq")))) {
+                    opened.add(coop);
+                }
+            }
+            return opened;
         }
     }
 
@@ -1504,6 +1695,9 @@ public class AM11SvcImpl implements AM11Svc {
         String docId = (String) paramMap.get("docId");
         String userId = (String) paramMap.get("userId");
         String apprOpinion = (String) paramMap.get("apprOpinion");
+        if (paramMap.get("pgmId") == null || String.valueOf(paramMap.get("pgmId")).trim().isEmpty()) {
+            paramMap.put("pgmId", "AM11_ARBIT");
+        }
 
         Map<String, Object> docLock = am11Mapper.selectApprovalDocForUpdate(paramMap);
         if (docLock == null) {
@@ -1575,6 +1769,16 @@ public class AM11SvcImpl implements AM11Svc {
             return resultMap;
         }
 
+        // WB24/QM01 업무별 승인 추가값 검증·수집 (전결도 평가팀장 투입공수 필수 검증 동일 적용)
+        Map<String, String> bizApprovalExtra;
+        try {
+            bizApprovalExtra = buildBizApprovalExtra(docLock, actingLine, userId, paramMap);
+        } catch (IllegalArgumentException e) {
+            resultMap.put("resultCode", "500");
+            resultMap.put("resultMessage", e.getMessage());
+            return resultMap;
+        }
+
         // 1. 현재 결재선 전결 승인 처리
         Map<String, Object> updateLineParam = new HashMap<>(paramMap);
         updateLineParam.put("lineSeq", actingSeq);
@@ -1593,7 +1797,7 @@ public class AM11SvcImpl implements AM11Svc {
             String approverId = (String) actingLine.get("approverId");
             executeLinkedWb20Approval(docLock, actingLine, approverId,
                     actingSeq,
-                    userId, apprOpinion != null ? apprOpinion : "전결 승인");
+                    userId, apprOpinion != null ? apprOpinion : "전결 승인", bizApprovalExtra);
         }
 
         String currentDiv2CodeId = (actingLine != null && actingLine.get("wb20Div2CodeId") != null)
@@ -1655,7 +1859,8 @@ public class AM11SvcImpl implements AM11Svc {
             }
         }
 
-        // 4. 다음 결재자 탐색 (1단계 신청부서 전결 시 2단계 관리부서 결재선 탐색)
+        // 4. 다음 결재자 탐색 (1단계 신청부서 전결 시 2단계 관리부서 결재선 탐색) - 전결 반영 후 최신 결재선 재조회
+        lineList = am11Mapper.selectApprovalLineList(paramMap);
         Map<String, Object> nextLine = null;
         if (isStage1 && lineList != null) {
             for (Map<String, Object> line : lineList) {
@@ -1663,7 +1868,7 @@ public class AM11SvcImpl implements AM11Svc {
                 String lType = lineTypeOf(line);
                 String lStatus = (String) line.get("lineStatus");
                 String lineDiv2 = line.get("wb20Div2CodeId") != null ? String.valueOf(line.get("wb20Div2CodeId")).trim() : "";
-                if (seq > actingSeq && !"REF".equals(lType) && !"POST".equals(lType)
+                if (seq > actingSeq && ("APPR".equals(lType) || "AGREE".equals(lType))
                         && !currentDiv2CodeId.equals(lineDiv2)
                         && ("READY".equals(lStatus) || "PENDING".equals(lStatus))) {
                     nextLine = line;
@@ -1687,11 +1892,12 @@ public class AM11SvcImpl implements AM11Svc {
         }
 
         String nextDocStatus;
+        List<Map<String, Object>> arbitOpenedLines = Collections.emptyList();
         if (nextLine != null) {
             // 2단계(관리부서) 결재선 PENDING 상태로 전환
             nextDocStatus = "PROGRESS";
             int nextSeq = Integer.parseInt(String.valueOf(nextLine.get("lineSeq")));
-            openStepAt(docId, nextSeq, lineList, paramMap);
+            arbitOpenedLines = openStepAt(docId, nextSeq, lineList, paramMap);
 
             Map<String, Object> docStatusParam = new HashMap<>(paramMap);
             docStatusParam.put("nextStatus", nextDocStatus);
@@ -1703,7 +1909,7 @@ public class AM11SvcImpl implements AM11Svc {
             // 잔여 후결자가 존재하므로 POST_PROGRESS 상태로 전환
             nextDocStatus = "POST_PROGRESS";
             int postSeq = Integer.parseInt(String.valueOf(nextPostLine.get("lineSeq")));
-            openStepAt(docId, postSeq, lineList, paramMap);
+            arbitOpenedLines = openStepAt(docId, postSeq, lineList, paramMap);
 
             Map<String, Object> docStatusParam = new HashMap<>(paramMap);
             docStatusParam.put("nextStatus", nextDocStatus);
@@ -1732,6 +1938,7 @@ public class AM11SvcImpl implements AM11Svc {
 
         Map<String, Object> docInfo = linkedDocInfo != null ? linkedDocInfo
                 : am11Mapper.selectApprovalDocInfo(paramMap);
+        copyApprovalNotificationMetadata(paramMap, docLock, docInfo, currentDiv2CodeId);
 
         // 6. ERP 사후처리 (최종 COMPLETED 완료 시점에만 트리거)
         if (nextLine == null) {
@@ -1772,6 +1979,37 @@ public class AM11SvcImpl implements AM11Svc {
                 enqueueApprovalNotification(notifParam, paramMap);
             } catch (Exception ne) {
                 logger.warn("다음 단계 결재자 알림 큐 적재 경고: docId={}", docId, ne);
+            }
+
+            // 전결 후 다음 단계의 병렬 합의(AGREE) 및 순번 도래 협조(COOP) 대상자에게도 알림 발송
+            try {
+                Object primaryId = nextLine.get("approverId");
+                for (Map<String, Object> openedLine : arbitOpenedLines) {
+                    String lType = lineTypeOf(openedLine);
+                    String aId = valueOf(openedLine.get("approverId"));
+                    if (aId.isEmpty()) continue;
+                    boolean isCoopLine = "COOP".equals(lType);
+                    if (!isCoopLine && primaryId != null && String.valueOf(primaryId).equals(aId)) continue;
+                    if (!isCoopLine && !"APPR".equals(lType) && !"AGREE".equals(lType)) continue;
+                    Map<String, Object> lineSource = new HashMap<>(paramMap);
+                    if (openedLine.get("wb20TodoNo") != null) lineSource.put("wb20TodoNo", openedLine.get("wb20TodoNo"));
+                    if (openedLine.get("wb20Div2CodeId") != null) lineSource.put("todoDiv2CodeId", openedLine.get("wb20Div2CodeId"));
+                    Map<String, Object> extraNotif = new HashMap<>();
+                    extraNotif.put("docId", docId);
+                    extraNotif.put("eventType", "APPROVE_NEXT");
+                    extraNotif.put("receiverId", aId);
+                    extraNotif.put("receiverNm", openedLine.get("approverNm"));
+                    extraNotif.put("notifChannel", "KAKAO");
+                    extraNotif.put("notifTitle", isCoopLine
+                            ? "[" + docLock.get("docNo") + "] 협조 요청 문서가 도착했습니다"
+                            : "[" + docLock.get("docNo") + "] 결재 대기 문서가 도착했습니다");
+                    extraNotif.put("notifMsg", isCoopLine
+                            ? "협조(의견) 요청이 도착했습니다. 문서를 확인하여 협조 의견을 등록해 주십시오."
+                            : "결재 순번이 도래하였습니다. 문서를 확인하십시오.");
+                    enqueueApprovalNotification(extraNotif, lineSource);
+                }
+            } catch (Exception ne) {
+                logger.warn("전결 후 병렬/협조 알림 큐 적재 경고: docId={}", docId, ne);
             }
 
             eventPublisher.publishEvent(new ApprovalEvent(
@@ -1963,7 +2201,9 @@ public class AM11SvcImpl implements AM11Svc {
         if ("APPR".equals(lineTypeOf(head)) || "AGREE".equals(lineTypeOf(head))) {
             for (int i = headIndex + 1; i < orderedLines.size(); i++) {
                 Map<String, Object> line = orderedLines.get(i);
-                if (!"AGREE".equals(lineTypeOf(line))) break;
+                String t = lineTypeOf(line);
+                if (isNonBindingStepSkipType(t)) continue;
+                if (!"AGREE".equals(t)) break;
                 String status = String.valueOf(line.get("lineStatus")).trim();
                 if (!"APPROVED".equals(status) && !"REJECTED".equals(status) && !"ARBIT".equals(status)) {
                     stage.add(line);
@@ -2126,7 +2366,7 @@ public class AM11SvcImpl implements AM11Svc {
                 return Collections.emptyList();
             }
             String erpBizType = String.valueOf(locked.get("erpBizType"));
-            if (("PM07".equals(erpBizType) || "PM51".equals(erpBizType) || "PM52".equals(erpBizType) || "PM08".equals(erpBizType))
+            if (("PM07".equals(erpBizType) || "PM51".equals(erpBizType) || "PM52".equals(erpBizType) || "PM08".equals(erpBizType) || "WB24".equals(erpBizType) || "QM01".equals(erpBizType))
                     && am11Mapper.selectLinkedSourceCount(locked) == 0) {
                 return Collections.emptyList();
             }
@@ -2367,8 +2607,39 @@ public class AM11SvcImpl implements AM11Svc {
             }
 
             int firstPendingSeq = resolveFirstPendingSeq(lineList, paramMap, prevLineTypeMap);
-            int seq = 1;
+            boolean activateInitialStep = !"READY".equals(firstStatus);
+            List<String> preservedLineTypes = new ArrayList<>(lineList.size());
             for (Map<String, Object> line : lineList) {
+                String approverId = (String) line.get("approverId");
+                String incomingLineType = line.get("lineType") != null && !String.valueOf(line.get("lineType")).trim().isEmpty()
+                        ? String.valueOf(line.get("lineType")).trim() : null;
+                preservedLineTypes.add(incomingLineType != null
+                        ? incomingLineType
+                        : prevLineTypeMap.getOrDefault(approverId, "APPR"));
+            }
+            // 첫 구속 단계 멤버 집합 계산: firstPendingSeq + 연속 AGREE (중간 COOP/REF는 건너뜀)
+            Set<Integer> initialStepSeqs = new HashSet<>();
+            if (activateInitialStep && firstPendingSeq <= lineList.size()) {
+                initialStepSeqs.add(firstPendingSeq);
+                for (int idx = firstPendingSeq; idx < lineList.size(); idx++) {
+                    String t = preservedLineTypes.get(idx);
+                    if (isNonBindingStepSkipType(t)) {
+                        continue;
+                    }
+                    if ("Y".equals(lineList.get(idx).get("sourceApproved"))) {
+                        break;
+                    }
+                    if ("AGREE".equals(t)) {
+                        initialStepSeqs.add(idx + 1);
+                    } else {
+                        break;
+                    }
+                }
+            }
+
+            int seq = 1;
+            for (int idx = 0; idx < lineList.size(); idx++) {
+                Map<String, Object> line = lineList.get(idx);
                 String approverId = (String) line.get("approverId");
                 Map<String, Object> approverOrg = am11Mapper.selectUserOrgSnapshot(approverId);
 
@@ -2380,12 +2651,7 @@ public class AM11SvcImpl implements AM11Svc {
                 lineParam.put("docId", docId);
                 lineParam.put("lineSeq", seq);
 
-                // lineType 보존: 요청에 명시적 lineType이 있으면 우선 적용, 없으면 기존값 유지 (기본 APPR)
-                String incomingLineType = line.get("lineType") != null && !String.valueOf(line.get("lineType")).trim().isEmpty()
-                        ? String.valueOf(line.get("lineType")).trim() : null;
-                String preservedLineType = incomingLineType != null
-                        ? incomingLineType
-                        : prevLineTypeMap.getOrDefault(approverId, "APPR");
+                String preservedLineType = preservedLineTypes.get(idx);
                 lineParam.put("lineType", preservedLineType);
                 lineParam.put("wb20TodoKey", line.get("wb20TodoKey"));
                 lineParam.put("wb20CoCd", line.get("wb20CoCd"));
@@ -2394,13 +2660,12 @@ public class AM11SvcImpl implements AM11Svc {
                 lineParam.put("wb20Div1CodeId", line.get("wb20Div1CodeId"));
                 lineParam.put("wb20Div2CodeId", line.get("wb20Div2CodeId"));
 
-                // 첫 번째 순번 결재자 상태 설정
+                // 첫 번째 병렬 결재 단계(헤드 + 연속 AGREE)와 선행 구속 결재가 없는 COOP만 PENDING으로 개방
                 if ("Y".equals(line.get("sourceApproved"))) {
                     lineParam.put("lineStatus", "APPROVED");
-                } else if (seq == firstPendingSeq && "PENDING".equals(firstStatus)) {
+                } else if (activateInitialStep && initialStepSeqs.contains(seq)) {
                     lineParam.put("lineStatus", "PENDING");
-                } else if ("COOP".equals(preservedLineType) && "PENDING".equals(firstStatus)) {
-                    // 방안 A: 협조(COOP)는 비구속 병렬이므로 상신 즉시 PENDING으로 개방되어 선결재 가능
+                } else if (activateInitialStep && "COOP".equals(preservedLineType) && seq < firstPendingSeq) {
                     lineParam.put("lineStatus", "PENDING");
                 } else {
                     lineParam.put("lineStatus", "READY");
@@ -2438,6 +2703,7 @@ public class AM11SvcImpl implements AM11Svc {
                 : Math.max(0, Math.min(Integer.parseInt(String.valueOf(paramMap.get("autoApprovedCount"))), lineList.size()));
         for (int i = autoCnt; i < lineList.size(); i++) {
             Map<String, Object> line = lineList.get(i);
+            if ("Y".equals(line.get("sourceApproved"))) continue;
             Object raw = line.get("lineType");
             String incoming = raw == null ? "" : String.valueOf(raw).trim();
             String effective = incoming.isEmpty()
@@ -2694,11 +2960,18 @@ public class AM11SvcImpl implements AM11Svc {
             return resultMap;
         }
 
-        // 2. 서버 사이드 권한 엄격 검증: 기안자 본인, 현재 결재 순번자, 시스템 관리자(AUTH001)만 변경 가능
+        // 2. 서버 사이드 권한 엄격 검증: 기안자 본인, 현재 결재 순번자(또는 활성 대결자), 시스템 관리자(AUTH001)만 변경 가능
         String draUserId = (String) docLock.get("draUserId");
         String currApproverId = (String) docLock.get("currApproverId");
         boolean isAdmin = isSystemAdmin(userId);
-        boolean isAuthorized = userId.equals(draUserId) || userId.equals(currApproverId) || isAdmin;
+        boolean isDelegateOfCurr = false;
+        if (currApproverId != null && !currApproverId.trim().isEmpty() && !userId.equals(currApproverId)) {
+            Map<String, Object> delegParam = new HashMap<>();
+            delegParam.put("originUserId", currApproverId);
+            delegParam.put("delegateUserId", userId);
+            isDelegateOfCurr = am11Mapper.selectActiveDelegation(delegParam) != null;
+        }
+        boolean isAuthorized = userId.equals(draUserId) || userId.equals(currApproverId) || isDelegateOfCurr || isAdmin;
         if (!isAuthorized) {
             resultMap.put("resultCode", "403");
             resultMap.put("resultMessage", "기안자 또는 현재 결재자만 결재선을 변경할 수 있습니다.");
@@ -2760,6 +3033,14 @@ public class AM11SvcImpl implements AM11Svc {
             return resultMap;
         }
 
+        // 진행 중(REQUEST/PROGRESS) 문서에는 최소 1명의 구속(APPR/AGREE) 결재자가 유지되어야 함
+        int bindingIdx = firstBindingIndex(newLines, 0);
+        if (("REQUEST".equals(docStatus) || "PROGRESS".equals(docStatus)) && bindingIdx >= newLines.size()) {
+            resultMap.put("resultCode", "500");
+            resultMap.put("resultMessage", "진행 중인 결재 문서에는 최소 1명 이상의 결재 또는 합의자가 남아있어야 합니다.");
+            return resultMap;
+        }
+
         // 5. 미처리(READY/PENDING) 결재선만 원자적 삭제 (처리완료 라인은 위치와 무관하게 보존)
         am11Mapper.deleteRemainingApprovalLines(paramMap);
 
@@ -2771,9 +3052,32 @@ public class AM11SvcImpl implements AM11Svc {
         }
         int startSeq = keptMaxSeq + 1;
         int nextSeq = startSeq;
-        // 커서는 신규 결재선의 첫 구속(APPR/AGREE) 라인. 구속이 하나도 없으면 레거시대로 첫 라인 유지.
-        int cursorIdx = firstBindingIndex(newLines, 0);
-        int cursorSeq = startSeq + (cursorIdx < newLines.size() ? cursorIdx : 0);
+        // 커서는 신규 결재선의 첫 구속(APPR/AGREE) 단계(헤드 + 연속 AGREE, 중간 COOP/REF 건너뜀). POST_PROGRESS에서는 첫 POST 라인.
+        int cursorSeq = -1;
+        Set<Integer> cursorStepSeqs = new HashSet<>();
+        if (bindingIdx < newLines.size()) {
+            cursorSeq = startSeq + bindingIdx;
+            cursorStepSeqs.add(cursorSeq);
+            for (int i = bindingIdx + 1; i < newLines.size(); i++) {
+                String t = lineTypeOf(newLines.get(i));
+                if (isNonBindingStepSkipType(t)) {
+                    continue;
+                }
+                if ("AGREE".equals(t)) {
+                    cursorStepSeqs.add(startSeq + i);
+                } else {
+                    break;
+                }
+            }
+        } else if ("POST_PROGRESS".equals(docStatus)) {
+            for (int i = 0; i < newLines.size(); i++) {
+                if ("POST".equals(lineTypeOf(newLines.get(i)))) {
+                    cursorSeq = startSeq + i;
+                    cursorStepSeqs.add(cursorSeq);
+                    break;
+                }
+            }
+        }
         String nextFirstApproverId = null;
         String nextFirstApproverNm = null;
 
@@ -2791,16 +3095,18 @@ public class AM11SvcImpl implements AM11Svc {
             String approverId = (String) line.get("approverId");
             Map<String, Object> approverOrg = am11Mapper.selectUserOrgSnapshot(approverId);
             Map<String, Object> prevLine = beforeByApprover.get(approverId);
+            boolean sameDiv1Group = prevLine != null
+                    && isRefLineType(lineTypeOf(prevLine)) == isRefLineType(lineTypeOf(line));
 
-            // WB20 링크 복원: 요청에 없으면 변경 전 값 유지. 복원값을 line(=newLines 요소)에도 되써서
-            // 뒤의 WB20 역방향 동기화(newLines 전달, 아래 wb20SyncParam)가 기존 결재자를 linked로 인식하게 한다
-            // (P1: 링크 유실로 전 라인이 brandNew 오분류→삭제+재생성 churn 방지).
-            Object lnkTodoKey = coalesceLink(line.get("wb20TodoKey"), prevLine, "wb20TodoKey");
-            Object lnkCoCd = coalesceLink(line.get("wb20CoCd"), prevLine, "wb20CoCd");
-            Object lnkTodoNo = coalesceLink(line.get("wb20TodoNo"), prevLine, "wb20TodoNo");
-            Object lnkSanctnSn = coalesceLink(line.get("wb20SanctnSn"), prevLine, "wb20SanctnSn");
-            Object lnkDiv1 = coalesceLink(line.get("wb20Div1CodeId"), prevLine, "wb20Div1CodeId");
-            Object lnkDiv2 = coalesceLink(line.get("wb20Div2CodeId"), prevLine, "wb20Div2CodeId");
+            // WB20 링크 복원: 동일 DIV1 그룹(결재그룹 <-> 참조그룹 전환 아님)일 때만 기존 링크를 유지한다.
+            // REF <-> APPR/AGREE/COOP/POST 전환 시에는 링크를 비워 WB20에서 기존 그룹 행 삭제 후 올바른 DIV1/DIV2로 재생성한다.
+            Map<String, Object> linkSource = sameDiv1Group ? prevLine : null;
+            Object lnkTodoKey = sameDiv1Group ? coalesceLink(line.get("wb20TodoKey"), linkSource, "wb20TodoKey") : null;
+            Object lnkCoCd = sameDiv1Group ? coalesceLink(line.get("wb20CoCd"), linkSource, "wb20CoCd") : null;
+            Object lnkTodoNo = sameDiv1Group ? coalesceLink(line.get("wb20TodoNo"), linkSource, "wb20TodoNo") : null;
+            Object lnkSanctnSn = sameDiv1Group ? coalesceLink(line.get("wb20SanctnSn"), linkSource, "wb20SanctnSn") : null;
+            Object lnkDiv1 = sameDiv1Group ? coalesceLink(line.get("wb20Div1CodeId"), linkSource, "wb20Div1CodeId") : null;
+            Object lnkDiv2 = sameDiv1Group ? coalesceLink(line.get("wb20Div2CodeId"), linkSource, "wb20Div2CodeId") : null;
             line.put("wb20TodoKey", lnkTodoKey);
             line.put("wb20CoCd", lnkCoCd);
             line.put("wb20TodoNo", lnkTodoNo);
@@ -2814,7 +3120,8 @@ public class AM11SvcImpl implements AM11Svc {
             lineParam.remove("creatDttm");
             lineParam.put("docId", docId);
             lineParam.put("lineSeq", nextSeq);
-            lineParam.put("lineType", line.get("lineType") != null ? line.get("lineType") : "APPR");
+            String resolvedType = line.get("lineType") != null ? String.valueOf(line.get("lineType")) : "APPR";
+            lineParam.put("lineType", resolvedType);
             lineParam.put("wb20TodoKey", lnkTodoKey);
             lineParam.put("wb20CoCd", lnkCoCd);
             lineParam.put("wb20TodoNo", lnkTodoNo);
@@ -2822,12 +3129,14 @@ public class AM11SvcImpl implements AM11Svc {
             lineParam.put("wb20Div1CodeId", lnkDiv1);
             lineParam.put("wb20Div2CodeId", lnkDiv2);
 
-            if (nextSeq == cursorSeq) {
+            if (cursorStepSeqs.contains(nextSeq)) {
                 lineParam.put("lineStatus", "PENDING");
-                nextFirstApproverId = (approverOrg != null) ? (String) approverOrg.get("userId") : approverId;
-                nextFirstApproverNm = (approverOrg != null) ? (String) approverOrg.get("userNm") : (String) line.get("approverNm");
-            } else if ("COOP".equals(line.get("lineType"))) {
-                // 방안 A: 협조(COOP)는 비구속 병렬이므로 PENDING으로 개방
+                if (nextSeq == cursorSeq) {
+                    nextFirstApproverId = (approverOrg != null) ? (String) approverOrg.get("userId") : approverId;
+                    nextFirstApproverNm = (approverOrg != null) ? (String) approverOrg.get("userNm") : (String) line.get("approverNm");
+                }
+            } else if ("COOP".equals(resolvedType) && (bindingIdx >= newLines.size() || nextSeq < cursorSeq)) {
+                // 선행 구속 결재가 남아있지 않은 순번 도래 협조(COOP)만 PENDING으로 개방
                 lineParam.put("lineStatus", "PENDING");
             } else {
                 lineParam.put("lineStatus", "READY");
@@ -2882,8 +3191,15 @@ public class AM11SvcImpl implements AM11Svc {
             wb20SyncParam.put("todoNo", String.valueOf(erpBizKey));
             wb20SyncParam.put("coCd", String.valueOf(docLock.get("coCd")));
             wb20SyncParam.put("userId", paramMap.get("userId"));
-            wb20SyncParam.put("histNo", docLock.get("histNo"));
+            String docHistNo = valueOf(docLock.get("histNo"));
+            if ("CR02".equals(valueOf(docLock.get("erpBizType"))) && !docHistNo.isEmpty()) {
+                wb20SyncParam.put("histNo", docHistNo);
+            }
             wb20SyncParam.put("lineList", newLines);
+            String stageTodoDiv2CodeIds = resolveStageTodoDiv2CodeIds(paramMap, docLock, beforeLineList, newLines);
+            if (!stageTodoDiv2CodeIds.isEmpty()) {
+                wb20SyncParam.put("todoDiv2CodeIds", stageTodoDiv2CodeIds);
+            }
             wb20LinkResults = wb20Svc.syncApprovalLinesFromAm(wb20SyncParam);
         } else {
             logger.warn("[AM→WB sync] 호출부 스킵: 가드 미통과(erpBizKey empty 또는 wb20Svc null). erpBizKey={}, wb20SvcNull={}",
@@ -2966,12 +3282,57 @@ public class AM11SvcImpl implements AM11Svc {
 
         // 10. 변경된 새 결재자에게 알림 큐 적재 및 이벤트 발행
         if (nextFirstApproverId != null) {
-            // 결재선 변경으로 순번이 도래한 다음 결재자에게 알림.
-            // 이벤트 경로로 단일화(리스너가 todoNo/결재구분/모바일 해석). 실제 문서제목(DOC_TITLE) 전달.
-            // (기존 직접 enqueue 경로는 todoNo/div2 누락으로 발송 스킵·제목 null·중복 적재라 제거)
+            // 결재선 변경으로 순번이 도래한 다음 결재자(병렬 AGREE 및 순번 도래 COOP 포함)에게 알림.
+            // 이벤트 경로로 단일화(리스너가 todoNo/결재구분/모바일 해석). 실제 문서제목(DOC_TITLE)·메타데이터 전달.
+            Map<String, Object> docInfo = am11Mapper.selectApprovalDocInfo(paramMap);
+            Object nextDiv2CodeId = null;
+            for (Map<String, Object> afterLine : afterLineList) {
+                if (String.valueOf(cursorSeq).equals(valueOf(afterLine.get("lineSeq")))
+                        && !valueOf(afterLine.get("wb20Div2CodeId")).isEmpty()) {
+                    nextDiv2CodeId = afterLine.get("wb20Div2CodeId");
+                    break;
+                }
+            }
+            if (nextDiv2CodeId == null) {
+                for (Map<String, Object> afterLine : afterLineList) {
+                    if (!valueOf(afterLine.get("wb20Div2CodeId")).isEmpty()
+                            && !isRefLineType(lineTypeOf(afterLine))) {
+                        nextDiv2CodeId = afterLine.get("wb20Div2CodeId");
+                        break;
+                    }
+                }
+            }
+            copyApprovalNotificationMetadata(paramMap, docLock, docInfo, nextDiv2CodeId);
+            String draUserNm = docInfo != null ? valueOf(docInfo.get("draUserNm")) : "";
+
+            for (Map<String, Object> afterLine : afterLineList) {
+                if (!"PENDING".equals(afterLine.get("lineStatus"))) continue;
+                String aId = valueOf(afterLine.get("approverId"));
+                if (aId.isEmpty() || nextFirstApproverId.equals(aId)) continue;
+                String aType = lineTypeOf(afterLine);
+                if (!("COOP".equals(aType) || "APPR".equals(aType) || "AGREE".equals(aType))) continue;
+                boolean isCoopLine = "COOP".equals(aType);
+                Map<String, Object> lineSource = new HashMap<>(paramMap);
+                if (afterLine.get("wb20TodoNo") != null) lineSource.put("wb20TodoNo", afterLine.get("wb20TodoNo"));
+                if (afterLine.get("wb20Div2CodeId") != null) lineSource.put("todoDiv2CodeId", afterLine.get("wb20Div2CodeId"));
+                Map<String, Object> notifParam = new HashMap<>();
+                notifParam.put("docId", docId);
+                notifParam.put("eventType", "APPROVE_NEXT");
+                notifParam.put("receiverId", aId);
+                notifParam.put("receiverNm", afterLine.get("approverNm"));
+                notifParam.put("notifChannel", "KAKAO");
+                notifParam.put("notifTitle", isCoopLine
+                        ? "[" + docLock.get("docNo") + "] 협조 요청 문서가 도착했습니다"
+                        : "[" + docLock.get("docNo") + "] 결재 대기 문서가 도착했습니다");
+                notifParam.put("notifMsg", isCoopLine
+                        ? "협조(의견) 요청이 도착했습니다. 문서를 확인하여 협조 의견을 등록해 주십시오."
+                        : "결재 순번이 도래하였습니다. 문서를 확인하십시오.");
+                enqueueApprovalNotification(notifParam, lineSource);
+            }
+
             eventPublisher.publishEvent(new ApprovalEvent(
                 "APPROVE_NEXT", docId, (String) docLock.get("docNo"), (String) docLock.get("docTitle"),
-                draUserId, "", nextFirstApproverId, nextFirstApproverNm, paramMap
+                draUserId, draUserNm, nextFirstApproverId, nextFirstApproverNm, paramMap
             ));
         }
 
@@ -2981,7 +3342,7 @@ public class AM11SvcImpl implements AM11Svc {
         return resultMap;
     }
     private void executeLinkedWb20Approval(Map<String, Object> docLock, Map<String, Object> amLine, String approverId,
-            int amLineSeq, String userId, String apprOpinion) {
+            int amLineSeq, String userId, String apprOpinion, Map<String, String> extra) {
         String erpBizKey = docLock.get("erpBizKey") == null ? null : String.valueOf(docLock.get("erpBizKey")).trim();
         if (erpBizKey == null || erpBizKey.isEmpty() || wb20Svc == null || amLine == null) return;
 
@@ -2991,7 +3352,7 @@ public class AM11SvcImpl implements AM11Svc {
         String todoNo = valueOf(amLine.get("wb20TodoNo"));
         if (todoNo.isEmpty()) todoNo = erpBizKey;
         String div1CodeId = valueOf(amLine.get("wb20Div1CodeId"));
-        String div2CodeId = valueOf(amLine.get("wb20Div2CodeId"));
+        String div2CodeId = resolveLinkedWb20Div2CodeId(docLock, amLine);
 
         Map<String, String> findParam = new HashMap<>();
         findParam.put("todoNo", todoNo);
@@ -3028,6 +3389,23 @@ public class AM11SvcImpl implements AM11Svc {
                     + ", DIV2=" + div2CodeId + ", 결재자=" + approverId + "). 결재를 롤백합니다.");
         }
 
+        // 협조(COOP)는 비구속 의견 확인이므로 WB20 해당 행만 완료 기록하고 업무 상태 전진/검증은 실행하지 않는다.
+        if ("COOP".equals(lineTypeOf(amLine))) {
+            Map<String, Object> coopParam = new HashMap<>();
+            coopParam.put("todoKey", targetLine.get("todoKey"));
+            coopParam.put("sanctnSn", targetLine.get("sanctnSn"));
+            coopParam.put("todoDiv1CodeId", targetLine.get("todoDiv1CodeId"));
+            coopParam.put("todoDiv2CodeId", targetLine.get("todoDiv2CodeId"));
+            coopParam.put("todoCfOpn", apprOpinion);
+            coopParam.put("userId", userId);
+            coopParam.put("pgmId", "AM1201M01");
+            int updated = am11Mapper.updateWb20CoopLineConfirmed(coopParam);
+            if (updated < 1) {
+                throw new IllegalStateException("WB20 협조 결재행을 완료 처리하지 못했습니다. 결재를 롤백합니다.");
+            }
+            return;
+        }
+
         // 4. WB20 승인 실행
         Map<String, String> approvalParam = new HashMap<>();
         for (Map.Entry<String, ?> entry : targetLine.entrySet()) {
@@ -3039,6 +3417,8 @@ public class AM11SvcImpl implements AM11Svc {
         approvalParam.put("todoCfOpn", apprOpinion);
         approvalParam.put("pgmId", "AM1201M01");
         approvalParam.put("amLinkedApproval", "Y");
+        applyBizApprovalExtra(docLock, approvalParam, userId, extra);
+        persistBizCoachingOnApproval(docLock, userId, extra);
 
         Map<String, String> approvalResult = wb20Svc.insertApprovalLine(approvalParam);
         int approvalResultCount = 0;
@@ -3053,6 +3433,441 @@ public class AM11SvcImpl implements AM11Svc {
         if (approvalResultCount < 1) {
             throw new IllegalStateException("WB20 기존 결재 API가 결재행을 완료 처리하지 못했습니다. 결재를 롤백합니다.");
         }
+    }
+
+    private String resolveLinkedWb20Div2CodeId(Map<String, Object> docLock, Map<String, Object> amLine) {
+        String div2CodeId = amLine == null ? "" : valueOf(amLine.get("wb20Div2CodeId"));
+        if (!div2CodeId.isEmpty()) {
+            return div2CodeId;
+        }
+        if (docLock == null || docLock.get("docId") == null) {
+            return "";
+        }
+        Map<String, Object> query = new HashMap<>();
+        query.put("docId", docLock.get("docId"));
+        List<Map<String, Object>> lines = am11Mapper.selectApprovalLineList(query);
+        if (lines != null) {
+            for (Map<String, Object> line : lines) {
+                if ("TODODIV10".equals(valueOf(line.get("wb20Div1CodeId")))) continue;
+                String candidate = valueOf(line.get("wb20Div2CodeId"));
+                if (!candidate.isEmpty()) {
+                    return candidate;
+                }
+            }
+        }
+        return "";
+    }
+
+    /** 업무별 승인 추가값 수집 및 WB24 평가팀장 투입공수 검증. */
+    private Map<String, String> buildBizApprovalExtra(Map<String, Object> docLock, Map<String, Object> actingLine,
+            String userId, Map<String, Object> paramMap) {
+        Map<String, String> extra = new HashMap<>();
+        Object rawActMh = paramMap.get("actMh");
+        if (rawActMh == null || valueOf(rawActMh).isEmpty()) {
+            rawActMh = paramMap.get("etcField1");
+        }
+        String wb24ActMh = resolveWb24ActMh(docLock, actingLine, userId, rawActMh);
+        if (wb24ActMh != null) {
+            extra.put("actMh", wb24ActMh);
+        }
+        String erpBizType = valueOf(docLock.get("erpBizType"));
+        if ("WB24".equals(erpBizType)) {
+            String actDngEval = valueOf(paramMap.get("actDngEval"));
+            if (!actDngEval.isEmpty()) {
+                extra.put("actDngEval", actDngEval);
+            }
+        } else if ("QM01".equals(erpBizType)) {
+            String actMh = valueOf(rawActMh).replace(",", "");
+            if (!actMh.isEmpty()) {
+                extra.put("actMh", actMh);
+            }
+            String sameTimeResultChk = valueOf(paramMap.get("sameTimeResultChk"));
+            if (!sameTimeResultChk.isEmpty()) {
+                extra.put("sameTimeResultChk", sameTimeResultChk);
+            }
+            String actTeamManager = valueOf(paramMap.get("actTeamManager"));
+            if (!actTeamManager.isEmpty()) {
+                extra.put("actTeamManager", actTeamManager);
+            }
+            String deptId = valueOf(paramMap.get("deptId"));
+            if (!deptId.isEmpty()) {
+                extra.put("deptId", deptId);
+            }
+        }
+        if ("WB24".equals(erpBizType) || "QM01".equals(erpBizType)) {
+            validateAndCollectBizCoachingExtra(docLock, actingLine, paramMap, extra);
+        }
+        return extra;
+    }
+
+    /** WB24/QM01 담당팀장 투입공수 검증. 본인 팀장 결재 행이면 정규화된 값을, 대상이 아니면 null(입력값 무시)을 반환한다. */
+    private String resolveWb24ActMh(Map<String, Object> docLock, Map<String, Object> amLine, String userId, Object rawActMh) {
+        if (findWb24TeamManagerRow(docLock, amLine, userId) == null) {
+            return null;
+        }
+        String value = rawActMh == null ? "" : String.valueOf(rawActMh).replace(",", "").trim();
+        if (value.isEmpty()) {
+            throw new IllegalArgumentException("팀장은 투입공수를 입력해야 결재를 처리할 수 있습니다.");
+        }
+        BigDecimal actMh;
+        try {
+            actMh = new BigDecimal(value);
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException("투입공수는 숫자로 입력해주세요.");
+        }
+        if (actMh.compareTo(BigDecimal.ZERO) < 0) {
+            throw new IllegalArgumentException("투입공수는 0 이상으로 입력해주세요.");
+        }
+        if (actMh.compareTo(new BigDecimal("150")) > 0) {
+            throw new IllegalArgumentException("투입공수는 150 이하로 입력해주세요.");
+        }
+        return actMh.stripTrailingZeros().toPlainString();
+    }
+
+    /** 업무별 승인 추가값 중계 지점. */
+    private void applyBizApprovalExtra(Map<String, Object> docLock, Map<String, String> approvalParam, String userId, Map<String, String> extra) {
+        Map<String, String> bizExtra = extra == null ? new HashMap<>() : extra;
+        String erpBizType = valueOf(docLock.get("erpBizType"));
+        if ("WB24".equals(erpBizType)) {
+            applyWb24ApprovalExtra(docLock, approvalParam, userId, bizExtra);
+        } else if ("QM01".equals(erpBizType)) {
+            applyQm01ApprovalExtra(approvalParam, userId, bizExtra);
+        }
+    }
+
+    private void applyWb24ApprovalExtra(Map<String, Object> docLock, Map<String, String> approvalParam, String userId, Map<String, String> extra) {
+        if (approvalParam.get("issNo") == null || approvalParam.get("issNo").trim().isEmpty()) {
+            String issNo = valueOf(docLock.get("erpBizKey"));
+            if (issNo.isEmpty()) {
+                issNo = valueOf(approvalParam.get("todoNo"));
+            }
+            if (!issNo.isEmpty()) {
+                approvalParam.put("issNo", issNo);
+            }
+        }
+        // 조회 행의 기존 ETC_FIELD1(ACT_MH)을 etcField1로 되써서 updateApprovalLine의 ETC_FIELD1 NULL 덮어쓰기를 막는다.
+        String stored = approvalParam.get("actMh");
+        if (stored != null) {
+            approvalParam.put("etcField1", stored);
+        }
+        String actDngEval = extra.get("actDngEval");
+        if (actDngEval != null && !actDngEval.isEmpty()) {
+            approvalParam.put("actDngEval", actDngEval);
+        }
+        String actMh = extra.get("actMh");
+        if (actMh == null) {
+            return;
+        }
+        approvalParam.put("actMh", actMh);
+        approvalParam.put("etcField1", actMh);
+        approvalParam.put("deptId", wb24ActorDeptId(userId));
+    }
+
+    private void applyQm01ApprovalExtra(Map<String, String> approvalParam, String userId, Map<String, String> extra) {
+        String stored = approvalParam.get("actMh");
+        if (stored != null) {
+            approvalParam.put("etcField1", stored);
+        }
+        String actMh = extra.get("actMh");
+        if (actMh != null && !actMh.isEmpty()) {
+            approvalParam.put("actMh", actMh);
+            approvalParam.put("etcField1", actMh);
+        }
+        String effectiveActMh = approvalParam.get("actMh");
+        if (effectiveActMh != null && !effectiveActMh.trim().isEmpty()) {
+            String sameTimeResultChk = extra.get("sameTimeResultChk");
+            if (sameTimeResultChk == null || sameTimeResultChk.isEmpty()) {
+                sameTimeResultChk = approvalParam.get("sameTimeResult");
+            }
+            if (sameTimeResultChk != null && !sameTimeResultChk.isEmpty()) {
+                approvalParam.put("sameTimeResultChk", sameTimeResultChk);
+            }
+        }
+        String actTeamManager = extra.get("actTeamManager");
+        if (actTeamManager == null || actTeamManager.isEmpty()) {
+            actTeamManager = approvalParam.get("teamManager");
+        }
+        if (actTeamManager == null || actTeamManager.isEmpty()) {
+            actTeamManager = approvalParam.get("deptTeamManager");
+        }
+        if ((actTeamManager == null || actTeamManager.isEmpty())
+                && effectiveActMh != null && !effectiveActMh.trim().isEmpty()) {
+            actTeamManager = "TEAM01";
+        }
+        if (actTeamManager != null && !actTeamManager.isEmpty()) {
+            approvalParam.put("actTeamManager", actTeamManager);
+        }
+        String deptId = extra.get("deptId");
+        if (deptId == null || deptId.isEmpty()) {
+            deptId = wb24ActorDeptId(userId);
+        } else {
+            deptId = normalizeActMhDeptPrefix(deptId);
+        }
+        if (deptId != null && !deptId.isEmpty()) {
+            approvalParam.put("deptId", deptId);
+        }
+        // WB20SvcImpl(TODODIV2030)은 workRptNo/issNo가 있을 때만 TB_QM01P01 팀 공수(SALE/DSGN/MATR/PROD_TEAM_MD)를 갱신한다.
+        // selectGetApprovalList에는 workRptNo가 포함되지 않으므로 QM01 원천 요청서에서 보강한다.
+        if (effectiveActMh != null && !effectiveActMh.trim().isEmpty()
+                && valueOf(approvalParam.get("workRptNo")).isEmpty()
+                && valueOf(approvalParam.get("issNo")).isEmpty()
+                && qm01Mapper != null) {
+            String todoNo = valueOf(approvalParam.get("todoNo"));
+            if (todoNo.isEmpty()) {
+                todoNo = valueOf(approvalParam.get("reqNo"));
+            }
+            String reqNo = (todoNo.startsWith("RES") && todoNo.length() >= 10)
+                    ? "REQ" + todoNo.substring(3, 10) : todoNo;
+            if (!reqNo.isEmpty()) {
+                Map<String, String> reqParam = new HashMap<>();
+                reqParam.put("reqNo", reqNo);
+                reqParam.put("onlyLgistQM", "N");
+                Map<String, String> reqInfo = qm01Mapper.selectQtyReqInfo(reqParam);
+                String workRptNo = reqInfo == null ? "" : valueOf(reqInfo.get("workRptNo"));
+                if (!workRptNo.isEmpty()) {
+                    approvalParam.put("workRptNo", workRptNo);
+                    approvalParam.put("issNo", workRptNo);
+                }
+            }
+        }
+    }
+
+    /** 반려·전결 알림 이벤트 발행 전 docLock/docInfo의 업무 메타데이터를 보강한다. */
+    private void copyApprovalNotificationMetadata(Map<String, Object> paramMap, Map<String, Object> docLock,
+            Map<String, Object> docInfo, Object div2CodeObj) {
+        if (docLock != null) {
+            if (valueOf(paramMap.get("todoNo")).isEmpty() && docLock.get("erpBizKey") != null) {
+                paramMap.put("todoNo", valueOf(docLock.get("erpBizKey")));
+            }
+            if (valueOf(paramMap.get("erpBizKey")).isEmpty() && docLock.get("erpBizKey") != null) {
+                paramMap.put("erpBizKey", docLock.get("erpBizKey"));
+            }
+            if (valueOf(paramMap.get("erpBizType")).isEmpty() && docLock.get("erpBizType") != null) {
+                paramMap.put("erpBizType", docLock.get("erpBizType"));
+            }
+            if (valueOf(paramMap.get("coCd")).isEmpty() && docLock.get("coCd") != null) {
+                paramMap.put("coCd", docLock.get("coCd"));
+            }
+        }
+        if (valueOf(paramMap.get("todoDiv2CodeId")).isEmpty() && div2CodeObj != null && !valueOf(div2CodeObj).isEmpty()) {
+            paramMap.put("todoDiv2CodeId", valueOf(div2CodeObj));
+        }
+        if (docInfo != null) {
+            normalizeClobValues(docInfo);
+            if (valueOf(paramMap.get("docDataJson")).isEmpty() && docInfo.get("docDataJson") != null) {
+                paramMap.put("docDataJson", docInfo.get("docDataJson"));
+            }
+            if (valueOf(paramMap.get("docTitle")).isEmpty() && docInfo.get("docTitle") != null) {
+                paramMap.put("docTitle", docInfo.get("docTitle"));
+            }
+        }
+    }
+
+    /** WB24/QM01 처럼 한 TODO_NO 아래 복수 결재단계가 공존하는 업무는 현재 AM 문서의 div2(+짝 공유 div2)로 WB20 역동기화 범위를 한정한다. */
+    private String resolveStageTodoDiv2CodeIds(Map<String, Object> paramMap, Map<String, Object> docLock,
+            List<Map<String, Object>> beforeLineList, List<Map<String, Object>> newLines) {
+        String explicit = valueOf(paramMap.get("todoDiv2CodeIds"));
+        if (!explicit.isEmpty()) {
+            return explicit;
+        }
+        String erpBizType = valueOf(docLock.get("erpBizType"));
+        if (!"WB24".equals(erpBizType) && !"QM01".equals(erpBizType)) {
+            return "";
+        }
+        Set<String> div2Set = new java.util.LinkedHashSet<>();
+        if (beforeLineList != null) {
+            for (Map<String, Object> line : beforeLineList) {
+                String d2 = valueOf(line.get("wb20Div2CodeId"));
+                if (!d2.isEmpty()) div2Set.add(d2);
+            }
+        }
+        if (newLines != null) {
+            for (Map<String, Object> line : newLines) {
+                String d2 = valueOf(line.get("wb20Div2CodeId"));
+                if (!d2.isEmpty()) div2Set.add(d2);
+            }
+        }
+        if (div2Set.contains("TODODIV2060")) div2Set.add("TODODIV1030");
+        if (div2Set.contains("TODODIV2090")) div2Set.add("TODODIV1090");
+        if (div2Set.contains("TODODIV2020")) div2Set.add("TODODIV1040");
+        if (div2Set.contains("TODODIV2030")) div2Set.add("TODODIV1050");
+        return String.join(",", div2Set);
+    }
+
+    /** 투입공수 입력 대상 WB20 결재행(WB24 조치 또는 QM01 일괄등록·결과, 비협조/비참조). 해당하지 않으면 null. */
+    private Map<String, String> findWb24TeamManagerRow(Map<String, Object> docLock, Map<String, Object> amLine, String userId) {
+        if (amLine == null || userId == null || docLock == null) {
+            return null;
+        }
+        String lType = lineTypeOf(amLine);
+        if ("COOP".equals(lType) || "REF".equals(lType) || "REFERENCE".equals(lType)) {
+            return null;
+        }
+        String erpBizType = valueOf(docLock.get("erpBizType"));
+        String div2 = resolveLinkedWb20Div2CodeId(docLock, amLine);
+        boolean wb24Target = "WB24".equals(erpBizType) && "TODODIV2090".equals(div2);
+        boolean qm01Target = "QM01".equals(erpBizType) && ("TODODIV2020".equals(div2) || "TODODIV2030".equals(div2));
+        if (!wb24Target && !qm01Target) {
+            return null;
+        }
+        String todoNo = valueOf(amLine.get("wb20TodoNo"));
+        if (todoNo.isEmpty()) {
+            todoNo = valueOf(docLock.get("erpBizKey"));
+        }
+        if (todoNo.isEmpty()) {
+            return null;
+        }
+        Map<String, String> query = new HashMap<>();
+        query.put("todoNo", todoNo);
+        query.put("todoDiv2CodeId", div2);
+        String coCd = valueOf(docLock.get("coCd"));
+        if (!coCd.isEmpty()) {
+            query.put("coCd", coCd);
+        }
+        List<Map<String, String>> wbLines = wb20Svc.selectGetApprovalList(query);
+        String approverId = valueOf(amLine.get("approverId"));
+        Map<String, String> matchedRow = findPendingWb20Row(wbLines, userId, approverId, div2, qm01Target);
+        if (matchedRow == null) {
+            // wb20.xml MAX(CREAT_DTTM) 조건으로 동일 TODO_NO 내 다른 초에 insert된 행이 누락된 경우 todoKey로 재조회
+            String wb20TodoKey = valueOf(amLine.get("wb20TodoKey"));
+            if (!wb20TodoKey.isEmpty()) {
+                Map<String, String> keyQuery = new HashMap<>();
+                keyQuery.put("todoKey", wb20TodoKey);
+                matchedRow = findPendingWb20Row(wb20Svc.selectGetApprovalList(keyQuery), userId, approverId, div2, qm01Target);
+            }
+        }
+        if (matchedRow != null) {
+            return isWb24TeamManagerRow(matchedRow, userId) ? matchedRow : null;
+        }
+        return null;
+    }
+
+    private Map<String, String> findPendingWb20Row(List<Map<String, String>> wbLines,
+            String userId, String approverId, String div2, boolean qm01Target) {
+        if (wbLines == null) {
+            return null;
+        }
+        for (Map<String, String> row : wbLines) {
+            String rowTodoId = valueOf(row.get("todoId"));
+            if ((userId.equalsIgnoreCase(rowTodoId) || (!approverId.isEmpty() && approverId.equalsIgnoreCase(rowTodoId)))
+                    && !"Y".equals(row.get("sanctnSttus"))) {
+                if (qm01Target) {
+                    if ("TODODIV2020".equals(div2) && !"Y".equalsIgnoreCase(valueOf(row.get("sameTimeResult")))) {
+                        continue;
+                    }
+                    if (isNormalOrderPartCd(valueOf(row.get("partCd")))) {
+                        continue;
+                    }
+                }
+                return row;
+            }
+        }
+        return null;
+    }
+
+    private static boolean isNormalOrderPartCd(String partCd) {
+        return "COBTP00".equals(partCd) || "COBTP01".equals(partCd)
+                || "COBTP04".equals(partCd) || "COBTP06".equals(partCd)
+                || "COBTP08".equals(partCd) || "COBTP09".equals(partCd);
+    }
+
+    private boolean isWb24TeamManagerRow(Map<String, String> row, String userId) {
+        Map<String, Object> org = am11Mapper.selectUserOrgSnapshot(userId);
+        String teamManager = valueOf(row.get("teamManager"));
+        String orgTeamManager = org == null ? "" : valueOf(org.get("teamManager"));
+        boolean manager = "TEAM01".equals(valueOf(row.get("deptTeamManager")))
+                || "TEAM01".equals(orgTeamManager) || "Y".equalsIgnoreCase(orgTeamManager)
+                || "평가".equals(teamManager) || "Y".equals(teamManager);
+        if (!manager) {
+            return false;
+        }
+        String deptId = wb24ActorDeptId(org);
+        return isActMhTargetDeptPrefix(deptId);
+    }
+
+    private static boolean isActMhTargetDeptPrefix(String deptId) {
+        return "GUN30".equals(deptId) || "GUN40".equals(deptId) || "TRN50".equals(deptId)
+                || "GUN60".equals(deptId) || "GUN70".equals(deptId);
+    }
+
+    private static String normalizeActMhDeptPrefix(String rawDeptId) {
+        String trimmed = rawDeptId == null ? "" : rawDeptId.trim();
+        String prefix = trimmed.length() >= 5 ? trimmed.substring(0, 5) : trimmed;
+        if ("TRN30".equals(prefix) || "GUN50".equals(prefix)) {
+            return "TRN50";
+        }
+        return prefix;
+    }
+
+    /** 결재자 실제 부서(서버 재조회, 앞 5자리). DEPT_ID 미해당 시 VIEW_DEPT_ID 및 조직 매핑(TRN30/GUN50->TRN50)을 반영하며 GUN80은 투입공수 대상에서 제외한다. */
+    private String wb24ActorDeptId(String userId) {
+        return wb24ActorDeptId(am11Mapper.selectUserOrgSnapshot(userId));
+    }
+
+    private String wb24ActorDeptId(Map<String, Object> org) {
+        if (org == null) {
+            return "";
+        }
+        String rawDept = valueOf(org.get("deptId"));
+        String rawPrefix = rawDept.length() >= 5 ? rawDept.substring(0, 5) : rawDept;
+        if ("GUN80".equals(rawPrefix)) {
+            return rawPrefix;
+        }
+        if (isActMhTargetDeptPrefix(rawPrefix)) {
+            return rawPrefix;
+        }
+        String viewDept = valueOf(org.get("viewDeptId"));
+        String viewPrefix = viewDept.length() >= 5 ? viewDept.substring(0, 5) : viewDept;
+        if (isActMhTargetDeptPrefix(viewPrefix)) {
+            return viewPrefix;
+        }
+        String normDept = normalizeActMhDeptPrefix(rawPrefix);
+        if (isActMhTargetDeptPrefix(normDept)) {
+            return normDept;
+        }
+        String normView = normalizeActMhDeptPrefix(viewPrefix);
+        if (isActMhTargetDeptPrefix(normView)) {
+            return normView;
+        }
+        return !rawPrefix.isEmpty() ? rawPrefix : viewPrefix;
+    }
+
+    /** 문서 상세용: 조회자(대결자 포함)가 현재 PENDING 구속 결재자이고 투입공수 입력 대상(WB24/QM01)이면 해당 WB20 행 반환. */
+    private Map<String, String> findActMhRequiredRow(Map<String, Object> docInfo, List<Map<String, Object>> lineList, String userId) {
+        if (lineList == null || userId == null) {
+            return null;
+        }
+        Map<String, Object> actingLine = findActingNonCoopPendingLine(lineList, userId);
+        if (actingLine != null) {
+            try {
+                Map<String, String> matched = findWb24TeamManagerRow(docInfo, actingLine, userId);
+                if (matched != null) {
+                    return matched;
+                }
+            } catch (Exception e) {
+                logger.warn("투입공수 입력 대상 판정 실패(N 처리): docId={}", docInfo.get("docId"), e);
+                return null;
+            }
+        }
+        for (Map<String, Object> line : lineList) {
+            String lType = lineTypeOf(line);
+            if ("COOP".equals(lType) || "REF".equals(lType) || "REFERENCE".equals(lType) || "NOTIFY".equals(lType) || "DRAFT".equals(lType)) {
+                continue;
+            }
+            if ("PENDING".equals(line.get("lineStatus"))
+                    && (userId.equalsIgnoreCase(valueOf(line.get("approverId"))) || userId.equalsIgnoreCase(valueOf(line.get("actualUserId"))))) {
+                try {
+                    Map<String, String> matched = findWb24TeamManagerRow(docInfo, line, userId);
+                    if (matched != null) {
+                        return matched;
+                    }
+                } catch (Exception e) {
+                    logger.warn("투입공수 입력 대상 판정 실패(N 처리): docId={}", docInfo.get("docId"), e);
+                    return null;
+                }
+            }
+        }
+        return null;
     }
 
     @Override
@@ -3079,6 +3894,433 @@ public class AM11SvcImpl implements AM11Svc {
     @Override
     public int updateApprovalDocContent(Map<String, Object> paramMap) {
         return am11Mapper.updateApprovalDocContent(paramMap);
+    }
+
+    @Override
+    public Map<String, Object> saveBizCoachingComment(Map<String, Object> paramMap) {
+        Map<String, Object> resultMap = new HashMap<>();
+        String docId = valueOf(paramMap.get("docId"));
+        String userId = valueOf(paramMap.get("userId"));
+        String pgmId = valueOf(paramMap.get("pgmId"));
+        if (pgmId.isEmpty()) {
+            pgmId = "AM1201M01";
+        }
+        if (docId.isEmpty() || userId.isEmpty()) {
+            resultMap.put("resultCode", "500");
+            resultMap.put("resultMessage", "필수 파라미터가 누락되었습니다.");
+            return resultMap;
+        }
+
+        Map<String, Object> docLock;
+        try {
+            docLock = am11Mapper.selectApprovalDocForUpdate(paramMap);
+        } catch (Exception e) {
+            resultMap.put("resultCode", "500");
+            resultMap.put("resultMessage", "현재 다른 사용자에 의해 결재 처리 중인 문서입니다. 잠시 후 다시 확인하십시오.");
+            return resultMap;
+        }
+        if (docLock == null) {
+            resultMap.put("resultCode", "500");
+            resultMap.put("resultMessage", "결재 대상 문서를 찾을 수 없습니다.");
+            return resultMap;
+        }
+        docLock = new HashMap<>(docLock);
+        String docStatus = valueOf(docLock.get("docStatus"));
+        if (!("REQUEST".equals(docStatus) || "PROGRESS".equals(docStatus) || "POST_PROGRESS".equals(docStatus))) {
+            resultMap.put("resultCode", "500");
+            resultMap.put("resultMessage", "진행 중인 결재 문서만 수정할 수 있습니다.");
+            return resultMap;
+        }
+        String erpBizType = valueOf(docLock.get("erpBizType"));
+        if (!("QM01".equals(erpBizType) || "WB24".equals(erpBizType))) {
+            resultMap.put("resultCode", "500");
+            resultMap.put("resultMessage", "원인/결과/근본원인 수정 대상 업무가 아닙니다.");
+            return resultMap;
+        }
+
+        List<Map<String, Object>> lineList = am11Mapper.selectApprovalLineList(paramMap);
+        Map<String, Object> actingLine = findActingNonCoopPendingLine(lineList, userId);
+        if (actingLine == null || findTeamManagerEvalWb20Row(docLock, actingLine) == null) {
+            resultMap.put("resultCode", "500");
+            resultMap.put("resultMessage", "현재 결재 차례인 평가팀장(또는 대결자)만 내용을 수정할 수 있습니다.");
+            return resultMap;
+        }
+
+        Map<String, Object> ctx = loadBizCoachingContext(docLock, actingLine);
+        if (ctx == null) {
+            resultMap.put("resultCode", "500");
+            resultMap.put("resultMessage", "연계된 원천 자료를 찾을 수 없습니다.");
+            return resultMap;
+        }
+
+        String measRst = valueOfRaw(paramMap.get("measRst"));
+        String actCnts = valueOfRaw(paramMap.get("actCnts"));
+        String fdmtSolutCd = valueOf(paramMap.get("fdmtSolutCd"));
+        String fdmtSolutCnt = valueOfRaw(paramMap.get("fdmtSolutCnt")).trim();
+        if ("Y".equals(ctx.get("rootCauseRequired"))) {
+            if (fdmtSolutCd.isEmpty()) {
+                resultMap.put("resultCode", "500");
+                resultMap.put("resultMessage", "근본원인을 선택해주세요.");
+                return resultMap;
+            }
+            if (fdmtSolutCnt.isEmpty()) {
+                resultMap.put("resultCode", "500");
+                resultMap.put("resultMessage", "근본예방대책을 입력해주세요.");
+                return resultMap;
+            }
+        }
+
+        updateBizCoachingSourceTable(ctx, measRst, actCnts, fdmtSolutCd, fdmtSolutCnt, userId, pgmId);
+        String renderedHtml = rerenderBizDocHtml(docId, ctx, userId, pgmId);
+
+        Map<String, Object> refreshedCtx = loadBizCoachingContext(docLock, actingLine);
+        resultMap.put("resultCode", "200");
+        resultMap.put("resultMessage", "저장되었습니다.");
+        resultMap.put("docRenderHtml", renderedHtml);
+        resultMap.put("bizCoachingData", refreshedCtx != null ? refreshedCtx.get("data") : Collections.emptyMap());
+        return resultMap;
+    }
+
+    private void enrichBizCoachingEditInfo(Map<String, Object> docInfo, List<Map<String, Object>> lineList, String userId) {
+        docInfo.put("bizCoachingEditable", "N");
+        docInfo.put("bizRootCauseRequired", "N");
+        String docStatus = valueOf(docInfo.get("docStatus"));
+        if (!("REQUEST".equals(docStatus) || "PROGRESS".equals(docStatus) || "POST_PROGRESS".equals(docStatus))) {
+            return;
+        }
+        Map<String, Object> actingLine = findActingNonCoopPendingLine(lineList, userId);
+        if (actingLine == null) {
+            return;
+        }
+        if (findTeamManagerEvalWb20Row(docInfo, actingLine) == null) {
+            return;
+        }
+        Map<String, Object> ctx = loadBizCoachingContext(docInfo, actingLine);
+        if (ctx == null) {
+            return;
+        }
+        docInfo.put("bizCoachingEditable", "Y");
+        docInfo.put("bizCoachingBizType", valueOf(docInfo.get("erpBizType")));
+        docInfo.put("bizRootCauseRequired", ctx.get("rootCauseRequired"));
+        docInfo.put("bizCoachingData", ctx.get("data"));
+    }
+
+    private Map<String, Object> findActingNonCoopPendingLine(List<Map<String, Object>> lineList, String userId) {
+        if (lineList == null || userId == null || userId.trim().isEmpty()) {
+            return null;
+        }
+        for (Map<String, Object> line : lineList) {
+            String lType = lineTypeOf(line);
+            if ("COOP".equals(lType) || "REF".equals(lType) || "REFERENCE".equals(lType)) {
+                continue;
+            }
+            if ("PENDING".equals(line.get("lineStatus")) && userId.equals(valueOf(line.get("approverId")))) {
+                return line;
+            }
+        }
+        for (Map<String, Object> line : lineList) {
+            String lType = lineTypeOf(line);
+            if ("COOP".equals(lType) || "REF".equals(lType) || "REFERENCE".equals(lType)) {
+                continue;
+            }
+            if ("PENDING".equals(line.get("lineStatus"))) {
+                String approverId = valueOf(line.get("approverId"));
+                Map<String, Object> delegParam = new HashMap<>();
+                delegParam.put("originUserId", approverId);
+                delegParam.put("delegateUserId", userId);
+                if (am11Mapper.selectActiveDelegation(delegParam) != null) {
+                    return line;
+                }
+            }
+        }
+        return null;
+    }
+
+    private Map<String, String> findTeamManagerEvalWb20Row(Map<String, Object> docInfo, Map<String, Object> amLine) {
+        if (docInfo == null || amLine == null || wb20Svc == null) {
+            return null;
+        }
+        String erpBizType = valueOf(docInfo.get("erpBizType"));
+        if (!("QM01".equals(erpBizType) || "WB24".equals(erpBizType))) {
+            return null;
+        }
+        String div2 = valueOf(amLine.get("wb20Div2CodeId"));
+        if (!("TODODIV2020".equals(div2) || "TODODIV2030".equals(div2) || "TODODIV2090".equals(div2))) {
+            return null;
+        }
+        String todoNo = valueOf(amLine.get("wb20TodoNo"));
+        if (todoNo.isEmpty()) {
+            todoNo = valueOf(docInfo.get("erpBizKey"));
+        }
+        if (todoNo.isEmpty()) {
+            return null;
+        }
+        Map<String, String> query = new HashMap<>();
+        query.put("todoNo", todoNo);
+        query.put("todoDiv2CodeId", div2);
+        List<Map<String, String>> wbLines = wb20Svc.selectGetApprovalList(query);
+        if (wbLines == null) {
+            return null;
+        }
+        String approverId = valueOf(amLine.get("approverId"));
+        for (Map<String, String> row : wbLines) {
+            if (approverId.equalsIgnoreCase(valueOf(row.get("todoId")))
+                    && !"Y".equals(row.get("sanctnSttus"))
+                    && "평가".equals(valueOf(row.get("teamManager")))) {
+                return row;
+            }
+        }
+        return null;
+    }
+
+    private Map<String, Object> loadBizCoachingContext(Map<String, Object> docInfo, Map<String, Object> actingLine) {
+        String erpBizType = valueOf(docInfo.get("erpBizType"));
+        String erpBizKey = valueOf(docInfo.get("erpBizKey"));
+        String div2 = valueOf(actingLine.get("wb20Div2CodeId"));
+        if (erpBizKey.isEmpty()) {
+            return null;
+        }
+
+        if ("QM01".equals(erpBizType)) {
+            if (qm01Mapper == null) {
+                return null;
+            }
+            String reqNo = erpBizKey.startsWith("RES") && erpBizKey.length() >= 10
+                    ? "REQ" + erpBizKey.substring(3, 10) : erpBizKey;
+            String rsltNo = erpBizKey.startsWith("RES")
+                    ? erpBizKey
+                    : (reqNo.startsWith("REQ") && reqNo.length() >= 10 ? "RES" + reqNo.substring(3, 10) : "");
+            if (rsltNo.isEmpty()) {
+                return null;
+            }
+            Map<String, String> reqParam = new HashMap<>();
+            reqParam.put("reqNo", reqNo);
+            reqParam.put("onlyLgistQM", "N");
+            Map<String, String> reqInfo = qm01Mapper.selectQtyReqInfo(reqParam);
+            if ("TODODIV2020".equals(div2) && (reqInfo == null || !"Y".equalsIgnoreCase(strVal(reqInfo, "sameTimeResult")))) {
+                return null;
+            }
+
+            Map<String, String> respParam = new HashMap<>();
+            respParam.put("rsltNo", rsltNo);
+            Map<String, String> respInfo = qm01Mapper.selectQtyReqRespInfo(respParam);
+            if (respInfo == null || respInfo.isEmpty()) {
+                return null;
+            }
+
+            String partCd = strVal(reqInfo, "partCd");
+            boolean normalOrder = "COBTP00".equals(partCd) || "COBTP01".equals(partCd)
+                    || "COBTP04".equals(partCd) || "COBTP06".equals(partCd)
+                    || "COBTP08".equals(partCd) || "COBTP09".equals(partCd);
+
+            Map<String, Object> data = new HashMap<>();
+            data.put("bizType", "QM01");
+            data.put("reqNo", reqNo);
+            data.put("rsltNo", rsltNo);
+            data.put("partCd", partCd);
+            data.put("subCd", strVal(respInfo, "subCd"));
+            data.put("measRst", strVal(respInfo, "measRst"));
+            data.put("actCnts", strVal(respInfo, "resltRst"));
+            data.put("fdmtSolutCd", strVal(respInfo, "fdmtSolutCd"));
+            data.put("fdmtSolutCnt", strVal(respInfo, "fdmtSolutCnt"));
+
+            Map<String, Object> ctx = new HashMap<>();
+            ctx.put("bizType", "QM01");
+            ctx.put("todoDiv2CodeId", div2);
+            ctx.put("reqNo", reqNo);
+            ctx.put("rsltNo", rsltNo);
+            ctx.put("rootCauseRequired", normalOrder ? "N" : "Y");
+            ctx.put("data", data);
+            return ctx;
+        }
+
+        if ("WB24".equals(erpBizType)) {
+            if (wb24Mapper == null) {
+                return null;
+            }
+            Map<String, String> issParam = new HashMap<>();
+            issParam.put("issNo", erpBizKey);
+            Map<String, String> issInfo = wb24Mapper.selectWbsIssueAmInfo(issParam);
+            if (issInfo == null || issInfo.isEmpty()) {
+                return null;
+            }
+            String issSts = strVal(issInfo, "issSts");
+            Map<String, Object> data = new HashMap<>();
+            data.put("bizType", "WB24");
+            data.put("issNo", erpBizKey);
+            data.put("issSts", issSts);
+            data.put("subCd", strVal(issInfo, "subCd"));
+            data.put("measRst", strVal(issInfo, "measRst"));
+            data.put("actCnts", strVal(issInfo, "actCnts"));
+            data.put("fdmtSolutCd", strVal(issInfo, "fdmtSolutCd"));
+            data.put("fdmtSolutCnt", strVal(issInfo, "fdmtSolutCnt"));
+
+            Map<String, Object> ctx = new HashMap<>();
+            ctx.put("bizType", "WB24");
+            ctx.put("todoDiv2CodeId", div2);
+            ctx.put("issNo", erpBizKey);
+            ctx.put("rootCauseRequired", "ISSSTS04".equals(issSts) ? "N" : "Y");
+            ctx.put("data", data);
+            return ctx;
+        }
+        return null;
+    }
+
+    private void validateAndCollectBizCoachingExtra(Map<String, Object> docLock, Map<String, Object> actingLine,
+            Map<String, Object> paramMap, Map<String, String> extra) {
+        if (findTeamManagerEvalWb20Row(docLock, actingLine) == null) {
+            return;
+        }
+        Map<String, Object> ctx = loadBizCoachingContext(docLock, actingLine);
+        if (ctx == null) {
+            return;
+        }
+        boolean rootRequired = "Y".equals(ctx.get("rootCauseRequired"));
+        boolean submittedFromAm = "Y".equalsIgnoreCase(valueOf(paramMap.get("bizCoachingSubmitted")));
+        if (submittedFromAm) {
+            String fdmtSolutCd = valueOf(paramMap.get("fdmtSolutCd"));
+            String fdmtSolutCnt = valueOfRaw(paramMap.get("fdmtSolutCnt")).trim();
+            if (rootRequired) {
+                if (fdmtSolutCd.isEmpty()) {
+                    throw new IllegalArgumentException("근본원인을 선택해주세요.");
+                }
+                if (fdmtSolutCnt.isEmpty()) {
+                    throw new IllegalArgumentException("근본예방대책을 입력해주세요.");
+                }
+            }
+            extra.put("bizCoachingSubmitted", "Y");
+            extra.put("bizCoachingType", valueOf(ctx.get("bizType")));
+            extra.put("bizTodoDiv2CodeId", valueOf(ctx.get("todoDiv2CodeId")));
+            extra.put("bizReqNo", valueOf(ctx.get("reqNo")));
+            extra.put("bizRsltNo", valueOf(ctx.get("rsltNo")));
+            extra.put("bizIssNo", valueOf(ctx.get("issNo")));
+            extra.put("bizMeasRst", valueOfRaw(paramMap.get("measRst")));
+            extra.put("bizActCnts", valueOfRaw(paramMap.get("actCnts")));
+            extra.put("bizFdmtSolutCd", fdmtSolutCd);
+            extra.put("bizFdmtSolutCnt", fdmtSolutCnt);
+        } else {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> data = (Map<String, Object>) ctx.get("data");
+            if (rootRequired) {
+                String dbCd = data == null ? "" : valueOf(data.get("fdmtSolutCd"));
+                String dbCnt = data == null ? "" : valueOf(data.get("fdmtSolutCnt"));
+                if (dbCd.isEmpty() || dbCnt.isEmpty()) {
+                    throw new IllegalArgumentException("평가팀장은 근본원인과 근본예방대책을 입력한 후 결재할 수 있습니다.");
+                }
+            }
+            extra.put("bizCoachingRerenderOnly", "Y");
+            extra.put("bizCoachingType", valueOf(ctx.get("bizType")));
+            extra.put("bizTodoDiv2CodeId", valueOf(ctx.get("todoDiv2CodeId")));
+            extra.put("bizReqNo", valueOf(ctx.get("reqNo")));
+            extra.put("bizRsltNo", valueOf(ctx.get("rsltNo")));
+            extra.put("bizIssNo", valueOf(ctx.get("issNo")));
+        }
+    }
+
+    private void persistBizCoachingOnApproval(Map<String, Object> docLock, String userId, Map<String, String> extra) {
+        if (extra == null) {
+            return;
+        }
+        String docId = valueOf(docLock.get("docId"));
+        if ("Y".equals(extra.get("bizCoachingSubmitted"))) {
+            Map<String, Object> ctx = new HashMap<>();
+            ctx.put("bizType", extra.get("bizCoachingType"));
+            ctx.put("todoDiv2CodeId", extra.get("bizTodoDiv2CodeId"));
+            ctx.put("reqNo", extra.get("bizReqNo"));
+            ctx.put("rsltNo", extra.get("bizRsltNo"));
+            ctx.put("issNo", extra.get("bizIssNo"));
+            updateBizCoachingSourceTable(ctx,
+                    extra.get("bizMeasRst"),
+                    extra.get("bizActCnts"),
+                    extra.get("bizFdmtSolutCd"),
+                    extra.get("bizFdmtSolutCnt"),
+                    userId,
+                    "AM1201M01");
+            rerenderBizDocHtml(docId, ctx, userId, "AM1201M01");
+        } else if ("Y".equals(extra.get("bizCoachingRerenderOnly"))) {
+            Map<String, Object> ctx = new HashMap<>();
+            ctx.put("bizType", extra.get("bizCoachingType"));
+            ctx.put("todoDiv2CodeId", extra.get("bizTodoDiv2CodeId"));
+            ctx.put("reqNo", extra.get("bizReqNo"));
+            ctx.put("rsltNo", extra.get("bizRsltNo"));
+            ctx.put("issNo", extra.get("bizIssNo"));
+            rerenderBizDocHtml(docId, ctx, userId, "AM1201M01");
+        }
+    }
+
+    private void updateBizCoachingSourceTable(Map<String, Object> ctx, String measRst, String actCnts,
+            String fdmtSolutCd, String fdmtSolutCnt, String userId, String pgmId) {
+        String bizType = valueOf(ctx.get("bizType"));
+        if ("QM01".equals(bizType) && qm01Mapper != null) {
+            Map<String, String> upd = new HashMap<>();
+            upd.put("rsltNo", valueOf(ctx.get("rsltNo")));
+            upd.put("reqNo", valueOf(ctx.get("reqNo")));
+            upd.put("measRst", measRst == null ? "" : measRst);
+            upd.put("resltRst", actCnts == null ? "" : actCnts);
+            upd.put("fdmtSolutCd", fdmtSolutCd == null ? "" : fdmtSolutCd);
+            upd.put("fdmtSolutCnt", fdmtSolutCnt == null ? "" : fdmtSolutCnt);
+            upd.put("userId", userId);
+            upd.put("pgmId", pgmId);
+            int updated = qm01Mapper.updateQualityResultComment(upd);
+            if (updated < 1) {
+                throw new IllegalStateException("품질요청 결과 자료를 업데이트하지 못했습니다.");
+            }
+        } else if ("WB24".equals(bizType) && wb24Mapper != null) {
+            Map<String, String> upd = new HashMap<>();
+            upd.put("issNo", valueOf(ctx.get("issNo")));
+            upd.put("measRst", measRst == null ? "" : measRst);
+            upd.put("actCnts", actCnts == null ? "" : actCnts);
+            upd.put("fdmtSolutCd", fdmtSolutCd == null ? "" : fdmtSolutCd);
+            upd.put("fdmtSolutCnt", fdmtSolutCnt == null ? "" : fdmtSolutCnt);
+            upd.put("userId", userId);
+            upd.put("pgmId", pgmId);
+            int updated = wb24Mapper.updateIssueComment(upd);
+            if (updated < 1) {
+                throw new IllegalStateException("WBS 조치 자료를 업데이트하지 못했습니다.");
+            }
+        }
+    }
+
+    private String rerenderBizDocHtml(String docId, Map<String, Object> ctx, String userId, String pgmId) {
+        if (docId == null || docId.isEmpty() || ctx == null) {
+            return null;
+        }
+        String bizType = valueOf(ctx.get("bizType"));
+        String div2 = valueOf(ctx.get("todoDiv2CodeId"));
+        String renderedHtml = null;
+        if ("QM01".equals(bizType) && qualityAmSyncAdapter != null) {
+            Map<String, String> syncParam = new HashMap<>();
+            syncParam.put("reqNo", valueOf(ctx.get("reqNo")));
+            syncParam.put("rsltNo", valueOf(ctx.get("rsltNo")));
+            syncParam.put("userId", userId);
+            renderedHtml = qualityAmSyncAdapter.buildHtml(syncParam, div2);
+        } else if ("WB24".equals(bizType) && wbsIssueAmSyncAdapter != null) {
+            Map<String, String> syncParam = new HashMap<>();
+            syncParam.put("issNo", valueOf(ctx.get("issNo")));
+            syncParam.put("userId", userId);
+            renderedHtml = wbsIssueAmSyncAdapter.buildHtml(syncParam, div2);
+        }
+        if (renderedHtml != null && !renderedHtml.isEmpty()) {
+            Map<String, Object> htmlParam = new HashMap<>();
+            htmlParam.put("docId", docId);
+            htmlParam.put("docRenderHtml", renderedHtml);
+            htmlParam.put("userId", userId);
+            htmlParam.put("pgmId", pgmId);
+            am11Mapper.updateDocRenderHtmlById(htmlParam);
+        }
+        return renderedHtml;
+    }
+
+    private static String valueOfRaw(Object obj) {
+        return obj == null ? "" : String.valueOf(obj);
+    }
+
+    private static String strVal(Map<?, ?> map, String key) {
+        if (map == null || key == null) {
+            return "";
+        }
+        Object v = map.get(key);
+        return v == null ? "" : String.valueOf(v);
     }
 
     private void enqueueApprovalNotification(Map<String, Object> notifParam, Map<String, Object> source) {

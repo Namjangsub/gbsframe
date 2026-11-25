@@ -63,19 +63,23 @@ public final class ApprovalLineRules {
         return steps[idxA] == steps[idxB];
     }
 
-    /** 목록 각 위치의 단계 번호. 같은 번호끼리 같은 단계이다. */
+    /** 목록 각 위치의 단계 번호. 같은 번호끼리 같은 단계이다. COOP/REF는 단계 경계를 끊지 않고 별도 음수 ID를 갖는다. */
     private static int[] stepIds(List<? extends Map<String, ?>> lines) {
         int[] ids = new int[lines.size()];
-        int step = -1;
-        String prev = null;
+        int bindingStep = -1;
+        String lastBinding = null;
         for (int i = 0; i < lines.size(); i++) {
             String t = lineType(lines.get(i).get("lineType"));
-            boolean joinsPrevStep = "AGREE".equals(t) && prev != null && isBinding(prev);
-            if (!joinsPrevStep) {
-                step++;
+            if (isNonBinding(t) && !"POST".equals(t)) {
+                ids[i] = -1 - i;
+                continue;
             }
-            ids[i] = step;
-            prev = t;
+            boolean joinsPrevStep = "AGREE".equals(t) && lastBinding != null && isBinding(lastBinding);
+            if (!joinsPrevStep) {
+                bindingStep++;
+            }
+            ids[i] = bindingStep;
+            lastBinding = t;
         }
         return ids;
     }

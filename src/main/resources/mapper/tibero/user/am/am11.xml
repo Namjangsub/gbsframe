@@ -114,6 +114,12 @@
                D.ARBIT_YN,
                D.WB20_TODO_KEY, D.WB20_CO_CD, D.WB20_TODO_NO, D.WB20_SANCTN_SN,
                D.WB20_DIV1_CODE_ID, D.WB20_DIV2_CODE_ID,
+               (SELECT MAX(W.ETC_FIELD1)
+                  FROM TB_WB20M03 W
+                 WHERE W.TODO_NO = D.WB20_TODO_NO
+                   AND W.TODO_DIV2_CODE_ID = D.WB20_DIV2_CODE_ID
+                   AND W.TODO_ID = D.APPROVER_ID
+                   AND NVL(TRIM(W.ETC_FIELD3), 'X') != 'DEL') AS ACT_MH,
                D.CREAT_ID,
                D.CREAT_PGM,
                TO_CHAR(D.CREAT_DTTM, 'YYYY-MM-DD HH24:MI:SS') AS CREAT_DTTM,
@@ -666,6 +672,8 @@
         SELECT U.ID AS USER_ID,
                U.NAME AS USER_NM,
                U.DEPT_ID,
+               U.VIEW_DEPT_ID,
+               U.TEAM_MANAGER,
                D.DEPT_NM,
                U.LEVEL_CD,
                L.LEVEL_NM,
@@ -1034,6 +1042,21 @@
                UDT_PGM      = 'AM_POST_PROCESSOR',
                UDT_DTTM     = SYSTIMESTAMP
          WHERE TODO_NO      = #{erpBizKey}
+    </update>
+
+    <!-- 협조(COOP) 비구속 확인: 해당 결재행만 완료 기록(업무 상태 전진 없음) -->
+    <update id="updateWb20CoopLineConfirmed" parameterType="Map">
+        UPDATE TB_WB20M03
+           SET TODO_CF_DT   = SYSDATE,
+               SANCTN_STTUS = 'Y',
+               TODO_CF_OPN  = #{todoCfOpn, jdbcType=VARCHAR},
+               UDT_ID       = #{userId, jdbcType=VARCHAR},
+               UDT_PGM      = #{pgmId, jdbcType=VARCHAR},
+               UDT_DTTM     = SYSDATE
+         WHERE TODO_KEY          = #{todoKey, jdbcType=NUMERIC}
+           AND SANCTN_SN         = #{sanctnSn, jdbcType=NUMERIC}
+           AND TODO_DIV1_CODE_ID = #{todoDiv1CodeId, jdbcType=VARCHAR}
+           AND TODO_DIV2_CODE_ID = #{todoDiv2CodeId, jdbcType=VARCHAR}
     </update>
 
     <!-- 7. ERP 연계 비즈니스 키(todoNo, todoKey 등)로 AM 전자결재 docId 조회 -->

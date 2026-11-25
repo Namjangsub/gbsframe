@@ -35,10 +35,16 @@ function pm51SequentialNotice(list, colSpan) {
 	// 같은 결재선의 앞 순번 판정은 문서번호+결재구분으로 전체를 다시 조회해서 수행한다.
 	var ownRows = pm51FetchApprovalLine(myRow.todoNo, myRow.todoDiv2CodeId);
 	if (ownRows.length === 0) ownRows = list;
-	$.each(pm51PendingRowsAsc(ownRows, Number(myRow.sanctnSn || 0)), function(idx, row) {
+	var mySn = Number(myRow.sanctnSn || 0);
+	$.each(pm51PendingRowsAsc(ownRows, mySn), function(idx, row) {
+		var sn = Number(row.sanctnSn || 0);
 		// 관리부서(1번 최정민, 2번 이영만)는 병행 결재가 가능하므로,
 		// 2번 결재자(이영만)에게는 1번(최정민) 미결을 차단 사유로 잡지 않는다.
-		if (isMngApprover && Number(myRow.sanctnSn || 0) === 2 && Number(row.sanctnSn || 0) === 1) {
+		if (isMngApprover && mySn === 2 && sn === 1) {
+			return true;
+		}
+		// 같은 병렬 단계(헤드 + 연속 AGREE) 멤버는 상호 차단하지 않는다.
+		if (isWb20SameParallelStep(ownRows, mySn, sn)) {
 			return true;
 		}
 		pendingList.push({ lineNm: isMngApprover ? '관리부서' : '신청부서', row: row });
@@ -86,11 +92,40 @@ function pm51FetchApprovalLine(todoNo, todoDiv2CodeId) {
 	return rows;
 }
 
-// 미결(sanctnSttus!=='Y') 결재행을 순번 오름차순으로 반환. maxSn을 주면 그 순번보다 앞선 행만 대상으로 한다.
+// 동일 병렬 결재 단계(헤드 APPR/AGREE + 연속 AGREE, 중간 COOP/REF 건너뜀) 판정 - 서버 ApprovalLineRules.isSameStep과 동일
+function isWb20SameParallelStep(rows, snA, snB) {
+	if (!rows || !rows.length || !snA || !snB) return false;
+	var sorted = rows.slice().sort(function(a, b) { return Number(a.sanctnSn || 0) - Number(b.sanctnSn || 0); });
+	var bindingStep = -1, lastBinding = null, stepA = -1, stepB = -2;
+	for (var i = 0; i < sorted.length; i++) {
+		var t = $.trim(sorted[i].lineType || '') || 'APPR';
+		if (t === 'REFERENCE') t = 'REF';
+		var sn = Number(sorted[i].sanctnSn || 0);
+		if (t === 'COOP' || t === 'REF') {
+			var skipId = -1 - i;
+			if (stepA < 0 && sn === snA) stepA = skipId;
+			if (stepB < 0 && sn === snB) stepB = skipId;
+			continue;
+		}
+		var isBindPrev = (lastBinding === 'APPR' || lastBinding === 'AGREE');
+		if (!(t === 'AGREE' && lastBinding !== null && isBindPrev)) {
+			bindingStep++;
+		}
+		if (stepA < 0 && sn === snA) stepA = bindingStep;
+		if (stepB < 0 && sn === snB) stepB = bindingStep;
+		lastBinding = t;
+	}
+	return stepA >= 0 && stepA === stepB;
+}
+
+// 미결(sanctnSttus!=='Y') 구속 결재행을 순번 오름차순으로 반환. maxSn을 주면 그 순번보다 앞선 행만 대상으로 한다.
+// 비구속 라인(COOP/POST/REF/REFERENCE)은 선행 차단에 포함하지 않는다.
 function pm51PendingRowsAsc(rows, maxSn) {
 	var pending = [];
 	$.each(rows || [], function(idx, row) {
 		if (row.sanctnSttus == 'Y') return;
+		var lt = $.trim(row.lineType || '') || 'APPR';
+		if (lt === 'COOP' || lt === 'POST' || lt === 'REF' || lt === 'REFERENCE') return;
 		var sn = Number(row.sanctnSn || 0);
 		if (!sn) return;
 		if (maxSn && sn >= maxSn) return;
@@ -286,6 +321,7 @@ function Approval(htmlParam, param, popParam) {
 								//html = html.replace(/@@item1@@/gi, (idx+1));		//순번
 								html = html.replace(/@@item1@@/gi, data.sanctnSn);		//순번
 								html = html.replace(/@@item2@@/gi, data.todoNm);		//결재자명
+								html = html.replace(/@@chatBtn@@/gi, typeof buildTeamsChatBtnHtml === 'function' ? buildTeamsChatBtnHtml(data.todoId, data.todoNm) : '');
 								var todoCfOpn = data.todoCfOpn;
 								if( typeof(todoCfOpn)== "undefined" || todoCfOpn=="" ) todoCfOpn = "";
 								html = html.replace(/@@item4@@/gi, todoCfOpn);		//결재의견
@@ -298,7 +334,7 @@ function Approval(htmlParam, param, popParam) {
 										// 관리부서(TODODIV2191/2201) 결재선에서 1번(최정민)과 2번(이영만)은 병행 결재이므로
 										// 2번 결재자(이영만)도 1번 승인 여부와 관계없이 바로 결재할 수 있다.
 										var isMngLine1or2 = (data.todoDiv2CodeId === "TODODIV2191" || data.todoDiv2CodeId === "TODODIV2201") && (data.sanctnSn == "1" || data.sanctnSn == "2");
-										if( data.sanctnSn == "1" || data.preSttus=="Y" || isMngLine1or2) {
+										if( data.sanctnSn == "1" || data.preSttus=="Y" || typeof(data.preSttus)=="undefined" || isMngLine1or2) {
 											applyBtn = true;
 										}
 									//결재가 1건일 경우
@@ -355,8 +391,9 @@ function Approval(htmlParam, param, popParam) {
 								let editable = false; // 투입공수 입력여부 플래그
 								// 본인결재건이면서 팀장일때
 								if (applyBtn && (data.deptTeamManager === 'TEAM01' || data.teamManager === '평가' || data.teamManager === 'Y') && jwt.userId === data.todoId && ['GUN30', 'GUN40', 'TRN50', 'GUN60', 'GUN70'].includes(jwt.deptId.slice(0, 5))) {
-									if  ((data.todoDiv2CodeId === 'TODODIV2020' && sameTimeResultChk === 'Y')
-											|| (data.todoDiv2CodeId === 'TODODIV2090' || data.todoDiv2CodeId === 'TODODIV2030')){
+									if  ((data.todoDiv2CodeId === 'TODODIV2020' && (sameTimeResultChk === 'Y' || data.sameTimeResult == 'Y') && !['COBTP00','COBTP01','COBTP04','COBTP06','COBTP08','COBTP09'].includes(data.partCd))
+											|| (data.todoDiv2CodeId === 'TODODIV2090')
+											|| (data.todoDiv2CodeId === 'TODODIV2030' && !['COBTP00','COBTP01','COBTP04','COBTP06','COBTP08','COBTP09'].includes(data.partCd))){
 											editable = true;
 									}
 								}
@@ -364,7 +401,7 @@ function Approval(htmlParam, param, popParam) {
 								if (editable) {
 									html = html.replace(
 										/@@item3@@/gi,
-										`<input type="text" name="actMh" class="form-control" value="${gPasIntChk((data.actMh)) || ''}" style='text-align:center; padding-right:5px; height:40px;' comma onkeyup="onlyNumber(this)" required msg="투입공수">
+										`<input type="text" name="actMh" class="form-control" value="${gPasFloatChk((data.actMh)) || ''}" style='text-align:center; padding-right:5px; height:40px;' comma onkeyup="onlyNumber(this)" required msg="투입공수">
 										 <input type="hidden" name="actTeamManager" value="${data.deptTeamManager}">
 										 <input type="hidden" name="requiredMh" value="YES">`
 									);
@@ -372,7 +409,7 @@ function Approval(htmlParam, param, popParam) {
 									// 읽기전용
 									html = html.replace(
 										/@@item3@@/gi,
-										`<input type="text" name="actMh" readonly value="${gPasIntChk((data.actMh)) || ''}" style='text-align:center; padding-right:5px; height:40px;' comma>`
+										`<input type="text" name="actMh" readonly value="${gPasFloatChk((data.actMh)) || ''}" style='text-align:center; padding-right:5px; height:40px;' comma>`
 									);
 								}
 
@@ -447,7 +484,7 @@ function Approval(htmlParam, param, popParam) {
 		var html = `
     		<tr data-dept-id="@@deptId@@" data-todoKey="@@todoKey@@" style="border-bottom:1px solid #dbdbdb;">
     			<td class="appTd">@@item1@@</td>
-    			<td class="appTd">@@bold@@@@item2@@</font></td>
+    			<td class="appTd">@@bold@@@@item2@@</font>@@chatBtn@@</td>
 				<td class="appTd">@@item3@@</td>
     			<td class="appTd" ><textarea class='form-control' rows='2'  name='todoCfOpn' readonly="readonly">@@item4@@</textarea></td>
     			<td class="appTd">@@item5@@</td>
@@ -460,9 +497,10 @@ function Approval(htmlParam, param, popParam) {
 	//승인 ajax
 	this.confirmApproval = function(param) {
 
-		if (this.applyBtn && ((this.param.todoDiv2CodeId === "TODODIV2020") || (this.param.todoDiv2CodeId === "TODODIV2030") || (this.param.todoDiv2CodeId === "TODODIV2090")) && this.param.teamManager == '평가' ) {
-			if ((this.param.todoDiv2CodeId === "TODODIV2020") || (this.param.todoDiv2CodeId === "TODODIV2030")) {
-				if (!['COBTP01', 'COBTP04', 'COBTP06', 'COBTP08', 'COBTP09'].includes($("#partCd").val())) {
+		const isQm2020SameTime = (this.param.todoDiv2CodeId === "TODODIV2020" && (this.param.sameTimeResultChk === 'Y' || $('#popFormQ01 #sameTimeResult').val() === 'Y'));
+		if (this.applyBtn && (isQm2020SameTime || (this.param.todoDiv2CodeId === "TODODIV2030") || (this.param.todoDiv2CodeId === "TODODIV2090")) && this.param.teamManager == '평가' ) {
+			if (isQm2020SameTime || (this.param.todoDiv2CodeId === "TODODIV2030")) {
+				if (!['COBTP00', 'COBTP01', 'COBTP04', 'COBTP06', 'COBTP08', 'COBTP09'].includes($("#partCd").val())) {
 					if (!inputValidation($('.popup_area [required]'))) {
 						return false;
 					}
@@ -486,16 +524,25 @@ function Approval(htmlParam, param, popParam) {
 		let chkFlag = true;
 
 		if (this.applyBtn && this.param.teamManager == '평가') {
-			if (this.param.todoDiv2CodeId === "TODODIV2020" || this.param.todoDiv2CodeId === "TODODIV2030") {
+			const isNormalOrderPart = ['COBTP00', 'COBTP01', 'COBTP04', 'COBTP06', 'COBTP08', 'COBTP09'].includes($("#partCd").val());
+			if (isQm2020SameTime || this.param.todoDiv2CodeId === "TODODIV2030") {
 				if (this.param.todoDiv2CodeId === "TODODIV2020" && typeof ModalApp !== 'undefined' && typeof ModalApp.updateQualityResultComment === 'function') {
 					chkFlag = ModalApp.updateQualityResultComment('결과수정');
 				} else if (typeof updateQualityResultComment === 'function') {
 					chkFlag = updateQualityResultComment('결과수정');
+				} else if (isNormalOrderPart) {
+					chkFlag = true;
 				} else {
+					customAlert("상세화면에서 근본원인 및 예방대책을 입력한 후 결재해 주세요.");
 					chkFlag = false;
 				}
 			} else if (this.param.todoDiv2CodeId === "TODODIV2090") {
-				chkFlag = (typeof updateIssueComment === 'function') ? updateIssueComment('결과수정') : false;
+				if (typeof updateIssueComment === 'function') {
+					chkFlag = updateIssueComment('결과수정');
+				} else {
+					customAlert("상세화면에서 근본원인 및 예방대책을 입력한 후 결재해 주세요.");
+					chkFlag = false;
+				}
 			}
 
 			if (!chkFlag) {
@@ -534,7 +581,7 @@ function Approval(htmlParam, param, popParam) {
 				var $tr = $('tr[data-dept-id="'+ jwt.userId+'"]');
 
 				// 각 항목 추출
-				var actMh = gPasIntChk($tr.find('input[name="actMh"]').val());
+				var actMh = gPasFloatChk($tr.find('input[name="actMh"]').val());
 				var requiredMh = $tr.find('input[name="requiredMh"]').val();
 				var actTeamManager = $tr.find('input[name="actTeamManager"]').val();
 				// var todoCfOpn = $tr.find('textarea[name="todoCfOpn"]').val();
@@ -563,12 +610,13 @@ function Approval(htmlParam, param, popParam) {
 				}
 				var confirmYn = false;
 				//본인 결재의견
-				var todoCfOpn = $("#appLine tr").find("font").closest("tr").find("textarea[name=todoCfOpn]").val();
+				todoCfOpn = ($("#appLine tr").find("font").closest("tr").find("textarea[name=todoCfOpn]").val() ?? todoCfOpn ?? '').trim();
 				//입력값 set
 				var paramMap = {
 						"todoId" 			: jwt.userId
 						, "todoCfOpn" 		: todoCfOpn
 						, "issNo" 			: $('#issNo').val() || this.param.issNo || this.param.todoNo || $('#todoNo').val()
+						, "actMh"			: actMh
 						, "etcField1"		: actMh			//팀장 작업공수 입력용으로 활용 2025.07.22
 						, "actTeamManager"	:  actTeamManager
 						, "reqNo" 			: $('#reqNo').val() || this.param.reqNo || this.param.todoNo || $('#todoNo').val()

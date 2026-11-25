@@ -46,6 +46,20 @@ public interface QM01Mapper {
 
 	List<Map<String, String>> selectApprovalChk(Map<String, String> paramMap);
 
+	String selectDeleteApprovalChk(Map<String, String> paramMap);
+
+	String selectDeleteRespApprovalChk(Map<String, String> paramMap);
+
+	Map<String, String> selectQualityRespMeta(Map<String, String> paramMap);
+
+	int resetReqRsltStatus(Map<String, String> paramMap);
+
+	int deleteWb20ByTodoNo(Map<String, String> paramMap);
+
+	int deleteAmD01ByQmRsltNo(Map<String, String> paramMap);
+
+	int deleteAmM01ByQmRsltNo(Map<String, String> paramMap);
+
 	int insertQualityReq(Map<String, String> paramMap);
 
 	int insertQualityResp(Map<String, String> paramMap);
@@ -59,6 +73,10 @@ public interface QM01Mapper {
 	int updateQualityResultComment(Map<String, String> paramMap);
 
 	int updateQualityResultCobgbComment(Map<String, String> paramMap);
+
+	String selectRsltNoByReqNo(Map<String, String> paramMap);
+
+	int updateWbsIssueSubCdByReqNo(Map<String, String> paramMap);
 
 	int deleteQualityReq(Map<String, String> paramMap);
 
@@ -152,4 +170,11 @@ public interface QM01Mapper {
 
     void deleteWorkReportSharngList(Map<String, String> paramMap);
 
+
+	/* 전자결재(AM) 연동 */
+	String selectAmDocIdByQmBizKey(Map<String, String> paramMap);
+
+	int deleteAmD01ByQmBizKey(Map<String, String> paramMap);
+
+	int deleteAmM01ByQmBizKey(Map<String, String> paramMap);
 }

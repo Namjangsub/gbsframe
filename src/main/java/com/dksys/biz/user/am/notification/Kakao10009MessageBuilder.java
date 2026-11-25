@@ -145,6 +145,13 @@ public class Kakao10009MessageBuilder {
             case "TODODIV2200":
             case "TODODIV2201":
                 return "PM5102";
+            case "TODODIV2020":
+                return "QM0101";
+            case "TODODIV2030":
+                return "QM0102";
+            case "TODODIV2060":
+            case "TODODIV2090":
+                return "WB24";
             default:
                 return null;
         }
@@ -184,8 +191,8 @@ public class Kakao10009MessageBuilder {
         return buttons;
     }
 
-    /** 업무명(#{todoCodeNm}). PM07 은 휴가유형명(vacTypeNm), 없으면 '휴가'. */
-    public String todoCodeName(String erpBizType, String todoDiv2CodeId, String vacTypeNm) {
+    /** 업무명(#{todoCodeNm}). PM07 은 휴가유형명(vacTypeNm), 없으면 '휴가'. WB24 는 pgPath(WB2401P01 계획 / WB2401P11 실적)로 계획·실적 명칭을 가른다. */
+    public String todoCodeName(String erpBizType, String todoDiv2CodeId, String vacTypeNm, String pgPath) {
         if ("PM07".equals(erpBizType)) {
             return vacTypeNm == null || vacTypeNm.trim().isEmpty() ? "휴가" : vacTypeNm.trim();
         }
@@ -200,6 +207,15 @@ public class Kakao10009MessageBuilder {
         }
         if ("CR02".equals(erpBizType)) {
             return "수주목표원가";
+        }
+        if ("WB24".equals(erpBizType)) {
+            boolean isAction = "TODODIV2090".equals(todoDiv2CodeId);
+            if (pgPath != null && pgPath.contains("WB2401P11")) return isAction ? "WBS실적조치" : "WBS실적문제";
+            if (pgPath != null && pgPath.contains("WB2401P01")) return isAction ? "WBS계획조치" : "WBS계획문제";
+            return "결재 문서";
+        }
+        if ("QM01".equals(erpBizType)) {
+            return "TODODIV2030".equals(todoDiv2CodeId) ? "발주 및 출장 결과서" : "발주 및 출장 요청";
         }
         return "결재 문서";
     }

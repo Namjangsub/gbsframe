@@ -325,8 +325,57 @@
 				<div style="font-weight:bold; color:#b25900; margin-bottom:6px;">
 					<i class="fa fa-stamp"></i> 결재 처리 (내 차례)
 				</div>
-				<div class="form-group" style="margin-bottom:8px;">
-					<textarea id="apprOpinion" name="apprOpinion" class="form-control input-sm" rows="3" placeholder="결재 의견 또는 반려 사유를 입력하세요. (반려 시 필수)"></textarea>
+				<div id="bizCoachingArea" style="display:none; margin-bottom:10px; background:#fff; border:1px solid #e6d3a7; border-radius:4px; padding:8px;">
+					<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+						<span style="font-weight:bold; color:#b25900; font-size:12px;">
+							<i class="fa fa-edit"></i> 평가팀장 내용 검토/수정
+						</span>
+						<button type="button" id="btnSaveBizCoaching" class="btn btn-primary btn-xs" onclick="saveBizCoachingComment();">
+							<i class="fa fa-save"></i> 내용 저장
+						</button>
+					</div>
+					<table class="table_input" style="width:100%; font-size:12px;">
+						<colgroup>
+							<col width="16%">
+							<col width="84%">
+						</colgroup>
+						<tbody>
+							<tr>
+								<th id="thBizMeasRst" style="text-align:center;">원인</th>
+								<td>
+									<textarea id="bizMeasRst" name="bizMeasRst" class="form-control input-sm" rows="3" maxlength="2000" style="width:100%;" placeholder="원인 내용을 입력하세요."></textarea>
+								</td>
+							</tr>
+							<tr>
+								<th id="thBizActCnts" style="text-align:center;">결과</th>
+								<td>
+									<textarea id="bizActCnts" name="bizActCnts" class="form-control input-sm" rows="3" maxlength="2000" style="width:100%;" placeholder="결과 내용을 입력하세요."></textarea>
+								</td>
+							</tr>
+							<tr id="bizFdmtSolutRow" style="display:none;">
+								<th id="thBizFdmtSolut" class="hit" style="text-align:center;">근본원인</th>
+								<td style="text-align:left;">
+									<div id="amFdmtSolutContainer" style="display:grid; grid-template-columns:repeat(2, max-content); column-gap:28px; row-gap:4px; padding:4px;"></div>
+								</td>
+							</tr>
+							<tr id="bizFdmtSolutCntRow" style="display:none;">
+								<th id="thBizFdmtSolutCnt" class="hit" style="text-align:center;">근본예방대책</th>
+								<td>
+									<textarea id="bizFdmtSolutCnt" name="bizFdmtSolutCnt" class="form-control input-sm" rows="2" maxlength="500" style="width:100%;" placeholder="근본예방대책(세부실행 대책)을 입력하세요."></textarea>
+								</td>
+							</tr>
+						</tbody>
+					</table>
+				</div>
+				<div style="display:flex; gap:10px; align-items:flex-start; margin-bottom:8px;">
+					<div id="wb24ActMhArea" style="display:none; width:165px; flex:0 0 165px;">
+						<label for="wb24ActMh" style="display:block; margin-bottom:4px; color:#b25900; font-weight:bold; font-size:12px;">* 투입공수 (150 이하)</label>
+						<input type="text" id="wb24ActMh" name="wb24ActMh" class="form-control input-sm" style="width:100%; height:62px; text-align:center; font-size:14px; font-weight:bold;" placeholder="0 ~ 150" oninput="this.value = this.value.replace(/[^0-9.]/g, '').replace(/(\..*)\./g, '$1');">
+					</div>
+					<div style="flex:1 1 auto; min-width:0;">
+						<label id="lblApprOpinion" for="apprOpinion" style="display:none; margin-bottom:4px; color:#555; font-weight:bold; font-size:12px;">결재 의견</label>
+						<textarea id="apprOpinion" name="apprOpinion" class="form-control input-sm" rows="3" placeholder="결재 의견 또는 반려 사유를 입력하세요. (반려 시 필수)"></textarea>
+					</div>
 				</div>
 			</div>
 
@@ -623,18 +672,27 @@
 			"NOTIFY": "통보"
 		};
 
-		// AGREE 연속 라인 감지 (병렬 배지용)
+		// AGREE 병렬 단계 감지 (병렬 배지용, 중간 COOP/REF/REFERENCE는 건너뜀)
 		var agreeRunMap = {};
 		for (var i = 0; i < lineList.length; i++) {
 			if ((lineList[i].lineType || 'APPR') === 'AGREE') {
-				var runLen = 1;
-				for (var j = i + 1; j < lineList.length && (lineList[j].lineType || 'APPR') === 'AGREE'; j++) {
-					runLen++;
+				var agreeIdxs = [i];
+				var lastIdx = i;
+				for (var j = i + 1; j < lineList.length; j++) {
+					var jt = lineList[j].lineType || 'APPR';
+					if (jt === 'AGREE') {
+						agreeIdxs.push(j);
+						lastIdx = j;
+					} else if (jt === 'COOP' || jt === 'REF' || jt === 'REFERENCE') {
+						continue;
+					} else {
+						break;
+					}
 				}
-				for (var k = 0; k < runLen; k++) {
-					agreeRunMap[i + k] = (runLen > 1);
+				for (var k = 0; k < agreeIdxs.length; k++) {
+					agreeRunMap[agreeIdxs[k]] = (agreeIdxs.length > 1);
 				}
-				i += runLen - 1;
+				i = lastIdx;
 			}
 		}
 
@@ -646,9 +704,14 @@
 			else if (stCls === 'REJECTED') stColor = "#d9534f";
 			else if (stCls === 'ARBIT') stColor = "#f0ad4e";
 
-			var nameDisp = line.approverNm;
+			var nameDisp = (typeof formatTeamsChatName === 'function')
+				? formatTeamsChatName(line.approverId, line.approverNm)
+				: (line.approverNm || '');
 			if (line.delegateYn === 'Y' && line.actualUserNm) {
-				nameDisp += ' <small class="text-warning">[' + line.actualUserNm + ' 대결]</small>';
+				var actualDisp = (typeof formatTeamsChatName === 'function')
+					? formatTeamsChatName(line.actualUserId, line.actualUserNm)
+					: line.actualUserNm;
+				nameDisp += ' <small class="text-warning">[' + actualDisp + ' 대결]</small>';
 			}
 
 			var lTypeStr = (line.lineTypeNm && /[가-힣]/.test(line.lineTypeNm)) ? line.lineTypeNm : (lineTypeNmMap[line.lineType] || line.lineTypeNm || line.lineType || "결재");
@@ -684,11 +747,17 @@
 				nodeClasses += ' coop-line';
 			}
 
+			var actMhBadge = '';
+			if (line.actMh !== undefined && line.actMh !== null && String(line.actMh).trim() !== '') {
+				actMhBadge = '<div style="font-size:10px; color:#b25900; font-weight:bold; margin-top:2px;">투입공수: ' + line.actMh + '</div>';
+			}
+
 			var nodeHtml = '<div class="' + nodeClasses + '">'
 				+ '<div class="node-type">(' + line.lineSeq + ') ' + lTypeBadge + '</div>'
 				+ '<div class="node-name">' + nameDisp + '</div>'
 				+ '<div class="node-dept">' + (line.deptNm || '') + ' ' + (line.levelNm || '') + '</div>'
 				+ '<div class="node-status" style="color:' + stColor + ';">' + stNm + '</div>'
+				+ actMhBadge
 				+ (line.apprDt ? '<div style="font-size:9px; color:#aaa;">' + line.apprDt + '</div>' : readBadge)
 				+ '</div>';
 
@@ -816,7 +885,7 @@
 				if (lt === 'APPR' || lt === 'APPROVE') {
 					isMyApprTurn = true;
 					myRejectTurn = true;
-				} else if (lt === 'COOP' || lt === 'REF' || lt === 'REFERENCE') {
+				} else if (lt === 'COOP' || lt === 'POST' || lt === 'REF' || lt === 'REFERENCE') {
 					myNoRejectTurn = true;
 				} else {
 					myRejectTurn = true;
@@ -849,11 +918,11 @@
 					}
 					if (currentStage.length === 0) {
 						currentStage.push(stageLine);
-						if (stageType !== 'AGREE') break;
-					} else if ((currentStage[0].lineType || 'APPR') === 'AGREE' && stageType === 'AGREE') {
+						if (stageType !== 'AGREE' && stageType !== 'APPR' && stageType !== 'APPROVE') break;
+					} else if (stageType === 'AGREE') {
 						currentStage.push(stageLine);
 					} else {
-					break;
+						break;
 					}
 				}
 				$.each(currentStage, function(idx, line) {
@@ -863,7 +932,7 @@
 						if (lt === 'APPR' || lt === 'APPROVE') {
 							isMyApprTurn = true;
 							myRejectTurn = true;
-						} else if (lt === 'COOP' || lt === 'REF' || lt === 'REFERENCE') {
+						} else if (lt === 'COOP' || lt === 'POST' || lt === 'REF' || lt === 'REFERENCE') {
 							myNoRejectTurn = true;
 						} else {
 							myRejectTurn = true;
@@ -886,6 +955,16 @@
 			if (doc.draUserId === jwt.userId || isMyApprTurn || jwt.authCd === 'AUTH001') {
 				$('#btnChangeLine').show();
 			}
+		} else if (doc.docStatus === 'COMPLETED') {
+			// 최종 결재 완료 후에도 미확인 협조(COOP) 라인은 독립적으로 확인 처리 가능
+			$.each(lineList || [], function(idx, line) {
+				var lt = line.lineType || 'APPR';
+				if (lt === 'COOP' && line.lineStatus === 'PENDING'
+						&& (line.approverId === jwt.userId || line.actualUserId === jwt.userId)) {
+					isMyTurn = true;
+					myNoRejectTurn = true;
+				}
+			});
 		}
 
 		if (isMyTurn) {
@@ -893,13 +972,153 @@
 			$('.appr-action-btn').show();
 			if (myNoRejectTurn && !myRejectTurn) {
 				$('#btnReject').hide();
+				$('#btnArbit').hide();
 			}
 			var opinionRequired = String(currentDocDetail.docInfo.pm08TeamManagerOpinionRequired || '').toUpperCase() === 'Y';
 			$('#apprOpinion').toggleClass('team-manager-opinion-required', opinionRequired).attr('placeholder', opinionRequired ? '결재 의견을 입력하세요. (담당팀장 필수)' : '결재 의견 또는 반려 사유를 입력하세요. (반려 시 필수)');
+			var wb24ActMhRequired = String(currentDocDetail.docInfo.wb24ActMhInputRequired || '').toUpperCase() === 'Y' && !(myNoRejectTurn && !myRejectTurn);
+			$('#wb24ActMhArea').toggle(wb24ActMhRequired);
+			$('#lblApprOpinion').toggle(wb24ActMhRequired);
+			if (wb24ActMhRequired) {
+				$('#wb24ActMh').val(currentDocDetail.docInfo.wb24ActMhDefault || '');
+			} else {
+				$('#wb24ActMh').val('');
+			}
+			renderBizCoachingArea(currentDocDetail.docInfo, !(myNoRejectTurn && !myRejectTurn));
 		} else {
 			$('#apprActionArea').hide();
 			$('.appr-action-btn').hide();
+			$('#wb24ActMhArea').hide();
+			$('#lblApprOpinion').hide();
+			renderBizCoachingArea(null, false);
 		}
+	}
+
+	var amFdmtSolutCodeList = null;
+
+	function ensureAmFdmtSolutCodes($container) {
+		if (!amFdmtSolutCodeList) {
+			postAjaxSync("/admin/cm/cm05/selectChildCodeList", { codeKind: "FDMTSOLUT", codeEtc: "" }, null, function(data) {
+				amFdmtSolutCodeList = (data && data.childCodeList) ? data.childCodeList : [];
+			});
+		}
+		$container.empty();
+		$.each(amFdmtSolutCodeList || [], function(idx, item) {
+			var $row = $('<div class="chk-row" style="white-space:nowrap;"></div>');
+			var $label = $('<label style="font-weight:normal; margin:0; cursor:pointer;"></label>');
+			var $chk = $('<input type="checkbox" name="AM_FDMTSOLUT" style="margin-right:4px; vertical-align:middle;">')
+				.val(item.codeId)
+				.attr('data-label', item.codeNm || '');
+			$label.append($chk).append($('<span></span>').text(item.codeNm || ''));
+			$row.append($label);
+			$container.append($row);
+		});
+		// 근본원인 1~4번(인덱스 0~3) 중복불가 단일선택, 5번 이후 독립선택
+		$container.find('input[name="AM_FDMTSOLUT"]').off('change.fdmt').on('change.fdmt', function() {
+			var $this = $(this);
+			if (!$this.is(':checked')) return;
+			var $inputs = $container.find('input[name="AM_FDMTSOLUT"]');
+			var currentIndex = $inputs.index($this);
+			if (currentIndex >= 0 && currentIndex < 4) {
+				$inputs.each(function(idx) {
+					if (idx >= 0 && idx < 4 && idx !== currentIndex) {
+						$(this).prop('checked', false);
+					}
+				});
+			}
+		});
+	}
+
+	function renderBizCoachingArea(doc, canEdit) {
+		var editable = canEdit && doc && String(doc.bizCoachingEditable || '').toUpperCase() === 'Y';
+		$('#bizCoachingArea').toggle(editable);
+		if (!editable) {
+			$('#bizMeasRst, #bizActCnts, #bizFdmtSolutCnt').val('');
+			$('#amFdmtSolutContainer').empty();
+			$('#bizFdmtSolutRow, #bizFdmtSolutCntRow').hide();
+			return;
+		}
+		var data = doc.bizCoachingData || {};
+		var rootRequired = String(doc.bizRootCauseRequired || '').toUpperCase() === 'Y';
+		var isWb24 = String(doc.bizCoachingBizType || doc.erpBizType || '') === 'WB24';
+		$('#thBizMeasRst').text(isWb24 ? '원인(측정결과)' : '원인');
+		$('#thBizActCnts').text(isWb24 ? '결과(조치내용)' : '결과사유');
+		$('#bizMeasRst').val(data.measRst || '');
+		$('#bizActCnts').val(data.actCnts || '');
+		$('#bizFdmtSolutCnt').val(data.fdmtSolutCnt || '');
+		$('#bizFdmtSolutRow, #bizFdmtSolutCntRow').toggle(rootRequired);
+		if (rootRequired) {
+			ensureAmFdmtSolutCodes($('#amFdmtSolutContainer'));
+			var selected = String(data.fdmtSolutCd || '').split(',');
+			$.each(selected, function(idx, code) {
+				var c = $.trim(code);
+				if (c) {
+					$('#amFdmtSolutContainer input[name="AM_FDMTSOLUT"][value="' + c + '"]').prop('checked', true);
+				}
+			});
+		} else {
+			$('#amFdmtSolutContainer').empty();
+		}
+	}
+
+	function collectBizCoachingPayload(validateRequired) {
+		var doc = currentDocDetail && currentDocDetail.docInfo;
+		if (!doc || String(doc.bizCoachingEditable || '').toUpperCase() !== 'Y') {
+			return null;
+		}
+		var rootRequired = String(doc.bizRootCauseRequired || '').toUpperCase() === 'Y';
+		var measRst = $('#bizMeasRst').val() || '';
+		var actCnts = $('#bizActCnts').val() || '';
+		var fdmtSolutCd = $('#amFdmtSolutContainer input[name="AM_FDMTSOLUT"]:checked').map(function() {
+			return this.value;
+		}).get().join(',');
+		var fdmtSolutCnt = ($('#bizFdmtSolutCnt').val() || '').trim();
+
+		if (validateRequired && rootRequired) {
+			if (!fdmtSolutCd) {
+				alert('근본원인을 선택해주세요.');
+				var $firstChk = $('#amFdmtSolutContainer input[name="AM_FDMTSOLUT"]').first();
+				if ($firstChk.length) $firstChk.focus();
+				return false;
+			}
+			if (!fdmtSolutCnt) {
+				alert('근본예방대책을 입력해주세요.');
+				$('#bizFdmtSolutCnt').css('border', '1px solid #d9534f').focus()
+					.off('input.reqErr').on('input.reqErr', function(){ $(this).css('border', ''); });
+				return false;
+			}
+		}
+		return {
+			bizCoachingSubmitted: 'Y',
+			measRst: measRst,
+			actCnts: actCnts,
+			fdmtSolutCd: fdmtSolutCd,
+			fdmtSolutCnt: fdmtSolutCnt
+		};
+	}
+
+	function saveBizCoachingComment() {
+		var payload = collectBizCoachingPayload(true);
+		if (payload === false || payload === null) return;
+		var docId = $('#detailForm').find('#docId').val();
+		var reqParam = $.extend({
+			docId: docId,
+			coCd: currentCoCd || jwt.coCd || "GUN"
+		}, payload);
+		postAjax("/user/am/am12/saveBizCoachingComment", reqParam, null, function(data) {
+			if (data && data.resultCode === '200') {
+				if (data.docRenderHtml) {
+					currentDocDetail.docInfo.docRenderHtml = data.docRenderHtml;
+					$('#viewRenderedHtml').html(cleanVacationRenderHtml(data.docRenderHtml, currentDocDetail.docInfo));
+				}
+				if (data.bizCoachingData) {
+					currentDocDetail.docInfo.bizCoachingData = data.bizCoachingData;
+				}
+				alert(data.resultMessage || "저장되었습니다.");
+			} else {
+				alert((data && data.resultMessage) || "저장에 실패했습니다.");
+			}
+		});
 	}
 
 	// 결재선 동적 변경 관리
@@ -939,6 +1158,7 @@
 
 		// 변경 감지 기준: 영역을 열 때의 잔여 결재선을 원본 스냅샷으로 저장
 		originalChangeLineSnapshot = JSON.stringify(modifiableLineList);
+		$('#changeReason').val('');
 		renderChangeLineTable();
 		$area.slideDown();
 	}
@@ -996,7 +1216,8 @@
 				clearInterval(blindTimer);
 			}
 		}, 200);
-		openSecondModal("/static/html/cmn/modal/userSearch.html", 450, 650, "결재자 검색", paramObj, function(tree) {
+		var opener = (typeof openAutoModal === 'function') ? openAutoModal : openSecondModal;
+		opener("/static/html/cmn/modal/userSearch.html", 450, 650, "결재자 검색", paramObj, function(tree) {
 			if (!tree || typeof tree.get_checked !== 'function') {
 				alert("사용자 검색 결과를 가져오지 못했습니다.");
 				return;
@@ -1031,6 +1252,18 @@
 			});
 			if (exists) {
 				alert("이미 결재선에 추가된 사용자입니다.");
+				return;
+			}
+			var alreadyProcessed = false;
+			$.each((currentDocDetail && currentDocDetail.lineList) || [], function(idx, line) {
+				if (line.approverId === user.approverId
+						&& (line.lineStatus === 'APPROVED' || line.lineStatus === 'REJECTED' || line.lineStatus === 'ARBIT')) {
+					alreadyProcessed = true;
+					return false;
+				}
+			});
+			if (alreadyProcessed) {
+				alert("이미 결재 처리된 결재자는 추가할 수 없습니다.");
 				return;
 			}
 			modifiableLineList.push(user);
@@ -1082,12 +1315,22 @@
 			alert("지정된 잔여 결재선이 없습니다.");
 			return;
 		}
+		var loadedDoc = (currentDocDetail && currentDocDetail.docInfo) ? currentDocDetail.docInfo : {};
+		if (loadedDoc.docStatus === 'REQUEST' || loadedDoc.docStatus === 'PROGRESS') {
+			var hasBinding = $.grep(modifiableLineList, function(item) {
+				var lt = item.lineType || 'APPR';
+				return lt === 'APPR' || lt === 'AGREE';
+			}).length > 0;
+			if (!hasBinding) {
+				alert("진행 중인 결재 문서에는 최소 1명 이상의 결재 또는 합의자가 남아있어야 합니다.");
+				return;
+			}
+		}
 		if (!confirm("결재선을 변경하시겠습니까? (이전 결재선 내역은 스냅샷으로 영구 보존됩니다)")) return;
 
 		var docId = $('#detailForm').find('#docId').val();
-		// 동시성 확인용: 화면이 로드한 시점의 진행정보(현재 결재순번/문서상태)를 함께 전송.
-		// 백엔드가 현재 DB값과 비교해 다르면(그 사이 결재/반려로 진행이 바뀜) 변경을 거부한다.
-		var loadedDoc = (currentDocDetail && currentDocDetail.docInfo) ? currentDocDetail.docInfo : {};
+		// 동시성 확인용: 화면이 로드한 시점의 진행정보(현재 결재순번/문서상태)와 현재 DB가 다르면
+		// (그 사이 다른 사용자가 결재/반려로 진행이 바뀐 것) 결재선 변경을 거부한다.
 		var param = {
 			docId: docId,
 			coCd: currentCoCd || jwt.coCd || "GUN",
@@ -1124,11 +1367,43 @@
 			return;
 		}
 
+		var wb24ActMhRequired = String((currentDocDetail && currentDocDetail.docInfo && currentDocDetail.docInfo.wb24ActMhInputRequired) || '').toUpperCase() === 'Y'
+				&& $('#wb24ActMhArea').is(':visible');
+		var actMhVal = '';
+		if ((actionType === 'APPROVE' || actionType === 'ARBIT') && wb24ActMhRequired) {
+			actMhVal = ($('#wb24ActMh').val() || '').replace(/,/g, '').trim();
+			if (!actMhVal) {
+				alert('팀장은 투입공수를 입력해야 결재를 처리할 수 있습니다.');
+				$('#wb24ActMh').css('border', '1px solid #d9534f').focus()
+					.off('input.reqErr').on('input.reqErr', function(){ $(this).css('border', ''); });
+				return;
+			}
+			var actMhNum = Number(actMhVal);
+			if (isNaN(actMhNum) || actMhNum < 0) {
+				alert('투입공수는 0 이상의 숫자로 입력해주세요.');
+				$('#wb24ActMh').css('border', '1px solid #d9534f').focus()
+					.off('input.reqErr').on('input.reqErr', function(){ $(this).css('border', ''); });
+				return;
+			}
+			if (actMhNum > 150) {
+				alert('투입공수는 150 이하로 입력해주세요.');
+				$('#wb24ActMh').css('border', '1px solid #d9534f').focus()
+					.off('input.reqErr').on('input.reqErr', function(){ $(this).css('border', ''); });
+				return;
+			}
+		}
+
 		if (actionType === 'REJECT' && (!opinion || opinion.trim().length === 0)) {
 			alert("반려 시에는 반드시 반려 사유를 입력해야 합니다.");
 			$('#apprOpinion').css('border', '1px solid #d9534f').focus()
 				.off('input.reqErr').on('input.reqErr', function(){ $(this).css('border', ''); });
 			return;
+		}
+
+		var bizCoachingPayload = null;
+		if (actionType === 'APPROVE' || actionType === 'ARBIT') {
+			bizCoachingPayload = collectBizCoachingPayload(true);
+			if (bizCoachingPayload === false) return;
 		}
 
 		var confirmMsg = "승인하시겠습니까?";
@@ -1151,13 +1426,19 @@
 			userNm: jwt.userNm,
 			apprOpinion: opinion
 		};
+		if (wb24ActMhRequired && actMhVal !== '') {
+			param.actMh = actMhVal;
+		}
+		if (bizCoachingPayload) {
+			$.extend(param, bizCoachingPayload);
+		}
 
 		postAjax(url, param, null, function(data) {
 			if (data && data.resultCode === '200') {
 				alert(data.resultMessage || "처리가 완료되었습니다.");
 				closeApprovalDetailModal("승인완료");
 			} else {
-				alert(data.resultMessage || "오류가 발생하였습니다.");
+				alert((data && (data.resultMessage || data.msg)) || "오류가 발생하였습니다.");
 			}
 		});
 	}
@@ -1216,7 +1497,16 @@
 		var doc = currentDocDetail.docInfo;
 		var srcKey = doc.erpBizKey;
 		var srcCoCd = doc.coCd || jwt.coCd || 'GUN';
-		postAjax("/user/wb/wb20/selectGetApprovalList", { todoNo: srcKey, coCd: srcCoCd }, null, function(res){
+		var srcParam = { todoNo: srcKey, coCd: srcCoCd };
+		if (currentDocDetail && currentDocDetail.lineList && currentDocDetail.lineList.length > 0) {
+			var div2Set = {};
+			$.each(currentDocDetail.lineList, function(idx, item) {
+				if (item && item.wb20Div2CodeId) div2Set[item.wb20Div2CodeId] = true;
+			});
+			var div2Keys = Object.keys(div2Set);
+			if (div2Keys.length > 0) srcParam.todoDiv2CodeIds = div2Keys.join(',');
+		}
+		postAjax("/user/wb/wb20/selectGetApprovalList", srcParam, null, function(res){
 			var rows = res.resultList || [];
 			var line = null;
 			for (var i=0;i<rows.length;i++){

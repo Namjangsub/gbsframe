@@ -15,7 +15,9 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartHttpServletRequest;
 
 import com.dksys.biz.admin.cm.cm08.service.CM08Svc;
+import com.dksys.biz.admin.cm.cm06.mapper.CM06Mapper;
 import com.dksys.biz.admin.cm.cm15.service.CM15Svc;
+import com.dksys.biz.user.am.sync.ErpAmSyncHelper;
 import com.dksys.biz.user.dw.dw03.mapper.DW03Mapper;
 import com.dksys.biz.user.qm.qm01.mapper.QM01Mapper;
 import com.dksys.biz.user.qm.qm01.service.QM01Svc;
@@ -46,6 +48,15 @@ public class QM01SvcImpl implements QM01Svc {
 
   @Autowired
   DW03Mapper dw03Mapper;
+
+  @Autowired
+  ErpAmSyncHelper erpAmSyncHelper;
+
+  @Autowired
+  QualityAmSyncAdapter qualityAmSyncAdapter;
+
+  @Autowired
+  CM06Mapper cm06Mapper;
   
   @Override
   public int selectQualityReqCount(Map<String, String> paramMap) {
@@ -201,7 +212,7 @@ public class QM01SvcImpl implements QM01Svc {
          * 2025.01.21 남장섭 수정 시작 - 요인별발주요청서 작성과 결과등록 처리 기능을 하나로 합침 - 아래는 요인별 발주요청서 결과등록 처리하는 로직을 복사함
          **********************************************************************************/
         String procType = paramMap.get("sameTimeResult"); // 결과 분리여부
-        if (procType.equals("Y")) {
+        if ("Y".equals(procType)) {
 
 			String fdmtSolutCd = paramMap.get("FDMTSOLUT");
 			paramMap.put("fdmtSolutCd", fdmtSolutCd);		// 선택된 근본대책 추가 (FDMTSOLUT=FDMTSOLUT01,FDMTSOLUT02,FDMTSOLUT03..)
@@ -250,6 +261,10 @@ public class QM01SvcImpl implements QM01Svc {
         if (paramMap.containsKey("approvalArr")) {
             // 결제라인 insert
             result += wb20Svc.insertTodoMaster(paramMap);
+            fillAmApplicant(paramMap, "regId");
+            erpAmSyncHelper.sync(qualityAmSyncAdapter, paramMap, "TODODIV2020");
+        } else {
+            erpAmSyncHelper.rerenderDocHtml(qualityAmSyncAdapter, paramMap, "TODODIV2020");
         }
         // ---------------------------------------------------------------
         // 결재라인 처리 end
@@ -302,6 +317,10 @@ public class QM01SvcImpl implements QM01Svc {
 	if( paramMap.containsKey("approvalArr") ) {	
         		//결제라인 insert
         		result += wb20Svc.insertTodoMaster(paramMap);	
+			fillAmApplicant(paramMap, "resRegId");
+			erpAmSyncHelper.sync(qualityAmSyncAdapter, paramMap, "TODODIV2030");
+	} else {
+			erpAmSyncHelper.rerenderDocHtml(qualityAmSyncAdapter, paramMap, "TODODIV2030");
 	}		
 	//---------------------------------------------------------------  
 	// 결재라인 처리 end
@@ -332,14 +351,35 @@ public class QM01SvcImpl implements QM01Svc {
 		int result = 0;
 		String fdmtSolutCd = paramMap.get("FDMTSOLUT");
 		String cobgbCode = paramMap.get("CODECOBGB");
-		String midCd = cobgbCode.substring(0, 7);
 
+		if (fdmtSolutCd != null && fdmtSolutCd.length() > 50) {
+			fdmtSolutCd = fdmtSolutCd.substring(0, 50);
+		}
 		paramMap.put("fdmtSolutCd", fdmtSolutCd);		// 선택된 근본대책 추가 (FDMTSOLUT=FDMTSOLUT01,FDMTSOLUT02,FDMTSOLUT03..)
-		paramMap.put("midCd", midCd);
-		paramMap.put("subCd", cobgbCode);
-		
-		result += QM01Mapper.updateQualityResultComment(paramMap);
-		result += QM01Mapper.updateQualityResultCobgbComment(paramMap);
+		if (cobgbCode != null && cobgbCode.length() >= 7) {
+			paramMap.put("midCd", cobgbCode.substring(0, 7));
+			paramMap.put("subCd", cobgbCode);
+		}
+
+		String rsltNo = paramMap.get("rsltNo");
+		if ((rsltNo == null || rsltNo.trim().isEmpty()) && paramMap.get("reqNo") != null && !paramMap.get("reqNo").trim().isEmpty()) {
+			rsltNo = QM01Mapper.selectRsltNoByReqNo(paramMap);
+			if (rsltNo != null && !rsltNo.trim().isEmpty()) {
+				paramMap.put("rsltNo", rsltNo);
+			}
+		}
+		if (rsltNo != null && !rsltNo.trim().isEmpty()) {
+			result += QM01Mapper.updateQualityResultComment(paramMap);
+		}
+		if (cobgbCode != null && cobgbCode.length() >= 7) {
+			result += QM01Mapper.updateQualityResultCobgbComment(paramMap);
+			result += QM01Mapper.updateWbsIssueSubCdByReqNo(paramMap);
+		}
+
+		if (result > 0) {
+			erpAmSyncHelper.rerenderDocHtml(qualityAmSyncAdapter, paramMap, "TODODIV2030");
+			erpAmSyncHelper.rerenderDocHtml(qualityAmSyncAdapter, paramMap, "TODODIV2020");
+		}
 
 		return result;
 	}
@@ -581,6 +621,11 @@ public class QM01SvcImpl implements QM01Svc {
 		// 결재라인 처리 end
 		//---------------------------------------------------------------
 		
+		if (paramMap.containsKey("approvalArr")) {
+			fillAmApplicant(paramMap, "regId");
+			erpAmSyncHelper.sync(qualityAmSyncAdapter, paramMap, "TODODIV2020");
+		}
+
 	    return rtnMap;
   }
   
@@ -635,6 +680,8 @@ public class QM01SvcImpl implements QM01Svc {
 		if( paramMap.containsKey("approvalArr") ) {	
 	        		//결제라인 insert
 	        		result += wb20Svc.insertTodoMaster(paramMap);	
+			fillAmApplicant(paramMap, "resRegId");
+			erpAmSyncHelper.sync(qualityAmSyncAdapter, paramMap, "TODODIV2030");
 		}		
 		//---------------------------------------------------------------  
 		// 결재라인 처리 end
@@ -666,6 +713,10 @@ public class QM01SvcImpl implements QM01Svc {
 		//첨부 화일 권한체크 끝 
 		//---------------------------------------------------------------  
 
+        // 결재 진행여부 최종 점검 (작업자 본인 결재 무시, 타인 결재 완료 건 존재 시 삭제 불가)
+        if ("Y".equals(QM01Mapper.selectDeleteApprovalChk(paramMap))) {
+            throw new RuntimeException("결재 진행중인 자료는 삭제할 수 없습니다.\n\n결재 진행 상태 확인 바랍니다.");
+        }
 
         // 1. 발주요청서 자료 삭제
 	  	int result = QM01Mapper.deleteQualityReq(paramMap);
@@ -709,6 +760,9 @@ public class QM01SvcImpl implements QM01Svc {
                 QM01Mapper.deleteWbsSharngList(paramApproval);
             }
         }
+        // 전자결재(AM) 문서 정리: 요청/결과 ERP 업무키 기준 삭제 (WB20 행 삭제 이후)
+        erpAmSyncHelper.deleteAmDocs(qualityAmSyncAdapter, paramMap);
+
         // **************************************************************************************
         // 여기까지 발주요청 결과자료 삭제처리 끝입니다. --아래 7번 첨부파일 삭제 까지 처리되어야 합니다.
         // **************************************************************************************
@@ -750,6 +804,77 @@ public class QM01SvcImpl implements QM01Svc {
 		}
 	    return result;
   }
+
+  @Override
+  public int deleteQualityResp(Map<String, String> paramMap) throws Exception {
+		String rsltNo = paramMap != null ? paramMap.get("rsltNo") : null;
+		if (rsltNo == null || rsltNo.trim().isEmpty()) {
+			throw new RuntimeException("삭제할 결과번호(rsltNo)가 없습니다.");
+		}
+
+		// 1. 실시간 DB 상태 재조회 (Final Pre-Check)
+		Map<String, String> meta = QM01Mapper.selectQualityRespMeta(paramMap);
+		if (meta == null || meta.isEmpty()) {
+			throw new RuntimeException("이미 삭제되었거나 존재하지 않는 결과 자료입니다.");
+		}
+		if ("Y".equals(meta.get("sameTimeResult"))) {
+			throw new RuntimeException("요청·결과 일괄등록 자료는 결과만 단독 삭제할 수 없습니다.\n요청서 삭제를 이용해 주세요.");
+		}
+
+		// 2. 결과 결재 진행여부 최종 점검 (작업자 본인 결재 무시, 타인 결재 완료 건 존재 시 삭제 불가)
+		if ("Y".equals(QM01Mapper.selectDeleteRespApprovalChk(paramMap))) {
+			throw new RuntimeException("결과 결재가 진행중인 자료는 삭제할 수 없습니다.\n\n결재 진행 상태 확인 바랍니다.");
+		}
+
+		String reqNo = meta.get("reqNo");
+		String fileTrgtKey = meta.get("fileTrgtKey") != null ? String.valueOf(meta.get("fileTrgtKey")) : paramMap.get("fileTrgtKey");
+		String coCd = meta.get("coCd") != null ? meta.get("coCd") : paramMap.get("coCd");
+
+		// 3. 결과 첨부파일 삭제 권한 체크 (FILE_TRGT_TYP = 'QM0101P03'만 대상)
+		List<Map<String, String>> deleteFileList = new ArrayList<>();
+		if (fileTrgtKey != null && !fileTrgtKey.trim().isEmpty()) {
+			HashMap<String, String> paramResultFile = new HashMap<>();
+			paramResultFile.put("fileTrgtTyp", "QM0101P03");
+			paramResultFile.put("fileTrgtKey", fileTrgtKey);
+			deleteFileList = cm08Svc.selectFileListAll(paramResultFile);
+			if (deleteFileList.size() > 0) {
+				HashMap<String, String> authParam = new HashMap<>();
+				authParam.put("jobType", "fileDelete");
+				authParam.put("coCd", coCd);
+				authParam.put("userId", paramMap.get("userId"));
+				for (Map<String, String> dtl : deleteFileList) {
+					authParam.put("comonCd", dtl.get("comonCd"));
+					cm15Svc.selectFileAuthCheck(authParam);
+				}
+			}
+		}
+
+		// 4. 결과 마스터(TB_QM01P01) 삭제
+		int result = QM01Mapper.deleteQualityResp(paramMap);
+
+		// 5. 요청서(TB_QM01M01) 결과등록여부 및 진행상태 원복 (REQST03 -> REQST02 or REQST01)
+		if (reqNo != null && !reqNo.trim().isEmpty()) {
+			HashMap<String, String> resetParam = new HashMap<>();
+			resetParam.put("reqNo", reqNo);
+			resetParam.put("restoreReqSt", "Y".equals(meta.get("reqApprovedYn")) ? "REQST02" : "REQST01");
+			resetParam.put("userId", paramMap.get("userId"));
+			resetParam.put("pgmId", paramMap.get("pgmId"));
+			QM01Mapper.resetReqRsltStatus(resetParam);
+		}
+
+		// 6. 결과 결재/공유선(TB_WB20M03, TODO_NO = #{rsltNo}) 및 결과 AM 문서(ERP_BIZ_KEY = #{rsltNo})만 삭제
+		QM01Mapper.deleteWb20ByTodoNo(paramMap);
+		QM01Mapper.deleteAmD01ByQmRsltNo(paramMap);
+		QM01Mapper.deleteAmM01ByQmRsltNo(paramMap);
+
+		// 7. 결과 첨부파일(QM0101P03) 삭제 (요청서 QM0101P01 파일은 유지)
+		for (Map<String, String> deleteDtl : deleteFileList) {
+			String fileKey = String.valueOf(deleteDtl.get("fileKey"));
+			cm08Svc.deleteFile(fileKey);
+		}
+
+		return result;
+  }
   
   
   @Override
@@ -770,6 +895,16 @@ public class QM01SvcImpl implements QM01Svc {
   @Override
   public List<Map<String, String>> selectApprovalChk(Map<String, String> paramMap) {
 		return QM01Mapper.selectApprovalChk(paramMap);
+  }
+
+  @Override
+  public String selectDeleteApprovalChk(Map<String, String> paramMap) {
+		return QM01Mapper.selectDeleteApprovalChk(paramMap);
+  }
+
+  @Override
+  public String selectDeleteRespApprovalChk(Map<String, String> paramMap) {
+		return QM01Mapper.selectDeleteRespApprovalChk(paramMap);
   }
   
   @Override
@@ -842,4 +977,20 @@ public class QM01SvcImpl implements QM01Svc {
     return QM01Mapper.nonOrderStatusList(paramMap);
   }
   
+  private void fillAmApplicant(Map<String, String> paramMap, String idKey) {
+    String applicantId = paramMap.get(idKey);
+    if (applicantId == null || applicantId.trim().isEmpty()) {
+      applicantId = paramMap.get("userId");
+    }
+    if (paramMap.get("reqId") == null || paramMap.get("reqId").trim().isEmpty()) {
+      paramMap.put("reqId", applicantId);
+    }
+    if ((paramMap.get("reqNm") == null || paramMap.get("reqNm").trim().isEmpty()) && applicantId != null && !applicantId.trim().isEmpty()) {
+      Map<String, String> userParam = new HashMap<>();
+      userParam.put("userId", applicantId);
+      Map<String, String> userInfo = cm06Mapper.selectUserInfo(userParam);
+      paramMap.put("reqNm", userInfo != null && userInfo.get("name") != null ? userInfo.get("name") : applicantId);
+    }
+  }
+
 }

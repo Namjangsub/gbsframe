@@ -181,6 +181,38 @@
 		</div>
 	</div>
 
+	<!-- QM01/WB24 평가팀장 내용 검토/수정 카드 (필요 시에만 표출) -->
+	<div class="m-card" id="mBizCoachingArea" style="display:none; background:#fffcf5; border-color:#f0ad4e;">
+		<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; border-bottom:1px solid #f0e1c2; padding-bottom:6px;">
+			<span style="font-size:13px; font-weight:bold; color:#b25900;"><i class="fa fa-edit"></i> 평가팀장 내용 검토/수정</span>
+			<button type="button" id="mBtnSaveBizCoaching" class="btn btn-primary btn-xs" onclick="saveMobileBizCoachingComment();">
+				<i class="fa fa-save"></i> 내용 저장
+			</button>
+		</div>
+		<div class="form-group" style="margin-bottom:8px;">
+			<label id="mLblBizMeasRst" for="mBizMeasRst" style="font-size:12px; color:#333; margin-bottom:4px;">원인</label>
+			<textarea id="mBizMeasRst" class="form-control" rows="3" maxlength="2000" placeholder="원인 내용을 입력하세요."></textarea>
+		</div>
+		<div class="form-group" style="margin-bottom:8px;">
+			<label id="mLblBizActCnts" for="mBizActCnts" style="font-size:12px; color:#333; margin-bottom:4px;">결과</label>
+			<textarea id="mBizActCnts" class="form-control" rows="3" maxlength="2000" placeholder="결과 내용을 입력하세요."></textarea>
+		</div>
+		<div id="mBizFdmtSolutGroup" class="form-group" style="display:none; margin-bottom:8px;">
+			<label style="font-size:12px; color:#c9302c; font-weight:bold; margin-bottom:4px;">* 근본원인</label>
+			<div id="mAmFdmtSolutContainer" style="display:grid; grid-template-columns:1fr; row-gap:6px; padding:6px 8px; background:#fff; border:1px solid #ddd; border-radius:4px;"></div>
+		</div>
+		<div id="mBizFdmtSolutCntGroup" class="form-group" style="display:none; margin-bottom:4px;">
+			<label for="mBizFdmtSolutCnt" style="font-size:12px; color:#c9302c; font-weight:bold; margin-bottom:4px;">* 근본예방대책</label>
+			<textarea id="mBizFdmtSolutCnt" class="form-control" rows="2" maxlength="500" placeholder="근본예방대책(세부실행 대책)을 입력하세요."></textarea>
+		</div>
+	</div>
+
+	<!-- 담당팀장 투입공수 입력 카드 (필요 시에만 표출) -->
+	<div class="m-card" id="mWb24ActMhArea" style="display:none; background:#fffcf5; border-color:#f0ad4e;">
+		<div class="card-section-tit" style="color:#b25900;"><i class="fa fa-clock"></i> 투입공수 입력 (담당팀장 필수, 150 이하)</div>
+		<input type="text" id="mWb24ActMh" class="form-control" inputmode="decimal" maxlength="10" placeholder="투입공수(시간)를 입력하세요. (예: 1.5)" oninput="this.value = this.value.replace(/[^0-9.]/g, '').replace(/(\..*)\./g, '$1');">
+	</div>
+
 	<!-- 결재 의견 입력 카드 (결재 권한자에게만 표출) -->
 	<div class="m-card" id="mOpinionCard" style="display:none; background:#fffcf5; border-color:#f0ad4e;">
 		<div class="card-section-tit" style="color:#b25900;"><i class="fa fa-pen"></i> 결재 의견 (내 차례)</div>
@@ -230,7 +262,7 @@
 				$('#mDocNo').text(doc.docNo || "-");
 				$('#mDocTitle').text(doc.docTitle || "-");
 				$('#mFormNm').text(doc.formNm || "-");
-				$('#mDrafter').text(doc.draUserNm + " (" + (doc.draDeptNm || '') + " " + (doc.draLevelNm || '') + ")");
+				$('#mDrafter').html((typeof formatTeamsChatName === 'function' ? formatTeamsChatName(doc.draUserId, doc.draUserNm) : (doc.draUserNm || '')) + " (" + (doc.draDeptNm || '') + " " + (doc.draLevelNm || '') + ")");
 				$('#mDraftDt').text(doc.draftDt || "-");
 				$('#mDocStatus').html('<span class="label label-primary">' + (doc.docStatusNm || doc.docStatus) + '</span>');
 
@@ -276,15 +308,23 @@
 						var stCls = line.lineStatus || "READY";
 						var stNm = (line.lineStatusNm && /[가-힣]/.test(line.lineStatusNm)) ? line.lineStatusNm : (lineStatusNmMap[stCls] || lineStatusNmMap[line.lineStatus] || line.lineStatusNm || line.lineStatus || "대기");
 						var lTypeStr = (line.lineTypeNm && /[가-힣]/.test(line.lineTypeNm)) ? line.lineTypeNm : (lineTypeNmMap[line.lineType] || line.lineTypeNm || line.lineType || "결재");
-						var nameDisp = line.approverNm;
+						var nameDisp = (typeof formatTeamsChatName === 'function')
+							? formatTeamsChatName(line.approverId, line.approverNm)
+							: (line.approverNm || '');
 						if (line.delegateYn === 'Y' && line.actualUserNm) {
-							nameDisp += ' <small class="text-warning">[' + line.actualUserNm + ' 대결]</small>';
+							var actualDisp = (typeof formatTeamsChatName === 'function')
+								? formatTeamsChatName(line.actualUserId, line.actualUserNm)
+								: line.actualUserNm;
+							nameDisp += ' <small class="text-warning">[' + actualDisp + ' 대결]</small>';
 						}
+
+						var actMhTxt = (line.actMh !== undefined && line.actMh !== null && String(line.actMh).trim() !== '')
+							? ' <span style="color:#b25900; font-weight:bold; margin-left:4px;">[공수:' + line.actMh + ']</span>' : '';
 
 						var itemHtml = '<div class="line-item ' + stCls + '">'
 							+ '<div>'
 							+ '<span style="font-weight:bold; color:#555; margin-right:6px;">' + line.lineSeq + '. ' + lTypeStr + '</span>'
-							+ '<span>' + nameDisp + ' (' + (line.deptNm || '') + ')</span>'
+							+ '<span>' + nameDisp + ' (' + (line.deptNm || '') + ')' + actMhTxt + '</span>'
 							+ '</div>'
 							+ '<div>'
 							+ '<span class="badge" style="font-size:10px;">' + stNm + '</span>'
@@ -297,7 +337,7 @@
 						var lt = line.lineType || 'APPR';
 						if (!NON_ACTION_TYPES[lt] && line.lineStatus === 'PENDING' && (line.approverId === jwt.userId || line.actualUserId === jwt.userId)) {
 							isMyTurn = true;
-							if (lt === 'COOP' || lt === 'REF' || lt === 'REFERENCE') {
+							if (lt === 'COOP' || lt === 'POST' || lt === 'REF' || lt === 'REFERENCE') {
 								myNoRejectTurn = true;
 							} else {
 								myRejectTurn = true;
@@ -306,13 +346,29 @@
 					});
 				}
 
-				if (isMyTurn && (doc.docStatus === 'REQUEST' || doc.docStatus === 'PROGRESS')) {
+				var canActOnStatus = (doc.docStatus === 'REQUEST' || doc.docStatus === 'PROGRESS' || doc.docStatus === 'POST_PROGRESS')
+					|| (doc.docStatus === 'COMPLETED' && myNoRejectTurn && !myRejectTurn);
+				if (isMyTurn && canActOnStatus) {
 					$('#mOpinionCard').show();
 					$('#mActionBar').show();
 					if (myNoRejectTurn && !myRejectTurn) {
 						$('#mActionBar').find('button:nth-child(2)').hide();
+						$('#mActionBar').find('button:nth-child(3)').hide();
+					} else {
+						$('#mActionBar').find('button').show();
 					}
+					var wb24ActMhRequired = String(doc.wb24ActMhInputRequired || '').toUpperCase() === 'Y' && !(myNoRejectTurn && !myRejectTurn);
+					$('#mWb24ActMhArea').toggle(wb24ActMhRequired);
+					if (wb24ActMhRequired) {
+						$('#mWb24ActMh').val(doc.wb24ActMhDefault || '');
+					} else {
+						$('#mWb24ActMh').val('');
+					}
+					renderMobileBizCoachingArea(doc, !(myNoRejectTurn && !myRejectTurn));
 				} else {
+					$('#mWb24ActMhArea').hide();
+					$('#mWb24ActMh').val('');
+					renderMobileBizCoachingArea(null, false);
 					$('#mOpinionCard').hide();
 					$('#mActionBar').hide();
 				}
@@ -404,8 +460,162 @@
 			}
 		}
 
+		function resolveMobileWb24ActMh() {
+			var docInfo = currentDoc && currentDoc.docInfo ? currentDoc.docInfo : null;
+			if (!docInfo || String(docInfo.wb24ActMhInputRequired || '').toUpperCase() !== 'Y' || !$('#mWb24ActMhArea').is(':visible')) {
+				return null;
+			}
+			var raw = $.trim($('#mWb24ActMh').val());
+			if (!raw) {
+				alert("투입공수를 입력해주세요.");
+				$('#mWb24ActMh').focus();
+				return false;
+			}
+			var val = parseFloat(raw);
+			if (isNaN(val) || val < 0) {
+				alert("투입공수는 0 이상으로 입력해주세요.");
+				$('#mWb24ActMh').focus();
+				return false;
+			}
+			if (val > 150) {
+				alert("투입공수는 150 이하로 입력해주세요.");
+				$('#mWb24ActMh').focus();
+				return false;
+			}
+			return raw;
+		}
+
+		var mAmFdmtSolutCodeList = null;
+
+		function ensureMobileAmFdmtSolutCodes($container) {
+			if (!mAmFdmtSolutCodeList) {
+				postAjaxSync("/admin/cm/cm05/selectChildCodeList", { codeKind: "FDMTSOLUT", codeEtc: "" }, null, function(data) {
+					mAmFdmtSolutCodeList = (data && data.childCodeList) ? data.childCodeList : [];
+				});
+			}
+			$container.empty();
+			$.each(mAmFdmtSolutCodeList || [], function(idx, item) {
+				var $label = $('<label style="font-weight:normal; font-size:12px; margin:0; display:flex; align-items:center; gap:6px; cursor:pointer;"></label>');
+				var $chk = $('<input type="checkbox" name="M_AM_FDMTSOLUT" style="margin:0; width:16px; height:16px;">')
+					.val(item.codeId)
+					.attr('data-label', item.codeNm || '');
+				$label.append($chk).append($('<span></span>').text(item.codeNm || ''));
+				$container.append($label);
+			});
+			// 근본원인 1~4번(인덱스 0~3) 중복불가 단일선택, 5번 이후 독립선택
+			$container.find('input[name="M_AM_FDMTSOLUT"]').off('change.fdmt').on('change.fdmt', function() {
+				var $this = $(this);
+				if (!$this.is(':checked')) return;
+				var $inputs = $container.find('input[name="M_AM_FDMTSOLUT"]');
+				var currentIndex = $inputs.index($this);
+				if (currentIndex >= 0 && currentIndex < 4) {
+					$inputs.each(function(idx) {
+						if (idx >= 0 && idx < 4 && idx !== currentIndex) {
+							$(this).prop('checked', false);
+						}
+					});
+				}
+			});
+		}
+
+		function renderMobileBizCoachingArea(doc, canEdit) {
+			var editable = canEdit && doc && String(doc.bizCoachingEditable || '').toUpperCase() === 'Y';
+			$('#mBizCoachingArea').toggle(editable);
+			if (!editable) {
+				$('#mBizMeasRst, #mBizActCnts, #mBizFdmtSolutCnt').val('');
+				$('#mAmFdmtSolutContainer').empty();
+				$('#mBizFdmtSolutGroup, #mBizFdmtSolutCntGroup').hide();
+				return;
+			}
+			var data = doc.bizCoachingData || {};
+			var rootRequired = String(doc.bizRootCauseRequired || '').toUpperCase() === 'Y';
+			var isWb24 = String(doc.bizCoachingBizType || doc.erpBizType || '') === 'WB24';
+			$('#mLblBizMeasRst').text(isWb24 ? '원인(측정결과)' : '원인');
+			$('#mLblBizActCnts').text(isWb24 ? '결과(조치내용)' : '결과사유');
+			$('#mBizMeasRst').val(data.measRst || '');
+			$('#mBizActCnts').val(data.actCnts || '');
+			$('#mBizFdmtSolutCnt').val(data.fdmtSolutCnt || '');
+			$('#mBizFdmtSolutGroup, #mBizFdmtSolutCntGroup').toggle(rootRequired);
+			if (rootRequired) {
+				ensureMobileAmFdmtSolutCodes($('#mAmFdmtSolutContainer'));
+				var selected = String(data.fdmtSolutCd || '').split(',');
+				$.each(selected, function(idx, code) {
+					var c = $.trim(code);
+					if (c) {
+						$('#mAmFdmtSolutContainer input[name="M_AM_FDMTSOLUT"][value="' + c + '"]').prop('checked', true);
+					}
+				});
+			} else {
+				$('#mAmFdmtSolutContainer').empty();
+			}
+		}
+
+		function collectMobileBizCoachingPayload(validateRequired) {
+			var doc = currentDoc && currentDoc.docInfo;
+			if (!doc || String(doc.bizCoachingEditable || '').toUpperCase() !== 'Y') {
+				return null;
+			}
+			var rootRequired = String(doc.bizRootCauseRequired || '').toUpperCase() === 'Y';
+			var measRst = $('#mBizMeasRst').val() || '';
+			var actCnts = $('#mBizActCnts').val() || '';
+			var fdmtSolutCd = $('#mAmFdmtSolutContainer input[name="M_AM_FDMTSOLUT"]:checked').map(function() {
+				return this.value;
+			}).get().join(',');
+			var fdmtSolutCnt = ($('#mBizFdmtSolutCnt').val() || '').trim();
+
+			if (validateRequired && rootRequired) {
+				if (!fdmtSolutCd) {
+					alert("근본원인을 선택해주세요.");
+					var $firstChk = $('#mAmFdmtSolutContainer input[name="M_AM_FDMTSOLUT"]').first();
+					if ($firstChk.length) $firstChk.focus();
+					return false;
+				}
+				if (!fdmtSolutCnt) {
+					alert("근본예방대책을 입력해주세요.");
+					$('#mBizFdmtSolutCnt').focus();
+					return false;
+				}
+			}
+			return {
+				bizCoachingSubmitted: 'Y',
+				measRst: measRst,
+				actCnts: actCnts,
+				fdmtSolutCd: fdmtSolutCd,
+				fdmtSolutCnt: fdmtSolutCnt
+			};
+		}
+
+		function saveMobileBizCoachingComment() {
+			var payload = collectMobileBizCoachingPayload(true);
+			if (payload === false || payload === null) return;
+			var reqParam = $.extend({
+				docId: currentDocId,
+				coCd: (currentDoc && currentDoc.docInfo && currentDoc.docInfo.coCd) || jwt.coCd || "GUN"
+			}, payload);
+			postAjax("/user/am/am12/saveBizCoachingComment", reqParam, null, function(data) {
+				if (data && data.resultCode === '200') {
+					if (data.docRenderHtml) {
+						currentDoc.docInfo.docRenderHtml = data.docRenderHtml;
+						$('#mRenderedHtml').html(cleanVacationRenderHtml(data.docRenderHtml, currentDoc.docInfo));
+					}
+					if (data.bizCoachingData) {
+						currentDoc.docInfo.bizCoachingData = data.bizCoachingData;
+					}
+					alert(data.resultMessage || "저장되었습니다.");
+				} else {
+					alert((data && data.resultMessage) || "저장에 실패했습니다.");
+				}
+			});
+		}
+
 		// 모바일 승인 처리
 		function doMobileApprove() {
+			var bizCoachingPayload = collectMobileBizCoachingPayload(true);
+			if (bizCoachingPayload === false) return;
+
+			var actMhVal = resolveMobileWb24ActMh();
+			if (actMhVal === false) return;
+
 			if (!confirm("승인 처리하시겠습니까?")) return;
 
 			var param = {
@@ -414,13 +624,19 @@
 				userNm: jwt.userNm,
 				apprOpinion: $('#mApprOpinion').val() || ""
 			};
+			if (actMhVal !== null) {
+				param.actMh = actMhVal;
+			}
+			if (bizCoachingPayload) {
+				$.extend(param, bizCoachingPayload);
+			}
 
 			postAjax("/user/am/am12/approveDocument", param, null, function(data) {
 				if (data && data.resultCode === '200') {
 					alert(data.resultMessage || "승인 완료되었습니다.");
 					location.href = "/static/mobile/html/user/am/am10/AM1001M01.html";
 				} else {
-					alert(data ? data.resultMessage : "오류가 발생하였습니다.");
+					alert((data && (data.resultMessage || data.msg)) || "오류가 발생하였습니다.");
 				}
 			});
 		}
@@ -455,6 +671,12 @@
 
 		// 모바일 전결 처리
 		function doMobileArbit() {
+			var bizCoachingPayload = collectMobileBizCoachingPayload(true);
+			if (bizCoachingPayload === false) return;
+
+			var actMhVal = resolveMobileWb24ActMh();
+			if (actMhVal === false) return;
+
 			if (!confirm("전결 처리하시겠습니까? (해당 결재라인은 종결 처리됩니다)")) return;
 
 			var param = {
@@ -463,13 +685,19 @@
 				userNm: jwt.userNm,
 				apprOpinion: $('#mApprOpinion').val() || "전결 승인"
 			};
+			if (actMhVal !== null) {
+				param.actMh = actMhVal;
+			}
+			if (bizCoachingPayload) {
+				$.extend(param, bizCoachingPayload);
+			}
 
 			postAjax("/user/am/am12/arbitDocument", param, null, function(data) {
 				if (data && data.resultCode === '200') {
 					alert(data.resultMessage || "전결 처리되었습니다.");
 					location.href = "/static/mobile/html/user/am/am10/AM1001M01.html";
 				} else {
-					alert(data ? data.resultMessage : "오류가 발생하였습니다.");
+					alert((data && (data.resultMessage || data.msg)) || "오류가 발생하였습니다.");
 				}
 			});
 		}

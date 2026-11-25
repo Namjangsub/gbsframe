@@ -38,6 +38,12 @@ public interface WB24Mapper {
 
 	List<Map<String, String>> actChk(Map<String, String> paramMap);
 
+	List<Map<String, String>> selectIssueOtherApprovalChk(Map<String, String> paramMap);
+
+	int selectIssueOther2060ApprovedCnt(Map<String, String> paramMap);
+
+	int updateIssueDrafterSelfApproval(Map<String, String> paramMap);
+
 	List<Map<String, String>> issueResultChk(Map<String, String> paramMap);
 
 	List<Map<String, String>> selectMemberTelNo(Map<String, String> paramMap);
@@ -77,4 +83,38 @@ public interface WB24Mapper {
 	Map<String, String> selectIssueInfo(Map<String, String> paramMap);		// 문제정보를 가지고 발주요청서 등록
 
 	int issueReqExistChk(Map<String, String> paramMap);
+
+	Map<String, String> selectWbsIssueApprovalStatus(Map<String, String> paramMap);
+
+	List<Map<String, String>> selectWbsIssueApprovalLines(Map<String, String> paramMap);
+
+	Map<String, String> selectWbsIssueCreatorInfo(Map<String, String> paramMap);
+
+		Map<String, String> selectIssueActEditorCheck(Map<String, String> paramMap);
+
+		Map<String, Object> selectIssueRefillValues(Map<String, String> paramMap);
+
+		int selectIssueTeamManagerPendingCnt(Map<String, String> paramMap);
+
+		Map<String, String> selectIssueStsActInfo(Map<String, String> paramMap);
+
+		int updateIssueClassification(Map<String, String> paramMap);
+
+		int updateActClassification(Map<String, String> paramMap);
+
+	String selectAmDocIdByIssNo(Map<String, String> paramMap);
+
+	Map<String, String> selectWbsIssueAmInfo(Map<String, String> paramMap);
+
+	int deleteAmD01ByIssNo(Map<String, String> paramMap);
+
+	int deleteAmM01ByIssNo(Map<String, String> paramMap);
+
+	int resetWbsIssueRejectedApprovalLines(Map<String, String> paramMap);
+
+	int syncWbsIssueApprovalCreatDttm(Map<String, String> paramMap);
+
+	int selectIssueStageApprovedCnt(Map<String, String> paramMap);
+
+	int selectIssueStageOtherApprovedCnt(Map<String, String> paramMap);
 }

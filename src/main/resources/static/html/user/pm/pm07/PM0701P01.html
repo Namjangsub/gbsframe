@@ -825,14 +825,30 @@
 
 		var autoList = [];
 		var addedIds = {};
+		var existingLineTypeById = {};
+		if (approvalGridView && approvalGridView.target && approvalGridView.target.list) {
+			$.each(approvalGridView.target.list || [], function(_, row) {
+				if (row && row.gb === "결재") {
+					var uid = String(row.usrNm || row.todoId || '').trim().toLowerCase();
+					var lt = String(row.lineType || '').trim().toUpperCase();
+					if (uid && (lt === "AGREE" || lt === "COOP" || lt === "POST")) {
+						existingLineTypeById[uid] = {
+							lineType: lt,
+							lineTypeNm: row.lineTypeNm || (lt === "COOP" ? "협조" : lt === "AGREE" ? "합의" : "후결")
+						};
+					}
+				}
+			});
+		}
 
 		function pushApprover(u, lineType, lineTypeNm) {
 			if (!u || !u.id) return;
-			var key = String(u.id).toLowerCase();
+			var key = String(u.id).trim().toLowerCase();
 			if (addedIds[key]) return;		// 동일인 중복 결재행 방지
 			addedIds[key] = true;
-			var lType = lineType || "APPR";
-			var lTypeNm = lineTypeNm || (lType === "COOP" ? "협조" : lType === "AGREE" ? "합의" : lType === "POST" ? "후결" : "결재");
+			var preserved = existingLineTypeById[key];
+			var lType = preserved ? preserved.lineType : (lineType || "APPR");
+			var lTypeNm = preserved ? preserved.lineTypeNm : (lineTypeNm || (lType === "COOP" ? "협조" : lType === "AGREE" ? "합의" : lType === "POST" ? "후결" : "결재"));
 			autoList.push({
 				gb    : "결재",
 				usrNm : u.id,
@@ -1048,13 +1064,13 @@
 		var curAppIds = {};
 		$.each(list, function(idx, item) {
 			if (item.gb === "결재") {
-				var uid = item.usrNm || item.todoId || item.empNo;
+				var uid = String(item.usrNm || item.todoId || item.empNo || '').trim().toLowerCase();
 				if (uid) curAppIds[uid] = true;
 			}
 		});
 		list = list.filter(function(item) {
 			if (item.gb === "공유") {
-				var uid = item.usrNm || item.todoId || item.empNo;
+				var uid = String(item.usrNm || item.todoId || item.empNo || '').trim().toLowerCase();
 				return !uid || !curAppIds[uid];
 			}
 			return true;

@@ -6,6 +6,8 @@ import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Controller;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.ui.ModelMap;
@@ -75,6 +77,8 @@ public class WB24Ctr {
 	@PostMapping(value = "/wbsIssueInsert")
     public String wbsIssInsert(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
   		try {
+			putLoginUserId(paramMap);
+			assertWriteLoginUserMatches(paramMap);
   			if (wb24Svc.wbsIssueInsert(paramMap, mRequest) != 0 ) {
   				model.addAttribute("resultCode", 200);
                 model.addAttribute("resultIssNo", paramMap.get("issNo"));
@@ -93,7 +97,9 @@ public class WB24Ctr {
 	@PostMapping(value = "/wbsIssueUpdate")
     public String wbsIssueUpdate(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
   		try {
-  			if (wb24Svc.wbsIssueUpdate(paramMap, mRequest) != 0 ) {
+  			putLoginUserId(paramMap);
+			assertWriteLoginUserMatches(paramMap);
+			if (wb24Svc.wbsIssueUpdate(paramMap, mRequest) != 0 ) {
   				model.addAttribute("resultCode", 200); 
 	  			model.addAttribute("resultMessage", messageUtils.getMessage("update"));
 	  		} else {
@@ -111,6 +117,8 @@ public class WB24Ctr {
 	public String updateIssueComment(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model)
 			throws Exception {
 		try {
+			putLoginUserId(paramMap);
+			assertWriteLoginUserMatches(paramMap);
 			if (wb24Svc.updateIssueComment(paramMap, mRequest) != 0) {
 				model.addAttribute("resultCode", 200);
 				model.addAttribute("resultMessage", messageUtils.getMessage("update"));
@@ -166,7 +174,15 @@ public class WB24Ctr {
 
 	@PostMapping(value = "/select_wb2401p01_Info")
 	public String select_wb2401p01_Info(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		putLoginUserId(paramMap);
 		Map<String, String> result = wb24Svc.select_wb2401p01_Info(paramMap);
+		if (result != null && result.containsKey("issEditAllowedYn") && isLoginUserMismatch(paramMap)) {
+			result.put("issEditAllowedYn", "N");
+		}
+		if (result != null && result.containsKey("issClassEditAllowedYn") && isLoginUserMismatch(paramMap)) {
+			result.put("issClassEditAllowedYn", "N");
+			result.put("issClassEditStage", "");
+		}
 		model.addAttribute("result", result);
 		return "jsonView";
 	}
@@ -177,6 +193,8 @@ public class WB24Ctr {
 	@PutMapping(value = "/wbsIssueDelete")
     public String wbsIssueDelete(@RequestBody Map<String, String> paramMap, ModelMap model) throws Exception {
   		try {
+			putLoginUserId(paramMap);
+			assertWriteLoginUserMatches(paramMap);
   			if (wb24Svc.wbsIssueDelete(paramMap) != 0 ) {
   				model.addAttribute("resultCode", 200); 
 	  			model.addAttribute("resultMessage", messageUtils.getMessage("delete"));
@@ -261,10 +279,34 @@ public class WB24Ctr {
 	// 발생공급업체 Update
 	@PutMapping(value = "/updateVendCd")
 	public String updateVendCd(@RequestBody Map<String, String> param, ModelMap model) {
+		putLoginUserId(param);
 		wb24Svc.updateVendCd(param);
 		model.addAttribute("resultCode", 200);
     	model.addAttribute("resultMessage", messageUtils.getMessage("update"));
 		return "jsonView";
+	}
+
+	private boolean isLoginUserMismatch(Map<String, String> paramMap) {
+		String loginUserId = paramMap.get("loginUserId");
+		if (loginUserId == null || loginUserId.trim().isEmpty()) {
+			return false;
+		}
+		String userId = paramMap.get("userId");
+		return userId == null || !loginUserId.trim().equals(userId.trim());
+	}
+
+	private void assertWriteLoginUserMatches(Map<String, String> paramMap) {
+		if (isLoginUserMismatch(paramMap)) {
+			throw new RuntimeException("로그인 사용자와 요청 사용자가 일치하지 않아 수정할 수 없습니다. 조회만 가능합니다.");
+		}
+	}
+
+	private void putLoginUserId(Map<String, String> paramMap) {
+		Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+		if (auth != null && auth.isAuthenticated() && !"anonymousUser".equals(auth.getPrincipal())
+				&& auth.getName() != null && !auth.getName().trim().isEmpty()) {
+			paramMap.put("loginUserId", auth.getName());
+		}
 	}
 
 	// 문제정보를 가지고 발주요청서 등록

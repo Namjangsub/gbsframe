@@ -1887,13 +1887,35 @@
 		}
 
 		// 기존 그리드의 수동 추가된 결재/공유자는 유지 (자동 추가분만 갱신)
+		// 동일 아이디가 이미 합의(AGREE)/협조(COOP)/후결(POST)로 등록된 경우 강제 추가 시에도 기존 결재구분을 유지한다.
 		// DB에서 재로드된 행에는 auto* 플래그가 없으므로, 자동 행과 같은 ID의 기존 행도 제거 (중복 누적 방지)
-		var autoIds = $.map(autoList, function(r) { return String(r.usrNm || '').toLowerCase(); });
+		var autoIds = $.map(autoList, function(r) { return String(r.usrNm || '').trim().toLowerCase(); });
 		var existingList = gridViewApproval.target.getList() || [];
+		var existingLineTypeById = {};
+		$.each(existingList, function(idx, row) {
+			if (row && row.gb === '결재') {
+				var uid = String(row.usrNm || row.todoId || '').trim().toLowerCase();
+				var lt = String(row.lineType || '').trim().toUpperCase();
+				if (uid && (lt === 'AGREE' || lt === 'COOP' || lt === 'POST')) {
+					existingLineTypeById[uid] = {
+						lineType: lt,
+						lineTypeNm: row.lineTypeNm || (lt === 'AGREE' ? '합의' : lt === 'COOP' ? '협조' : '후결')
+					};
+				}
+			}
+		});
+		$.each(autoList, function(idx, row) {
+			var uid = String(row.usrNm || row.todoId || '').trim().toLowerCase();
+			var preserved = existingLineTypeById[uid];
+			if (preserved) {
+				row.lineType = preserved.lineType;
+				row.lineTypeNm = preserved.lineTypeNm;
+			}
+		});
 		var preservedList = [];
 		$.each(existingList, function(idx, row) {
-			var rowUserId = String(row.usrNm || row.todoId || '').toLowerCase();
-			var oldApplicantId = String(previousReqId || '').toLowerCase();
+			var rowUserId = String(row.usrNm || row.todoId || '').trim().toLowerCase();
+			var oldApplicantId = String(previousReqId || '').trim().toLowerCase();
 			var isPreviousApplicant = oldApplicantId && rowUserId === oldApplicantId;
 			var isAutoTarget = $.inArray(rowUserId, autoIds) > -1;
 			if (row.autoApplicantApproval !== 'Y' && row.autoPmApproval !== 'Y' && !isPreviousApplicant && !isAutoTarget) {
@@ -1940,9 +1962,13 @@
 		if (!popParam || (!isPaymentFlowNow && popParam.actionType !== 'CHG') || !gridViewApprovalMng || !gridViewApprovalMng.target) return;
 		var list = gridViewApprovalMng.target.getList() || [];
 		var registeredIds = {};
-		$.each(list, function(_, row) { registeredIds[row.usrNm || row.todoId] = true; });
+		$.each(list, function(_, row) {
+			var key = String((row && (row.usrNm || row.todoId)) || '').trim().toLowerCase();
+			if (key) registeredIds[key] = true;
+		});
 		$.each(getMngFixedOrderUserIds(), function(_, userId) {
-			if (!registeredIds[userId]) {
+			var key = String(userId || '').trim().toLowerCase();
+			if (key && !registeredIds[key]) {
 				list.push({
 					gb: '결재', usrNm: userId, todoId: userId, name: userId,
 					todoDiv2CodeId: 'TODODIV2191', flag: 'I', autoPayMngApproval: 'Y', coCd: jwt.coCd
@@ -6048,6 +6074,21 @@
 			var userIds = codeEtc.split(',');
 			var defaultList = [];
 			var sanctnSn = 1;
+			var existingMngLineTypeById = {};
+			if (gridViewApprovalMng && gridViewApprovalMng.target && gridViewApprovalMng.target.getList) {
+				$.each(gridViewApprovalMng.target.getList() || [], function(_, row) {
+					if (row && row.gb === '결재') {
+						var uid = String(row.usrNm || row.todoId || '').trim().toLowerCase();
+						var lt = String(row.lineType || '').trim().toUpperCase();
+						if (uid && (lt === 'AGREE' || lt === 'COOP' || lt === 'POST')) {
+							existingMngLineTypeById[uid] = {
+								lineType: lt,
+								lineTypeNm: row.lineTypeNm || (lt === 'AGREE' ? '합의' : lt === 'COOP' ? '협조' : '후결')
+							};
+						}
+					}
+				});
+			}
 
 			$.each(userIds, function(idx, rawId) {
 				var uId = $.trim(rawId);
@@ -6056,6 +6097,7 @@
 				postAjaxSync("/admin/cm/cm06/selectUserInfo", { userId: uId }, null, function(userData) {
 					var user = userData.userInfo;
 					if (user) {
+						var preserved = existingMngLineTypeById[String(user.id || '').trim().toLowerCase()];
 						defaultList.push({
 							gb: "결재",
 							usrNm: user.id,
@@ -6067,6 +6109,8 @@
 							email: user.email || '',
 							todoId: user.id,
 							todoDiv2CodeId: 'TODODIV2191',
+							lineType: preserved ? preserved.lineType : 'APPR',
+							lineTypeNm: preserved ? preserved.lineTypeNm : '결재',
 							sanctnSn: sanctnSn++,
 							sanctnSttus: 'N',
 							flag: 'I',
@@ -6162,20 +6206,22 @@
 	function updateSalesPmInApprovalLine(oldPmId, newPmId, newPmNm) {
 		if (!gridViewApproval || !gridViewApproval.target) return;
 		var list = gridViewApproval.target.getList() || [];
+		var oldPmKey = String(oldPmId || '').trim().toLowerCase();
+		var newPmKey = String(newPmId || '').trim().toLowerCase();
 
-		// 1. 기존 결재선에서 이전 영업 PM 제거
+		// 1. 기존 결재선에서 이전 영업 PM 제거 (새 영업 PM과 동일 아이디면 기존 결재구분 포함 행 유지)
 		var filteredList = list;
-		if (oldPmId) {
+		if (oldPmKey && oldPmKey !== newPmKey) {
 			filteredList = $.grep(list, function(item) {
-				return item.usrNm !== oldPmId;
+				return String((item && (item.usrNm || item.todoId)) || '').trim().toLowerCase() !== oldPmKey;
 			});
 		}
 
-		// 2. 신규 영업 PM 추가
-		if (newPmId) {
+		// 2. 신규 영업 PM 추가 (동일 아이디가 이미 결재/합의/협조 등으로 등록된 경우 기존 행·결재구분 유지)
+		if (newPmKey) {
 			var isAlreadyExists = false;
 			$.each(filteredList, function(idx, item) {
-				if (item.usrNm === newPmId) {
+				if (String((item && (item.usrNm || item.todoId)) || '').trim().toLowerCase() === newPmKey) {
 					isAlreadyExists = true;
 					return false;
 				}

@@ -18,7 +18,7 @@
 		 LEFT OUTER JOIN TB_CM05M01 C7 ON C7.CODE_ID = B.PRDT_GRP
 		 LEFT OUTER JOIN TB_CM06M01 N1 ON N1.ID = T.REG_ID -- AND N1.CO_CD =  T.CO_CD
 		 LEFT OUTER JOIN TB_CM06M01 N2 ON N2.ID = T.ORDRG_ID -- AND N2.CO_CD =  T.CO_CD
-		 LEFT OUTER JOIN TB_CM06M01 N3 ON N3.ID = T.CREAT_ID  --AND N3.CO_CD =  T.CO_CD
+		 LEFT OUTER JOIN TB_CM06M01 N3 ON N3.ID = NVL(P.RES_REQ_ID, P.CREAT_ID)  --결과 등록자(담당자)
 		 LEFT OUTER JOIN TB_BM02M01 CT ON CT.CLNT_CD = SM.ORDRS_CLNT_CD
 		 LEFT OUTER JOIN TB_CM04M01 CM4 ON CM4.DEPT_ID = substr(N2.DEPT_ID,1,5)
 		 LEFT OUTER JOIN TB_WB20M03 CC ON CC.TODO_FILE_TRGT_KEY = T.FILE_TRGT_KEY
@@ -63,12 +63,15 @@
         <if test="cobtbCd !=null and !cobtbCd.equals('')">
           AND T.PART_CD = #{cobtbCd}
         </if>
-        <if test="rsltYn !=null and !rsltYn.equals('')">
-          AND T.RSLT_YN = #{rsltYn}
+        <if test="reqCd !=null and !reqCd.equals('')">
+          AND T.REQ_CD = #{reqCd}
         </if>
-	  	<!-- <if test="clntNm !=null and !clntNm.equals('')">
+        <if test="rsltYn !=null and !rsltYn.equals('')">
+          AND DECODE(P.RSLT_NO, '', 'N', 'Y') = #{rsltYn}
+        </if>
+	  	<if test="clntNm !=null and !clntNm.equals('')">
 	      AND CT.CLNT_NM LIKE '%' || #{clntNm} || '%'
-	    </if> -->
+	    </if>
         <if test="prdtDiv !=null and !prdtDiv.equals('')">
           AND B.PRDT_GRP = #{prdtDiv}
         </if>
@@ -154,11 +157,48 @@
 				  (SELECT FN_CM05M01_CD_TO_NM(T.SCD_STS) FROM DUAL) AS SCD_STS_NM,
 				  T.ISS_NO,
 				  P.ACT_MH,
-		          TO_CHAR(T.ACT_COMP_DTTM, 'YYYY-MM-DD HH24:MI:SS') AS REQ_DT,
+		          TO_CHAR(T.ACT_COMP_DTTM, 'YYYY-MM-DD HH24:MI:SS') AS ACT_COMP_DTTM,
 				  T.ACT_COMP_DGN_FILE_NM,
 				  NVL(P.SAME_TIME_RESULT,'N') 						AS SAME_TIME_RESULT,  --결과동시처리여부
 				  P.FDMT_SOLUT_CD						AS ACT_FDMT_SOLUT_CD,
 				  get_code_names(P.FDMT_SOLUT_CD) 		AS ACT_FDMT_SOLUT_NM,
+				  P.MEAS_RST							AS MEAS_RST,
+				  FN_CM05M01_CD_TO_NM(T.REQ_CD)			AS REQ_CD_NM,
+				  FN_CM05M01_CD_TO_NM(T.MC_PART_CD)		AS MC_PART_NM,
+				  FN_CM05M01_CD_TO_NM(T.IMPORTANT_CD)	AS IMPORTANT_NM,
+				  FN_CM05M01_CD_TO_NM(T.IMPACT_CD)		AS IMPACT_NM,
+				  (SELECT BM.CLNT_NM
+				     FROM TB_WB24M02 WB
+				     LEFT OUTER JOIN TB_BM02M01 BM ON BM.CLNT_CD = WB.VEND_CD
+				    WHERE WB.ISS_NO = T.ISS_NO
+				      AND ROWNUM = 1)					AS VEND_CD_NM,
+				  (SELECT CASE
+				            WHEN COUNT(*) = 0 THEN '미상신'
+				            WHEN SUM(CASE WHEN NVL(W.APPR_REJECT_YN, 'N') = 'Y' THEN 1 ELSE 0 END) &gt; 0 THEN '반려'
+				            WHEN SUM(CASE WHEN W.SANCTN_STTUS = 'Y' THEN 1 ELSE 0 END) = COUNT(*) THEN '승인완료'
+				            ELSE TO_CHAR(SUM(CASE WHEN W.SANCTN_STTUS = 'Y' THEN 1 ELSE 0 END)) || '/' || TO_CHAR(COUNT(*)) || ' 진행'
+				          END
+				     FROM TB_WB20M03 W
+				    WHERE W.TODO_NO = T.REQ_NO
+				      AND W.TODO_DIV1_CODE_ID = 'TODODIV20'
+				      AND NVL(TRIM(W.ETC_FIELD3), 'X') != 'DEL'
+				      AND NVL(W.LINE_TYPE, 'APPR') NOT IN ('COOP', 'POST')
+				  )										AS REQ_APPR_STS,
+				  CASE
+				    WHEN P.RSLT_NO IS NULL THEN ''
+				    WHEN NVL(P.SAME_TIME_RESULT, 'N') = 'Y' THEN '일괄승인'
+				    ELSE (SELECT CASE
+				                   WHEN COUNT(*) = 0 THEN '미상신'
+				                   WHEN SUM(CASE WHEN NVL(W.APPR_REJECT_YN, 'N') = 'Y' THEN 1 ELSE 0 END) &gt; 0 THEN '반려'
+				                   WHEN SUM(CASE WHEN W.SANCTN_STTUS = 'Y' THEN 1 ELSE 0 END) = COUNT(*) THEN '승인완료'
+				                   ELSE TO_CHAR(SUM(CASE WHEN W.SANCTN_STTUS = 'Y' THEN 1 ELSE 0 END)) || '/' || TO_CHAR(COUNT(*)) || ' 진행'
+				                 END
+				            FROM TB_WB20M03 W
+				           WHERE W.TODO_NO = P.RSLT_NO
+				             AND W.TODO_DIV1_CODE_ID = 'TODODIV20'
+				             AND NVL(TRIM(W.ETC_FIELD3), 'X') != 'DEL'
+				             AND NVL(W.LINE_TYPE, 'APPR') NOT IN ('COOP', 'POST'))
+				  END									AS RSLT_APPR_STS,
 				  P.SALE_TEAM_MD            		AS SALE_TEAM_MD,			-- 영업공수
 				  P.DSGN_TEAM_MD            		AS DSGN_TEAM_MD,		-- 설계공수
 				  P.MATR_TEAM_MD         			AS MATR_TEAM_MD,			-- 구매공수
@@ -183,7 +223,7 @@
 		 LEFT OUTER JOIN TB_CM05M01 C7 ON C7.CODE_ID = B.PRDT_GRP
 		 LEFT OUTER JOIN TB_CM06M01 N1 ON N1.ID = T.REG_ID -- AND N1.CO_CD =  T.CO_CD
 		 LEFT OUTER JOIN TB_CM06M01 N2 ON N2.ID = T.ORDRG_ID -- AND N2.CO_CD =  T.CO_CD
-		 LEFT OUTER JOIN TB_CM06M01 N3 ON N3.ID = T.CREAT_ID  --AND N3.CO_CD =  T.CO_CD
+		 LEFT OUTER JOIN TB_CM06M01 N3 ON N3.ID = NVL(P.RES_REQ_ID, P.CREAT_ID)  --결과 등록자(담당자)
 		 LEFT OUTER JOIN TB_BM02M01 CT ON CT.CLNT_CD = SM.ORDRS_CLNT_CD
 		 LEFT OUTER JOIN TB_CM04M01 CM4 ON CM4.DEPT_ID = substr(N2.DEPT_ID,1,5)
 		 LEFT OUTER JOIN TB_WB20M03 CC ON CC.TODO_FILE_TRGT_KEY = T.FILE_TRGT_KEY
@@ -228,12 +268,15 @@
         <if test="cobtbCd !=null and !cobtbCd.equals('')">
           AND T.PART_CD = #{cobtbCd}
         </if>
-        <if test="rsltYn !=null and !rsltYn.equals('')">
-          AND T.RSLT_YN = #{rsltYn}
+        <if test="reqCd !=null and !reqCd.equals('')">
+          AND T.REQ_CD = #{reqCd}
         </if>
-	  	<!-- <if test="clntNm !=null and !clntNm.equals('')">
+        <if test="rsltYn !=null and !rsltYn.equals('')">
+          AND DECODE(P.RSLT_NO, '', 'N', 'Y') = #{rsltYn}
+        </if>
+	  	<if test="clntNm !=null and !clntNm.equals('')">
 	      AND CT.CLNT_NM LIKE '%' || #{clntNm} || '%'
-	    </if> -->
+	    </if>
         <if test="prdtDiv !=null and !prdtDiv.equals('')">
           AND B.PRDT_GRP = #{prdtDiv}
         </if>
@@ -354,6 +397,9 @@
                         , FN_CM05M01_CD_TO_NM(QP.IMPORTANT_CD ) 	AS IMPORTANT_CD_RSLT_NM 	--발주요청영향도
                         , FN_CM05M01_CD_TO_NM(QP.IMPACT_CD) 		AS IMPACT_CD_RSLT_NM 	--발주요청중요도
                         , QP.RSLT_NO
+                        , DECODE(QP.RSLT_NO, '', 'N', 'Y') AS RSLT_YN
+                        , NVL(QP.SUB_CD, '') AS RESLT_SUB_CD
+                        , T.REQ_ST
                         , QP.MEAS_RST
                         , QP.RESLT_RST
                         , QP.ACT_MH
@@ -520,6 +566,14 @@
 							 , D.LEVEL_NM AS JIK
 							 , C.TODO_DIV1_CODE_ID AS TODO_DIV1_CODE_ID
 							 , C.TODO_DIV2_CODE_ID AS TODO_DIV2_CODE_ID
+							 , NVL(C.LINE_TYPE, DECODE(C.TODO_DIV1_CODE_ID, 'TODODIV10', 'REF', 'APPR')) AS LINE_TYPE
+							 , CASE
+									WHEN C.LINE_TYPE = 'AGREE' THEN '합의'
+									WHEN C.LINE_TYPE = 'COOP' THEN '협조'
+									WHEN C.LINE_TYPE = 'POST' THEN '후결'
+									WHEN C.LINE_TYPE = 'REF' OR C.TODO_DIV1_CODE_ID = 'TODODIV10' THEN '참조'
+									ELSE '결재'
+							   END AS LINE_TYPE_NM
 							 , DECODE(C.TODO_DIV1_CODE_ID, 'TODODIV10', '공유', 'TODODIV20', '결재', '') AS GB
 							 , TO_CHAR(C.TODO_CF_DT, 'YYYY-MM-DD') AS TODO_CF_DT
 							 , TO_CHAR(C.CREAT_DTTM, 'YYYY-MM-DD') AS REQ_DATE
@@ -755,8 +809,12 @@
 			, RESLT_RST 		= #{resltRst, jdbcType=VARCHAR}
 			, FDMT_SOLUT_CD 	= #{fdmtSolutCd, jdbcType=VARCHAR}
 			, FDMT_SOLUT_CNT 	= #{fdmtSolutCnt, jdbcType=VARCHAR}
+			<if test="midCd != null and midCd != ''">
 			, MID_CD 			= #{midCd, jdbcType=VARCHAR}
+			</if>
+			<if test="subCd != null and subCd != ''">
 			, SUB_CD 			= #{subCd, jdbcType=VARCHAR}
+			</if>
 			, UDT_ID 			= #{userId}
 			, UDT_PGM 			= #{pgmId}
 			, UDT_DTTM 			= SYSDATE
@@ -772,6 +830,23 @@
 			, UDT_PGM 			= #{pgmId}
 			, UDT_DTTM 			= SYSDATE
 		WHERE REQ_NO = #{reqNo}
+	</update>
+
+	<select id="selectRsltNoByReqNo" parameterType="Map" resultType="String">
+		SELECT RSLT_NO
+		  FROM TB_QM01P01
+		 WHERE REQ_NO = #{reqNo}
+		   AND ROWNUM = 1
+	</select>
+
+	<update id="updateWbsIssueSubCdByReqNo" parameterType="Map">
+		UPDATE TB_WB24M02
+		   SET MID_CD   = #{midCd, jdbcType=VARCHAR}
+		     , SUB_CD   = #{subCd, jdbcType=VARCHAR}
+		     , UDT_ID   = #{userId}
+		     , UDT_PGM  = #{pgmId}
+		     , UDT_DTTM = SYSDATE
+		 WHERE ISS_NO = (SELECT ISS_NO FROM TB_QM01M01 WHERE REQ_NO = #{reqNo})
 	</update>
 
 	<update id="updateQualityResp" parameterType="Map">
@@ -968,6 +1043,95 @@
 		   AND TODO_NO = #{reqNo}
 		   AND TODO_DIV1_CODE_ID = 'TODODIV20'
 	</select>
+
+	<!-- 발주요청서 삭제 가능 여부 체크: 작업자 본인(TODO_ID) 결재 제외, 타인 결재 승인 건 존재 시 Y -->
+	<select id="selectDeleteApprovalChk" parameterType="Map" resultType="String">
+		SELECT CASE WHEN COUNT(*) &gt; 0 THEN 'Y' ELSE 'N' END AS SANCTN_STTUS
+		  FROM TB_WB20M03
+		 WHERE 1=1
+		   AND TODO_DIV1_CODE_ID = 'TODODIV20'
+		   AND SANCTN_STTUS = 'Y'
+		   AND NVL(APPR_REJECT_YN, 'N') = 'N'
+		   AND NVL(TRIM(ETC_FIELD3), 'X') != 'DEL'
+		   AND (
+		       TODO_NO = #{reqNo}
+		       <if test="rsltNo != null and !rsltNo.equals('')">
+		       OR TODO_NO = #{rsltNo}
+		       </if>
+		   )
+		   <if test="userId != null and !userId.equals('')">
+		   AND TODO_ID != #{userId}
+		   </if>
+	</select>
+
+	<!-- 결과 단독 삭제 가능 여부 체크: 결과 결재선(TODO_NO=#{rsltNo}) 중 작업자 본인 외 타인 결재 승인 건 존재 시 Y -->
+	<select id="selectDeleteRespApprovalChk" parameterType="Map" resultType="String">
+		SELECT CASE WHEN COUNT(*) &gt; 0 THEN 'Y' ELSE 'N' END AS SANCTN_STTUS
+		  FROM TB_WB20M03
+		 WHERE 1=1
+		   AND TODO_DIV1_CODE_ID = 'TODODIV20'
+		   AND SANCTN_STTUS = 'Y'
+		   AND NVL(APPR_REJECT_YN, 'N') = 'N'
+		   AND NVL(TRIM(ETC_FIELD3), 'X') != 'DEL'
+		   AND TODO_NO = #{rsltNo}
+		   <if test="userId != null and !userId.equals('')">
+		   AND TODO_ID != #{userId}
+		   </if>
+	</select>
+
+	<!-- 결과 단독 삭제 전 실시간 DB 상태 재조회 -->
+	<select id="selectQualityRespMeta" parameterType="Map" resultType="camelMap">
+		SELECT P.RSLT_NO,
+		       P.REQ_NO,
+		       NVL(P.SAME_TIME_RESULT, 'N') AS SAME_TIME_RESULT,
+		       TO_CHAR(M.FILE_TRGT_KEY) AS FILE_TRGT_KEY,
+		       M.CO_CD,
+		       M.REQ_ST,
+		       NVL((SELECT MAX(W.SANCTN_STTUS)
+		              FROM TB_WB20M03 W
+		             WHERE W.TODO_NO = M.REQ_NO
+		               AND W.TODO_DIV1_CODE_ID = 'TODODIV20'
+		               AND NVL(APPR_REJECT_YN, 'N') = 'N'
+		               AND NVL(TRIM(W.ETC_FIELD3), 'X') != 'DEL'), 'N') AS REQ_APPROVED_YN
+		  FROM TB_QM01P01 P
+		  LEFT OUTER JOIN TB_QM01M01 M ON M.REQ_NO = P.REQ_NO
+		 WHERE P.RSLT_NO = #{rsltNo}
+	</select>
+
+	<!-- 결과 단독 삭제 시 요청서 마스터 상태 원복 -->
+	<update id="resetReqRsltStatus" parameterType="Map">
+		UPDATE TB_QM01M01
+		   SET RSLT_YN  = 'N',
+		       REQ_ST   = CASE WHEN REQ_ST = 'REQST03' THEN #{restoreReqSt, jdbcType=VARCHAR} ELSE REQ_ST END,
+		       UDT_ID   = #{userId, jdbcType=VARCHAR},
+		       UDT_PGM  = #{pgmId, jdbcType=VARCHAR},
+		       UDT_DTTM = SYSDATE
+		 WHERE REQ_NO = #{reqNo}
+	</update>
+
+	<!-- 결과 결재/공유선(TODO_NO=#{rsltNo}) 단독 삭제 -->
+	<delete id="deleteWb20ByTodoNo" parameterType="Map">
+		DELETE FROM TB_WB20M03
+		 WHERE TODO_NO = #{rsltNo}
+	</delete>
+
+	<!-- 결과 AM 전자결재 결재선(ERP_BIZ_KEY=#{rsltNo}) 단독 삭제 -->
+	<delete id="deleteAmD01ByQmRsltNo" parameterType="Map">
+		DELETE FROM TB_AM11D01
+		 WHERE DOC_ID IN (
+		       SELECT DOC_ID
+		         FROM TB_AM11M01
+		        WHERE ERP_BIZ_TYPE = 'QM01'
+		          AND ERP_BIZ_KEY = #{rsltNo, jdbcType=VARCHAR}
+		 )
+	</delete>
+
+	<!-- 결과 AM 전자결재 마스터(ERP_BIZ_KEY=#{rsltNo}) 단독 삭제 -->
+	<delete id="deleteAmM01ByQmRsltNo" parameterType="Map">
+		DELETE FROM TB_AM11M01
+		 WHERE ERP_BIZ_TYPE = 'QM01'
+		   AND ERP_BIZ_KEY = #{rsltNo, jdbcType=VARCHAR}
+	</delete>
 
 	<delete id="deleteQualityReq" parameterType="Map">
 		DELETE TB_QM01M01 WHERE FILE_TRGT_KEY = #{fileTrgtKey}
@@ -1182,6 +1346,7 @@
 			UPDATE
 			SET T.ETC_FIELD3 = 'KAKAO'
 			  , T.SANCTN_SN  = #{sanCtnSn, jdbcType=VARCHAR}
+			  , T.LINE_TYPE  = NVL(#{lineType, jdbcType=VARCHAR}, CASE WHEN #{todoDiv1CodeId, jdbcType=VARCHAR} = 'TODODIV10' THEN 'REF' ELSE 'APPR' END)
 		WHEN NOT MATCHED THEN
 			INSERT
 			( T.TODO_KEY
@@ -1201,7 +1366,8 @@
 			, T.CREAT_ID
 			, T.CREAT_PGM
 			, T.CREAT_DTTM
-			, T.TODO_CODE_ID )
+			, T.TODO_CODE_ID
+			, T.LINE_TYPE )
 			VALUES
 			( ( SELECT NVL(MAX(TODO_KEY), 0) + 1 FROM TB_WB20M03 )
 			, #{sanCtnSn, jdbcType=VARCHAR}
@@ -1223,12 +1389,13 @@
 				FROM TB_WB20M03 T
 				WHERE T.TODO_FILE_TRGT_KEY = #{fileTrgtKey}
 				AND T.TODO_NO            = #{reqNo}
-				AND T.CREAT_PGM          = #{pgmId, jdbcType=VARCHAR}
+				AND T.TODO_DIV2_CODE_ID  = #{todoDiv2CodeId, jdbcType=VARCHAR}
 				<if test="histNo != null and !histNo.equals('')" >
 				AND T.ETC_FIELD2         = #{histNo, jdbcType=VARCHAR}
 				</if>
 			)
-			, 'insertWb24SharngList')
+			, 'insertWb24SharngList'
+			, NVL(#{lineType, jdbcType=VARCHAR}, CASE WHEN #{todoDiv1CodeId, jdbcType=VARCHAR} = 'TODODIV10' THEN 'REF' ELSE 'APPR' END))
 	</update>
     
 <!-- insertWb24SharngList 와 기능 중복됨 남장섭, 24,11,06-->
@@ -1847,7 +2014,8 @@
 				       SELECT 1
 				         FROM TB_CM06M01 C
 				        WHERE C.ID  = #{userId}
-		 		  		  AND substr(C.DEPT_ID, 1, 5)	IN ('GUN30', 'GUN40', 'TRN50', 'GUN60', 'GUN70')
+		 		  		  AND (substr(C.DEPT_ID, 1, 5) IN ('GUN30', 'GUN40', 'TRN50', 'GUN60', 'GUN70', 'TRN30', 'GUN50', 'GUN80')
+		 		  		    OR substr(C.VIEW_DEPT_ID, 1, 5) IN ('GUN30', 'GUN40', 'TRN50', 'GUN60', 'GUN70'))
 		   			  )		
 	</update>
 
@@ -1880,7 +2048,8 @@
 				       SELECT 1
 				         FROM TB_CM06M01 C
 				        WHERE C.ID  = #{userId}
-		 		  		  AND substr(C.DEPT_ID, 1, 5)	IN ('GUN30', 'GUN40', 'TRN50', 'GUN60', 'GUN70')
+		 		  		  AND (substr(C.DEPT_ID, 1, 5) IN ('GUN30', 'GUN40', 'TRN50', 'GUN60', 'GUN70', 'TRN30', 'GUN50', 'GUN80')
+		 		  		    OR substr(C.VIEW_DEPT_ID, 1, 5) IN ('GUN30', 'GUN40', 'TRN50', 'GUN60', 'GUN70'))
 		   			  )		
 	</update>
 
@@ -2071,5 +2240,42 @@
 		   SET REQ_NO = ''
 		 WHERE ISS_NO = #{issNo}
 	</update>
+
+	<!-- 전자결재(AM) 연동: ERP 업무키 기준 AM 문서 DOC_ID 조회 (PM08 selectAmDocIdByReqNo 동형) -->
+	<select id="selectAmDocIdByQmBizKey" parameterType="Map" resultType="String">
+		SELECT DOC_ID
+		FROM (
+			SELECT DOC_ID
+			FROM TB_AM11M01
+			WHERE ERP_BIZ_KEY = #{erpBizKey, jdbcType=VARCHAR}
+				AND ERP_BIZ_TYPE = 'QM01'
+				<if test="todoDiv2CodeId != null and todoDiv2CodeId != ''">
+				AND DOC_ID IN (
+					SELECT DOC_ID
+					FROM TB_AM11D01
+					WHERE WB20_DIV2_CODE_ID = #{todoDiv2CodeId, jdbcType=VARCHAR}
+				)
+				</if>
+			ORDER BY TO_NUMBER(DOC_ID) DESC
+		)
+		WHERE ROWNUM = 1
+	</select>
+
+	<!-- 전자결재(AM) 연동 삭제: 요청(reqNo)/결과(rsltNo) ERP 업무키 기준 결재선 삭제 -->
+	<delete id="deleteAmD01ByQmBizKey" parameterType="Map">
+		DELETE FROM TB_AM11D01
+		 WHERE DOC_ID IN (
+			SELECT DOC_ID FROM TB_AM11M01
+			 WHERE ERP_BIZ_TYPE = 'QM01'
+			   AND ERP_BIZ_KEY IN (#{reqNo, jdbcType=VARCHAR}, #{rsltNo, jdbcType=VARCHAR})
+		 )
+	</delete>
+
+	<!-- 전자결재(AM) 연동 삭제: 요청(reqNo)/결과(rsltNo) ERP 업무키 기준 마스터 삭제 -->
+	<delete id="deleteAmM01ByQmBizKey" parameterType="Map">
+		DELETE FROM TB_AM11M01
+		 WHERE ERP_BIZ_TYPE = 'QM01'
+		   AND ERP_BIZ_KEY IN (#{reqNo, jdbcType=VARCHAR}, #{rsltNo, jdbcType=VARCHAR})
+	</delete>
 
 </mapper>

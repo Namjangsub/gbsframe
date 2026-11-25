@@ -273,7 +273,7 @@
 					</tr>
 					<thead>
 						<tr>
-							<td colspan="2" style="height: 30px; text-align: left; font-weight: bold; font-size: 14px;">▣ 문제정보</td>
+							<td colspan="2" style="height: 30px; text-align: left; font-weight: bold; font-size: 14px;">▣ 문제정보<span id="issEditLockMsg" style="display:none;margin-left:10px;font-size:12px;font-weight:normal;color:red;">문제 등록자만 수정할 수 있습니다. 다른 결재자가 승인한 후에는 수정할 수 없습니다.</span></td>
 						</tr>
 					</thead>
 					<tr>
@@ -543,7 +543,10 @@ var actionType = null;
     var wbsRsltseDt = null;
     var approval_Yn = 'N';
     var act_approval_Yn = 'N';
+    var issEditAllowedYn;
+    var issBtnHideYn = 'N';
 	var teamManagerFlag = false;
+	var managerRelationFlag = false;
     const currFormId = "#popForm_SP11";	//현재화면의 Form ID,  poup 화면을 중복으로 Call 할시 필드명 중복으로 구분 안됨
     const currDivId = "#wbsPopupIss";		//현재화면의 Form ID,  poup 화면을 중복으로 Call 할시 필드명 중복으로 구분 안됨
 
@@ -757,6 +760,7 @@ var actionType = null;
 					}
 
                     gridResize2(); //그리드 높이 조정
+                    if (typeof toggleIssActSectionM === 'function') toggleIssActSectionM();
                 } catch (error) {
                     customAlert("오류 발생!! 전산실 연락 바랍니다", error.message);
                     return null; // 오류 발생 시 null 반환
@@ -773,6 +777,7 @@ var actionType = null;
                 }
             });
             gridResize2(); //그리드 높이 조정
+            if (typeof toggleIssActSectionM === 'function') toggleIssActSectionM();
         }
     }
 
@@ -936,10 +941,6 @@ var actionType = null;
     $(document).ready(function() {
 //         actionType = modalStack.last().paramObj.actionType;
         if (actionType == undefined) actionType = "C2";
-    	//결재에서 들어온경우 수정 불가로 수정 버튼 제거함
-    	if (actionType == "I") {
-    		$(currDivId + '  #actionBtn').remove();
-    	}
         coCd = jwt.coCd; //modalStack.last().paramObj.coCd;
         salesCd = ''; //modalStack.last().paramObj.salesCd;
 
@@ -1000,7 +1001,7 @@ var actionType = null;
 
         		$(currFormId + ' #btn_plus2').show();
         		$(currFormId + ' #btn_minus2').show();
-        		if (act_approval_Yn == 'Y') {
+        		if (act_approval_Yn == 'Y' && !(managerRelationFlag && (issEditAllowedYn == 'Y' || issEditAllowedYn === undefined))) {
         			$(currDivId).find('#actionBtn').hide();
         		} else {
         			$(currDivId).find('#actionBtn').show();
@@ -1038,7 +1039,7 @@ var actionType = null;
 				}
 
 				if ($(currFormId + ' #issSts').val() == 'ISSSTS04')	{
-					if (act_approval_Yn == 'Y') {
+					if (act_approval_Yn == 'Y' && !(managerRelationFlag && (issEditAllowedYn == 'Y' || issEditAllowedYn === undefined))) {
 						$(currDivId).find('#actionBtn').hide();
 					} else {
 						$(currDivId).find('#actionBtn').show();
@@ -1048,7 +1049,7 @@ var actionType = null;
 					$(currDivId).find('.issAct').removeClass('no-click');
 
 				} else {
-					if (approval_Yn == 'Y') {
+					if (issBtnHideYn == 'Y') {
 						$(currDivId).find('#actionBtn').hide();
 					} else {
 						$(currDivId).find('#actionBtn').show();
@@ -1061,6 +1062,7 @@ var actionType = null;
 				$(currFormId + ' #btn_plus2').hide();
 				$(currFormId + ' #btn_minus2').hide();
 			}
+			toggleIssActSectionM();
 		})
 
 		$(document).on('input', currFormId + ' #actCompDgnFileNm', function(){
@@ -1230,6 +1232,15 @@ var actionType = null;
             $(currDivId + ' #actionBtn').on("click", function() {
                 insertWbsIssue();
             });
+        } else if (actionType == "I") {
+        	if (issBtnHideYn == 'N') {
+        		$(currDivId + ' #actionBtn').text("수정").show();
+        		$(currDivId + ' #actionBtn').off("click").on("click", function() {
+        			updateWbsIssue();
+        		});
+        	} else {
+        		$(currDivId + ' #actionBtn').remove();
+        	}
         }
 
 
@@ -1303,7 +1314,7 @@ var actionType = null;
 
 
 		// 결재시 수정하면 change 이벤트 적용
-		$(currFormId).on('input paste drop change', '#measRst, #actCnts, #FDMTSOLUT-radioButtonContainer input[type=checkbox], #fdmtSolutCnt, #COBGB-checkboxContainer-P11 input[type=radio]',function() {
+		$(currFormId).on('input paste drop change', '#measRst, #actCnts, #FDMTSOLUT-radioButtonContainer input[type=checkbox], #fdmtSolutCnt, #COBGB-checkboxContainer-P11 input[type=radio], input[type=radio][name="mcPartCd"], input[type=radio][name="importantCd"], input[type=radio][name="impactCd"]',function() {
 			if ($(currDivId + ' #commentBtn').length === 0 && actionType != 'C' && teamManagerFlag && $(currDivId + ' #issSts').val() != 'ISSSTS04') {
 				const callCmdBtn = '<button id="commentBtn">코칭수정</button>';
 				$(currDivId + ' .popup_bottom_btn').first().prepend(callCmdBtn);
@@ -1473,7 +1484,11 @@ var actionType = null;
 		            filePostAjax("/user/wb/wb24/wbsIssueUpdate", formData, function(data) {
 		                customAlert(data.resultMessage);
 		                if (data.resultCode == 200) {
-		                    kakaoTodo();
+		                    var curIssSts = $(currFormId + ' #issSts').val();
+		                    var skipKakao = (curIssSts != 'ISSSTS03' && approvalYn() > 0) || (curIssSts == 'ISSSTS03' && approvalYn2() > 0);
+		                    if (!skipKakao) {
+		                        kakaoTodo();
+		                    }
 	                    	if (typeof gridView !== "undefined") gridView.setData(0);
 	                    	if (typeof gridView2 !== "undefined") gridView2.setData(0);
 	                    	if (typeof salesGridView !== "undefined") salesGridView.setData(0);
@@ -1548,8 +1563,10 @@ var actionType = null;
 		//2. 조치담당자 팀장 결재 자동등록 처리하기
 		//3. 문제 등록자 담당팀장 결재 자동 등록 처리하기
 
-		// ($("#issSts").val() == 'ISSSTS04') 진행상태일때는 결재자에 추가하지 않음
-		if ($(currFormId + ' #issSts').val() != "ISSSTS04") {
+		// ($("#issSts").val() == 'ISSSTS04') 진행상태이거나 이미 타인 결재가 진행된 상태에서는 결재선을 재조합하지 않음
+		var curIssStsForAppr = $(currFormId + ' #issSts').val();
+		var hasExistingOtherAppr = (curIssStsForAppr != 'ISSSTS03' && approvalYn() > 0) || (curIssStsForAppr == 'ISSSTS03' && approvalYn2() > 0);
+		if (curIssStsForAppr != "ISSSTS04" && !hasExistingOtherAppr) {
 			selectTeamManagerApprovalAdd();  //($("#issSts").val() == 'ISSSTS03')에달 등록인지 결과인지 판단함
 		}
 
@@ -1993,7 +2010,23 @@ var actionType = null;
     }
 
     //입력정보
-	function select_wb2401p01_Info() {
+	// 저장된 장애유형(SUB_CD)이 현재 라디오 목록에 없으면 목록 마지막에 코드명으로 추가하고 선택한다.
+    function addLegacyCodecobgbRadio(subCd, subCdNm) {
+        if (!subCd || !subCdNm || subCdNm === subCd) return;
+        const table = $(currFormId + ' #COBGB-checkboxContainer-P11 table').first();
+        const exists = table.find('input[name="CODECOBGB"]').filter(function() { return this.value === subCd; }).length > 0;
+        if (exists) return;
+        const $radio = $('<input type="radio">').attr({ id: subCd, name: 'CODECOBGB', value: subCd, 'data-label': subCdNm })
+            .on('change', function() { fnc(this); }).prop('checked', true);
+        const $label = $('<label class="chkItem">').append($radio, $('<span>').text(subCdNm));
+        const $td = $('<td>').attr('style', 'text-align:left;').append($label);
+        if (subCd.length > 2 && subCd.slice(-2) == '99' && !table.find('#etcInputWrapper').length) {
+            $td.append('<span id="etcInputWrapper" style="display:none; margin-left:5px;"><input type="text" id="etcInput" name="etcInput" msg="기타사유" placeholder="기타사유" style="width:150px;"></span>');
+        }
+        $('<tr style="height:30px;">').append('<th style="width:90px; vertical-align:middle; text-align:center;"></th>').append($td).appendTo(table);
+    }
+
+    function select_wb2401p01_Info() {
 		if(modalStack.last().paramObj.issFileTrgtKey == '' || modalStack.last().paramObj.issFileTrgtKey == undefined) {
             return;
 		} else {
@@ -2013,6 +2046,9 @@ var actionType = null;
 				let tempDeptId = tempActDeptId.slice(0,5);
 				if (!tempDeptId) tempDeptId = tempCreatDeptId.slice(0,5);
 	            createHtmlCode1(tempDeptId);
+	            addLegacyCodecobgbRadio(data.result.subCd, data.result.subCdNm);
+
+				issEditAllowedYn = data.result.issEditAllowedYn;	// 문제 수정 가능여부(서버). 부재(구응답)면 아래 APP_CNT 기준. 최종 방어선은 서버 가드
 
 				$.each(data.result, function(key, value) {
 					if (key == 'issDiv' || key == 'mcPartCd' || key == 'importantCd' || key == 'impactCd') { // radio 체크
@@ -2044,23 +2080,63 @@ var actionType = null;
 						$(currFormId + ' #issSts').trigger('change');
 					}
 
-					if (key == 'teamManagerYn' && value == 'Y') {
-						teamManagerFlag = true;
+					if (key == 'teamManagerYn') {
+						managerRelationFlag = (value == 'Y');
+						if (managerRelationFlag) {
+							teamManagerFlag = true;
+						}
 					}
 				});
 
 				originMeasRst = data.result.measRst;	// 원인
 				originActCnts =  data.result.actCnts;	// 결과
 
-	            //결재카운트 기준 문제정보 입력 제어
-	            if (data.result.appCnt == "0" || data.result.appCnt == undefined) {
-	                approval_Yn = 'N';
-	            } else {
-	                approval_Yn = 'Y';
-					if ($(currFormId + ' #issSts').val() != 'ISSSTS04') {
-						$(currDivId + ' #actionBtn').hide();
-					}
-	            }
+	            //결재카운트 기준 문제정보 입력 제어 (issEditAllowedYn 우선, 부재 시 APP_CNT 기준)
+            var appHasYn = (data.result.appCnt == "0" || data.result.appCnt == undefined) ? 'N' : 'Y';
+            var actEditorYn = (teamManagerFlag || ($(currFormId + ' #actId').val() == jwt.userId && (jwt.deptId.slice(0, 5) === 'TRN50' || jwt.deptId.slice(0, 5) === 'GUN60' || jwt.deptId.slice(0, 5) === 'GUN70'))) ? 'Y' : 'N';
+            if (issEditAllowedYn === undefined) {
+                if (data.result.teamManagerYn == 'Y') {
+                    appHasYn = 'N';
+                } else if (appHasYn == 'Y' && data.result.issNo && data.result.creatId == jwt.userId) {
+                    var hasOtherAppr = false;
+                    postAjaxSync("/user/qm/qm01/selectShareUserlst", {
+                        "fileTrgtKey": issFileTrgtKey,
+                        "reqNo": data.result.issNo,
+                        "flag": "Y1",
+                        "pageNo": 1
+                    }, null, function(shareData) {
+                        var list = (shareData && shareData.result) ? shareData.result : [];
+                        hasOtherAppr = list.some(function(elem) {
+                            return elem.gb === "결재" && elem.usrNm != jwt.userId && (elem.sanctnSttus == "Y" || Boolean(elem.todoCfDt));
+                        });
+                    });
+                    appHasYn = hasOtherAppr ? 'Y' : 'N';
+                }
+                approval_Yn = appHasYn;
+                issBtnHideYn = appHasYn;
+            } else {
+                approval_Yn = (issEditAllowedYn == 'Y') ? 'N' : 'Y';
+                // 팀장/특수부서 조치담당자는 같은 버튼으로 조치를 저장하므로 APP_CNT 기준 숨김 유지
+                issBtnHideYn = (actEditorYn == 'Y' && appHasYn == 'N') ? 'N' : approval_Yn;
+                if (issEditAllowedYn == 'Y' && appHasYn == 'Y') {
+                    $(currFormId + ' #btn_plus1').hide();
+                    $(currFormId + ' #btn_minus1').hide();
+                }
+            }
+            if (issBtnHideYn == 'Y' && $(currFormId + ' #issSts').val() != 'ISSSTS04') {
+                $(currDivId + ' #actionBtn').hide();
+            }
+            if (issEditAllowedYn == 'N') {
+                $(currFormId + ' #issSj, ' + currFormId + ' #reqDt, ' + currFormId + ' #custReqDt, ' + currFormId + ' #issCnts, ' + currFormId + ' #etcInput').prop('readonly', true).css({'background-color':'#e6e6e6'});
+                $(currFormId + ' #issCnts').siblings('.ai-mark').hide();
+                $(currFormId + ' #vendCdNm, ' + currFormId + ' #actNm').siblings('a').hide();
+                $(currFormId + ' #updateVendCdBtn').hide();
+                $(currFormId + ' #btn_minus1').hide();
+                if (data.result.subCd || issBtnHideYn == 'Y') {	// 장애유형 잠금(셀렉터 공백 보정). 등록사유 없음 + 구응답/조치편집 예외는 선택 허용
+                    $(currFormId + ' input[name="CODECOBGB"]').addClass('no-click').on('click', function(e) { e.preventDefault(); });
+                }
+            }
+            $(currFormId + ' #issEditLockMsg').toggle(issEditAllowedYn == 'N');
 
 	            // 문제정보 입력제어
 				if (data.result.subCd) { //등록사유가 없으면 입력금지 활성화 않음.
@@ -2078,7 +2154,7 @@ var actionType = null;
 					$('#etcInput').val('').removeAttr('required');
 				}
 
-	            if (data.result.actAppCnt == "0" || data.result.appCnt == undefined) {
+	            if (data.result.actAppCnt == "0" || data.result.actAppCnt == undefined) {
 	                act_approval_Yn = 'N';
 	            } else {
 	                act_approval_Yn = 'Y';
@@ -2091,8 +2167,9 @@ var actionType = null;
 //                 $(currDivId + ' #actionBtn').hide();
 //             }
 
-				//진행상태가 완료(ISSSTS03) 이면서 결재완료이면 수정버튼 숨김
-	            if (act_approval_Yn == "Y" || $(currFormId + ' #issSts').val() == 'ISSSTS03') {
+				//진행상태가 완료(ISSSTS03) 이면서 결재완료이면 수정버튼 숨김 (단, 담당팀장 최종 수정 권한자는 제외)
+	            if ((act_approval_Yn == "Y" || $(currFormId + ' #issSts').val() == 'ISSSTS03') && !(managerRelationFlag && (issEditAllowedYn == 'Y' || issEditAllowedYn === undefined))) {
+	            	issBtnHideYn = 'Y';
 	            	iss_edit_chk('Y');
 	                // act_edit_chk('Y');
 	                $(currDivId + ' #actionBtn').hide();
@@ -2108,10 +2185,57 @@ var actionType = null;
 				txtareaHeightResize($(currFormId + ' #issCnts'));  //문제현황 크기 조절하기
 				txtareaHeightResize($(currFormId + ' #actCnts'));  //조치내용 크기 조절하기
 				txtareaHeightResize($(currFormId + ' #measRst'));  //조치내용 크기 조절하기
+				toggleIssActSectionM();
 
             }
 		});
 		// ModalgridView.setData(0);
+	}
+
+	function hasIssueActDataM() {
+		var $form = $(currFormId);
+		if ($.trim($form.find('#actsDt').val()) !== '') return true;
+		if ($.trim($form.find('#acteDt').val()) !== '') return true;
+		var actMhVal = parseFloat(String($form.find('#actMh').val() || '').replace(/,/g, ''));
+		if (!isNaN(actMhVal) && actMhVal > 0) return true;
+		if ($.trim($form.find('#actCompDgnFileNm').val()) !== '') return true;
+		if ($.trim($form.find('#measRst').val()) !== '') return true;
+		if ($.trim($form.find('#actCnts').val()) !== '') return true;
+		if ($.trim($form.find('#fdmtSolutCnt').val()) !== '') return true;
+		if ($form.find('input[name="FDMTSOLUT"]:checked').length > 0) return true;
+		if (typeof gridViewPop2P11 !== 'undefined' && gridViewPop2P11.target && Array.isArray(gridViewPop2P11.target.list) && gridViewPop2P11.target.list.length > 0) return true;
+		return false;
+	}
+
+	function toggleIssActSectionM() {
+		var $form = $(currFormId);
+		var isCreateMode = /^C/.test(String(actionType || ''));
+		var issStsVal = $form.find('#issSts').val();
+		var reqNoVal = typeof rowData !== 'undefined' && rowData ? $.trim(rowData.reqNo || '') : '';
+		var hasActData = hasIssueActDataM();
+
+		var showAct = false;
+		if (!isCreateMode) {
+			if (reqNoVal !== '') {
+				showAct = hasActData;
+			} else {
+				showAct = (issStsVal === 'ISSSTS03' || issStsVal === 'ISSSTS04' || hasActData);
+			}
+		} else {
+			showAct = (issStsVal === 'ISSSTS03' || issStsVal === 'ISSSTS04');
+		}
+
+		$form.find('.issAct').toggle(showAct);
+		if (showAct) {
+			txtareaHeightResize($form.find('#measRst'));
+			txtareaHeightResize($form.find('#actCnts'));
+			if (typeof gridViewPop2P11 !== 'undefined' && gridViewPop2P11.target) {
+				gridResize2();
+				if (typeof gridViewPop2P11.target.repaint === 'function') {
+					gridViewPop2P11.target.repaint();
+				}
+			}
+		}
 	}
 
     function iss_edit_chk(approval_Yn, addFlag='') {
@@ -2126,12 +2250,12 @@ var actionType = null;
 // 			$(currFormId + ' #issSts').css({'background-color':'#e6e6e6', 'pointer-events':'none'});
 
 			//제목 비활성화
-			$(currFormId + ' #issSj').css({'background-color':'#e6e6e6', 'pointer-events':'none'});
+			$(currFormId + ' #issSj').prop('readonly', true).css({'background-color':'#e6e6e6', 'pointer-events':'none'});
 			//제목 비활성화
 			$(currFormId + ' #vendCdNm').css({'background-color':'#e6e6e6', 'pointer-events':'none'});
 
 			//내용 비활성화
-			$(currFormId + ' #issCnts').css({'background-color':'#e6e6e6'});
+			$(currFormId + ' #issCnts').prop('readonly', true).css({'background-color':'#e6e6e6'});
 			//조치담당자
 			$(currFormId + ' #actNm').prop('disabled', true);
 
@@ -2140,7 +2264,7 @@ var actionType = null;
 // 			$('input[name="CODECOBGB"]').prop('disabled', true);
 
 			if (addFlag != 'CHANGE') {
-	            $(currFormId + 'input[name="CODECOBGB"]').addClass('no-click').each(function() {
+	            $(currFormId + ' input[name="CODECOBGB"]').addClass('no-click').each(function() {
 	                $(this).on('click', function(e) {
 	                    e.preventDefault();
 	                });
@@ -2247,10 +2371,6 @@ var actionType = null;
 	            kakaoSendBody('TODODIV10','TODODIV1030', 'WBS문제','WBS실적문제','공유');
 	        }
 
-	        // 1-2. WBS 계획 문제 결재 알림톡 처리
-	        if (appChk > 0) {
-	            kakaoSendBody('TODODIV20','TODODIV2060', 'WBS문제','WBS실적문제','결재');
-	        }
         }
 
 
@@ -2274,10 +2394,6 @@ var actionType = null;
 	            kakaoSendBody('TODODIV10','TODODIV1090', 'WBS조치','WBS실적조치','공유');
 	        }
 
-	        // 2-2. WBS 계획 조치 결재 알림톡 처리
-	        if (appChk2 > 0) {
-	            kakaoSendBody('TODODIV20','TODODIV2090', 'WBS조치','WBS실적조치','결재');
-	        }
         }
 
         if (kakaoCnt > 0) {
@@ -2395,7 +2511,13 @@ var actionType = null;
 
 	// 팀장일때 필드 활성화 처리 flag = teamManagerYn
 	function teamManagerFieldControl(flag) {
+		const issStsVal = $(currFormId + ' #issSts').val();
+		if ((issStsVal == 'ISSSTS03' || issStsVal == 'ISSSTS04') && issEditAllowedYn != 'Y') {
+			$(currFormId + ' #issSj, ' + currFormId + ' #issCnts').prop('readonly', true);
+		}
 		if (flag) {
+			$(currFormId + ' input[name="mcPartCd"], ' + currFormId + ' input[name="importantCd"], ' + currFormId + ' input[name="impactCd"], ' + currFormId + ' input[name="CODECOBGB"]').removeClass('no-click').off('click');
+			$(currFormId + ' #FDMTSOLUT-radioButtonContainer, ' + currFormId + ' #fdmtSolutCnt').css({'pointer-events': 'auto', 'background-color': ''});
 			if ($(currDivId + ' #issSts').val() == 'ISSSTS03') {
 				$(currDivId + ' #FDMTSOLUT-radioButtonContainer').closest('td').prev('th').addClass('hit');
 				$(currDivId + ' #fdmtSolutCnt').closest('td').prev('th').addClass('hit');
@@ -2454,7 +2576,7 @@ var actionType = null;
 		var appArray = [];	//결재권자 정보
 		var shaArray = [];	//공유자 정보
 		let tempActId = $(currFormId + ' #actId').val();		//조치 담당자 ID
-		let tempCreatId = $(currFormId + ' #creatId').val();	//문제 등록담당 ID
+		let tempCreatId = $(currFormId + ' #creatId').val() || jwt.userId;	//문제 등록담당 ID
 
         $.each(appshaList, function(idx, item){
         	if (item.usrNm.includes('gyrsult') || item.usrNm == tempCreatId) {
@@ -2481,7 +2603,9 @@ var actionType = null;
 		}
 		//조치자, 등록자 팀장 결재추가하기
 		appArray = approvalTeamManagerInfoData(tempActId, appArray);
-		appArray = approvalTeamManagerInfoData(jwt.userId, appArray);
+		if (!$(currFormId + ' #creatId').val() || $(currFormId + ' #creatId').val() == jwt.userId) {
+			appArray = approvalTeamManagerInfoData(jwt.userId, appArray);
+		}
 
 		// 실적 문제 등록 시 영업 및 연구소가 등록 시 해당 특정 유저 결재권자 자동 추가
 		if (jwt.deptId.slice(0, 5) == 'GUN30') {
@@ -2498,6 +2622,12 @@ var actionType = null;
 		}
 	}
 
+	function isSameApprovalUserId(item, targetId) {
+		var a = String((item && (item.usrNm || item.todoId)) || '').trim().toLowerCase();
+		var b = String(targetId || '').trim().toLowerCase();
+		return !!a && a === b;
+	}
+
     //조치담당자정보 자동 추가하기
 	function approvalUserInfoData (appUserId, appArray) {
 	    var formData = {
@@ -2507,8 +2637,8 @@ var actionType = null;
 	    	if (data.resultList != '' && data.resultList!=null) {
 	    		//조치결과 결자자 정보 가져오기
 	    		let list = data.resultList[0];
-	    		if (appArray.some(item => item.usrNm === list.usrNm)) {
-	    			//Array에 usrNm 의 값중에 list.id와 같은 값이 있으면 true
+	    		if (appArray.some(function(item) { return isSameApprovalUserId(item, list.usrNm); })) {
+	    			//동일 아이디가 이미 결재(결재/합의/협조 등)로 등록된 경우 기존 결재구분 유지
 	    		} else {
 	    			appArray.push({
 		                        gb: "결재",
@@ -2535,8 +2665,8 @@ var actionType = null;
 			if (data.result != '' && data.result!=null) {
 				//결자자 정보 가져오기
 				let list = data.result;
-				if (appArray.some(item => item.usrNm === list.id)) {
-					//Array에 usrNm 의 값중에 list.id와 같은 값이 있으면 true
+				if (appArray.some(function(item) { return isSameApprovalUserId(item, list.id); })) {
+					//동일 아이디가 이미 결재(결재/합의/협조 등)로 등록된 경우 기존 결재구분 유지
 				} else {
 					appArray.push({
 								gb: "결재",
@@ -2564,8 +2694,8 @@ var actionType = null;
         	if (data.result != '' && data.result!=null) {
         		//결자자 정보 가져오기
         		let list = data.result;
-        		if (appArray.some(item => item.usrNm === list.id)) {
-        			//Array에 usrNm 의 값중에 list.id와 같은 값이 있으면 true
+        		if (appArray.some(function(item) { return isSameApprovalUserId(item, list.id); })) {
+        			//동일 아이디가 이미 결재(결재/합의/협조 등)로 등록된 경우 기존 결재구분 유지
         		} else {
         			appArray.push({
 		                        gb: "결재",

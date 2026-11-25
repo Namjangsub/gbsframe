@@ -128,6 +128,20 @@ public class QM01Ctr {
 	  return "jsonView";
   }
 
+  @PostMapping(value = "/selectDeleteApprovalChk")
+  public String selectDeleteApprovalChk(@RequestBody Map<String, String> paramMap, ModelMap model) {
+	  String result = qm01Svc.selectDeleteApprovalChk(paramMap);
+	  model.addAttribute("result", result);
+	  return "jsonView";
+  }
+
+  @PostMapping(value = "/selectDeleteRespApprovalChk")
+  public String selectDeleteRespApprovalChk(@RequestBody Map<String, String> paramMap, ModelMap model) {
+	  String result = qm01Svc.selectDeleteRespApprovalChk(paramMap);
+	  model.addAttribute("result", result);
+	  return "jsonView";
+  }
+
   @PostMapping(value = "/selectConfirmCount")
   public String selectConfirmCount(@RequestBody Map<String, String> paramMap, ModelMap model) {
     int result = qm01Svc.selectConfirmCount(paramMap);
@@ -241,6 +255,23 @@ public class QM01Ctr {
   public String deleteQualityReq(@RequestBody Map<String, String> paramMap, ModelMap model) throws Exception {
 	  	try {
 			if (qm01Svc.deleteQualityReq(paramMap) != 0 ) {
+				model.addAttribute("resultCode", 200);
+				model.addAttribute("resultMessage", messageUtils.getMessage("delete"));
+			} else {
+				model.addAttribute("resultCode", 500);
+				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+			};
+		}catch(Exception e){
+			model.addAttribute("resultCode", 900);
+			model.addAttribute("resultMessage", e.getMessage());
+		}
+	  	return "jsonView";
+  }
+
+  @PutMapping(value = "/deleteQualityResp")
+  public String deleteQualityResp(@RequestBody Map<String, String> paramMap, ModelMap model) throws Exception {
+	  	try {
+			if (qm01Svc.deleteQualityResp(paramMap) != 0 ) {
 				model.addAttribute("resultCode", 200);
 				model.addAttribute("resultMessage", messageUtils.getMessage("delete"));
 			} else {

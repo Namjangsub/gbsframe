@@ -2824,9 +2824,13 @@
 		if (!gridViewApprovalMng || !gridViewApprovalMng.target) return;
 		var list = gridViewApprovalMng.target.getList() || [];
 		var registeredIds = {};
-		$.each(list, function(_, row) { registeredIds[row.usrNm || row.todoId] = true; });
+		$.each(list, function(_, row) {
+			var key = String((row && (row.usrNm || row.todoId)) || '').trim().toLowerCase();
+			if (key) registeredIds[key] = true;
+		});
 		$.each(getMngFixedOrderUserIds(), function(_, userId) {
-			if (!registeredIds[userId]) {
+			var key = String(userId || '').trim().toLowerCase();
+			if (key && !registeredIds[key]) {
 				list.push({
 					gb: '결재', usrNm: userId, todoId: userId, name: userId,
 					todoDiv2CodeId: 'TODODIV2201', flag: 'I', autoRptMngApproval: 'Y', coCd: jwt.coCd
@@ -2876,7 +2880,8 @@
 		});
 
 		// 신청인과 다른 사람이 작성하는 경우에도 실제 작성자를 결재선에 포함한다.
-		if (!autoList.some(function(row) { return (row.usrNm || row.todoId) === jwt.userId; })) {
+		var loginIdKey = String(jwt.userId || '').trim().toLowerCase();
+		if (!autoList.some(function(row) { return String(row.usrNm || row.todoId || '').trim().toLowerCase() === loginIdKey; })) {
 			autoList.unshift({
 				gb: '결재', usrNm: jwt.userId, todoId: jwt.userId, name: jwt.userNm || jwt.userId,
 				jik: jwt.levelNm, dtNm: jwt.deptNm, todoDiv2CodeId: 'TODODIV2200',
@@ -2884,12 +2889,37 @@
 			});
 		}
 
+		// 동일 아이디가 이미 합의(AGREE)/협조(COOP)/후결(POST)로 등록된 경우 강제 추가 시에도 기존 결재구분을 유지한다.
+		var existingList = gridViewApproval.target.getList() || [];
+		var existingLineTypeById = {};
+		$.each(existingList, function(idx, row) {
+			if (row && row.gb === '결재') {
+				var uid = String(row.usrNm || row.todoId || '').trim().toLowerCase();
+				var lt = String(row.lineType || '').trim().toUpperCase();
+				if (uid && (lt === 'AGREE' || lt === 'COOP' || lt === 'POST')) {
+					existingLineTypeById[uid] = {
+						lineType: lt,
+						lineTypeNm: row.lineTypeNm || (lt === 'AGREE' ? '합의' : lt === 'COOP' ? '협조' : '후결')
+					};
+				}
+			}
+		});
+		$.each(autoList, function(idx, row) {
+			var uid = String(row.usrNm || row.todoId || '').trim().toLowerCase();
+			var preserved = existingLineTypeById[uid];
+			if (preserved) {
+				row.lineType = preserved.lineType;
+				row.lineTypeNm = preserved.lineTypeNm;
+			}
+		});
+
 		// DB에서 재로드된 행에는 autoApplicantApproval 표시가 없으므로, 자동 행과 같은 ID의 기존 행도 제거 (중복 누적 방지)
-		var autoIds = $.map(autoList, function(r) { return r.usrNm; });
-		var preservedList = $.grep(gridViewApproval.target.getList() || [], function(row) {
-			var rowId = row.usrNm || row.todoId;
-			if (skipApplicantSelfApproval && row.gb === '결재' && rowId === reqId) return false;
-			return row.autoApplicantApproval !== 'Y' && $.inArray(rowId, autoIds) === -1;
+		var autoIds = $.map(autoList, function(r) { return String(r.usrNm || r.todoId || '').trim().toLowerCase(); });
+		var reqIdKey = String(reqId || '').trim().toLowerCase();
+		var preservedList = $.grep(existingList, function(row) {
+			var rowIdKey = String((row && (row.usrNm || row.todoId)) || '').trim().toLowerCase();
+			if (skipApplicantSelfApproval && row.gb === '결재' && rowIdKey === reqIdKey) return false;
+			return row.autoApplicantApproval !== 'Y' && $.inArray(rowIdKey, autoIds) === -1;
 		});
 		var newList = autoList.concat(preservedList);
 		newList = reorderRptGeneralApprovalLine(newList, reqId);
@@ -3542,6 +3572,21 @@
 			var userIds = codeEtc.split(',');
 			var defaultList = [];
 			var sanctnSn = 1;
+			var existingMngLineTypeById = {};
+			if (gridViewApprovalMng && gridViewApprovalMng.target && gridViewApprovalMng.target.getList) {
+				$.each(gridViewApprovalMng.target.getList() || [], function(_, row) {
+					if (row && row.gb === '결재') {
+						var uid = String(row.usrNm || row.todoId || '').trim().toLowerCase();
+						var lt = String(row.lineType || '').trim().toUpperCase();
+						if (uid && (lt === 'AGREE' || lt === 'COOP' || lt === 'POST')) {
+							existingMngLineTypeById[uid] = {
+								lineType: lt,
+								lineTypeNm: row.lineTypeNm || (lt === 'AGREE' ? '합의' : lt === 'COOP' ? '협조' : '후결')
+							};
+						}
+					}
+				});
+			}
 
 			$.each(userIds, function(idx, rawId) {
 				var uId = $.trim(rawId);
@@ -3550,6 +3595,7 @@
 				postAjaxSync("/admin/cm/cm06/selectUserInfo", { userId: uId }, null, function(userData) {
 					var user = userData.userInfo;
 					if (user) {
+						var preserved = existingMngLineTypeById[String(user.id || '').trim().toLowerCase()];
 						defaultList.push({
 							gb: "결재",
 							usrNm: user.id,
@@ -3561,6 +3607,8 @@
 							email: user.email || '',
 							todoId: user.id,
 							todoDiv2CodeId: 'TODODIV2201',
+							lineType: preserved ? preserved.lineType : 'APPR',
+							lineTypeNm: preserved ? preserved.lineTypeNm : '결재',
 							sanctnSn: sanctnSn++,
 							sanctnSttus: 'N',
 							sanctnSttusNm: '미승인',

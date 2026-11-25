@@ -480,6 +480,43 @@ if (typeof ax5 !== 'undefined' && typeof ax5.ui !== 'undefined') {
 				return "";
 			}
 	    };
+
+		// "※ 공유 및 결재" 류 레거시 결재 그리드(todoCfOpn + 성명 컬럼)에 Teams 채팅 아이콘 자동 적용
+		if (!ax5.ui.grid._gbsTeamsChatPatched) {
+			var _OrigAx5Grid = ax5.ui.grid;
+			var _patchGridConfig = function (config) {
+				try {
+					if (config && Array.isArray(config.columns)) {
+						var isExcelGrid = config.target && $(config.target).attr('data-ax5grid') === 'excel-grid';
+						if (!isExcelGrid) {
+							attachTeamsChatToApprovalColumns(config.columns);
+						}
+					}
+				} catch (e) {}
+			};
+			var _PatchedAx5Grid = function () {
+				if (arguments.length > 0 && arguments[0]) {
+					_patchGridConfig(arguments[0]);
+				}
+				var res = _OrigAx5Grid.apply(this, arguments);
+				var inst = (res && typeof res === 'object') ? res : this;
+				if (inst && typeof inst.setConfig === 'function' && !inst._gbsTeamsChatSetConfigWrapped) {
+					var _origSetConfig = inst.setConfig;
+					inst._gbsTeamsChatSetConfigWrapped = true;
+					inst.setConfig = function (config) {
+						_patchGridConfig(config);
+						return _origSetConfig.apply(this, arguments);
+					};
+				}
+				return res;
+			};
+			_PatchedAx5Grid.prototype = _OrigAx5Grid.prototype;
+			Object.keys(_OrigAx5Grid).forEach(function (k) {
+				_PatchedAx5Grid[k] = _OrigAx5Grid[k];
+			});
+			_PatchedAx5Grid._gbsTeamsChatPatched = true;
+			ax5.ui.grid = _PatchedAx5Grid;
+		}
 	}
 
 }
@@ -3921,7 +3958,11 @@ var KAKAO_APPROVAL_GO_BY_DIV2 = {
 	TODODIV2190: "PM5101",
 	TODODIV2191: "PM5101",
 	TODODIV2200: "PM5102",
-	TODODIV2201: "PM5102"
+	TODODIV2201: "PM5102",
+	TODODIV2020: "QM0101",
+	TODODIV2030: "QM0102",
+	TODODIV2060: "WB24",
+	TODODIV2090: "WB24"
 };
 
 function buildKakaoTodoTexts(param, sendObj, userNm) {
@@ -5611,4 +5652,354 @@ function applyFlowContext(callback) {
 			callback(ordrsNo, histNo);
 		}
 	}
+}
+
+var _gbsTeamsEmailCache = {};
+var _gbsTeamsEmailPending = {};
+var _gbsUserContactCache = {};
+var _gbsUserContactPending = {};
+
+function ensureTeamsChatStyle() {
+	if (typeof document === 'undefined' || !document.head) return;
+	if (document.getElementById('gbsTeamsChatStyle')) return;
+	var style = document.createElement('style');
+	style.id = 'gbsTeamsChatStyle';
+	style.type = 'text/css';
+	style.textContent =
+		'.ax5_grid button.gbs-teams-chat-btn, button.gbs-teams-chat-btn {' +
+			'display: inline-flex; align-items: center; justify-content: center;' +
+			'width: 17px !important; min-width: 17px !important; height: 17px !important;' +
+			'margin: 0 0 0 4px !important; padding: 0 !important;' +
+			'font-size: 10px; line-height: 1 !important; color: #7C83DB;' +
+			'background-color: #F3F4FC; border: 1px solid #C5CAE9; border-radius: 4px;' +
+			'cursor: pointer; vertical-align: middle; flex-shrink: 0;' +
+			'transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease, transform 0.1s ease;' +
+		'}' +
+		'.ax5_grid button.gbs-teams-chat-btn:hover, button.gbs-teams-chat-btn:hover {' +
+			'color: #5B63C8; background-color: #E4E7FA; border-color: #9FA8E8; transform: scale(1.08);' +
+		'}' +
+		'.ax5_grid button.gbs-phone-call-btn, button.gbs-phone-call-btn {' +
+			'display: inline-flex; align-items: center; justify-content: center;' +
+			'width: 17px !important; min-width: 17px !important; height: 17px !important;' +
+			'margin: 0 0 0 3px !important; padding: 0 !important;' +
+			'font-size: 10px; line-height: 1 !important; color: #499E76;' +
+			'background-color: #EFF9F4; border: 1px solid #BEE3D0; border-radius: 4px;' +
+			'cursor: pointer; vertical-align: middle; flex-shrink: 0;' +
+			'transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease, transform 0.1s ease;' +
+		'}' +
+		'.ax5_grid button.gbs-phone-call-btn:hover, button.gbs-phone-call-btn:hover {' +
+			'color: #2E7D5B; background-color: #DCF2E7; border-color: #8CCFB0; transform: scale(1.08);' +
+		'}';
+	document.head.appendChild(style);
+}
+
+function attachTeamsChatToApprovalColumns(columns) {
+	var hasTodoCfOpn = false;
+	var nameCols = [];
+	var scan = function (cols) {
+		if (!Array.isArray(cols)) return;
+		for (var i = 0; i < cols.length; i++) {
+			var col = cols[i];
+			if (!col) continue;
+			if (Array.isArray(col.columns)) {
+				scan(col.columns);
+				continue;
+			}
+			if (col.key === 'todoCfOpn') {
+				hasTodoCfOpn = true;
+			} else if (col.key === 'name' && col.label === '성명' && !col.formatter && !col.editor) {
+				nameCols.push(col);
+			}
+		}
+	};
+	scan(columns);
+	if (!hasTodoCfOpn || nameCols.length === 0) return;
+
+	for (var j = 0; j < nameCols.length; j++) {
+		var targetCol = nameCols[j];
+		if (targetCol.width !== undefined && /^\d+$/.test(String(targetCol.width)) && Number(targetCol.width) < 115) {
+			targetCol.width = 115;
+		}
+		targetCol.formatter = function () {
+			var item = this.item || {};
+			var uid = item.usrNm || item.todoId || item.wbsSharngUserId || item.id || '';
+			if (typeof formatTeamsChatName === 'function') {
+				return formatTeamsChatName(uid, this.value, item.email, item.telNo);
+			}
+			return this.value || '';
+		};
+	}
+}
+
+function escapeTeamsHtml(str) {
+	if (str === undefined || str === null) return '';
+	return String(str)
+		.replace(/&/g, '&amp;')
+		.replace(/</g, '&lt;')
+		.replace(/>/g, '&gt;')
+		.replace(/"/g, '&quot;')
+		.replace(/'/g, '&#39;');
+}
+
+function normalizeValidTeamsEmail(rawEmail) {
+	if (rawEmail === undefined || rawEmail === null) return '';
+	var s = String(rawEmail).trim();
+	if (!s) return '';
+	var lower = s.toLowerCase();
+	if (lower === 'null' || lower === 'undefined' || lower === 'n/a' || lower === 'none') return '';
+	if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(s)) return '';
+	return s;
+}
+
+function normalizeValidPhoneNo(rawPhone) {
+	if (rawPhone === undefined || rawPhone === null) return '';
+	var s = String(rawPhone).trim();
+	if (!s) return '';
+	var lower = s.toLowerCase();
+	if (lower === 'null' || lower === 'undefined' || lower === 'n/a' || lower === 'none') return '';
+	var digits = s.replace(/[^0-9]/g, '');
+	if (digits.length < 7 || /^0+$/.test(digits)) return '';
+	return s;
+}
+
+function resolveUserContact(userId, callback) {
+	var uid = userId ? String(userId).trim() : '';
+	if (!uid || uid === 'SYSTEM') {
+		if (typeof callback === 'function') callback({ email: '', telNo: '' });
+		return;
+	}
+	if (Object.prototype.hasOwnProperty.call(_gbsUserContactCache, uid)) {
+		if (typeof callback === 'function') callback(_gbsUserContactCache[uid]);
+		return;
+	}
+	if (_gbsUserContactPending[uid]) {
+		if (typeof callback === 'function') _gbsUserContactPending[uid].push(callback);
+		return;
+	}
+	_gbsUserContactPending[uid] = typeof callback === 'function' ? [callback] : [];
+	postAjax("/admin/cm/cm06/selectUserInfo", { userId: uid }, null, function(data) {
+		var info = (data && data.userInfo) ? data.userInfo : null;
+		var resolvedEmail = info ? normalizeValidTeamsEmail(info.email) : '';
+		var resolvedTelNo = info ? normalizeValidPhoneNo(info.telNo) : '';
+		var contact = { email: resolvedEmail, telNo: resolvedTelNo };
+		_gbsUserContactCache[uid] = contact;
+		_gbsTeamsEmailCache[uid] = resolvedEmail;
+		var callbacks = _gbsUserContactPending[uid] || [];
+		delete _gbsUserContactPending[uid];
+		for (var i = 0; i < callbacks.length; i++) {
+			try { callbacks[i](contact); } catch (e) {}
+		}
+	}, false);
+}
+
+function resolveTeamsChatEmail(userId, callback) {
+	var uid = userId ? String(userId).trim() : '';
+	if (uid && Object.prototype.hasOwnProperty.call(_gbsTeamsEmailCache, uid)) {
+		if (typeof callback === 'function') callback(_gbsTeamsEmailCache[uid]);
+		return;
+	}
+	resolveUserContact(uid, function(contact) {
+		if (typeof callback === 'function') callback(contact ? contact.email : '');
+	});
+}
+
+function renderTeamsChatButtonTag(userId, userName, targetEmail) {
+	var uid = userId ? String(userId).trim() : '';
+	var unm = userName ? String(userName).trim() : '';
+	var emailStr = normalizeValidTeamsEmail(targetEmail);
+	if (!emailStr) return '';
+	var title = (unm ? unm + '님과 ' : '') + 'Teams 채팅 열기 (' + emailStr + ')';
+	return '<button type="button" class="gbs-teams-chat-btn"'
+		+ ' data-user-id="' + escapeTeamsHtml(uid) + '"'
+		+ ' data-user-nm="' + escapeTeamsHtml(unm) + '"'
+		+ ' data-email="' + escapeTeamsHtml(emailStr) + '"'
+		+ ' title="' + escapeTeamsHtml(title) + '"'
+		+ ' onmousedown="if(event&&event.stopPropagation)event.stopPropagation();"'
+		+ ' onclick="openTeamsChatFromBtn(this, event);"'
+		+ ' ondblclick="if(event&&event.stopPropagation)event.stopPropagation();">'
+		+ '<i class="fa fa-comments"></i></button>';
+}
+
+function fillTeamsChatSlots(uid, resolvedEmail) {
+	if (typeof document === 'undefined') return;
+	var slots = document.querySelectorAll('.gbs-teams-chat-slot');
+	for (var i = slots.length - 1; i >= 0; i--) {
+		var slot = slots[i];
+		if ((slot.getAttribute('data-user-id') || '') !== uid) continue;
+		if (!resolvedEmail) {
+			if (slot.parentNode) slot.parentNode.removeChild(slot);
+			continue;
+		}
+		var unm = slot.getAttribute('data-user-nm') || '';
+		slot.outerHTML = renderTeamsChatButtonTag(uid, unm, resolvedEmail);
+	}
+}
+
+function openTeamsChat(userId, userName, email) {
+	var uid = userId ? String(userId).trim() : '';
+	var unm = userName ? String(userName).trim() : '';
+	var launch = function(targetEmail) {
+		var validEmail = normalizeValidTeamsEmail(targetEmail);
+		if (!validEmail) {
+			alert((unm ? unm + "님의 " : "") + "유효한 이메일 정보가 없습니다.");
+			return;
+		}
+		window.location.href = "msteams:/l/chat/0/0?users=" + encodeURIComponent(validEmail);
+	};
+
+	var directEmail = normalizeValidTeamsEmail(email);
+	if (directEmail) {
+		launch(directEmail);
+		return;
+	}
+	if (!uid) {
+		launch('');
+		return;
+	}
+	resolveTeamsChatEmail(uid, launch);
+}
+
+function openTeamsChatFromBtn(btn, evt) {
+	if (evt && typeof evt.stopPropagation === 'function') {
+		evt.stopPropagation();
+	}
+	if (evt && typeof evt.preventDefault === 'function') {
+		evt.preventDefault();
+	}
+	if (!btn) return;
+	openTeamsChat(
+		btn.getAttribute('data-user-id') || '',
+		btn.getAttribute('data-user-nm') || '',
+		btn.getAttribute('data-email') || ''
+	);
+}
+
+function fillPhoneCallSlots(uid, resolvedTelNo) {
+	if (typeof document === 'undefined') return;
+	var slots = document.querySelectorAll('.gbs-phone-call-slot');
+	for (var i = slots.length - 1; i >= 0; i--) {
+		var slot = slots[i];
+		if ((slot.getAttribute('data-user-id') || '') !== uid) continue;
+		if (!resolvedTelNo) {
+			if (slot.parentNode) slot.parentNode.removeChild(slot);
+			continue;
+		}
+		var unm = slot.getAttribute('data-user-nm') || '';
+		slot.outerHTML = renderPhoneCallButtonTag(uid, unm, resolvedTelNo);
+	}
+}
+
+function buildSingleTeamsChatHtml(uid, unm, email) {
+	var directEmail = normalizeValidTeamsEmail(email);
+	if (directEmail) {
+		_gbsTeamsEmailCache[uid] = directEmail;
+		return renderTeamsChatButtonTag(uid, unm, directEmail);
+	}
+	if (email !== undefined) {
+		_gbsTeamsEmailCache[uid] = '';
+		return '';
+	}
+	if (!uid || uid === 'SYSTEM') {
+		return '';
+	}
+	if (Object.prototype.hasOwnProperty.call(_gbsTeamsEmailCache, uid)) {
+		var cachedEmail = _gbsTeamsEmailCache[uid];
+		return cachedEmail ? renderTeamsChatButtonTag(uid, unm, cachedEmail) : '';
+	}
+	return null;
+}
+
+function buildSinglePhoneCallHtml(uid, unm, telNo) {
+	var directTel = normalizeValidPhoneNo(telNo);
+	if (directTel) {
+		if (uid && Object.prototype.hasOwnProperty.call(_gbsUserContactCache, uid)) {
+			_gbsUserContactCache[uid].telNo = directTel;
+		}
+		return renderPhoneCallButtonTag(uid, unm, directTel);
+	}
+	if (telNo !== undefined || !uid || uid === 'SYSTEM') {
+		return '';
+	}
+	if (Object.prototype.hasOwnProperty.call(_gbsUserContactCache, uid)) {
+		var cachedTel = _gbsUserContactCache[uid] ? _gbsUserContactCache[uid].telNo : '';
+		return cachedTel ? renderPhoneCallButtonTag(uid, unm, cachedTel) : '';
+	}
+	return null;
+}
+
+function buildTeamsChatBtnHtml(userId, userName, email, telNo) {
+	ensureTeamsChatStyle();
+	var uid = userId ? String(userId).trim() : '';
+	var unm = userName ? String(userName).trim() : '';
+	var chatHtml = buildSingleTeamsChatHtml(uid, unm, email);
+	var phoneHtml = buildSinglePhoneCallHtml(uid, unm, telNo);
+
+	var needsResolve = (chatHtml === null || phoneHtml === null) && uid && uid !== 'SYSTEM';
+	if (needsResolve) {
+		resolveUserContact(uid, function(contact) {
+			fillTeamsChatSlots(uid, contact ? contact.email : '');
+			fillPhoneCallSlots(uid, contact ? contact.telNo : '');
+		});
+	}
+
+	if (chatHtml === null) {
+		chatHtml = '<span class="gbs-teams-chat-slot"'
+			+ ' data-user-id="' + escapeTeamsHtml(uid) + '"'
+			+ ' data-user-nm="' + escapeTeamsHtml(unm) + '"'
+			+ ' style="display:none;"></span>';
+	}
+	if (phoneHtml === null) {
+		phoneHtml = '<span class="gbs-phone-call-slot"'
+			+ ' data-user-id="' + escapeTeamsHtml(uid) + '"'
+			+ ' data-user-nm="' + escapeTeamsHtml(unm) + '"'
+			+ ' style="display:none;"></span>';
+	}
+	return chatHtml + phoneHtml;
+}
+
+function formatTeamsChatName(userId, userName, email, telNo) {
+	var unm = (userName !== undefined && userName !== null) ? String(userName).trim() : '';
+	if (!unm) return '';
+	return escapeTeamsHtml(unm) + buildTeamsChatBtnHtml(userId, unm, email, telNo);
+}
+
+function renderPhoneCallButtonTag(userId, userName, rawPhone) {
+	var phoneStr = normalizeValidPhoneNo(rawPhone);
+	if (!phoneStr) return '';
+	var uid = userId ? String(userId).trim() : '';
+	var unm = userName ? String(userName).trim() : '';
+	var title = (unm ? unm + '님에게 ' : '') + '전화 걸기 (' + phoneStr + ')';
+	return '<button type="button" class="gbs-phone-call-btn"'
+		+ ' data-user-id="' + escapeTeamsHtml(uid) + '"'
+		+ ' data-user-nm="' + escapeTeamsHtml(unm) + '"'
+		+ ' data-phone="' + escapeTeamsHtml(phoneStr) + '"'
+		+ ' title="' + escapeTeamsHtml(title) + '"'
+		+ ' onmousedown="if(event&&event.stopPropagation)event.stopPropagation();"'
+		+ ' onclick="openPhoneCallFromBtn(this, event);"'
+		+ ' ondblclick="if(event&&event.stopPropagation)event.stopPropagation();">'
+		+ '<i class="fa fa-phone"></i></button>';
+}
+
+function openPhoneCall(rawPhone, userName) {
+	var validPhone = normalizeValidPhoneNo(rawPhone);
+	if (!validPhone) {
+		alert((userName ? userName + "님의 " : "") + "유효한 전화번호가 없습니다.");
+		return;
+	}
+	var dialNo = validPhone.replace(/(?!^\+)[^0-9]/g, '');
+	window.location.href = "tel:" + dialNo;
+}
+
+function openPhoneCallFromBtn(btn, evt) {
+	if (evt && typeof evt.stopPropagation === 'function') {
+		evt.stopPropagation();
+	}
+	if (evt && typeof evt.preventDefault === 'function') {
+		evt.preventDefault();
+	}
+	if (!btn) return;
+	openPhoneCall(
+		btn.getAttribute('data-phone') || '',
+		btn.getAttribute('data-user-nm') || ''
+	);
 }

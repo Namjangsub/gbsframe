@@ -88,8 +88,14 @@
                		<a onclick="openSecondUserSearch5();"><i class="i_search_w"></i></a>
            			</div>
 				</td>
-				<th></th>
-				<td></td>
+				<th>결과여부</th>
+				<td>
+					<select id="rsltYn_S" name="rsltYn_S" data-search="rsltYn">
+						<option value="">전체</option>
+						<option value="Y">등록(Y)</option>
+						<option value="N">미등록(N)</option>
+					</select>
+				</td>
 				<th>분류</th>
 				<td><select id="cobtbCd_S" name="cobtbCd_S" data-kind="COBTP" data-search="cobtbCd" >
 						<option value="">전체</option>
@@ -149,18 +155,22 @@
           </tr>
 
           <tr>
-<!-- 				<th>설비명</th> -->
-<!-- 				<td> -->
-<!-- 				    <div class="search_form"> -->
-<!-- 					 <input type="text" id="eqpNm_S" name="eqpNm_S" data-search="eqpNm" class="" onkeyup="if(window.event.keyCode == 13){gridView.setData(0)};"> -->
-<!-- 					</div>	 -->
-<!-- 				</td> -->
-<!-- 				<th>아이템구분</th> -->
-<!-- 				<td> -->
-<!-- 					<select id="itemCd_S" name="itemCd_S" data-kind="ITEMLIST" data-search="itemCd" > -->
-<!-- 						<option value="">전체</option> -->
-<!-- 					</select>	 -->
-<!-- 				</td> -->
+				<th>요청구분</th>
+				<td>
+					<select id="reqCd_S" name="reqCd_S" data-kind="REQCD" data-search="reqCd">
+						<option value="">전체</option>
+					</select>
+				</td>
+				<th>고객사</th>
+				<td>
+					<input type="text" id="clntNm_S" name="clntNm_S" data-search="clntNm" onkeyup="if(window.event.keyCode == 13){gridView.setData(0)};">
+				</td>
+				<th>설비명</th>
+				<td>
+					<input type="text" id="eqpNm_S" name="eqpNm_S" data-search="eqpNm" onkeyup="if(window.event.keyCode == 13){gridView.setData(0)};">
+				</td>
+				<th></th><td></td>
+				<th></th><td></td>
           </tr>
         </table>
 		<input type="hidden" id="userId"    name="userId">
@@ -177,6 +187,7 @@
           <a onclick="updateCheckDept();" style="height: 30px; line-height: 28px;width: 60px;"><i class="fas fa-check-square"></i> 확인</a>
           <a onclick="excelDown();" style="height: 30px; line-height: 28px; width: 90px;"><i class="fas fa-file-excel"></i> 엑셀다운로드</a>
           <a onclick="insertQualityRespModal();" style="height: 30px; line-height: 28px; width: 90px;"><i class="fas fa-file-invoice"></i> 결과등록</a>
+          <a onclick="deleteQualityResp();" style="height: 30px; line-height: 28px; width: 90px;" authchk><i class="fas fa-trash-alt"></i> 결과삭제</a>
           <a onclick="setReport();" style="height: 30px; line-height: 28px; width: 100px;"><i class="fas fa-print"></i> 발주요청서출력</a>
           <a onclick="openGridColumnEdit();" style="height: 30px; line-height: 28px; width: 90px;"><i class="fas fa-cog"></i>그리드설정</a>
         </div>
@@ -244,25 +255,88 @@ if (typeof ax5.ui.toast === 'function') {
 		}
 	};
 
-	var defaultColumns = [
-						{key: "ordrgDt",	    label: "발행일",			width: 80,		align: "center"}
-						,{key: "reqDt",	    	label: "요구일",			width: 80,		align: "center"}
-						,{key: "ordrgNm",	    label: "발행자",		    width: 60,		align: "center"}
-						,{key: "subNm",	    	label: "소분류",		    width: 70,		align: "left"}
-						,{key: "rsltYn",	    label: "결과",			width: 50,		align: "center", 	formatter: "bilgYn"}
-						,{key: "sameTimeResult",label: "동시",		    width: 60,		align: "center"}
-						,{key: "codeNm",	    label: "상태",		    width: 60,		align: "center"}
-						,{key: "reqNo",	    	label: "요청번호",			width: 90,		align: "center"}
-						,{key: "issNo",	    	label: "문제등록번호",		width: 90,		align: "center"}
-						,{key: "clntNm",	    label: "고객사",		    width: 180,		align: "left", formatter: function () {
-							return this.value.slice(0,12) + "(" + this.item.clntPjt + ")"}
-						}
-						 //,{key: "clntPjt",	    label: "고객사PJT",		width: 100,		align: "center"}
-						,{key: "prdtDivCd",	    label: "제품군",		    width: 70,		align: "center", 	    hidden: true}
-						,{key: "prdtDivNm",	    label: "제품군",		    width: 120,		align: "left"}
-						,{key: "matrDrwNo",	    label: "대표도번",		    width: 120,		align: "center"}
+	function escapeHtmlAttr(str) {
+		return String(str || '')
+			.replace(/&/g, '&amp;')
+			.replace(/"/g, '&quot;')
+			.replace(/</g, '&lt;')
+			.replace(/>/g, '&gt;');
+	}
 
-						,{key: "chkdept1Yn",	    label: "영업완료",		    width: 70,		align: "center",
+	function formatApprBadge(val) {
+		if (!val) return '';
+		var bg = '#eef2f7', color = '#495057';
+		if (val === '승인완료') {
+			bg = '#e6f4ea'; color = '#1e7e34';
+		} else if (val === '반려') {
+			bg = '#fdecea'; color = '#c62828';
+		} else if (val === '일괄승인') {
+			bg = '#ede7f6'; color = '#5e35b1';
+		} else if (val.indexOf('진행') > -1) {
+			bg = '#e8f0fe'; color = '#1a73e8';
+		}
+		return '<span style="display:inline-block;padding:1px 6px;border-radius:10px;font-size:11px;font-weight:600;background:' + bg + ';color:' + color + ';">' + escapeHtmlAttr(val) + '</span>';
+	}
+
+	function formatEllipsisTitle(val) {
+		var s = $.trim(val || '');
+		if (!s) return '';
+		return '<span title="' + escapeHtmlAttr(s) + '">' + escapeHtmlAttr(s) + '</span>';
+	}
+
+	function formatReqDtHighlight(val, item) {
+		if (!val) return '';
+		var todayStr = dateToStr(new Date());
+		var isOverdue = (item && item.rsltYn === 'N' && item.reqSt !== 'REQST03' && val < todayStr);
+		if (isOverdue) {
+			return '<span style="color:#d32f2f;font-weight:600;" title="요구일 경과 미완료">' + escapeHtmlAttr(val) + '</span>';
+		}
+		return escapeHtmlAttr(val);
+	}
+
+	var defaultColumns = [
+						{key: "ordrgDt",	    label: "발행일",			width: 85,		align: "center"}
+						,{key: "reqNo",	    	label: "요청번호",			width: 95,		align: "center"}
+						,{key: "issNo",	    	label: "문제번호",			width: 95,		align: "center"}
+						,{key: "codeNm",	    label: "요청상태",		    width: 65,		align: "center"}
+						,{key: "reqApprSts",    label: "요청결재",		    width: 80,		align: "center",
+							formatter: function () { return formatApprBadge(this.value); }
+						}
+						,{key: "rsltYn",	    label: "결과여부",			width: 60,		align: "center", 	formatter: "bilgYn"}
+						,{key: "rsltNo",	    label: "결과번호",			width: 95,		align: "center"}
+						,{key: "rsltApprSts",   label: "결과결재",		    width: 80,		align: "center",
+							formatter: function () { return formatApprBadge(this.value); }
+						}
+						,{key: "sameTimeResult",label: "동시",		    width: 50,		align: "center"}
+						,{key: "reqCdNm",	    label: "요청구분",		    width: 65,		align: "center"}
+						,{key: "clntNm",	    label: "고객사(PJT)",	    width: 170,		align: "left", formatter: function () {
+							var nm = (this.value || "").slice(0, 12);
+							return this.item.clntPjt ? nm + "(" + this.item.clntPjt + ")" : nm;
+						}}
+						,{key: "matrDrwNo",	    label: "대표도번(SalesCode)", width: 125,	align: "center"}
+						,{key: "eqpNm",	    	label: "장비명",		    width: 160,		align: "left", formatter: function () { return formatEllipsisTitle(this.value); }}
+						,{key: "prdtDivCd",	    label: "제품군CD",		    width: 70,		align: "center", 	    hidden: true}
+						,{key: "prdtDivNm",	    label: "제품군",		    width: 110,		align: "left"}
+						,{key: "partNm",	    label: "분류",		    width: 70,		align: "center"}
+						,{key: "midNm",	    	label: "대분류",		    width: 75,		align: "left"}
+						,{key: "subNm",	    	label: "소분류",		    width: 80,		align: "left"}
+						,{key: "mcPartNm",	    label: "기계분류",		    width: 75,		align: "center"}
+						,{key: "importantNm",	label: "중요도",		    width: 75,		align: "center"}
+						,{key: "impactNm",	    label: "영향도",		    width: 85,		align: "center"}
+						,{key: "scdStsNm",	    label: "일정지연상황",		width: 120,		align: "left"}
+						,{key: "reqDt",	    	label: "사내요구일",		width: 85,		align: "center",
+							formatter: function () { return formatReqDtHighlight(this.value, this.item); }
+						}
+						,{key: "custReqDt",	    label: "고객요구일",		width: 85,		align: "center"}
+						,{key: "delayDay",	    label: "지연일수",		    width: 65,		align: "right", formatter: "money"}
+						,{key: "reqRmk",	    label: "요청비고",		    width: 220,		align: "left", formatter: function () { return formatEllipsisTitle(this.value); }}
+						,{key: "vendCdNm",	    label: "발생공급업체",		width: 110,		align: "left"}
+						,{key: "ordrgNm",	    label: "발행자",		    width: 65,		align: "center"}
+						,{key: "deptId",	    label: "소속팀CD",			width: 80,		align: "center", 	    hidden: true}
+						,{key: "deptnNm2",	    label: "소속팀",			width: 95,		align: "center"}
+						,{key: "regNm",	    	label: "작성자",		    width: 65,		align: "center"}
+
+						,{key: "chkdept1Yn",	    label: "영업완료",		    width: 65,		align: "center",
 							editor: {
 								type   : "checkbox",
                                 disabled: function () {
@@ -274,7 +348,7 @@ if (typeof ax5.ui.toast === 'function') {
 								}
 							}
 						}
-						,{key: "chkdept2Yn",	    label: "설계완료",		    width: 70,		align: "center",
+						,{key: "chkdept2Yn",	    label: "설계완료",		    width: 65,		align: "center",
 							editor: {
 								type   : "checkbox",
                                 disabled: function () {
@@ -286,7 +360,7 @@ if (typeof ax5.ui.toast === 'function') {
 								}
 							}
 						}
-						,{key: "chkdept3Yn",	    label: "구매완료",		    width: 70,		align: "center",
+						,{key: "chkdept3Yn",	    label: "구매완료",		    width: 65,		align: "center",
 							editor: {
 								type   : "checkbox",
                                 disabled: function () {
@@ -298,7 +372,7 @@ if (typeof ax5.ui.toast === 'function') {
 								}
 							}
 						}
-						,{key: "chkdept4Yn",	    label: "생산완료",		    width: 70,		align: "center",
+						,{key: "chkdept4Yn",	    label: "생산완료",		    width: 65,		align: "center",
 							editor: {
 								type   : "checkbox",
                                 disabled: function () {
@@ -310,7 +384,7 @@ if (typeof ax5.ui.toast === 'function') {
 								}
 							}
 						}
-						,{key: "chkdept5Yn",	    label: "출장완료",		    width: 70,		align: "center",
+						,{key: "chkdept5Yn",	    label: "출장완료",		    width: 65,		align: "center",
 							editor: {
 								type   : "checkbox",
 								config : {
@@ -320,35 +394,26 @@ if (typeof ax5.ui.toast === 'function') {
 							}
 						}
 
-						,{key: "scdStsNm",	    label: "일정지연상황",		width: 125,		align: "left"}
-						,{key: "reqRmk",	    label: "요청비고",		    width: 240,		align: "left"}
-						,{key: "eqpNm",	    	label: "장비명",		    width: 160,		align: "left"}
-						,{key: "resltRst",	    label: "결과",	    	width: 140,		align: "left"}
-						,{key: "actFdmtSolutCd",label: "근본원인CD",	    	width: 140,		align: "left", hidden:true}
-						,{key: "actFdmtSolutNm",label: "근본원인",	    	width: 200,		align: "left"}
+						,{key: "creatDttm",	    label: "결과등록일",	    width: 85,		align: "center"}
+						,{key: "creatNm",	    label: "결과등록자",	    width: 75,		align: "center"}
+						,{key: "measRst",	    label: "조치원인",	    	width: 150,		align: "left", formatter: function () { return formatEllipsisTitle(this.value); }}
+						,{key: "resltRst",	    label: "결과내용",	    	width: 150,		align: "left", formatter: function () { return formatEllipsisTitle(this.value); }}
+						,{key: "actFdmtSolutCd",label: "근본원인CD",	    width: 100,		align: "left", hidden:true}
+						,{key: "actFdmtSolutNm",label: "근본원인",	    	width: 180,		align: "left", formatter: function () { return formatEllipsisTitle(this.value); }}
+						,{key: "actMh",	    	label: "조치공수",		    width: 65,		align: "right", formatter: "money"}
+						,{key: "sumTeamMd", 	label: "총합공수", 		width: 65,		align: "right", formatter: "money"}
+						,{key: "saleTeamMd", 	label: "영업공수", 		width: 65,		align: "right", formatter: "money"}
+						,{key: "dsgnTeamMd", 	label: "설계공수", 		width: 65,		align: "right", formatter: "money"}
+						,{key: "matrTeamMd", 	label: "구매공수", 		width: 65,		align: "right", formatter: "money"}
+						,{key: "prodTeamMd", 	label: "생산공수", 		width: 65,		align: "right", formatter: "money"}
 						,{key: "req1yn",	    label: "발주",		    width: 50,		align: "center"}
 						,{key: "req2yn",	    label: "출장",		    width: 50,		align: "center"}
-
-						,{key: "bustNm01",	    label: "출장구분",		    width: 50,		align: "center"}
-						,{key: "bustNm02",	    label: "출장구분",		    width: 50,		align: "center"}
-						,{key: "inwkNm01",	    label: "사내작업구분",		width: 50,		align: "center"}
-						,{key: "inwkNm02",	    label: "사내작업구분",		width: 50,		align: "center"}
-
-						,{key: "inwkNm",	    label: "사내작업구분",		width: 50,		align: "center"}
-						,{key: "partNm",	    label: "분류",		    width: 70,		align: "center"}
-						,{key: "midNm",	    	label: "대분류",		    width: 70,		align: "left"}
+						,{key: "bustNm01",	    label: "출장구분1",		    width: 70,		align: "center"}
+						,{key: "bustNm02",	    label: "출장구분2",		    width: 70,		align: "center"}
+						,{key: "inwkNm01",	    label: "사내작업1",		width: 70,		align: "center"}
+						,{key: "inwkNm02",	    label: "사내작업2",		width: 70,		align: "center"}
+						,{key: "inwkNm",	    label: "사내작업구분",		width: 80,		align: "center"}
 						,{key: "statYy",	    label: "마감년월",		    width: 70,		align: "center"}
-						,{key: "regNm",	    	label: "작성자",		    width: 70,		align: "center"}
-
-						,{key: "creatDttm",	    label: "결과등록일",	    width: 80,		align: "center"}
-						,{key: "creatNm",	    label: "결과등록자",	    width: 80,		align: "center"}
-						,{key: "deptId",	    label: "소속팀",			width: 100,		align: "center", 	    hidden: true}
-						,{key: "deptnNm2",	    label: "소속팀",			width: 100,		align: "center"}
-						,{key: "sumTeamMd", 	label: "총합공수", 		width: 70,		align: "center", formatter: "money"}
-						,{key: "saleTeamMd", 	label: "영업공수", 		width: 70,		align: "center", formatter: "money"}
-						,{key: "dsgnTeamMd", 	label: "설계공수", 		width: 70,		align: "center", formatter: "money"}
-						,{key: "matrTeamMd", 	label: "구매공수", 		width: 70,		align: "center", formatter: "money"}
-						,{key: "prodTeamMd", 	label: "생산공수", 		width: 70,		align: "center", formatter: "money"}
 	];
 
 	var gridView = {
@@ -374,7 +439,7 @@ if (typeof ax5.ui.toast === 'function') {
 						var index = this.dindex;
 						var targetObj = this.target;
 						var row = gridView.target.getList()[index];
-				        if (this.column.key == "rsltYn" && (this.item.sameTimeResult =="N")) {    //결과등록여부 필드 선택시
+				        if ((this.column.key == "rsltYn" || this.column.key == "rsltNo" || this.column.key == "rsltApprSts") && (this.item.sameTimeResult =="N")) {    //결과 관련 필드 더블클릭 시 결과 팝업
 								insertQualityRespModal();
 						} else {
 							insertQualityReqModal('U');
@@ -463,105 +528,64 @@ if (typeof ax5.ui.toast === 'function') {
 				// ,{key: "itemDiv",	    label: "아이템구분",	    width: 70,		align: "center", 	hidden:true}
 				// ,{key: "itemDivNm",	    label: "아이템구분이름",	    width: 70,		align: "center", 	hidden:true}
 				// ,{key: "prdtCd",	    label: "제품그룹코드",	    width: 70,		align: "center", 	hidden:true}
-				{key: "ordrgDt",	    label: "발행일",			width: 80,		align: "center"}
-				,{key: "reqDt",	    	label: "요구일",			width: 80,		align: "center"}
-				,{key: "ordrgNm",	    label: "발행자",		    width: 60,		align: "center"}
-				,{key: "partNm",	    label: "분류",		    width: 70,		align: "center"}
-				,{key: "rsltYn",	    label: "결과",			width: 50,		align: "center"}
-				,{key: "codeNm",	    label: "상태",		    width: 60,		align: "center"}
-				,{key: "reqNo",	    	label: "요청번호",			width: 100,		align: "center"}
-				,{key: "clntNm",	    label: "고객사",		    width: 180,		align: "left", formatter: function () {
-					return this.value.slice(0,12) + "(" + this.item.clntPjt + ")"}
-				}
-				 //,{key: "clntPjt",	    label: "고객사PJT",		width: 100,		align: "center"}
-				,{key: "matrDrwNo",	    label: "대표도번",		    width: 120,		align: "center"}
+				{key: "ordrgDt",	    label: "발행일",			width: 85,		align: "center"}
+				,{key: "reqNo",	    	label: "요청번호",			width: 95,		align: "center"}
+				,{key: "issNo",	    	label: "문제번호",			width: 95,		align: "center"}
+				,{key: "codeNm",	    label: "요청상태",		    width: 65,		align: "center"}
+				,{key: "reqApprSts",    label: "요청결재",		    width: 80,		align: "center"}
+				,{key: "rsltYn",	    label: "결과여부",			width: 60,		align: "center"}
+				,{key: "rsltNo",	    label: "결과번호",			width: 95,		align: "center"}
+				,{key: "rsltApprSts",   label: "결과결재",		    width: 80,		align: "center"}
+				,{key: "sameTimeResult",label: "동시",		    width: 50,		align: "center"}
+				,{key: "reqCdNm",	    label: "요청구분",		    width: 65,		align: "center"}
+				,{key: "clntNm",	    label: "고객사(PJT)",	    width: 170,		align: "left", formatter: function () {
+					var nm = (this.value || "").slice(0, 12);
+					return this.item.clntPjt ? nm + "(" + this.item.clntPjt + ")" : nm;
+				}}
+				,{key: "matrDrwNo",	    label: "대표도번(SalesCode)", width: 125,	align: "center"}
 				,{key: "eqpNm",	    	label: "장비명",		    width: 160,		align: "left"}
+				,{key: "prdtDivNm",	    label: "제품군",		    width: 110,		align: "left"}
+				,{key: "partNm",	    label: "분류",		    width: 70,		align: "center"}
+				,{key: "midNm",	    	label: "대분류",		    width: 75,		align: "left"}
+				,{key: "subNm",	    	label: "소분류",		    width: 80,		align: "left"}
+				,{key: "mcPartNm",	    label: "기계분류",		    width: 75,		align: "center"}
+				,{key: "importantNm",	label: "중요도",		    width: 75,		align: "center"}
+				,{key: "impactNm",	    label: "영향도",		    width: 85,		align: "center"}
+				,{key: "scdStsNm",	    label: "일정지연상황",		width: 120,		align: "left"}
+				,{key: "reqDt",	    	label: "사내요구일",		width: 85,		align: "center"}
+				,{key: "custReqDt",	    label: "고객요구일",		width: 85,		align: "center"}
+				,{key: "delayDay",	    label: "지연일수",		    width: 65,		align: "right", formatter: "money"}
+				,{key: "reqRmk",	    label: "요청비고",		    width: 220,		align: "left"}
+				,{key: "vendCdNm",	    label: "발생공급업체",		width: 110,		align: "left"}
+				,{key: "ordrgNm",	    label: "발행자",		    width: 65,		align: "center"}
+				,{key: "deptnNm2",	    label: "소속팀",			width: 95,		align: "center"}
+				,{key: "regNm",	    	label: "작성자",		    width: 65,		align: "center"}
 
-				,{key: "chkdept1Yn",	    label: "영업완료",		    width: 70,		align: "center",
-					editor: {
-						type   : "checkbox",
-                        disabled: function () {
-                            return chkDept1 == "N";
-                        },
-						config : {
-							trueValue: "Y",
-							falseValue: "N"
-						}
-					}
-                 }
-				,{key: "chkdept2Yn",	    label: "설계완료",		    width: 70,		align: "center",
-					editor: {
-						type   : "checkbox",
-                        disabled: function () {
-                            return chkDept2 == "N";
-                        },
-						config : {
-							trueValue: "Y",
-							falseValue: "N"
-						}
-					}
-				}
-				,{key: "chkdept3Yn",	    label: "구매완료",		    width: 70,		align: "center",
-					editor: {
-						type   : "checkbox",
-                        disabled: function () {
-                            return chkDept3 == "N";
-                        },
-						config : {
-							trueValue: "Y",
-							falseValue: "N"
-						}
-					}
-				}
-				,{key: "chkdept4Yn",	    label: "생산완료",		    width: 70,		align: "center",
-					editor: {
-						type   : "checkbox",
-                        disabled: function () {
-                            return chkDept4 == "N";
-                        },
-						config : {
-							trueValue: "Y",
-							falseValue: "N"
-						}
-					}
-				}
-				,{key: "chkdept5Yn",	    label: "출장완료",		    width: 70,		align: "center",
-					editor: {
-						type   : "checkbox",
-						config : {
-							trueValue: "Y",
-							falseValue: "N"
-						}
-					}
-				}
+				,{key: "chkdept1Yn",	    label: "영업완료",		    width: 65,		align: "center"}
+				,{key: "chkdept2Yn",	    label: "설계완료",		    width: 65,		align: "center"}
+				,{key: "chkdept3Yn",	    label: "구매완료",		    width: 65,		align: "center"}
+				,{key: "chkdept4Yn",	    label: "생산완료",		    width: 65,		align: "center"}
+				,{key: "chkdept5Yn",	    label: "출장완료",		    width: 65,		align: "center"}
 
-				,{key: "scdStsNm",	    label: "일정지연상황",		width: 125,		align: "left"}
-				,{key: "reqRmk",	    label: "요청비고",		    width: 240,		align: "left"}
-				,{key: "resltRst",	    label: "결과/근본대책",	    width: 140,		align: "left"}
+				,{key: "creatDttm",	    label: "결과등록일",	    width: 85,		align: "center"}
+				,{key: "creatNm",	    label: "결과등록자",	    width: 75,		align: "center"}
+				,{key: "measRst",	    label: "조치원인",	    	width: 150,		align: "left"}
+				,{key: "resltRst",	    label: "결과내용",	    	width: 150,		align: "left"}
+				,{key: "actFdmtSolutNm",label: "근본원인",	    	width: 180,		align: "left"}
+				,{key: "actMh",	    	label: "조치공수",		    width: 65,		align: "right", formatter: "money"}
+				,{key: "sumTeamMd", 	label: "총합공수", 		width: 65,		align: "right", formatter: "money"}
+				,{key: "saleTeamMd", 	label: "영업공수", 		width: 65,		align: "right", formatter: "money"}
+				,{key: "dsgnTeamMd", 	label: "설계공수", 		width: 65,		align: "right", formatter: "money"}
+				,{key: "matrTeamMd", 	label: "구매공수", 		width: 65,		align: "right", formatter: "money"}
+				,{key: "prodTeamMd", 	label: "생산공수", 		width: 65,		align: "right", formatter: "money"}
 				,{key: "req1yn",	    label: "발주",		    width: 50,		align: "center"}
 				,{key: "req2yn",	    label: "출장",		    width: 50,		align: "center"}
-
-				,{key: "bustNm01",	    label: "출장구분",		    width: 50,		align: "center"}
-				,{key: "bustNm02",	    label: "출장구분",		    width: 50,		align: "center"}
-				,{key: "inwkNm01",	    label: "사내작업구분",		width: 50,		align: "center"}
-				,{key: "inwkNm02",	    label: "사내작업구분",		width: 50,		align: "center"}
-
-				,{key: "inwkNm",	    label: "사내작업구분",		width: 50,		align: "center"}
-				,{key: "midNm",	    	label: "대분류",		    width: 70,		align: "left"}
-				,{key: "subNm",	    	label: "소분류",		    width: 70,		align: "left"}
-				,{key: "prdtDivNm",	    label: "제품군",		    width: 120,		align: "left"}
+				,{key: "bustNm01",	    label: "출장구분1",		    width: 70,		align: "center"}
+				,{key: "bustNm02",	    label: "출장구분2",		    width: 70,		align: "center"}
+				,{key: "inwkNm01",	    label: "사내작업1",		width: 70,		align: "center"}
+				,{key: "inwkNm02",	    label: "사내작업2",		width: 70,		align: "center"}
+				,{key: "inwkNm",	    label: "사내작업구분",		width: 80,		align: "center"}
 				,{key: "statYy",	    label: "마감년월",		    width: 70,		align: "center"}
-				,{key: "regNm",	    	label: "작성자",		    width: 70,		align: "center"}
-
-				,{key: "creatDttm",	    label: "결과등록일",	    width: 80,		align: "center"}
-				,{key: "creatNm",	    label: "결과등록자",	    width: 80,		align: "center"}
-				,{key: "deptId",	    label: "소속팀",		width: 100,		align: "center", 	    hidden: true}
-				,{key: "deptnNm2",	    label: "소속팀",		width: 100,		align: "center"}
-				,{key: "sumTeamMd", 	label: "총합공수", 		width: 70,		align: "center", formatter: "money"}
-				,{key: "saleTeamMd", 	label: "영업공수", 		width: 70,		align: "center", formatter: "money"}
-				,{key: "dsgnTeamMd", 	label: "설계공수", 		width: 70,		align: "center", formatter: "money"}
-				,{key: "matrTeamMd", 	label: "구매공수", 		width: 70,		align: "center", formatter: "money"}
-				,{key: "prodTeamMd", 	label: "생산공수", 		width: 70,		align: "center", formatter: "money"}
 				// ,{key: "resltSubCd",	label: "결과코드",	        width: 80,		align: "left", 	    hidden:true}
              ]
 			});
@@ -689,9 +713,8 @@ if (typeof ax5.ui.toast === 'function') {
 			let tempMessage = (row.rsltNo != undefined) ? "요청결과 등록자료가 있습니다. -->" + row.rsltNo : "";
 			tempMessage = tempMessage + "\n" + "삭제하시겠습니까?"
 			if (confirm(tempMessage)) {
-				postAjaxSync("/user/qm/qm01/selectApprovalChk", formData, null, function(data) {//결재가 진행이 되었는지 안되었는지 DB체크
-					var list = data.result[0]
-				    if (list == 'Y'){//결재가 한개라도 진행이 되었으면 알림창
+				postAjaxSync("/user/qm/qm01/selectDeleteApprovalChk", formData, null, function(data) {//작업자 본인 결재 외 타인 결재 진행 여부 DB체크
+				    if (data.result == 'Y'){//타인 결재가 한개라도 진행이 되었으면 알림창
 				    	alert("결재 진행중인 자료는 삭제할 수 없습니다.\n\n결재 진행 상태 확인 바랍니다.");
 				    	return;
 				    }
@@ -708,6 +731,48 @@ if (typeof ax5.ui.toast === 'function') {
 // 		}else{
 // 		  alert("접수상태가 진행 또는  완료상태 에서는 삭제 할수 없습니다.");
 // 		}
+	}
+
+	/*결과만 단독 삭제 버튼 클릭 시*/
+	function deleteQualityResp() {
+		var row = gridView.target.getList("selected")[0];
+		if (!row) {
+			alert("결과를 삭제할 자료를 선택하세요.");
+			return false;
+		}
+		if (!row.rsltNo) {
+			alert("등록된 결과 자료가 없습니다.");
+			return false;
+		}
+		if (row.sameTimeResult === "Y") {
+			alert("요청·결과 일괄등록 자료는 결과만 단독 삭제할 수 없습니다.\n좌측 [-] 버튼으로 요청서와 함께 삭제해 주세요.");
+			return false;
+		}
+		if (row.creatDttm && !monthCloseChk(row.creatDttm, 'D', row.coCd)) return;  //마감일통제
+
+		var formData = {
+			"fileTrgtKey" : row.fileTrgtKey,
+			"coCd"        : row.coCd,
+			"reqNo"       : row.reqNo,
+			"rsltNo"      : row.rsltNo,
+			"userId"      : jwt.userId,
+			"pgmId"       : "QM0101M01"
+		};
+
+		if (confirm("등록된 결과 자료(" + row.rsltNo + ")만 삭제하시겠습니까?\n(요청서 및 요청 첨부파일은 유지됩니다.)")) {
+			postAjaxSync("/user/qm/qm01/selectDeleteRespApprovalChk", formData, null, function(data) {
+				if (data.result == 'Y') {
+					alert("결과 결재가 진행중인 자료는 삭제할 수 없습니다.\n\n결재 진행 상태 확인 바랍니다.");
+					return;
+				}
+				putAjax("/user/qm/qm01/deleteQualityResp", formData, null, function(data) {
+					alert(data.resultMessage);
+					if (data.resultCode == 200) {
+						gridView.setData(0);
+					}
+				});
+			});
+		}
 	}
 
 	function insertQualityRespModal() {
@@ -842,21 +907,15 @@ if (typeof ax5.ui.toast === 'function') {
 
  // 엑셀다운로드
 	function excelDown() {
-		var formData = {
-			   "coCd" : $("#coCd_S").val(),
-	           "reqDtFrom" :  $("#reqDtFrom").val().replace(/\-/g, ''),
-	           "reqDtTo" : $("#reqDtTo").val().replace(/\-/g, ''),
-			   "ordrgId" : $("#userId_S").val(),
-			   "sharId" : $("#appId_S").val(),
-			   "salesCd" : $("#salesCd_S").val(),
-			   "itemCd" : $("#itemCd_S").val(),
-			   "prdtCd" : $("#prdtCd_S").val(),
-			   "prdtNm" :$("#prdtNm").val(),
-			   "eqpNm" : $("#eqpNm_S").val(),
-			   "clntCd" : $("#clntCd_S").val(),
-			   "partCd" : $("#cobtbCd_S").val()
-	    }
-		formData["pageNo"] = 1;
+		var formData = {};
+		$.each($('[data-search]'), function(idx, elem){
+			formData[$(elem).data("search")] = $(elem).val();
+		});
+		formData["reqDtFrom"] = $("#reqDtFrom").val().replace(/\-/g, '');
+		formData["reqDtTo"]   = $("#reqDtTo").val().replace(/\-/g, '');
+		formData["ordrgId"]   = $("#userId_S").val();
+		formData["ordrgNm"]   = $("#userName_S").val();
+		formData["pageNo"]    = 1;
 		formData["recordCnt"] = 99999999;
 		postAjax("/user/qm/qm01/selectQualityReqList", formData, null, function(data){
 

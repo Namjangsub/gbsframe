@@ -289,6 +289,8 @@
         <div class="contents no_bg">
             <div class="contents_tit">
                 <div class="add_btn_small pdl10">
+                    <a id="endSjNoY" onclick="endSjNo('Y');" style="height: 30px; line-height: 28px; width: 90px;"><i class="fas fa-lock"></i> 과제마감</a>
+                    <a id="endSjNoN" onclick="endSjNo('N');" style="height: 30px; line-height: 28px; width: 90px;"><i class="fas fa-unlock"></i> 마감취소</a>
 					<a onclick="mindMapInquiryModal();" style="height: 30px; line-height: 28px; width: 110px;"><i class="fa fa-project-diagram"></i> 이슈맵</a>
 					<a onclick="qr_generation();" style="height: 30px; line-height: 28px; width: 100px;">QR생성</a>
                     <!-- <a id="wb22confirmBtn" onclick="wb22OrdrsNoVersionUp();" style="height: 30px; line-height: 28px; width: 100px;">수주별 일괄버젼업</a> -->
@@ -320,6 +322,7 @@
     var isFirst = true;
     var coCd = null;
     var salesCd = null;
+    var lastClickedColumn = null;
 
     ax5.ui.grid.formatter["chkYn"] = function () {
         var color = this.value == "Y" ? "color-circle_02.png" : "color-circle_01.png";
@@ -377,7 +380,6 @@
 	                    {key: "verUpReason",      label: "Ver.Up사유",    width: 100,   align: "center", styleClass: function () {return salesGridColor(this);}},
 	                ]},
                     {key: "histYn",           label: "이력여부",          width: 60,   align: "center",hidden:true},
-                    {key: "endYn",            label: "마감여부",          width: 60,   align: "center", hidden:true},
                     {key: "planCodeCnt",      label: "1레벨 계획수량",  hidden:true},
 	    		    {key : undefined, label : "제작", columns: [
 	                    {key: "mkerDivNm",        label: "구분",       width: 60,   align: "center", styleClass: function () {return salesGridColor(this);}},
@@ -457,6 +459,7 @@
                         salesCd = this.item.salesCd;
 
                         var colKey = this.column ? this.column.key : '';
+                        lastClickedColumn = colKey;
                         if (colKey == "shipPhotoBfCnt" || colKey == "shipPhotoAfCnt") {
                             shipmentPhotoModal();
                         }
@@ -571,6 +574,7 @@
                     {key: "mkerDivNm",        label: "제작구분",       width: 60,   align: "center"},
                     {key: "mkerNm",           label: "제작처",       width: 160,   align: "left"},
                     {key: "smrizeNm",         label: "총괄PM",       width: 80,   align: "center"},
+                    {key: "endYn",            label: "마감여부",       width: 70,   align: "center"},
                     {key: "beginDt",          label: "시작일",       width: 80,   align: "center"},
                     {key: "deDt",             label: "출고일",       width: 80,   align: "center"},
                     {key: "acptncDt",         label: "완료검수일",       width: 80,   align: "center"},
@@ -1300,6 +1304,135 @@ $(document).ready(function() {
 			$('#clntPjtNm_S').val(row.codeNm);
 			salesGridView.setData(0);
 		});
+	}
+
+	// 과제마감 / 마감취소
+	function endSjNo(endYn) {
+		var selectedRows = salesGridView.target.getList("selected");
+		if (selectedRows.length === 0) {
+			alert("선택된 데이터가 없습니다.");
+			return;
+		}
+
+		var row = selectedRows[0];
+		var allList = salesGridView.target.getList();
+		var targetList = [];       // 처리 대상
+		var alreadyEndList = [];   // 이미 처리된 건
+		var confirmMsg = "";
+		var actionNm = endYn === 'Y' ? "마감" : "마감 취소";
+
+		if (selectedRows.length > 1) {
+			// 체크박스로 여러 건 선택 → 선택된 모든 건 일괄 마감/마감취소
+			var seenKeys = {};
+			for (var i = 0; i < selectedRows.length; i++) {
+				var item = selectedRows[i];
+				var uniqKey = (item.fileTrgtKey || '') + '|' + (item.salesCd || '');
+				if (seenKeys[uniqKey]) continue;
+				seenKeys[uniqKey] = true;
+
+				var curEndYn = (item.endYn === 'Y') ? 'Y' : 'N';
+				if (curEndYn === endYn) {
+					if (alreadyEndList.indexOf(item.salesCd) === -1) {
+						alreadyEndList.push(item.salesCd);
+					}
+				} else {
+					targetList.push({
+						"salesCd"      : item.salesCd,
+						"fileTrgtKey"  : item.fileTrgtKey,
+						"coCd"         : item.coCd
+					});
+				}
+			}
+
+			if (targetList.length === 0) {
+				customAlert("선택된 과제는 이미 모두 " + actionNm + " 상태입니다.");
+				return;
+			}
+
+			confirmMsg = "선택된 " + targetList.length + "건의 과제를 " + actionNm + "하시겠습니까?";
+			if (alreadyEndList.length > 0) {
+				confirmMsg += "\n\n※ 이미 " + actionNm + " 상태인 " + alreadyEndList.length + "건은 제외됩니다.";
+			}
+		} else if (lastClickedColumn === 'clntPjtNm') {
+			// 고객사PJT 컬럼 선택 → 동일 그룹 전체 마감/마감취소
+			var selectedClntPjtNm = row.clntPjtNm;
+
+			for (var i = 0; i < allList.length; i++) {
+				if (allList[i].clntPjtNm === selectedClntPjtNm) {
+					var curEndYn = (allList[i].endYn === 'Y') ? 'Y' : 'N';
+					if (curEndYn === 'Y' && endYn === 'Y') {
+						if (alreadyEndList.indexOf(allList[i].salesCd) === -1) {
+							alreadyEndList.push(allList[i].salesCd);
+						}
+					} else if (curEndYn === 'N' && endYn === 'N') {
+						if (alreadyEndList.indexOf(allList[i].salesCd) === -1) {
+							alreadyEndList.push(allList[i].salesCd);
+						}
+					} else {
+						targetList.push({
+							"salesCd"      : allList[i].salesCd,
+							"fileTrgtKey"  : allList[i].fileTrgtKey,
+							"coCd"         : allList[i].coCd
+						});
+					}
+				}
+			}
+
+			if (targetList.length === 0) {
+				customAlert("고객사PJT [" + selectedClntPjtNm + "] 에 속한 과제는 이미 모두 " + actionNm + " 상태입니다.");
+				return;
+			}
+
+			confirmMsg = "고객사PJT [" + selectedClntPjtNm + "] 에 속한 "
+					   + targetList.length + "건의 과제를 " + actionNm + "하시겠습니까?";
+			if (alreadyEndList.length > 0) {
+				confirmMsg += "\n\n※ 이미 " + actionNm + " 상태인 " + alreadyEndList.length + "건은 제외됩니다.";
+			}
+		} else {
+			// 다른 컬럼 선택 → 선택된 1건만 마감/마감취소
+			var rowEndYn = (row.endYn === 'Y') ? 'Y' : 'N';
+			if (rowEndYn === 'Y' && endYn === 'Y') {
+				customAlert("이미 마감된 과제입니다.");
+				return;
+			}
+			if (rowEndYn === 'N' && endYn === 'N') {
+				customAlert("이미 마감 취소(진행 중) 상태인 과제입니다.");
+				return;
+			}
+
+			targetList.push({
+				"salesCd"      : row.salesCd,
+				"fileTrgtKey"  : row.fileTrgtKey,
+				"coCd"         : row.coCd
+			});
+
+			var sjText = "SALES CD [" + row.salesCd + "]" + (row.sjNm ? " (" + row.sjNm + ")" : "");
+			if (endYn === 'Y') {
+				confirmMsg = sjText + " 과제를 마감하시겠습니까?";
+			} else if (endYn === 'N') {
+				confirmMsg = sjText + " 과제의 마감을 취소하시겠습니까?";
+			}
+		}
+
+		if (confirm(confirmMsg)) {
+			var formData = {
+				"userId"        : jwt.userId,
+				"pgmId"         : "WB2201M02",
+				"endYn"         : endYn,
+				"targetList"    : JSON.stringify(targetList)
+			};
+
+			postAjaxSync("/user/wb/wb21/endSjNo", formData, null, function(data) {
+				if (data.resultCode == 200) {
+					var countPrefix = targetList.length > 1 ? targetList.length + "건의 " : "";
+					var successMsg = countPrefix + (endYn === 'Y' ? "과제가 마감되었습니다." : "과제 마감이 취소되었습니다.");
+					customAlert(data.resultMessage || successMsg);
+					salesGridView.setData(0);
+				} else {
+					customAlert(data.resultMessage || (endYn === 'Y' ? "과제 마감에 실패하였습니다." : "과제 마감 취소에 실패하였습니다."));
+				}
+			});
+		}
 	}
 
 </script>

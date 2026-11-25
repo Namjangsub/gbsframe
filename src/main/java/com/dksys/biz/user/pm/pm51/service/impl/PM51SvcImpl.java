@@ -667,8 +667,8 @@ public class PM51SvcImpl implements PM51Svc {
 				iSharng++;
 			} else {
 				approvalMap.put("sanCtnSn", Integer.toString(iApproval));
-				// 출장신청/복명서 관리부서도 등록된 순번대로 한 명씩 결재한다.
-				if ("mngApprovalArr".equals(arrKey)) {
+				// 출장신청/복명서 관리부서도 기본은 결재(APPR)이나, 이미 합의(AGREE)/협조(COOP) 등이 등록되어 있으면 기존 결재구분을 유지한다.
+				if ("mngApprovalArr".equals(arrKey) && !hasText(approvalMap.get("lineType"))) {
 					approvalMap.put("lineType", "APPR");
 				}
 				approvalMap.put("pgParam", pgParam2);
@@ -1913,9 +1913,11 @@ public class PM51SvcImpl implements PM51Svc {
 			if (!hasText(userId)) {
 				userId = approvalMap.get("todoId");
 			}
-			if (!isShareApproval(approvalMap) && userId != null && userId.equals(skipSelfApprovalUserId)) continue;
+			String userIdKey = hasText(userId) ? userId.trim().toLowerCase(java.util.Locale.ROOT) : "";
+			if (!isShareApproval(approvalMap) && hasText(skipSelfApprovalUserId)
+					&& userIdKey.equals(skipSelfApprovalUserId.trim().toLowerCase(java.util.Locale.ROOT))) continue;
 			Set<String> idSet = "공유".equals(approvalMap.get("gb")) ? sharedUserIds : registeredUserIds;
-			if (hasText(userId) && !idSet.add(userId)) {
+			if (hasText(userIdKey) && !idSet.add(userIdKey)) {
 				continue;
 			}
 			mergedApprovalArr.add(approvalMap);
@@ -1928,7 +1930,10 @@ public class PM51SvcImpl implements PM51Svc {
 
 		for (Map<String, String> leaderRow : leaderArr) {
 			String userId = leaderRow.get("usrNm");
-			if (!hasText(userId) || userId.equals(skipSelfApprovalUserId) || !registeredUserIds.add(userId)) {
+			String userIdKey = hasText(userId) ? userId.trim().toLowerCase(java.util.Locale.ROOT) : "";
+			if (!hasText(userIdKey)
+					|| (hasText(skipSelfApprovalUserId) && userIdKey.equals(skipSelfApprovalUserId.trim().toLowerCase(java.util.Locale.ROOT)))
+					|| !registeredUserIds.add(userIdKey)) {
 				continue;
 			}
 			// 조회 결과(CamelMap)는 put 시 키가 변형되므로 일반 HashMap으로 복사해서 사용
@@ -1949,7 +1954,7 @@ public class PM51SvcImpl implements PM51Svc {
 		for (Map<String, String> approvalMap : mergedApprovalArr) {
 			String userId = hasText(approvalMap.get("usrNm")) ? approvalMap.get("usrNm") : approvalMap.get("todoId");
 			if (hasText(userId)) {
-				registeredUserIds.add(userId);
+				registeredUserIds.add(userId.trim().toLowerCase(java.util.Locale.ROOT));
 			}
 		}
 
@@ -1970,7 +1975,7 @@ public class PM51SvcImpl implements PM51Svc {
 			}
 		}
 
-		if (registeredUserIds.add(reqId)) {
+		if (registeredUserIds.add(reqId.trim().toLowerCase(java.util.Locale.ROOT))) {
 			Map<String, String> applicantMap = new HashMap<>();
 			applicantMap.put("gb", "결재");
 			applicantMap.put("usrNm", reqId);
@@ -1992,11 +1997,13 @@ public class PM51SvcImpl implements PM51Svc {
 		for (Map<String, String> approvalMap : mergedApprovalArr) {
 			String userId = hasText(approvalMap.get("usrNm")) ? approvalMap.get("usrNm") : approvalMap.get("todoId");
 			if (hasText(userId)) {
-				registeredUserIds.add(userId);
+				registeredUserIds.add(userId.trim().toLowerCase(java.util.Locale.ROOT));
 			}
 		}
-		for (String userId : selectPayMngApproverIds()) {
-			if (registeredUserIds.add(userId)) {
+		for (String rawUserId : selectPayMngApproverIds()) {
+			String userId = rawUserId == null ? "" : rawUserId.trim();
+			if (!hasText(userId)) continue;
+			if (registeredUserIds.add(userId.toLowerCase(java.util.Locale.ROOT))) {
 				Map<String, String> approvalMap = new HashMap<>();
 				approvalMap.put("gb", "결재");
 				approvalMap.put("usrNm", userId);

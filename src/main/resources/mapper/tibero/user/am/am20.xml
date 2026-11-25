@@ -31,40 +31,74 @@
         </if>
     </sql>
 
-    <!-- 1. 결재 대기함 (Inbox) - 내가 지금 결재해야 할 차례인 문서 -->
+    <!-- 1. 결재 대기함 (Inbox) - 내가 지금 결재해야 할 차례인 문서 (최종결재 완료 후 미확인 협조(COOP) 포함) -->
     <select id="selectInboxCount" parameterType="Map" resultType="int">
         SELECT COUNT(*)
           FROM TB_AM11M01 M
-         WHERE M.DOC_STATUS IN ('REQUEST', 'PROGRESS', 'POST_PROGRESS')
-           AND (
-                M.CURR_APPROVER_ID = #{userId}
-                OR EXISTS (
-                    SELECT 1 FROM TB_AM11D01 P
-                     WHERE P.DOC_ID = M.DOC_ID
-                       AND P.LINE_STATUS = 'PENDING'
-                       AND P.APPROVER_ID = #{userId}
+         WHERE (
+                (
+                    M.DOC_STATUS IN ('REQUEST', 'PROGRESS', 'POST_PROGRESS')
+                    AND (
+                         (
+                             M.CURR_APPROVER_ID = #{userId}
+                             AND EXISTS (
+                                 SELECT 1 FROM TB_AM11D01 X
+                                  WHERE X.DOC_ID = M.DOC_ID
+                                    AND X.LINE_SEQ = M.CURR_LINE_SEQ
+                                    AND X.LINE_STATUS IN ('READY', 'PENDING')
+                             )
+                         )
+                         OR EXISTS (
+                             SELECT 1 FROM TB_AM11D01 P
+                              WHERE P.DOC_ID = M.DOC_ID
+                                AND P.LINE_STATUS = 'PENDING'
+                                AND (
+                                     P.APPROVER_ID = #{userId}
+                                     OR EXISTS (
+                                         SELECT 1
+                                           FROM TB_AM03M02 G
+                                          WHERE G.ORIGIN_USER_ID = P.APPROVER_ID
+                                            AND G.DELEGATE_USER_ID = #{userId}
+                                            AND G.USE_YN = 'Y'
+                                            AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN G.START_DT AND G.END_DT
+                                     )
+                                )
+                         )
+                         OR EXISTS (
+                             SELECT 1 FROM TB_AM11D01 P
+                              WHERE P.DOC_ID = M.DOC_ID
+                                AND P.LINE_STATUS IN ('READY', 'PENDING')
+                                AND P.LINE_TYPE NOT IN ('COOP', 'REF', 'REFERENCE', 'POST')
+                                AND P.APPROVER_ID = #{userId}
+                                AND NOT EXISTS (
+                                    SELECT 1 FROM TB_AM11D01 Q
+                                     WHERE Q.DOC_ID = M.DOC_ID
+                                       AND Q.LINE_SEQ &lt; P.LINE_SEQ
+                                       AND Q.LINE_TYPE NOT IN ('COOP', 'REF', 'REFERENCE', 'POST')
+                                       AND Q.LINE_STATUS NOT IN ('APPROVED', 'ARBIT', 'REJECTED')
+                                )
+                         )
+                    )
                 )
-                OR EXISTS (
-                    SELECT 1
-                      FROM TB_AM03M02 G
-                     WHERE G.ORIGIN_USER_ID = M.CURR_APPROVER_ID
-                       AND G.DELEGATE_USER_ID = #{userId}
-                       AND G.USE_YN = 'Y'
-                       AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN G.START_DT AND G.END_DT
-                )
-                OR EXISTS (
-                    SELECT 1 FROM TB_AM11D01 P
-                     WHERE P.DOC_ID = M.DOC_ID
-                       AND P.LINE_STATUS IN ('READY', 'PENDING')
-                       AND P.LINE_TYPE NOT IN ('COOP', 'REF', 'REFERENCE', 'POST')
-                       AND P.APPROVER_ID = #{userId}
-                       AND NOT EXISTS (
-                           SELECT 1 FROM TB_AM11D01 Q
-                            WHERE Q.DOC_ID = M.DOC_ID
-                              AND Q.LINE_SEQ &lt; P.LINE_SEQ
-                              AND Q.LINE_TYPE NOT IN ('COOP', 'REF', 'REFERENCE', 'POST')
-                              AND Q.LINE_STATUS NOT IN ('APPROVED', 'ARBIT', 'REJECTED')
-                       )
+                OR (
+                    M.DOC_STATUS = 'COMPLETED'
+                    AND EXISTS (
+                        SELECT 1 FROM TB_AM11D01 P
+                         WHERE P.DOC_ID = M.DOC_ID
+                           AND P.LINE_TYPE = 'COOP'
+                           AND P.LINE_STATUS = 'PENDING'
+                           AND (
+                                P.APPROVER_ID = #{userId}
+                                OR EXISTS (
+                                    SELECT 1
+                                      FROM TB_AM03M02 G
+                                     WHERE G.ORIGIN_USER_ID = P.APPROVER_ID
+                                       AND G.DELEGATE_USER_ID = #{userId}
+                                       AND G.USE_YN = 'Y'
+                                       AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN G.START_DT AND G.END_DT
+                                )
+                           )
+                    )
                 )
            )
            <include refid="approvalSearchCondition"/>
@@ -92,40 +126,74 @@
                                M.CURR_LINE_SEQ,
                                M.CURR_APPROVER_ID,
                                M.CURR_APPROVER_NM,
-                               (SELECT LINE_TYPE FROM TB_AM11D01 WHERE DOC_ID = M.DOC_ID AND LINE_SEQ = M.CURR_LINE_SEQ) AS MY_LINE_TYPE,
-                               CASE WHEN M.CURR_APPROVER_ID != #{userId} THEN 'Y' ELSE 'N' END AS IS_DELEGATED
+                               NVL((SELECT MIN(P.LINE_TYPE) FROM TB_AM11D01 P WHERE P.DOC_ID = M.DOC_ID AND P.LINE_STATUS = 'PENDING' AND P.APPROVER_ID = #{userId}), (SELECT LINE_TYPE FROM TB_AM11D01 WHERE DOC_ID = M.DOC_ID AND LINE_SEQ = M.CURR_LINE_SEQ)) AS MY_LINE_TYPE,
+                               CASE WHEN M.CURR_APPROVER_ID != #{userId} AND NOT EXISTS (SELECT 1 FROM TB_AM11D01 P WHERE P.DOC_ID = M.DOC_ID AND P.LINE_STATUS = 'PENDING' AND P.APPROVER_ID = #{userId}) THEN 'Y' ELSE 'N' END AS IS_DELEGATED
                           FROM TB_AM11M01 M
                                LEFT OUTER JOIN TB_AM02M01 F ON M.FORM_CD = F.FORM_CD
-                         WHERE M.DOC_STATUS IN ('REQUEST', 'PROGRESS', 'POST_PROGRESS')
-                           AND (
-                                M.CURR_APPROVER_ID = #{userId}
-                                OR EXISTS (
-                                    SELECT 1 FROM TB_AM11D01 P
-                                     WHERE P.DOC_ID = M.DOC_ID
-                                       AND P.LINE_STATUS = 'PENDING'
-                                       AND P.APPROVER_ID = #{userId}
+                         WHERE (
+                                (
+                                    M.DOC_STATUS IN ('REQUEST', 'PROGRESS', 'POST_PROGRESS')
+                                    AND (
+                                         (
+                                             M.CURR_APPROVER_ID = #{userId}
+                                             AND EXISTS (
+                                                 SELECT 1 FROM TB_AM11D01 X
+                                                  WHERE X.DOC_ID = M.DOC_ID
+                                                    AND X.LINE_SEQ = M.CURR_LINE_SEQ
+                                                    AND X.LINE_STATUS IN ('READY', 'PENDING')
+                                             )
+                                         )
+                                         OR EXISTS (
+                                             SELECT 1 FROM TB_AM11D01 P
+                                              WHERE P.DOC_ID = M.DOC_ID
+                                                AND P.LINE_STATUS = 'PENDING'
+                                                AND (
+                                                     P.APPROVER_ID = #{userId}
+                                                     OR EXISTS (
+                                                         SELECT 1
+                                                           FROM TB_AM03M02 G
+                                                          WHERE G.ORIGIN_USER_ID = P.APPROVER_ID
+                                                            AND G.DELEGATE_USER_ID = #{userId}
+                                                            AND G.USE_YN = 'Y'
+                                                            AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN G.START_DT AND G.END_DT
+                                                     )
+                                                )
+                                         )
+                                         OR EXISTS (
+                                             SELECT 1 FROM TB_AM11D01 P
+                                              WHERE P.DOC_ID = M.DOC_ID
+                                                AND P.LINE_STATUS IN ('READY', 'PENDING')
+                                                AND P.LINE_TYPE NOT IN ('COOP', 'REF', 'REFERENCE', 'POST')
+                                                AND P.APPROVER_ID = #{userId}
+                                                AND NOT EXISTS (
+                                                    SELECT 1 FROM TB_AM11D01 Q
+                                                     WHERE Q.DOC_ID = M.DOC_ID
+                                                       AND Q.LINE_SEQ &lt; P.LINE_SEQ
+                                                       AND Q.LINE_TYPE NOT IN ('COOP', 'REF', 'REFERENCE', 'POST')
+                                                       AND Q.LINE_STATUS NOT IN ('APPROVED', 'ARBIT', 'REJECTED')
+                                                )
+                                         )
+                                    )
                                 )
-                                OR EXISTS (
-                                    SELECT 1
-                                      FROM TB_AM03M02 G
-                                     WHERE G.ORIGIN_USER_ID = M.CURR_APPROVER_ID
-                                       AND G.DELEGATE_USER_ID = #{userId}
-                                       AND G.USE_YN = 'Y'
-                                       AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN G.START_DT AND G.END_DT
-                                )
-                                OR EXISTS (
-                                    SELECT 1 FROM TB_AM11D01 P
-                                     WHERE P.DOC_ID = M.DOC_ID
-                                       AND P.LINE_STATUS IN ('READY', 'PENDING')
-                                       AND P.LINE_TYPE NOT IN ('COOP', 'REF', 'REFERENCE', 'POST')
-                                       AND P.APPROVER_ID = #{userId}
-                                       AND NOT EXISTS (
-                                           SELECT 1 FROM TB_AM11D01 Q
-                                            WHERE Q.DOC_ID = M.DOC_ID
-                                              AND Q.LINE_SEQ &lt; P.LINE_SEQ
-                                              AND Q.LINE_TYPE NOT IN ('COOP', 'REF', 'REFERENCE', 'POST')
-                                              AND Q.LINE_STATUS NOT IN ('APPROVED', 'ARBIT', 'REJECTED')
-                                       )
+                                OR (
+                                    M.DOC_STATUS = 'COMPLETED'
+                                    AND EXISTS (
+                                        SELECT 1 FROM TB_AM11D01 P
+                                         WHERE P.DOC_ID = M.DOC_ID
+                                           AND P.LINE_TYPE = 'COOP'
+                                           AND P.LINE_STATUS = 'PENDING'
+                                           AND (
+                                                P.APPROVER_ID = #{userId}
+                                                OR EXISTS (
+                                                    SELECT 1
+                                                      FROM TB_AM03M02 G
+                                                     WHERE G.ORIGIN_USER_ID = P.APPROVER_ID
+                                                       AND G.DELEGATE_USER_ID = #{userId}
+                                                       AND G.USE_YN = 'Y'
+                                                       AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN G.START_DT AND G.END_DT
+                                                )
+                                           )
+                                    )
                                 )
                            )
                            <include refid="approvalSearchCondition"/>

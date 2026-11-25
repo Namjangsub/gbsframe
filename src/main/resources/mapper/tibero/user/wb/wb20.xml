@@ -105,6 +105,27 @@
 					  AND S.SANCTN_STTUS = 'N'
 					  AND S.TODO_ID != T.TODO_ID
 					  AND S.SANCTN_SN &lt; T.SANCTN_SN
+					  AND NVL(S.LINE_TYPE, 'APPR') NOT IN ('COOP', 'REF', 'REFERENCE', 'POST')
+					  AND NOT (
+					      NVL(T.LINE_TYPE, 'APPR') = 'AGREE'
+					      AND NOT EXISTS (
+					          SELECT 1
+					            FROM TB_WB20M03 X
+					           WHERE X.TODO_DIV1_CODE_ID = T.TODO_DIV1_CODE_ID
+					             AND X.TODO_DIV2_CODE_ID = T.TODO_DIV2_CODE_ID
+					             AND X.SALES_CD = T.SALES_CD
+					             AND X.TODO_NO = T.TODO_NO
+					             AND X.SANCTN_SN &gt; S.SANCTN_SN
+					             AND X.SANCTN_SN &lt;= T.SANCTN_SN
+					             AND NVL(X.LINE_TYPE, 'APPR') NOT IN ('AGREE', 'COOP', 'REF', 'REFERENCE')
+					      )
+					  )
+					  AND NOT EXISTS (
+					      SELECT 1
+					      FROM TB_AM11D01 D
+					      WHERE D.WB20_TODO_KEY = TO_CHAR(S.TODO_KEY)
+					        AND D.LINE_TYPE IN ('COOP', 'REF', 'REFERENCE', 'POST')
+					  )
 				)
 			)
 		GROUP BY T.TODO_DIV1_CODE_ID
@@ -138,6 +159,35 @@
 	</select>
 
 	<!-- ToDo List 메인 화면 조회 리스트  -->
+	<sql id="wb20BeforeNotConfirmSubquery">
+		NVL((
+			SELECT COUNT(*) CNT
+			FROM TB_WB20M03 S
+			WHERE S.TODO_DIV1_CODE_ID = T.TODO_DIV1_CODE_ID
+			  AND S.TODO_DIV2_CODE_ID = T.TODO_DIV2_CODE_ID
+			  AND S.SALES_CD = T.SALES_CD
+			  AND S.TODO_NO = T.TODO_NO
+			  AND S.SANCTN_STTUS = 'N'
+			  AND S.TODO_ID != T.TODO_ID
+			  AND S.SANCTN_SN <![CDATA[ < ]]> T.SANCTN_SN
+			  AND NVL(S.LINE_TYPE, 'APPR') NOT IN ('COOP', 'REF', 'REFERENCE', 'POST')
+			  AND NOT (
+			      NVL(T.LINE_TYPE, 'APPR') = 'AGREE'
+			      AND NOT EXISTS (
+			          SELECT 1
+			            FROM TB_WB20M03 X
+			           WHERE X.TODO_DIV1_CODE_ID = T.TODO_DIV1_CODE_ID
+			             AND X.TODO_DIV2_CODE_ID = T.TODO_DIV2_CODE_ID
+			             AND X.SALES_CD = T.SALES_CD
+			             AND X.TODO_NO = T.TODO_NO
+			             AND X.SANCTN_SN &gt; S.SANCTN_SN
+			             AND X.SANCTN_SN &lt;= T.SANCTN_SN
+			             AND NVL(X.LINE_TYPE, 'APPR') NOT IN ('AGREE', 'COOP', 'REF', 'REFERENCE')
+			      )
+			  )
+		), 0)
+	</sql>
+
 	<select id="selectToDoList" parameterType="Map" resultType="camelMap">
 		SELECT Z.*
 		FROM
@@ -296,17 +346,7 @@
 						, '' AS DUDT_INTEND_DT
 						, '' AS VIEW_SORT
 						, NVL(QP.SAME_TIME_RESULT,'N')  AS SAME_TIME_RESULT	--발주요청서와 결과를 동시에 등록한 자료 구분
-						, NVL((
-							  SELECT COUNT(*) CNT
-							  FROM TB_WB20M03 S
-							  WHERE S.TODO_DIV1_CODE_ID = T.TODO_DIV1_CODE_ID
-							    AND S.TODO_DIV2_CODE_ID = T.TODO_DIV2_CODE_ID
-							    AND S.SALES_CD = T.SALES_CD
-							    AND S.TODO_NO = T.TODO_NO
-							    AND S.SANCTN_STTUS = 'N'
-							    AND S.TODO_ID != T.TODO_ID
-							    AND S.SANCTN_SN <![CDATA[ < ]]> T.SANCTN_SN
-						), 0) AS BEFORE_NOT_CONFIRM  --이전미결자료 존재여부
+						, <include refid="wb20BeforeNotConfirmSubquery"/> AS BEFORE_NOT_CONFIRM  --이전미결자료 존재여부
 					FROM TB_WB20M03 T
 							LEFT OUTER JOIN TB_CM05M01 X ON  X.CODE_ID = T.TODO_DIV2_CODE_ID
 							LEFT OUTER JOIN TB_CM06M01 B  ON T.TODO_ID = B.ID
@@ -526,23 +566,30 @@
 			, B.TEAM_MANAGER AS DEPT_TEAM_MANAGER
 			,
 			(
-				SELECT SANCTN_STTUS
-					FROM
-					(
-					SELECT SANCTN_STTUS
-						, ROWNUM RN
-						FROM TB_WB20M03 B
+				SELECT CASE WHEN COUNT(*) = 0 THEN NULL ELSE MIN(NVL(B.SANCTN_STTUS, 'N')) END
+					FROM TB_WB20M03 B
 					WHERE 1=1
 						AND A.SANCTN_SN <![CDATA[ > ]]> B.SANCTN_SN
 						AND A.CO_CD = B.CO_CD
 						AND A.TODO_DIV1_CODE_ID = B.TODO_DIV1_CODE_ID
 						AND A.TODO_DIV2_CODE_ID = B.TODO_DIV2_CODE_ID
-						AND NVL(B.LINE_TYPE, 'APPR') &lt;&gt; 'COOP'
+						AND NVL(B.LINE_TYPE, 'APPR') NOT IN ('COOP', 'POST', 'REF', 'REFERENCE')
+						AND NOT (
+							NVL(A.LINE_TYPE, 'APPR') = 'AGREE'
+							AND NOT EXISTS (
+								SELECT 1
+								  FROM TB_WB20M03 X
+								 WHERE X.CO_CD = A.CO_CD
+								   AND X.TODO_DIV1_CODE_ID = A.TODO_DIV1_CODE_ID
+								   AND X.TODO_DIV2_CODE_ID = A.TODO_DIV2_CODE_ID
+								   AND X.TODO_NO = A.TODO_NO
+								   AND X.SANCTN_SN &gt; B.SANCTN_SN
+								   AND X.SANCTN_SN &lt;= A.SANCTN_SN
+								   AND NVL(X.LINE_TYPE, 'APPR') NOT IN ('AGREE', 'COOP', 'REF', 'REFERENCE')
+							)
+						)
 <!-- 						AND A.SALES_CD = B.SALES_CD -->
 						AND A.TODO_NO = B.TODO_NO
-					ORDER BY B.SANCTN_SN DESC
-					)
-					WHERE RN=1
 			) AS PRE_STTUS 			/* 하위 완료여부 */
 ,
 			(
@@ -868,6 +915,9 @@
 		               <if test="includeCompleted != null and includeCompleted == 'Y'.toString()">
 		               OR M.DOC_STATUS = 'COMPLETED'
 		               </if>
+		               <if test="includeCoopPendingOnCompleted != null and includeCoopPendingOnCompleted == 'Y'.toString()">
+		               OR (M.DOC_STATUS = 'COMPLETED' AND D.LINE_TYPE = 'COOP' AND D.LINE_STATUS = 'PENDING')
+		               </if>
 		           )
 		           <choose>
 		           <when test="cr02Cancel == 'Y'.toString()">
@@ -929,10 +979,10 @@
 	</sql>
 
 	<!-- 취소 라인보다 뒤에 열려 있는 PENDING 라인을 READY로 되돌린다. 단, 아래는 되돌리지 않는다.
-	     1) 협조(COOP): 비구속 병렬이라 상신 즉시 열려 있어야 한다.
-	     2) 취소 라인과 같은 병렬 단계의 피어(취소 라인 뒤로 이어진 연속 AGREE): 엔진은 단계 진입 때만 열어 주므로
+	     1) 취소 라인과 같은 병렬 단계의 피어(취소 라인 뒤로 이어진 연속 AGREE): 엔진은 단계 진입 때만 열어 주므로
 	        READY로 밀면 다시 열리지 않아 교착한다. 단계 구성은 엔진(approveDocument)과 동일하게
-	        "헤드 + 뒤따르는 연속 AGREE, 첫 비-AGREE에서 끊김"으로 본다. -->
+	        "헤드 + 뒤따르는 연속 AGREE, 첫 비-AGREE에서 끊김"으로 본다.
+	     (후속 순번의 협조 COOP도 아직 미확인 PENDING이면 권한 도래 전 상태로 함께 READY 복원) -->
 	<update id="syncAmApprovalCancelNextLine" parameterType="Map">
 		UPDATE TB_AM11D01 L
 		   SET LINE_STATUS = 'READY',
@@ -941,7 +991,6 @@
 		       UDT_DTTM    = SYSDATE
 		 WHERE L.DOC_ID = #{amDocId, jdbcType=VARCHAR}
 		   AND L.LINE_STATUS = 'PENDING'
-		   AND NVL(L.LINE_TYPE, 'APPR') <![CDATA[ <> ]]> 'COOP'
 		   AND L.LINE_SEQ &gt; NVL((<include refid="amCancelLineSeq"/>), 9999)
 		   AND NOT (
 		       NVL(L.LINE_TYPE, 'APPR') = 'AGREE'
@@ -951,7 +1000,7 @@
 		            WHERE X.DOC_ID = L.DOC_ID
 		              AND X.LINE_SEQ &gt; (<include refid="amCancelLineSeq"/>)
 		              AND X.LINE_SEQ <![CDATA[ <= ]]> L.LINE_SEQ
-		              AND NVL(X.LINE_TYPE, 'APPR') <![CDATA[ <> ]]> 'AGREE'
+		              AND NVL(X.LINE_TYPE, 'APPR') NOT IN ('AGREE', 'COOP', 'REF', 'REFERENCE')
 		       )
 		   )
 	</update>
@@ -1255,6 +1304,12 @@
 			WHERE TODO_NO = #{todoNo,jdbcType=VARCHAR}
 			AND CO_CD = #{coCd,jdbcType=VARCHAR}
 			AND CREAT_DTTM IS NOT NULL
+			<if test="todoDiv2CodeIds != null and todoDiv2CodeIds != ''">
+			AND INSTR(',' || #{todoDiv2CodeIds} || ',', ',' || TODO_DIV2_CODE_ID || ',') &gt; 0
+			</if>
+			<if test="histNo != null and histNo != ''">
+			AND ETC_FIELD2 = #{histNo,jdbcType=VARCHAR}
+			</if>
 			ORDER BY CREAT_DTTM DESC
 		)
 		WHERE ROWNUM = 1
@@ -1515,6 +1570,12 @@
 			FROM TB_WB20M03
 			WHERE TODO_NO = #{todoNo,jdbcType=VARCHAR}
 				AND CO_CD = #{coCd,jdbcType=VARCHAR}
+			<if test="todoDiv2CodeIds != null and todoDiv2CodeIds != ''">
+				AND INSTR(',' || #{todoDiv2CodeIds} || ',', ',' || TODO_DIV2_CODE_ID || ',') &gt; 0
+			</if>
+			<if test="histNo != null and histNo != ''">
+				AND ETC_FIELD2 = #{histNo,jdbcType=VARCHAR}
+			</if>
 			ORDER BY CASE WHEN TODO_DIV1_CODE_ID = #{todoDiv1CodeId,jdbcType=VARCHAR} THEN 0 ELSE 1 END
 					, SANCTN_SN
 		)
@@ -1613,6 +1674,9 @@
 		   AND CO_CD = #{coCd, jdbcType=VARCHAR}
 		   AND SANCTN_STTUS != 'Y'
 		   AND TODO_DIV1_CODE_ID IN ('TODODIV20','TODODIV10')
+		<if test="todoDiv2CodeIds != null and todoDiv2CodeIds != ''">
+			AND INSTR(',' || #{todoDiv2CodeIds} || ',', ',' || TODO_DIV2_CODE_ID || ',') &gt; 0
+		</if>
 		<if test="histNo != null and histNo != ''">
 			AND ETC_FIELD2 = #{histNo, jdbcType=VARCHAR}
 		</if>
@@ -1651,6 +1715,9 @@
 		   AND CO_CD = #{coCd, jdbcType=VARCHAR}
 		   AND SANCTN_STTUS != 'Y'
 		   AND SANCTN_SN >= #{offset, jdbcType=NUMERIC}
+		<if test="todoDiv2CodeIds != null and todoDiv2CodeIds != ''">
+			AND INSTR(',' || #{todoDiv2CodeIds} || ',', ',' || TODO_DIV2_CODE_ID || ',') &gt; 0
+		</if>
 		<if test="histNo != null and histNo != ''">
 			AND ETC_FIELD2 = #{histNo, jdbcType=VARCHAR}
 		</if>
@@ -1727,17 +1794,7 @@
 			<when test="beforeNotConfirm != null and !beforeNotConfirm.equals('')">
 				SELECT COUNT(*)
 				 FROM (SELECT 	T.TODO_KEY
-								, NVL((
-									  SELECT COUNT(*) CNT
-									  FROM TB_WB20M03 S
-									  WHERE S.TODO_DIV1_CODE_ID = T.TODO_DIV1_CODE_ID
-									    AND S.TODO_DIV2_CODE_ID = T.TODO_DIV2_CODE_ID
-									    AND S.SALES_CD = T.SALES_CD
-									    AND S.TODO_NO = T.TODO_NO
-									    AND S.SANCTN_STTUS = 'N'
-									    AND S.TODO_ID != T.TODO_ID
-									    AND S.SANCTN_SN <![CDATA[ < ]]> T.SANCTN_SN
-				 				), 0) AS BEFORE_NOT_CONFIRM  --이전미결자료 존재여부
+								, <include refid="wb20BeforeNotConfirmSubquery"/> AS BEFORE_NOT_CONFIRM  --이전미결자료 존재여부
 						FROM TB_WB20M03 T
 								LEFT OUTER JOIN TB_CM05M01 X ON  X.CODE_ID = T.TODO_DIV2_CODE_ID
 								LEFT OUTER JOIN TB_CM06M01 B ON  T.TODO_ID = B.ID
@@ -1823,17 +1880,7 @@
 						, T.TODO_TITL AS TODO_TITL
 						, T.CREAT_PGM
 						, T.ETC_FIELD2
-						, NVL((
-							  SELECT COUNT(*) CNT
-							  FROM TB_WB20M03 S
-							  WHERE S.TODO_DIV1_CODE_ID = T.TODO_DIV1_CODE_ID
-							    AND S.TODO_DIV2_CODE_ID = T.TODO_DIV2_CODE_ID
-							    AND S.SALES_CD = T.SALES_CD
-							    AND S.TODO_NO = T.TODO_NO
-							    AND S.SANCTN_STTUS = 'N'
-							    AND S.TODO_ID != T.TODO_ID
-							    AND S.SANCTN_SN <![CDATA[ < ]]> T.SANCTN_SN
-		 				), 0) AS BEFORE_NOT_CONFIRM  --이전미결자료 존재여부
+						, <include refid="wb20BeforeNotConfirmSubquery"/> AS BEFORE_NOT_CONFIRM  --이전미결자료 존재여부
 					FROM TB_WB20M03 T
 							LEFT OUTER JOIN TB_CM05M01 X1 ON X1.CODE_ID = T.TODO_DIV1_CODE_ID
 							LEFT OUTER JOIN TB_CM05M01 X  ON X.CODE_ID = T.TODO_DIV2_CODE_ID
@@ -1900,17 +1947,7 @@
 				, T.TODO_TITL AS TODO_TITL
 				, T.CREAT_PGM
 				, T.ETC_FIELD2
-				, NVL((
-					  SELECT COUNT(*) CNT
-					  FROM TB_WB20M03 S
-					  WHERE S.TODO_DIV1_CODE_ID = T.TODO_DIV1_CODE_ID
-					    AND S.TODO_DIV2_CODE_ID = T.TODO_DIV2_CODE_ID
-					    AND S.SALES_CD = T.SALES_CD
-					    AND S.TODO_NO = T.TODO_NO
-					    AND S.SANCTN_STTUS = 'N'
-					    AND S.TODO_ID != T.TODO_ID
-					    AND S.SANCTN_SN <![CDATA[ < ]]> T.SANCTN_SN
-		 		), 0) AS BEFORE_NOT_CONFIRM  --이전미결자료 존재여부
+				, <include refid="wb20BeforeNotConfirmSubquery"/> AS BEFORE_NOT_CONFIRM  --이전미결자료 존재여부
 				, DECODE(B.TEAM_MANAGER, 'TEAM01', 'Y', 'N') AS TEAM_MANAGER_CHECK
 			FROM TB_WB20M03 T
 					LEFT OUTER JOIN TB_CM05M01 X  ON  X.CODE_ID = T.TODO_DIV2_CODE_ID
@@ -1980,17 +2017,7 @@
 				, T.TODO_TITL AS TODO_TITL
 				, T.CREAT_PGM
 				, T.ETC_FIELD2
-				, NVL((
-					SELECT COUNT(*) CNT
-					FROM TB_WB20M03 S
-					WHERE S.TODO_DIV1_CODE_ID = T.TODO_DIV1_CODE_ID
-						AND S.TODO_DIV2_CODE_ID = T.TODO_DIV2_CODE_ID
-						AND S.SALES_CD = T.SALES_CD
-						AND S.TODO_NO = T.TODO_NO
-						AND S.SANCTN_STTUS = 'N'
-						AND S.TODO_ID != T.TODO_ID
-						AND S.SANCTN_SN <![CDATA[ < ]]> T.SANCTN_SN
-				), 0) AS BEFORE_NOT_CONFIRM  --이전미결자료 존재여부
+				, <include refid="wb20BeforeNotConfirmSubquery"/> AS BEFORE_NOT_CONFIRM  --이전미결자료 존재여부
 			FROM TB_WB20M03 T
 					LEFT OUTER JOIN TB_CM05M01 X ON  X.CODE_ID = T.TODO_DIV2_CODE_ID
 					LEFT OUTER JOIN TB_CM06M01 B  ON T.TODO_ID = B.ID

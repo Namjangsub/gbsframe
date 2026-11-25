@@ -108,7 +108,7 @@
 
 <body>
 	<div id="head_area" class="off">
-		<div class="left_btn" onclick="history.back(-1)">
+		<div class="left_btn" onclick="goBackPage()">
 			<a class="back_btn"></a>
 		</div>
 		<h1 class="logo">
@@ -121,7 +121,6 @@
 			<form id="popForm">   
 				<table class="table_input">
 					<input type="hidden" id="coCd" name="coCd" readonly>
-					<input type="hidden" id="issNo" name="issNo" readonly>
 					<input type="hidden" id="userId" name="userId">
 					<input type="hidden" id="pgmId" name="pgmId" value="WB2401P02_M">
 					
@@ -195,8 +194,8 @@
 												
 						<th>등록사유</th>
 						<td>
-							<input type="hidden" id=subCd name="id=subCd" readonly>
-							<input type="text" id=subCdNm name="id=subCdNm" readonly>
+							<input type="hidden" id="subCd" name="subCd" readonly>
+							<input type="text" id="subCdNm" name="subCdNm" readonly>
 						</td>
 					</tr>
 					<tr>
@@ -218,13 +217,13 @@
 							</table>
 						</td>
 					</tr>
-					<tr>
+					<tr class="issActSection" style="display:none;">
 						<td colspan="4" bgcolor="gray" style="height:2px;"></td>
 					</tr>
-					<tr>
+					<tr class="issActSection" style="display:none;">
 						<td colspan="4">▣ 조치내역</td>
 					</tr>
-					<tr>
+					<tr class="issActSection" style="display:none;">
 						<th>시작일</th>
 						<td><input type="text" id="actsDt" name="actsDt" readonly></td>
 						<th rowspan="3">조치 도면 저장명</th>
@@ -232,23 +231,23 @@
 							<input type="text" id="actCompDgnFileNm" name="actCompDgnFileNm" rows="4" maxlength="1000" readonly></input>
 						</td>
 					</tr>
-					<tr>
+					<tr class="issActSection" style="display:none;">
 						<th>종료일</th>
 						<td><input type="text" id="acteDt" name="acteDt" readonly></td>
 					</tr>
-					<tr>
+					<tr class="issActSection" style="display:none;">
 						<th>투입공수</th>
 						<td><input type="text" id="actMh" name="actMh" readonly></td>
 					</tr>
-					<tr>
+					<tr class="issActSection" style="display:none;">
                         <th>원인</th>
                         <td colspan=3><textarea id="measRst" name="measRst" rows="4"  style="border:none; width: 100%"></textarea></td>
                     </tr> 
-					<tr>
+					<tr class="issActSection" style="display:none;">
                         <th>결과</th>
                         <td colspan=3><textarea id="actCnts" name="actCnts" rows="4"  style="border:none; width: 100%"></textarea></td>
                     </tr> 
-					<tr>
+					<tr class="issActSection" style="display:none;">
 						<td colspan="4" >
 							<table>
 								<tr>
@@ -304,6 +303,14 @@ var htmlParam = {
 //세션에 정보를 활용하여 승인처리3
 //JSON.parse : JSON.stringify를 받을 때 / 문자열-> 자바스크립트로 변환
 var paramObj = JSON.parse(sessionStorage.getItem('paramObj'));
+var isFromLink = !!(paramObj && paramObj.fromLink === 'Y');
+function goBackPage() {
+	if (isFromLink || window.history.length <= 1) {
+		location.replace("/static/mobile/admin/cm/cm11/M08.html");
+		return;
+	}
+	history.back(-1);
+}
 //sessionStorage.removeItem('paramObj');제거??
 if (paramObj && paramObj != "undefined") {
 	//to-do 에서 넘어온 param;
@@ -462,9 +469,49 @@ var gridViewPop2 = {
                                         totalElements :  list.length,
                             } 
                         });
+                        toggleIssActSection();
                     });
                 }
-    }    
+    }
+
+var wb24IssueReqNo = "";
+
+function hasIssueActData() {
+	var $form = $('#popForm');
+	if ($.trim($form.find('#actsDt').val()) !== '') return true;
+	if ($.trim($form.find('#acteDt').val()) !== '') return true;
+	var actMhVal = parseFloat(String($form.find('#actMh').val() || '').replace(/,/g, ''));
+	if (!isNaN(actMhVal) && actMhVal > 0) return true;
+	if ($.trim($form.find('#actCompDgnFileNm').val()) !== '') return true;
+	if ($.trim($form.find('#measRst').val()) !== '') return true;
+	if ($.trim($form.find('#actCnts').val()) !== '') return true;
+	if ($.trim($form.find('#fdmtSolutCnt').val()) !== '') return true;
+	if ($form.find('input[name="FDMTSOLUT"]:checked').length > 0) return true;
+	if (typeof gridViewPop2 !== 'undefined' && gridViewPop2.target && Array.isArray(gridViewPop2.target.list) && gridViewPop2.target.list.length > 0) return true;
+	return false;
+}
+
+function toggleIssActSection() {
+	var $form = $('#popForm');
+	var curParam = paramObj || {};
+	var isActionTodo = (curParam.todoDiv2CodeId === 'TODODIV1090' || curParam.todoDiv2CodeId === 'TODODIV2090');
+	var issStsVal = $form.find('#issSts').val();
+	var hasActData = hasIssueActData();
+
+	var showAct = false;
+	if (isActionTodo) {
+		showAct = true;
+	} else if ($.trim(wb24IssueReqNo) !== '') {
+		showAct = hasActData;
+	} else {
+		showAct = (issStsVal === 'ISSSTS03' || issStsVal === 'ISSSTS04' || hasActData);
+	}
+
+	$form.find('.issActSection').toggle(showAct);
+	if (showAct && typeof gridViewPop2 !== 'undefined' && gridViewPop2.target && typeof gridViewPop2.target.repaint === 'function') {
+		gridViewPop2.target.repaint();
+	}
+}
 
 $(document).ready(function() {
 	// const params = getParams();
@@ -479,7 +526,7 @@ $(document).ready(function() {
 		postAjaxSync("/user/wb/wb24/select_wb2401p01_Info", formData1, null, function(data) {
 			var list = data.result;
 			if (list != undefined) {
-				if (data.result.teamManagerYn == 'Y' && paramObj.todoDiv2CodeId == "TODODIV2030" || data.result.teamManagerYn == 'Y' && paramObj.todoDiv2CodeId == "TODODIV2090") {
+				if (data.result.teamManagerYn == 'Y' && (paramObj.todoDiv2CodeId == "TODODIV2030" || paramObj.todoDiv2CodeId == "TODODIV2090")) {
 					const addHtml = `
 						<tr class="teamManagerApproval">
 							<th class='hit'>근본원인</th>
@@ -499,13 +546,14 @@ $(document).ready(function() {
 					createRadioOption_FDMTSOLUT('FDMTSOLUT', 'checkbox') // 근본원인 구분
 				}
 
+				wb24IssueReqNo = list.reqNo || "";
 				$.each(list, function (key, value) {
 					$("#popForm #" + key).val(value);
 					if ($('#popForm #' + key).is('[comma]')) {
 						onlyNumber($('#popForm #' + key)[0]);
 					}
 
-					if (key == 'fdmtSolutCd') {	// 근본원인 체크하기
+					if (key == 'fdmtSolutCd' && value) {	// 근본원인 체크하기
 						const codes = value.split(',');
 						codes.forEach(code => {
 							$(`input[name="FDMTSOLUT"][value="${code}"]`).prop('checked', true);
@@ -517,12 +565,14 @@ $(document).ready(function() {
 				} else {
 					$("#popupTit").text('WBS조치 결과 [' + list.salesCd + ', ' + list.clntPjtNm + ']');
 				}
+				toggleIssActSection();
 							
 			}
 		});
 
 	gridViewPop.initView().setData(0);
 	gridViewPop2.initView().setData(0);
+	toggleIssActSection();
 });
 
 	function createRadioOption_FDMTSOLUT(groupName, _type) {
@@ -561,21 +611,36 @@ $(document).ready(function() {
 
 // 결재시 코멘트 추가 수정
 	function updateIssueComment(){
-		if (inputValidation($('.popup_area [required]')) &&  $('#issSts').val() != 'ISSSTS04') {
+		if (inputValidation($('#popForm [required], .popup_area [required]')) && $('#issSts').val() != 'ISSSTS04') {
 			if ($("input[name='FDMTSOLUT']:checked").val() == undefined) {
 				customAlert("근본원인을 선택해주세요.");
 				return false;
-			} else {
-				var formData = makeFormData();
-				filePostAjax("/user/wb/wb24/updateIssueComment", formData, function(data) {
-					if (data.resultCode == 200) {
-					} else {
-						customAlert(data.resultMessage);
-						return false;
-					}
-				});
-				return true;
 			}
+			var formData = makeFormData();
+			var saved = false;
+			$.ajax({
+				type: "POST",
+				url: "/user/wb/wb24/updateIssueComment",
+				processData: false,
+				contentType: false,
+				async: false,
+				xhrFields: { withCredentials: true },
+				data: formData,
+				beforeSend: function (request) {
+					request.setRequestHeader("Authorization", authorizationToken);
+				},
+				success: function(data) {
+					if (data && data.resultCode == 200) {
+						saved = true;
+					} else {
+						customAlert((data && data.resultMessage) || "근본원인 저장에 실패했습니다.");
+					}
+				},
+				error: function() {
+					customAlert("근본원인 저장 중 오류가 발생했습니다.");
+				}
+			});
+			return saved;
 		} else { return false;}
 	}
 

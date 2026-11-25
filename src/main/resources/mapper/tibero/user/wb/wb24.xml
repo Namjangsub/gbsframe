@@ -909,7 +909,53 @@
 				   AND SANCTN_STTUS  =  'Y'
             </select>
 
+            <!-- WBS 이슈 삭제 가능 여부 체크: 작업자 본인(TODO_ID) 결재 제외, 타인 결재 승인 건 조회 -->
+            <select id="selectIssueOtherApprovalChk" parameterType="Map" resultType="camelMap">
+	            SELECT *
+				  FROM TB_WB20M03
+				 WHERE 1=1
+				   AND TODO_NO = #{issNo}
+				   <if test="salesCd != null and !salesCd.equals('')">
+				   AND SALES_CD = #{salesCd}
+				   </if>
+				   AND TODO_DIV1_CODE_ID = 'TODODIV20'
+				   AND SANCTN_STTUS = 'Y'
+				   AND NVL(APPR_REJECT_YN, 'N') = 'N'
+				   AND NVL(TRIM(ETC_FIELD3), 'X') != 'DEL'
+				   <if test="userId != null and !userId.equals('')">
+				   AND TODO_ID != #{userId}
+				   </if>
+            </select>
 
+
+
+            <!-- WBS 문제(2060) 타인 확정 승인 건수: 작성자(userId) 제외, 공유(1030)·조치(2090) 행 제외 -->
+            <select id="selectIssueOther2060ApprovedCnt" parameterType="Map" resultType="int">
+	            SELECT COUNT(*)
+				  FROM TB_WB20M03
+				 WHERE TODO_NO = #{issNo, jdbcType=VARCHAR}
+				   AND TODO_DIV1_CODE_ID = 'TODODIV20'
+				   AND TODO_DIV2_CODE_ID = 'TODODIV2060'
+				   AND SANCTN_STTUS = 'Y'
+				   AND TODO_ID != #{userId, jdbcType=VARCHAR}
+				   AND NVL(TRIM(ETC_FIELD3), 'X') != 'DEL'
+            </select>
+
+            <!-- WBS 문제(2060) 기안자 자체승인: 등록(insertWbsApprovalList 의 userId == usrNm 분기)과 동일 값 적용, 기승인 행은 제외 -->
+            <update id="updateIssueDrafterSelfApproval" parameterType="Map">
+				UPDATE TB_WB20M03
+				   SET SANCTN_STTUS = 'Y',
+				       TODO_CF_DT   = SYSDATE,
+				       TODO_CF_OPN  = '',
+				       ETC_FIELD1   = NVL(#{etcField1, jdbcType=VARCHAR}, #{actMh, jdbcType=VARCHAR}),
+				       ETC_FIELD3   = 'N'
+				 WHERE TODO_NO = #{issNo, jdbcType=VARCHAR}
+				   AND TODO_DIV1_CODE_ID = 'TODODIV20'
+				   AND TODO_DIV2_CODE_ID = 'TODODIV2060'
+				   AND TODO_ID = #{userId, jdbcType=VARCHAR}
+				   AND NVL(SANCTN_STTUS, 'N') != 'Y'
+				   AND NVL(TRIM(ETC_FIELD3), 'X') != 'DEL'
+            </update>
 
             <select id="issueResultChk" parameterType="Map" resultType="camelMap">
 	            SELECT *
@@ -991,6 +1037,82 @@
 						, UDT_DTTM 			= SYSDATE
 				WHERE ISS_NO =  #{issNo}
             </update>
+
+			<!-- WBS 문제 조치 저장 시 담당팀장 외 요청의 되채움용 현재값 (M02 문제영역 + M03 조치결과 영역, 조치 전이면 M03 값은 NULL) -->
+			<select id="selectIssueRefillValues" parameterType="Map" resultType="camelMap">
+				SELECT I.ISS_NO
+					 , I.ISS_SJ
+					 , I.ISS_CNTS
+					 , I.MID_CD
+					 , I.SUB_CD
+					 , I.ETC_INPUT
+					 , I.MC_PART_CD
+					 , I.IMPORTANT_CD
+					 , I.IMPACT_CD
+					 , S.FDMT_SOLUT_CD
+					 , S.FDMT_SOLUT_CNT
+				  FROM TB_WB24M02 I
+				  LEFT OUTER JOIN (
+						SELECT ISS_NO, FDMT_SOLUT_CD, FDMT_SOLUT_CNT
+						  FROM TB_WB24M03
+						 WHERE ISS_NO = #{issNo, jdbcType=VARCHAR}
+						   AND ROWNUM = 1
+				  ) S ON S.ISS_NO = I.ISS_NO
+				 WHERE I.ISS_NO = #{issNo, jdbcType=VARCHAR}
+				   AND I.FILE_TRGT_KEY = #{issFileTrgtKey, jdbcType=VARCHAR}
+			</select>
+
+			<!-- WBS 문제 담당팀장 판정: 조치담당자(ACT_ID)의 팀장(MNG_ID=로그인 사용자)이고, 해당 단계(2060/2090) 본인 결재행이 존재하며 미승인(미승인 또는 반려)인 건수 -->
+			<select id="selectIssueTeamManagerPendingCnt" parameterType="Map" resultType="int">
+				SELECT COUNT(*)
+				  FROM TB_WB20M03 T
+				  JOIN TB_WB24M02 I ON I.ISS_NO = T.TODO_NO
+				  JOIN TB_CM06M01 U ON U.ID = I.ACT_ID
+				 WHERE T.TODO_NO = #{issNo, jdbcType=VARCHAR}
+				   AND T.TODO_DIV1_CODE_ID = 'TODODIV20'
+				   AND T.TODO_DIV2_CODE_ID = #{todoDiv2CodeId, jdbcType=VARCHAR}
+				   AND T.TODO_ID = #{userId, jdbcType=VARCHAR}
+				   AND U.MNG_ID = #{userId, jdbcType=VARCHAR}
+				   AND NVL(TRIM(T.ETC_FIELD3), 'X') != 'DEL'
+				   AND NVL(T.LINE_TYPE, 'APPR') NOT IN ('COOP', 'POST')
+				   AND (NVL(T.SANCTN_STTUS, 'N') != 'Y' OR NVL(T.APPR_REJECT_YN, 'N') = 'Y')
+			</select>
+
+			<!-- WBS 문제 현재 상태·조치담당자 조회 (DB 기준 상태 전환 가드용) -->
+			<select id="selectIssueStsActInfo" parameterType="Map" resultType="camelMap">
+				SELECT I.ISS_STS AS ISS_STS
+					 , I.ACT_ID AS ACT_ID
+				  FROM TB_WB24M02 I
+				 WHERE I.ISS_NO = #{issNo, jdbcType=VARCHAR}
+			</select>
+
+			<!-- WBS 결과수정: 문제영역 분류값(기계분류·중요도·영향도) 저장, 전달되지 않은(빈값) 항목은 기존값 유지 -->
+			<update id="updateIssueClassification" parameterType="Map">
+				UPDATE TB_WB24M02
+				<set>
+					<if test="mcPartCd != null and mcPartCd != ''">MC_PART_CD = #{mcPartCd, jdbcType=VARCHAR},</if>
+					<if test="importantCd != null and importantCd != ''">IMPORTANT_CD = #{importantCd, jdbcType=VARCHAR},</if>
+					<if test="impactCd != null and impactCd != ''">IMPACT_CD = #{impactCd, jdbcType=VARCHAR},</if>
+					UDT_ID = #{userId, jdbcType=VARCHAR},
+					UDT_PGM = #{pgmId, jdbcType=VARCHAR},
+					UDT_DTTM = SYSDATE
+				</set>
+				WHERE ISS_NO = #{issNo, jdbcType=VARCHAR}
+			</update>
+
+			<!-- WBS 결과수정: 조치결과(M03)에 동일 분류값 반영, 전달되지 않은(빈값) 항목은 기존값 유지 -->
+			<update id="updateActClassification" parameterType="Map">
+				UPDATE TB_WB24M03
+				<set>
+					<if test="mcPartCd != null and mcPartCd != ''">MC_PART_CD = #{mcPartCd, jdbcType=VARCHAR},</if>
+					<if test="importantCd != null and importantCd != ''">IMPORTANT_CD = #{importantCd, jdbcType=VARCHAR},</if>
+					<if test="impactCd != null and impactCd != ''">IMPACT_CD = #{impactCd, jdbcType=VARCHAR},</if>
+					UDT_ID = #{userId, jdbcType=VARCHAR},
+					UDT_PGM = #{pgmId, jdbcType=VARCHAR},
+					UDT_DTTM = SYSDATE
+				</set>
+				WHERE ISS_NO = #{issNo, jdbcType=VARCHAR}
+			</update>
 
             <select id="selectTodoRsltsView" parameterType="Map" resultType="camelMap">
                 SELECT  X.FILE_TRGT_KEY AS ISS_FILE_TRGT_KEY,
@@ -1201,13 +1323,18 @@
                LEFT OUTER JOIN TB_BM02M01 AS B3 ON B3.CLNT_CD = CM.ORDRS_CLNT_CD
                LEFT OUTER JOIN
 				               (
-					                SELECT sum(CASE WHEN TODO_DIV2_CODE_ID = 'TODODIV2060' THEN 1 ELSE 0 END) AS  APP_CNT
+					                SELECT sum(CASE WHEN TODO_DIV2_CODE_ID = 'TODODIV2060'
+					                                <if test="userId != null and userId != ''">
+					                                AND TODO_ID != #{userId}
+					                                </if>
+					                                THEN 1 ELSE 0 END) AS  APP_CNT
 					                	,  sum(CASE WHEN TODO_DIV2_CODE_ID = 'TODODIV2090' THEN 1 ELSE 0 END) AS  ACT_APP_CNT
 					                	, MAX(TODO_NO) AS TODO_NO
 					                FROM   TB_WB20M03
 					                WHERE  1 = 1
 					                AND    TODO_NO= (SELECT A.ISS_NO FROM TB_WB24M02 AS A WHERE  A.FILE_TRGT_KEY = #{fileTrgtKey})
 					                AND    TODO_CF_DT IS NOT NULL
+					                AND    NVL(TRIM(ETC_FIELD3), 'X') != 'DEL'
 				               ) AS WB ON A.ISS_NO  =  WB.TODO_NO
         WHERE  1 = 1
         AND    A.FILE_TRGT_KEY = #{fileTrgtKey}
@@ -1302,7 +1429,8 @@
 				       SELECT 1
 				         FROM TB_CM06M01 C
 				        WHERE C.ID  = #{userId}
-		 		  		  AND substr(C.DEPT_ID, 1, 5)	IN ('GUN30', 'GUN40', 'TRN50', 'GUN60', 'GUN70')
+		 		  		  AND (substr(C.DEPT_ID, 1, 5) IN ('GUN30', 'GUN40', 'TRN50', 'GUN60', 'GUN70', 'TRN30', 'GUN50', 'GUN80')
+		 		  		    OR substr(C.VIEW_DEPT_ID, 1, 5) IN ('GUN30', 'GUN40', 'TRN50', 'GUN60', 'GUN70'))
 		   			  )		
 	</update>
 
@@ -1332,7 +1460,8 @@
                   SELECT 1
                     FROM TB_CM06M01 C
                    WHERE C.ID  = #{userId}
-                     AND SUBSTR(C.DEPT_ID, 1, 5) IN ('GUN30', 'GUN40', 'TRN50', 'GUN60', 'GUN70')
+                     AND (SUBSTR(C.DEPT_ID, 1, 5) IN ('GUN30', 'GUN40', 'TRN50', 'GUN60', 'GUN70', 'TRN30', 'GUN50', 'GUN80')
+                       OR SUBSTR(C.VIEW_DEPT_ID, 1, 5) IN ('GUN30', 'GUN40', 'TRN50', 'GUN60', 'GUN70'))
                   )
 	</update>
 
@@ -1557,13 +1686,18 @@
                LEFT OUTER JOIN TB_BM02M01 AS B3 ON B3.CLNT_CD = CM.ORDRS_CLNT_CD
                LEFT OUTER JOIN
 				               (
-					                SELECT sum(CASE WHEN TODO_DIV2_CODE_ID = 'TODODIV2060' THEN 1 ELSE 0 END) AS  APP_CNT
+					                SELECT sum(CASE WHEN TODO_DIV2_CODE_ID = 'TODODIV2060'
+					                                <if test="userId != null and userId != ''">
+					                                AND TODO_ID != #{userId}
+					                                </if>
+					                                THEN 1 ELSE 0 END) AS  APP_CNT
 					                	,  sum(CASE WHEN TODO_DIV2_CODE_ID = 'TODODIV2090' THEN 1 ELSE 0 END) AS  ACT_APP_CNT
 					                	, MAX(TODO_NO) AS TODO_NO
 					                FROM   TB_WB20M03
 					                WHERE  1 = 1
 					                AND    TODO_NO= (SELECT A.ISS_NO FROM TB_WB24M02 AS A WHERE  A.FILE_TRGT_KEY = #{fileTrgtKey})
 					                AND    TODO_CF_DT IS NOT NULL
+					                AND    NVL(TRIM(ETC_FIELD3), 'X') != 'DEL'
 				               ) AS WB ON A.ISS_NO  =  WB.TODO_NO
 			   LEFT OUTER JOIN (
 									SELECT W1.*, ROW_NUMBER() OVER (PARTITION BY SALES_CD ORDER BY VER_NO DESC) AS rn
@@ -1579,6 +1713,202 @@
 			FROM TB_WB24M02
 		WHERE ISS_NO = #{issNo}
 			AND REQ_NO = #{reqNo}
+	</select>
+
+
+	<!-- WB24 AM 연동: 문제(이슈) 결재 상태 판정 (ETC_FIELD3='DEL' 임시행 제외) -->
+	<select id="selectWbsIssueApprovalStatus" parameterType="Map" resultType="camelMap">
+		SELECT TO_CHAR(COUNT(*)) AS CNT
+			, MIN(NVL(A.SANCTN_STTUS, 'N')) AS TODO_YN
+			, TO_CHAR(NVL(SUM(CASE WHEN NVL(A.APPR_REJECT_YN, 'N') = 'Y' THEN 1 ELSE 0 END), 0)) AS REJ_CNT
+		FROM TB_WB20M03 A
+		WHERE A.TODO_NO = #{issNo, jdbcType=VARCHAR}
+			AND A.TODO_DIV2_CODE_ID = #{todoDiv2CodeId, jdbcType=VARCHAR}
+			AND NVL(TRIM(A.ETC_FIELD3), 'X') != 'DEL'
+			AND NVL(A.LINE_TYPE, 'APPR') NOT IN ('COOP', 'POST')
+			AND EXISTS (SELECT 1 FROM TB_WB24M02 I WHERE I.ISS_NO = #{issNo, jdbcType=VARCHAR})
+	</select>
+
+	<!-- WB24 AM 연동: 결재 단계별 결재행 목록 (ETC_FIELD3='DEL' 임시행 제외) -->
+	<select id="selectWbsIssueApprovalLines" parameterType="Map" resultType="camelMap">
+		SELECT A.TODO_ID
+			, TO_CHAR(A.SANCTN_SN) AS SANCTN_SN
+			, NVL(A.SANCTN_STTUS, 'N') AS SANCTN_STTUS
+			, NVL(A.APPR_REJECT_YN, 'N') AS APPR_REJECT_YN
+		FROM TB_WB20M03 A
+		WHERE A.TODO_NO = #{issNo, jdbcType=VARCHAR}
+			AND A.TODO_DIV2_CODE_ID = #{todoDiv2CodeId, jdbcType=VARCHAR}
+			AND NVL(TRIM(A.ETC_FIELD3), 'X') != 'DEL'
+			AND NVL(A.LINE_TYPE, 'APPR') NOT IN ('COOP', 'POST')
+	</select>
+
+	<!-- WB24 AM 연동: 문제 등록자(TB_WB24M02) / 조치 작성자(TB_WB24M03) 조회 -->
+	<select id="selectWbsIssueCreatorInfo" parameterType="Map" resultType="camelMap">
+		SELECT I.CREAT_ID AS ISS_CREAT_ID
+			, IU.NAME AS ISS_CREAT_NM
+			, ACT.CREAT_ID AS ACT_CREAT_ID
+			, AU.NAME AS ACT_CREAT_NM
+		FROM TB_WB24M02 I
+			LEFT OUTER JOIN TB_CM06M01 IU ON IU.ID = I.CREAT_ID
+			LEFT OUTER JOIN TB_WB24M03 ACT ON ACT.ISS_NO = I.ISS_NO
+			LEFT OUTER JOIN TB_CM06M01 AU ON AU.ID = ACT.CREAT_ID
+		WHERE I.ISS_NO = #{issNo, jdbcType=VARCHAR}
+	</select>
+
+	<!-- WBS 문제(2060) 수정 예외 판정: 화면 actEditorYn 조건을 DB 기준으로 재도출 (PC 팀장=조치담당자 MNG_ID, 모바일 동일부서 팀장 결재자, 특수부서 조치담당자 본인) -->
+	<select id="selectIssueActEditorCheck" parameterType="Map" resultType="camelMap">
+		SELECT CASE WHEN U.MNG_ID = #{userId, jdbcType=VARCHAR} THEN 'Y' ELSE 'N' END AS ACT_MNG_YN
+			, CASE WHEN I.ACT_ID = #{userId, jdbcType=VARCHAR} THEN 'Y' ELSE 'N' END AS ACT_SELF_YN
+			, CASE WHEN SUBSTR(U.DEPT_ID, 1, 5) = SUBSTR(M.DEPT_ID, 1, 5) THEN 'Y' ELSE 'N' END AS ACT_SAME_DEPT_YN
+			, SUBSTR(M.DEPT_ID, 1, 5) AS USER_DEPT_CD
+			, TO_CHAR((SELECT COUNT(*) FROM TB_CM06M01 S WHERE S.MNG_ID = #{userId, jdbcType=VARCHAR})) AS USER_SUB_CNT
+			, TO_CHAR((SELECT COUNT(*) FROM TB_WB20M03 C WHERE C.TODO_NO = I.ISS_NO AND C.TODO_DIV2_CODE_ID IN ('TODODIV1090', 'TODODIV2090') AND C.TODO_ID = #{userId, jdbcType=VARCHAR})) AS USER_ACT_LINE_CNT
+		FROM TB_WB24M02 I
+			LEFT OUTER JOIN TB_CM06M01 U ON U.ID = I.ACT_ID
+			LEFT OUTER JOIN TB_CM06M01 M ON M.ID = #{userId, jdbcType=VARCHAR}
+		WHERE I.ISS_NO = #{issNo, jdbcType=VARCHAR}
+	</select>
+
+	<!-- WB24 AM 전자결재 연동: ERP_BIZ_KEY(ISS_NO) + 결재단계(div2) 기준 AM 문서 DOC_ID (최신 1건) -->
+	<select id="selectAmDocIdByIssNo" parameterType="Map" resultType="String">
+		SELECT DOC_ID
+		FROM (
+			SELECT DOC_ID
+			FROM TB_AM11M01
+			WHERE ERP_BIZ_KEY = #{issNo, jdbcType=VARCHAR}
+				AND ERP_BIZ_TYPE = 'WB24'
+				<if test="todoDiv2CodeId != null and todoDiv2CodeId != ''">
+				AND DOC_ID IN (
+					SELECT DOC_ID
+					FROM TB_AM11D01
+					WHERE WB20_DIV2_CODE_ID = #{todoDiv2CodeId, jdbcType=VARCHAR}
+				)
+				</if>
+			ORDER BY TO_NUMBER(DOC_ID) DESC
+		)
+		WHERE ROWNUM = 1
+	</select>
+
+	<!-- WB24 AM 전자결재 연동: ISS_NO 기준 본문/팀장편집용 최신 정보 조회 -->
+	<select id="selectWbsIssueAmInfo" parameterType="Map" resultType="camelMap">
+		SELECT A.ISS_NO
+			 , A.CO_CD
+			 , A.SALES_CD
+			 , A.ISS_STS
+			 , A.ISS_SJ
+			 , A.ISS_CNTS
+			 , A.ACT_ID
+			 , U.NAME AS ACT_NM
+			 , A.REQ_NO
+			 , A.WBS_PLAN_CODE_ID
+			 , NVL(R2.CODE_NM, R1.CODE_NM) AS WBS_PLAN_CODE_NM
+			 , (SELECT FN_CM05M01_CD_TO_NM(CM.CLNT_PJT) FROM DUAL) AS CLNT_PJT_NM
+			 , B3.CLNT_NM AS CLNT_NM
+			 , R4.CODE_NM AS ISS_STS_NM
+			 , TO_CHAR(A.REQ_DT, 'YYYY-MM-DD') AS REQ_DT
+			 , TO_CHAR(A.CUST_REQ_DT, 'YYYY-MM-DD') AS CUST_REQ_DT
+			 , B2.CLNT_NM AS VEND_NM
+			 , A.SUB_CD
+			 , (SELECT FN_CM05M01_CD_TO_NM(A.SUB_CD) FROM DUAL) AS SUB_CD_NM
+			 , A.ETC_INPUT
+			 , (SELECT FN_CM05M01_CD_TO_NM(A.MC_PART_CD) FROM DUAL) AS MC_PART_NM
+			 , (SELECT FN_CM05M01_CD_TO_NM(A.IMPORTANT_CD) FROM DUAL) AS IMPORTANT_NM
+			 , (SELECT FN_CM05M01_CD_TO_NM(A.IMPACT_CD) FROM DUAL) AS IMPACT_NM
+			 , TO_CHAR(S.ACTS_DT, 'YYYY-MM-DD') AS ACTS_DT
+			 , TO_CHAR(S.ACTE_DT, 'YYYY-MM-DD') AS ACTE_DT
+			 , TO_CHAR(NVL(S.ACT_MH, 0)) AS ACT_MH
+			 , S.ACT_CNTS
+			 , S.MEAS_RST
+			 , S.FDMT_SOLUT_CD
+			 , get_code_names(S.FDMT_SOLUT_CD) AS FDMT_SOLUT_NM
+			 , S.FDMT_SOLUT_CNT
+		  FROM TB_WB24M02 A
+		  LEFT OUTER JOIN TB_WB24M03 S ON S.ISS_NO = A.ISS_NO
+		  LEFT OUTER JOIN TB_CM06M01 U ON U.ID = A.ACT_ID
+		  LEFT OUTER JOIN TB_CM05M01 R1 ON R1.CODE_ID = A.WBS_PLAN_CODE_KIND
+		  LEFT OUTER JOIN TB_CM05M01 R2 ON R2.CODE_ID = A.WBS_PLAN_CODE_ID
+		  LEFT OUTER JOIN TB_CM05M01 R4 ON R4.CODE_ID = A.ISS_STS
+		  LEFT OUTER JOIN TB_BM02M01 B2 ON B2.CLNT_CD = A.VEND_CD
+		  LEFT OUTER JOIN TB_CR02D02 CR ON CR.SALES_CD = A.SALES_CD
+		  LEFT OUTER JOIN TB_CR02M01 CM ON CM.CO_CD = A.CO_CD AND CM.ORDRS_NO = CR.ORDRS_NO
+		  LEFT OUTER JOIN TB_BM02M01 B3 ON B3.CLNT_CD = CM.ORDRS_CLNT_CD
+		 WHERE A.ISS_NO = #{issNo, jdbcType=VARCHAR}
+		   AND ROWNUM = 1
+	</select>
+
+	<!-- WB24 AM 전자결재 삭제: 이슈 기준 결재선 삭제 (ERP_BIZ_TYPE='WB24') -->
+	<delete id="deleteAmD01ByIssNo" parameterType="Map">
+		DELETE FROM TB_AM11D01
+		 WHERE DOC_ID IN (
+			SELECT DOC_ID
+			FROM TB_AM11M01
+			WHERE ERP_BIZ_TYPE = 'WB24'
+				AND ERP_BIZ_KEY = #{issNo, jdbcType=VARCHAR}
+		 )
+	</delete>
+
+	<!-- WB24 AM 전자결재 삭제: 이슈 기준 마스터 삭제 (ERP_BIZ_TYPE='WB24') -->
+	<delete id="deleteAmM01ByIssNo" parameterType="Map">
+		DELETE FROM TB_AM11M01
+		 WHERE ERP_BIZ_TYPE = 'WB24'
+			AND ERP_BIZ_KEY = #{issNo, jdbcType=VARCHAR}
+	</delete>
+
+	<!-- 반려 후 재상신 시 기존 결재선 반려 상태/의견/일자 초기화 (WB24 전용) -->
+	<update id="resetWbsIssueRejectedApprovalLines" parameterType="Map">
+		UPDATE TB_WB20M03
+		   SET APPR_REJECT_YN = 'N'
+			 , SANCTN_STTUS = 'N'
+			 , TODO_CF_OPN = ''
+			 , TODO_CF_DT = NULL
+			 , UDT_ID = #{userId, jdbcType=VARCHAR}
+			 , UDT_PGM = #{pgmId, jdbcType=VARCHAR}
+			 , UDT_DTTM = SYSDATE
+		 WHERE TODO_NO = #{issNo, jdbcType=VARCHAR}
+		   AND TODO_DIV1_CODE_ID = 'TODODIV20'
+		   AND TODO_DIV2_CODE_ID = #{todoDiv2CodeId, jdbcType=VARCHAR}
+		   AND NVL(TRIM(ETC_FIELD3), 'X') != 'DEL'
+		   AND APPR_REJECT_YN = 'Y'
+	</update>
+
+	<!-- AM 결재선 동기화 직전 동일 단계(결재+공유) CREAT_DTTM 을 최신 시각으로 통일 (selectGetApprovalList MAX(CREAT_DTTM) 누락 방지) -->
+	<update id="syncWbsIssueApprovalCreatDttm" parameterType="Map">
+		UPDATE TB_WB20M03
+		   SET CREAT_DTTM = (
+				SELECT MAX(CREAT_DTTM)
+				  FROM TB_WB20M03
+				 WHERE TODO_NO = #{issNo, jdbcType=VARCHAR}
+				   AND TODO_DIV2_CODE_ID IN (#{apprDiv2, jdbcType=VARCHAR}, #{refDiv2, jdbcType=VARCHAR})
+				   AND NVL(TRIM(ETC_FIELD3), 'X') != 'DEL'
+		   )
+		 WHERE TODO_NO = #{issNo, jdbcType=VARCHAR}
+		   AND TODO_DIV2_CODE_ID IN (#{apprDiv2, jdbcType=VARCHAR}, #{refDiv2, jdbcType=VARCHAR})
+		   AND NVL(TRIM(ETC_FIELD3), 'X') != 'DEL'
+	</update>
+
+	<!-- WBS 문제/조치 단계별 승인 건수 (반려·공유·DEL 제외) -->
+	<select id="selectIssueStageApprovedCnt" parameterType="Map" resultType="int">
+		SELECT COUNT(*)
+		  FROM TB_WB20M03
+		 WHERE TODO_NO = #{issNo, jdbcType=VARCHAR}
+		   AND TODO_DIV1_CODE_ID = 'TODODIV20'
+		   AND TODO_DIV2_CODE_ID = #{todoDiv2CodeId, jdbcType=VARCHAR}
+		   AND SANCTN_STTUS = 'Y'
+		   AND NVL(APPR_REJECT_YN, 'N') = 'N'
+		   AND NVL(TRIM(ETC_FIELD3), 'X') != 'DEL'
+	</select>
+
+	<!-- WBS 문제/조치 단계별 타인 승인 건수 (본인 제외, 반려·공유·DEL 제외) -->
+	<select id="selectIssueStageOtherApprovedCnt" parameterType="Map" resultType="int">
+		SELECT COUNT(*)
+		  FROM TB_WB20M03
+		 WHERE TODO_NO = #{issNo, jdbcType=VARCHAR}
+		   AND TODO_DIV1_CODE_ID = 'TODODIV20'
+		   AND TODO_DIV2_CODE_ID = #{todoDiv2CodeId, jdbcType=VARCHAR}
+		   AND SANCTN_STTUS = 'Y'
+		   AND NVL(APPR_REJECT_YN, 'N') = 'N'
+		   AND TODO_ID != #{userId, jdbcType=VARCHAR}
+		   AND NVL(TRIM(ETC_FIELD3), 'X') != 'DEL'
 	</select>
 
 </mapper>

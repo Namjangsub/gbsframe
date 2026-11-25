@@ -78,7 +78,7 @@
 
 <body>
 	<div id="head_area" class="off">
-		<div class="left_btn" onclick="history.back(-1)">
+		<div class="left_btn" onclick="goBackPage()">
 			<a class="back_btn"></a>
 		</div>
 		<h1 class="logo">
@@ -230,6 +230,14 @@
 	//세션에 정보를 활용하여 승인처리3
 	//JSON.parse : JSON.stringify를 받을 때 / 문자열-> 자바스크립트로 변환
 	var paramObj = JSON.parse(sessionStorage.getItem('paramObj'));
+	var isFromLink = !!(paramObj && paramObj.fromLink === 'Y');
+	function goBackPage() {
+		if (isFromLink || window.history.length <= 1) {
+			location.replace("/static/mobile/admin/cm/cm11/M08.html");
+			return;
+		}
+		history.back(-1);
+	}
 	//sessionStorage.removeItem('paramObj');제거??
 	if (paramObj && paramObj != "undefined") {
 		//to-do 에서 넘어온 param;
@@ -271,7 +279,7 @@
 				}
 				postAjaxSync("/user/qm/qm01/selectQtyReqInfo", formData1, null, function(data) {
 					
-					if (data.result.teamManagerYn == 'Y' && !['COBTP01', 'COBTP04', 'COBTP06', 'COBTP08', 'COBTP09'].includes($("#partCd").val())) {
+					if (data.result && data.result.teamManagerYn == 'Y' && !['COBTP01', 'COBTP04', 'COBTP06', 'COBTP08', 'COBTP09'].includes(data.result.partCd)) {
 						const addHtml = `
 							<tr class="teamManagerApproval">
 								<th class='hit'>근본원인</th>
@@ -389,20 +397,36 @@
 
 	// 결재시 코멘트 추가 수정
 	function updateQualityResultComment(){
-		if (inputValidation($('.popup_area [required]'))) {
+		if (inputValidation($('#mForm [required], .popup_area [required]'))) {
 			if (!['COBTP01', 'COBTP04', 'COBTP06', 'COBTP08', 'COBTP09'].includes($("#partCd").val()) && $("input[name='FDMTSOLUT']:checked").val() == undefined) {
 				customAlert("근본원인을 선택해주세요.");
+				return false;
 			}
 			var formData = makeFormData();
-			filePostAjax("/user/qm/qm01/updateQualityResultComment", formData,function(data) {
-				if (data.resultCode == 200) {
-				} else {
-					customAlert(data.resultMessage);
-					return false;
+			var saved = false;
+			$.ajax({
+				type: "POST",
+				url: "/user/qm/qm01/updateQualityResultComment",
+				processData: false,
+				contentType: false,
+				async: false,
+				xhrFields: { withCredentials: true },
+				data: formData,
+				beforeSend: function (request) {
+					request.setRequestHeader("Authorization", authorizationToken);
+				},
+				success: function(data) {
+					if (data && data.resultCode == 200) {
+						saved = true;
+					} else {
+						customAlert((data && data.resultMessage) || "근본원인 저장에 실패했습니다.");
+					}
+				},
+				error: function() {
+					customAlert("근본원인 저장 중 오류가 발생했습니다.");
 				}
 			});
-			return true;
-				
+			return saved;
 		} else { return false;}
 	}
 

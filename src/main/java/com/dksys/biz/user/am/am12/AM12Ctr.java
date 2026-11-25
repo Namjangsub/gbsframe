@@ -40,11 +40,16 @@ public class AM12Ctr {
     @PostMapping(value = "/approveDocument")
     public String approveDocument(@RequestBody Map<String, Object> paramMap, HttpServletRequest request, ModelMap model) {
         enrichRequestInfo(paramMap, request);
-        Map<String, Object> result = am11Svc.approveDocument(paramMap);
-        model.addAttribute("resultCode", result.get("resultCode"));
-        model.addAttribute("resultMessage", result.get("resultMessage"));
-        model.addAttribute("docId", result.get("docId"));
-        model.addAttribute("nextStatus", result.get("nextStatus"));
+        try {
+            Map<String, Object> result = am11Svc.approveDocument(paramMap);
+            model.addAttribute("resultCode", result.get("resultCode"));
+            model.addAttribute("resultMessage", result.get("resultMessage"));
+            model.addAttribute("docId", result.get("docId"));
+            model.addAttribute("nextStatus", result.get("nextStatus"));
+        } catch (IllegalStateException | IllegalArgumentException e) {
+            model.addAttribute("resultCode", "500");
+            model.addAttribute("resultMessage", e.getMessage());
+        }
         return "jsonView";
     }
 
@@ -84,10 +89,15 @@ public class AM12Ctr {
     @PostMapping(value = "/arbitDocument")
     public String arbitDocument(@RequestBody Map<String, Object> paramMap, HttpServletRequest request, ModelMap model) {
         enrichRequestInfo(paramMap, request);
-        Map<String, Object> result = am11Svc.arbitDocument(paramMap);
-        model.addAttribute("resultCode", result.get("resultCode"));
-        model.addAttribute("resultMessage", result.get("resultMessage"));
-        model.addAttribute("docId", result.get("docId"));
+        try {
+            Map<String, Object> result = am11Svc.arbitDocument(paramMap);
+            model.addAttribute("resultCode", result.get("resultCode"));
+            model.addAttribute("resultMessage", result.get("resultMessage"));
+            model.addAttribute("docId", result.get("docId"));
+        } catch (IllegalStateException | IllegalArgumentException e) {
+            model.addAttribute("resultCode", "500");
+            model.addAttribute("resultMessage", e.getMessage());
+        }
         return "jsonView";
     }
 
@@ -133,6 +143,18 @@ public class AM12Ctr {
         String docId = am11Svc.selectDocIdByBizKey(paramMap);
         model.addAttribute("resultCode", "200");
         model.addAttribute("docId", docId != null ? docId : "");
+        return "jsonView";
+    }
+
+    // QM01/WB24 평가팀장 원인/결과/근본원인/근본예방대책 단독 저장 (AM 결재상세)
+    @PostMapping(value = "/saveBizCoachingComment")
+    public String saveBizCoachingComment(@RequestBody Map<String, Object> paramMap, HttpServletRequest request, ModelMap model) {
+        enrichRequestInfo(paramMap, request);
+        Map<String, Object> result = am11Svc.saveBizCoachingComment(paramMap);
+        model.addAttribute("resultCode", result.get("resultCode"));
+        model.addAttribute("resultMessage", result.get("resultMessage"));
+        model.addAttribute("docRenderHtml", result.get("docRenderHtml"));
+        model.addAttribute("bizCoachingData", result.get("bizCoachingData"));
         return "jsonView";
     }
 

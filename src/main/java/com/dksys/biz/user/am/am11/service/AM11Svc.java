@@ -40,4 +40,7 @@ public interface AM11Svc {
 
     // 지급/경비 저장 시 결재선과 현재 순번을 변경하지 않고 원본문서 내용만 갱신한다.
     int updateApprovalDocContent(Map<String, Object> paramMap);
+
+    // QM01/WB24 평가팀장 원인/결과/근본원인/근본예방대책 단독 저장 및 AM 본문 HTML 재렌더링
+    Map<String, Object> saveBizCoachingComment(Map<String, Object> paramMap);
 }

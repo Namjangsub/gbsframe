@@ -114,7 +114,7 @@ public class ApprovalNotificationEventListener {
         }
     }
 
-    /** 결재 요청(상신/다음 결재자). 직접 발송 대상 업무(PM07/PM08/PM51/CR02)는 업무별 번호·결재구분 규칙을 쓰고, 그 외는 ERP 원자료 값을 쓴다. */
+    /** 결재 요청(상신/다음 결재자). 직접 발송 대상 업무(PM07/PM08/PM51/CR02/WB24/QM01)는 업무별 번호·결재구분 규칙을 쓰고, 그 외는 ERP 원자료 값을 쓴다. */
     private void sendRequestNotification(ApprovalEvent event) {
         String docTitle = notificationDocTitle(event);
         String requestType = "COOP_REQUEST".equals(event.getEventType()) ? "협조" : "결재";
@@ -183,13 +183,14 @@ public class ApprovalNotificationEventListener {
 
     private boolean isRichType(String erpBizType) {
         return "PM07".equals(erpBizType) || "PM08".equals(erpBizType)
-                || "PM51".equals(erpBizType) || "PM52".equals(erpBizType) || "CR02".equals(erpBizType);
+                || "PM51".equals(erpBizType) || "PM52".equals(erpBizType) || "CR02".equals(erpBizType)
+                || "WB24".equals(erpBizType) || "QM01".equals(erpBizType);
     }
 
     /** 업무명 + (PM51 이면 출장기간). */
     private String todoCodeNameOf(ApprovalEvent event) {
         String erpBizType = extra(event, "erpBizType");
-        String name = messageBuilder.todoCodeName(erpBizType, approvalTodoDiv2CodeId(event), vacTypeName(event));
+        String name = messageBuilder.todoCodeName(erpBizType, approvalTodoDiv2CodeId(event), vacTypeName(event), resolvePgPath(event));
         if ("PM51".equals(erpBizType)) {
             String period = resolvePm51TripPeriod(event.getExtraInfo() == null ? new HashMap<String, Object>() : event.getExtraInfo());
             if (!period.isEmpty()) {
@@ -214,6 +215,14 @@ public class ApprovalNotificationEventListener {
         }
         if ("CR02".equals(erpBizType)) {
             return "TODODIV2100";
+        }
+        if ("WB24".equals(erpBizType)) {
+            String div2 = extra(event, "todoDiv2CodeId");
+            return "TODODIV2060".equals(div2) || "TODODIV2090".equals(div2) ? div2 : null;
+        }
+        if ("QM01".equals(erpBizType)) {
+            String div2 = extra(event, "todoDiv2CodeId");
+            return "TODODIV2020".equals(div2) || "TODODIV2030".equals(div2) ? div2 : null;
         }
         return null;
     }
@@ -292,7 +301,7 @@ public class ApprovalNotificationEventListener {
             logParam.put("mobile", mobile);
             logParam.put("nameTo", receiverNm);
             logParam.put("creatId", notificationSenderId(event));
-            logParam.put("creatPgm", creatPgmOf(extra(event, "erpBizType")));
+            logParam.put("creatPgm", creatPgmOf(event, todoDiv2CodeId));
             logParam.put("todoNo", todoNo);
             logParam.put("todoDiv2CodeId", todoDiv2CodeId);
             notificationHistory.save(logParam);
@@ -301,9 +310,9 @@ public class ApprovalNotificationEventListener {
         }
     }
 
-    /** 발송 이력의 생성 프로그램(업무별 화면 코드). 매핑이 없으면 AM_ALIM. */
-    private String creatPgmOf(String erpBizType) {
-        switch (erpBizType) {
+    /** 발송 이력의 생성 프로그램(업무별 화면 코드). 매핑이 없으면 AM_ALIM. WB24 는 pgPath, QM01 은 결재구분(2030=결과)으로 가른다. */
+    private String creatPgmOf(ApprovalEvent event, String todoDiv2CodeId) {
+        switch (extra(event, "erpBizType")) {
             case "PM07":
                 return "PM0701P01";
             case "PM08":
@@ -314,6 +323,14 @@ public class ApprovalNotificationEventListener {
                 return "PM5102P01";
             case "CR02":
                 return "CR0202P01";
+            case "WB24": {
+                String pgPath = resolvePgPath(event);
+                if (pgPath.contains("WB2401P11")) return "WB2401P11";
+                if (pgPath.contains("WB2401P01")) return "WB2401P01";
+                return "AM_ALIM";
+            }
+            case "QM01":
+                return "TODODIV2030".equals(todoDiv2CodeId) ? "QM0101P03" : "QM0101P01";
             default:
                 return "AM_ALIM";
         }
@@ -390,6 +407,25 @@ public class ApprovalNotificationEventListener {
             if (!sender.isEmpty()) return sender;
         }
         return event.getDraUserNm();
+    }
+
+    private String resolvePgPath(ApprovalEvent event) {
+        String pgPath = extra(event, "pgPath");
+        if (!pgPath.isEmpty()) {
+            return pgPath;
+        }
+        String docDataJson = extra(event, "docDataJson");
+        if (docDataJson.isEmpty()) {
+            return "";
+        }
+        try {
+            Map<String, Object> docData = new Gson().fromJson(docDataJson, Map.class);
+            Object value = docData == null ? null : docData.get("pgPath");
+            return value == null ? "" : String.valueOf(value).trim();
+        } catch (Exception e) {
+            logger.warn("[ApprovalNotification] docDataJson pgPath 파싱 실패: {}", e.getMessage());
+            return "";
+        }
     }
 
     private String extra(ApprovalEvent event, String key) {

@@ -121,4 +121,7 @@ public interface AM11Mapper {
     List<Map<String, Object>> selectCr02DocsForRerender();
 
     int updateDocRenderHtmlById(Map<String, Object> paramMap);
+
+    // 9. 협조(COOP) 비구속 확인 시 TB_WB20M03 단일 결재행만 완료 표기
+    int updateWb20CoopLineConfirmed(Map<String, Object> paramMap);
 }

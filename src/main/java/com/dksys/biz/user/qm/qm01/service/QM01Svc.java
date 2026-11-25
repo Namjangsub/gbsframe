@@ -51,10 +51,16 @@ public interface QM01Svc {
 	int updateQualityResultComment(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
 
   int deleteQualityReq(Map<String, String> paramMap) throws Exception;
+
+  int deleteQualityResp(Map<String, String> paramMap) throws Exception;
   
   List<Map<String, String>> selectApprovalList(Map<String, String> paramMap);
   
   List<Map<String, String>> selectApprovalChk(Map<String, String> paramMap);
+
+  String selectDeleteApprovalChk(Map<String, String> paramMap);
+
+  String selectDeleteRespApprovalChk(Map<String, String> paramMap);
   
   int selectCodeMaxCount(Map<String, String> paramMap);
   

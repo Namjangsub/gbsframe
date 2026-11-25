@@ -29,6 +29,7 @@ import com.dksys.biz.user.qm.qm01.mapper.QM01Mapper;
 import com.dksys.biz.user.wb.wb20.mapper.WB20Mapper;
 import com.dksys.biz.user.wb.wb20.service.WB20Svc;
 import com.dksys.biz.user.wb.wb24.mapper.WB24Mapper;
+import com.dksys.biz.user.wb.wb24.service.WB24Svc;
 import com.dksys.biz.util.ExceptionThrower;
 import com.dksys.biz.util.SenderNameResolver;
 import com.google.gson.Gson;
@@ -73,6 +74,10 @@ public class WB20SvcImpl implements WB20Svc {
 
 	@Autowired
 	PM08Svc pm08Svc;
+
+	@Autowired
+	@Lazy
+	WB24Svc wb24Svc;
 
 	@Autowired
 	@Lazy
@@ -213,6 +218,15 @@ public class WB20SvcImpl implements WB20Svc {
 		validatePm51SalesApproval(paramMap);
 		validatePm51SequentialApproval(paramMap);
 
+		// WB24 조치결재(TODODIV2090)는 같은 이슈의 문제결재(TODODIV2060) 최종 완료 후에만 허용 (기안자 본인 자체승인은 예외)
+		if ("TODODIV2090".equals(todoDiv2CodeId) && !wb24Svc.isIssueApprovedOrMissing(tempReqNo)
+				&& !wb24Svc.isResultDrafterSelfApprovalAllowed(tempReqNo, paramMap.get("todoId"), paramMap.get("userId"))) {
+			if (wb24Svc.isIssueRejected(tempReqNo)) {
+				throw new IllegalStateException("문제(이슈) 결재가 반려되었습니다. 이슈 재상신 후 조치 결재를 처리할 수 있습니다.");
+			}
+			throw new IllegalStateException("문제(이슈) 결재 완료 후 조치 결재를 처리할 수 있습니다.");
+		}
+
 		// AM 연동 판별 및 위임 (1차진입일 때만)
 		boolean isReentry = "Y".equals(paramMap.get("amLinkedApproval"));
 		if (!isReentry && am11Svc != null) {
@@ -228,6 +242,22 @@ public class WB20SvcImpl implements WB20Svc {
 				amParam.put("docId", docId);
 				amParam.put("userId", paramMap.get("userId"));
 				amParam.put("apprOpinion", todoCfOpn != null ? todoCfOpn : "");
+				String actMh = hasText(paramMap.get("actMh")) ? paramMap.get("actMh") : paramMap.get("etcField1");
+				if (hasText(actMh)) {
+					amParam.put("actMh", actMh);
+				}
+				if (hasText(paramMap.get("actDngEval"))) {
+					amParam.put("actDngEval", paramMap.get("actDngEval"));
+				}
+				if (hasText(paramMap.get("sameTimeResultChk"))) {
+					amParam.put("sameTimeResultChk", paramMap.get("sameTimeResultChk"));
+				}
+				if (hasText(paramMap.get("actTeamManager"))) {
+					amParam.put("actTeamManager", paramMap.get("actTeamManager"));
+				}
+				if (hasText(paramMap.get("deptId"))) {
+					amParam.put("deptId", paramMap.get("deptId"));
+				}
 				enrichAmEngineParam(amParam, paramMap);
 
 				Map<String, Object> amResult = am11Svc.approveDocument(amParam);
@@ -346,11 +376,18 @@ public class WB20SvcImpl implements WB20Svc {
 			}
 			// TODODIV2060:WBS이슈 발생에 대한 결재이면 이슈상태 변경처리
 		} else if ("TODODIV2060".equals(todoDiv2CodeId)) {
+			// AM 재진입 등 pgParam/요청에 issNo가 없는 경우에도 TODO_NO(=ISS_NO)로 보강한다.
+			if (!hasText(paramMap.get("issNo")) && hasText(tempReqNo)) {
+				paramMap.put("issNo", tempReqNo);
+			}
 			// ISS_STS: ISSSTS01 --> ISSSTS02 로 상태 변경처리
 			result += wb24Mapper.updateWbsIssueStChk(paramMap);
 
 			// TODODIV2090:WBS조치 이슈조치결과 담당팀장 위험도 평가내역 수정 처리
 		} else if ("TODODIV2090".equals(todoDiv2CodeId)) {
+			if (!hasText(paramMap.get("issNo")) && hasText(tempReqNo)) {
+				paramMap.put("issNo", tempReqNo);
+			}
 			if (paramMap.containsKey("actDngEval")) {
 				String value = paramMap.get("actDngEval");
 				if (value != null && !value.isEmpty()) {
@@ -370,12 +407,13 @@ public class WB20SvcImpl implements WB20Svc {
 			}
 			paramMap.put("deptId", appDeptId);
 
-			// 팀장 투입시간 업데이트
-			if ("GUN30".equals(appDeptId) ||
-				"GUN40".equals(appDeptId) ||
-				"TRN50".equals(appDeptId) ||
-				"GUN60".equals(appDeptId) ||
-				"GUN70".equals(appDeptId)) {
+			// 팀장 투입시간 업데이트 (AM 재진입 시 비평가 결재자(actMh 미입력)는 기존 값을 NULL로 덮어쓰지 않음)
+			if ((!isReentry || hasText(paramMap.get("actMh")))
+					&& ("GUN30".equals(appDeptId) ||
+						"GUN40".equals(appDeptId) ||
+						"TRN50".equals(appDeptId) ||
+						"GUN60".equals(appDeptId) ||
+						"GUN70".equals(appDeptId))) {
 				result += wb24Mapper.updateWbsIssueActMn(paramMap);	// 이슈조치 투입시간 업데이트
 			}
 			// 조치 결재시 문제에 결재 미완료를 완료로 변경
@@ -808,6 +846,9 @@ public class WB20SvcImpl implements WB20Svc {
 		keyParam.put("todoDiv1CodeId", paramMap.get("todoDiv1CodeId"));
 		keyParam.put("todoDiv2CodeId", paramMap.get("todoDiv2CodeId"));
 		keyParam.put("coCd", paramMap.get("coCd"));
+		if (approving) {
+			keyParam.put("includeCoopPendingOnCompleted", "Y");
+		}
 		if (approving && "TODODIV20".equals(paramMap.get("todoDiv1CodeId"))
 				&& "TODODIV2100".equals(paramMap.get("todoDiv2CodeId"))) {
 			if (!hasText(paramMap.get("todoKey"))) {
@@ -1566,10 +1607,19 @@ public class WB20SvcImpl implements WB20Svc {
 			return results;
 		}
 
+		String todoDiv2CodeIds = (paramMap.get("todoDiv2CodeIds") != null)
+				? String.valueOf(paramMap.get("todoDiv2CodeIds")).trim() : null;
+
 		// 0) 현재 WB20 결재체인 스냅샷 로드
 		Map<String, String> snapParam = new HashMap<>();
 		snapParam.put("todoNo", todoNo);
 		snapParam.put("coCd", coCd);
+		if (todoDiv2CodeIds != null && !todoDiv2CodeIds.isEmpty()) {
+			snapParam.put("todoDiv2CodeIds", todoDiv2CodeIds);
+		}
+		if (histNo != null && !histNo.trim().isEmpty()) {
+			snapParam.put("histNo", histNo.trim());
+		}
 		List<Map<String, String>> wb20Rows = wb20Mapper.selectGetApprovalList(snapParam);
 
 		if (wb20Rows == null || wb20Rows.isEmpty()) {
@@ -1583,6 +1633,12 @@ public class WB20SvcImpl implements WB20Svc {
 		Map<String, String> origCreatParam = new HashMap<>();
 		origCreatParam.put("todoNo", todoNo);
 		origCreatParam.put("coCd", coCd);
+		if (todoDiv2CodeIds != null && !todoDiv2CodeIds.isEmpty()) {
+			origCreatParam.put("todoDiv2CodeIds", todoDiv2CodeIds);
+		}
+		if (histNo != null && !histNo.trim().isEmpty()) {
+			origCreatParam.put("histNo", histNo.trim());
+		}
 		Map<String, String> origCreatInfo = wb20Mapper.selectOrigCreatInfo(origCreatParam);
 
 		if (origCreatInfo == null || origCreatInfo.isEmpty()) {
@@ -1827,13 +1883,19 @@ public class WB20SvcImpl implements WB20Svc {
 			}
 		}
 
-		// 4) 신규 라인 생성 (brandNew lines, APPR/REF 모두)
-		// C) REF 라인의 DIV2 도출 규칙: linked lines가 있으면 그들의 DIV2에서 페어링, 없으면 검증
-		String linkedDiv2 = null;
-		if (!linked.isEmpty()) {
-			Object firstLinkedDiv2 = linked.get(0).get("wb20Div2CodeId");
-			if (firstLinkedDiv2 != null) {
-				linkedDiv2 = String.valueOf(firstLinkedDiv2);
+		// 4) 신규 라인 생성 (brandNew lines, APPR/AGREE/COOP/POST/REF 모두)
+		// C) linked 라인에서 결재(TODODIV2*) 및 공유(TODODIV1*) DIV2 각각 추출
+		String linkedApprDiv2 = null;
+		String linkedRefDiv2 = null;
+		for (Map<String, Object> linkedLine : linked) {
+			Object div2Obj = linkedLine.get("wb20Div2CodeId");
+			if (div2Obj == null) continue;
+			String d2 = String.valueOf(div2Obj).trim();
+			if (d2.isEmpty()) continue;
+			if (d2.startsWith("TODODIV2") && linkedApprDiv2 == null) {
+				linkedApprDiv2 = d2;
+			} else if (d2.startsWith("TODODIV1") && linkedRefDiv2 == null) {
+				linkedRefDiv2 = d2;
 			}
 		}
 
@@ -1881,16 +1943,16 @@ public class WB20SvcImpl implements WB20Svc {
 				wbLineType = "APPR";
 			}
 
-			if ("APPR".equals(lineType)) {
-				// APPR: DIV2는 linked 라인에서 도출, 또는 문서의 유일한 APPR 그룹
-				if (linkedDiv2 != null) {
-					div2CodeId = linkedDiv2;
+			if (isApprGroup) {
+				// 결재그룹(APPR/AGREE/COOP/POST): DIV2는 linked 결재라인에서 도출, 또는 문서의 유일한 APPR 그룹
+				if (linkedApprDiv2 != null) {
+					div2CodeId = linkedApprDiv2;
 				} else {
 					// brandNew만 있는 경우: DIV2 다중 그룹 검증 (approvalDiv2Set은 루프 전에 사전 계산됨)
 					if (approvalDiv2Set.isEmpty()) {
 						logger.warn(
-								"[AM→WB sync] 신규 결재자 생성 실패: 같은 문서에 APPR(TODODIV20) 그룹이 없음. approverId={}",
-								line.get("approverId"));
+								"[AM→WB sync] 신규 결재자 생성 실패: 같은 문서에 APPR(TODODIV20) 그룹이 없음. lineType={}, approverId={}",
+								lineType, line.get("approverId"));
 						continue;
 					} else if (approvalDiv2Set.size() > 1) {
 						logger.error(
@@ -1903,18 +1965,20 @@ public class WB20SvcImpl implements WB20Svc {
 					}
 				}
 			} else {
-				// REF: DIV2는 linked의 APPR DIV2를 페어링으로 변환
-				if (linkedDiv2 == null) {
-					// REF만 있고 APPR linked가 없는 경우: 기존 공유 라인에서 상속
+				// REF: 기존 linked 공유행 또는 기존 WB20 공유행 우선, 없으면 APPR DIV2 페어링
+				if (linkedRefDiv2 != null) {
+					div2CodeId = linkedRefDiv2;
+				} else {
 					for (Map<String, String> row : wb20Rows) {
 						if ("TODODIV10".equals(row.get("todoDiv1CodeId"))) {
 							div2CodeId = row.get("todoDiv2CodeId");
 							break;
 						}
 					}
-
-					if (div2CodeId == null) {
-						// 폴백: 문서의 APPR 그룹 DIV2를 사용해서 페어링으로 도출
+				}
+				if (div2CodeId == null) {
+					String sourceApprDiv2 = linkedApprDiv2;
+					if (sourceApprDiv2 == null) {
 						if (approvalDiv2Set.isEmpty()) {
 							logger.warn(
 									"[AM→WB sync] 신규 공유자 생성 실패: 같은 문서에 기존 REF 라인도 APPR도 없음. approverId={}",
@@ -1927,31 +1991,14 @@ public class WB20SvcImpl implements WB20Svc {
 									approvalDiv2Set, line.get("approverId"));
 							continue;
 						} else {
-							// 문서의 유일한 APPR DIV2를 페어링으로 변환
-							String approvalDiv2 = approvalDiv2Set.iterator().next();
-							if (approvalDiv2.startsWith("TODODIV2")) {
-								div2CodeId = "TODODIV1" + approvalDiv2.substring(8);
-								logger.info(
-										"[AM→WB sync] REF DIV2 폴백: APPR DIV2 페어링. approvalDiv2={} → refDiv2={}, approverId={}",
-										approvalDiv2, div2CodeId, line.get("approverId"));
-							} else {
-								logger.warn(
-										"[AM→WB sync] 신규 공유자 생성 실패: APPR DIV2의 페어링 규칙 미적용(startsWith TODODIV2 아님). "
-											+ "approvalDiv2={}, approverId={}",
-										approvalDiv2, line.get("approverId"));
-								continue;
-							}
+							sourceApprDiv2 = approvalDiv2Set.iterator().next();
 						}
 					}
-				} else {
-					// linkedDiv2를 TODODIV2xxx → TODODIV1xxx로 페어링
-					if (linkedDiv2.startsWith("TODODIV2")) {
-						div2CodeId = "TODODIV1" + linkedDiv2.substring(8);
-					} else {
+					div2CodeId = resolvePairedRefDiv2(sourceApprDiv2);
+					if (div2CodeId == null) {
 						logger.warn(
-								"[AM→WB sync] 신규 공유자 생성 실패: linked DIV2의 페어링 규칙 미적용(startsWith TODODIV2 아님). "
-									+ "linkedDiv2={}, approverId={}",
-								linkedDiv2, line.get("approverId"));
+								"[AM→WB sync] 신규 공유자 생성 실패: APPR DIV2 페어링 불가. sourceApprDiv2={}, approverId={}",
+								sourceApprDiv2, line.get("approverId"));
 						continue;
 					}
 				}
@@ -2039,6 +2086,12 @@ public class WB20SvcImpl implements WB20Svc {
 				insertParam.put("userId", userId);
 				insertParam.put("etcField2", histNo);
 				insertParam.put("lineType", wbLineType);
+				if (todoDiv2CodeIds != null && !todoDiv2CodeIds.isEmpty()) {
+					insertParam.put("todoDiv2CodeIds", todoDiv2CodeIds);
+				}
+				if (histNo != null && !histNo.trim().isEmpty()) {
+					insertParam.put("histNo", histNo.trim());
+				}
 
 				logger.info(
 						"[AM→WB sync] 신규 행 insert (라이브 템플릿 복사). todoKey={}, approverId={}, div1={}, div2={}, sanctnSn={}",
@@ -2088,6 +2141,9 @@ public class WB20SvcImpl implements WB20Svc {
 		offParam.put("todoNo", todoNo);
 		offParam.put("coCd", coCd);
 		offParam.put("offset", SANCTN_OFFSET);
+		if (todoDiv2CodeIds != null && !todoDiv2CodeIds.isEmpty()) {
+			offParam.put("todoDiv2CodeIds", todoDiv2CodeIds);
+		}
 		if (histNo != null && !histNo.isEmpty()) {
 			offParam.put("histNo", histNo);
 		}
@@ -2164,6 +2220,9 @@ public class WB20SvcImpl implements WB20Svc {
 		chkParam.put("todoNo", todoNo);
 		chkParam.put("coCd", coCd);
 		chkParam.put("offset", SANCTN_OFFSET);
+		if (todoDiv2CodeIds != null && !todoDiv2CodeIds.isEmpty()) {
+			chkParam.put("todoDiv2CodeIds", todoDiv2CodeIds);
+		}
 		if (histNo != null && !histNo.isEmpty()) {
 			chkParam.put("histNo", histNo);
 		}
@@ -2175,6 +2234,17 @@ public class WB20SvcImpl implements WB20Svc {
 
 		logger.info("[AM→WB sync] 완료. 재배정/생성 {}건(신규행 {}개)", reorderResults.size(), brandNew.size());
 		return reorderResults;
+	}
+
+	private String resolvePairedRefDiv2(String apprDiv2) {
+		if (apprDiv2 == null || !apprDiv2.startsWith("TODODIV2")) {
+			return null;
+		}
+		if ("TODODIV2060".equals(apprDiv2)) return "TODODIV1030";
+		if ("TODODIV2090".equals(apprDiv2)) return "TODODIV1090";
+		if ("TODODIV2020".equals(apprDiv2)) return "TODODIV1040";
+		if ("TODODIV2030".equals(apprDiv2)) return "TODODIV1050";
+		return "TODODIV1" + apprDiv2.substring(8);
 	}
 
 }
