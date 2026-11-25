@@ -12,6 +12,7 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import javax.annotation.PreDestroy;
@@ -41,8 +42,11 @@ public class SseNotificationService {
 	// 재접속 쇄도 완화를 위해 타임아웃에 더하는 최대 지터 (0~5분)
 	private static final long SSE_JITTER_MAX_MS = 5 * 60 * 1000L;
 
+	// 컨테이너 Async 타임아웃 여유분 (5분): 하트비트에서 선제 complete() 처리해 Tomcat asyncTimeout 경합 방지
+	private static final long SSE_CONTAINER_TIMEOUT_BUFFER_MS = 5 * 60 * 1000L;
+
 	// 사용자별 SseEmitter 목록 보관 Map (key: userId, 한 사용자가 여러 기기/탭에서 동시 접속 가능)
-	private final Map<String, CopyOnWriteArrayList<SseEmitter>> emitters = new ConcurrentHashMap<>();
+	private final Map<String, CopyOnWriteArrayList<EmitterEntry>> emitters = new ConcurrentHashMap<>();
 
 	// 건수 조회 전용 소형 스레드풀 (요청 스레드에서 DB 조회하지 않도록 분리, 포화 시 조회 작업은 버림 - 화면 캐시로 보완)
 	private final ThreadPoolExecutor countExecutor = new ThreadPoolExecutor(2, 2, 0L, TimeUnit.MILLISECONDS,
@@ -50,6 +54,20 @@ public class SseNotificationService {
 
 	@Autowired
 	private WB20Svc wb20Svc;
+
+	/**
+	 * 개별 SSE 연결과 만료/종료 상태를 함께 추적하는 내부 래퍼
+	 */
+	private static final class EmitterEntry {
+		final SseEmitter emitter;
+		final long expiresAt;
+		final AtomicBoolean closed = new AtomicBoolean(false);
+
+		EmitterEntry(SseEmitter emitter, long expiresAt) {
+			this.emitter = emitter;
+			this.expiresAt = expiresAt;
+		}
+	}
 
 	/**
 	 * 사용자의 SSE 구독 등록
@@ -63,20 +81,15 @@ public class SseNotificationService {
 		}
 
 		String userKey = userId.trim();
-		SseEmitter emitter = new SseEmitter(SSE_TIMEOUT_MS + ThreadLocalRandom.current().nextLong(SSE_JITTER_MAX_MS + 1));
+		long appTimeoutMs = SSE_TIMEOUT_MS + ThreadLocalRandom.current().nextLong(SSE_JITTER_MAX_MS + 1);
+		SseEmitter emitter = new SseEmitter(appTimeoutMs + SSE_CONTAINER_TIMEOUT_BUFFER_MS);
+		EmitterEntry entry = new EmitterEntry(emitter, System.currentTimeMillis() + appTimeoutMs);
 
-		// 연결 종료/타임아웃/에러 발생 시 자기 자신만 목록에서 제거
-		emitter.onCompletion(() -> removeEmitter(userKey, emitter));
-		emitter.onTimeout(() -> {
-			emitter.complete();
-			removeEmitter(userKey, emitter);
-		});
-		emitter.onError((e) -> {
-			emitter.complete();
-			removeEmitter(userKey, emitter);
-		});
-
-		addEmitter(userKey, emitter);
+		// 연결 종료/타임아웃/에러 발생 시 자기 자신만 목록에서 안전하게 제거
+		// - onError에서는 이미 에러 전이된 상태이므로 emitter.complete()를 중복 호출하지 않는다.
+		emitter.onCompletion(() -> closeAndRemove(userKey, entry, false));
+		emitter.onTimeout(() -> closeAndRemove(userKey, entry, true));
+		emitter.onError((e) -> closeAndRemove(userKey, entry, false));
 
 		// 1) 연결 성공 더미 이벤트 전송 (브라우저 최초 연결 확인 및 503 방지)
 		try {
@@ -84,9 +97,16 @@ public class SseNotificationService {
 					.name("connect")
 					.data("connected", MediaType.TEXT_PLAIN));
 		} catch (Exception e) {
-			removeEmitter(userKey, emitter);
+			entry.closed.set(true);
+			try {
+				emitter.completeWithError(e);
+			} catch (Exception ignored) {
+				// 이미 종료된 연결은 무시
+			}
 			return emitter;
 		}
+
+		addEmitter(userKey, entry);
 
 		// 2) 연결 즉시 최신 결재/공유 건수를 1회 푸시하여 화면 초기화 지원 (DB 조회는 별도 스레드에서 수행)
 		countExecutor.execute(() -> sendLatestCount(userKey, coCd));
@@ -141,18 +161,27 @@ public class SseNotificationService {
 		if (userId == null) {
 			return;
 		}
-		CopyOnWriteArrayList<SseEmitter> list = emitters.get(userId);
+		CopyOnWriteArrayList<EmitterEntry> list = emitters.get(userId);
 		if (list == null) {
 			return;
 		}
-		for (SseEmitter emitter : list) {
+		for (EmitterEntry entry : list) {
+			if (entry.closed.get()) {
+				removeEmitter(userId, entry);
+				continue;
+			}
 			try {
-				emitter.send(SseEmitter.event()
-						.name("todoCount")
-						.data(countData, MediaType.APPLICATION_JSON));
+				synchronized (entry) {
+					if (entry.closed.get()) {
+						continue;
+					}
+					entry.emitter.send(SseEmitter.event()
+							.name("todoCount")
+							.data(countData, MediaType.APPLICATION_JSON));
+				}
 			} catch (Exception e) {
 				logger.debug("[SSE] Emitter disconnected for user {}: {}", userId, e.getMessage());
-				removeEmitter(userId, emitter);
+				closeAndRemove(userId, entry, false);
 			}
 		}
 	}
@@ -231,17 +260,32 @@ public class SseNotificationService {
 	}
 
 	/**
-	 * 30초마다 모든 연결에 주석 이벤트(ping)를 보내 유휴 연결 끊김을 방지하고, 전송 실패한 연결은 제거
+	 * 30초마다 모든 연결에 주석 이벤트(ping)를 보내 유휴 연결 끊김을 방지하고,
+	 * 만료 시각에 도달한 연결은 컨테이너 asyncTimeout 이전에 선제 종료하며 전송 실패한 연결은 제거
 	 */
 	@Scheduled(fixedDelay = 30000)
 	public void sendHeartbeat() {
-		for (Map.Entry<String, CopyOnWriteArrayList<SseEmitter>> entry : emitters.entrySet()) {
-			String userKey = entry.getKey();
-			for (SseEmitter emitter : entry.getValue()) {
+		long now = System.currentTimeMillis();
+		for (Map.Entry<String, CopyOnWriteArrayList<EmitterEntry>> mapEntry : emitters.entrySet()) {
+			String userKey = mapEntry.getKey();
+			for (EmitterEntry entry : mapEntry.getValue()) {
+				if (entry.closed.get()) {
+					removeEmitter(userKey, entry);
+					continue;
+				}
+				if (now >= entry.expiresAt) {
+					closeAndRemove(userKey, entry, true);
+					continue;
+				}
 				try {
-					emitter.send(SseEmitter.event().comment("ping"));
+					synchronized (entry) {
+						if (entry.closed.get()) {
+							continue;
+						}
+						entry.emitter.send(SseEmitter.event().comment("ping"));
+					}
 				} catch (Exception e) {
-					removeEmitter(userKey, emitter);
+					closeAndRemove(userKey, entry, false);
 				}
 			}
 		}
@@ -261,19 +305,19 @@ public class SseNotificationService {
 		if (userId == null) {
 			return false;
 		}
-		CopyOnWriteArrayList<SseEmitter> list = emitters.get(userId);
+		CopyOnWriteArrayList<EmitterEntry> list = emitters.get(userId);
 		return list != null && !list.isEmpty();
 	}
 
 	/**
 	 * 사용자 연결 목록에 연결 추가 (목록 조회/생성과 추가를 원자적으로 수행하여 정리 작업과의 경합 방지)
 	 * @param userKey 사용자ID
-	 * @param emitter 추가할 연결
+	 * @param entry 추가할 연결 래퍼
 	 */
-	private void addEmitter(String userKey, SseEmitter emitter) {
+	private void addEmitter(String userKey, EmitterEntry entry) {
 		emitters.compute(userKey, (k, list) -> {
-			CopyOnWriteArrayList<SseEmitter> target = list != null ? list : new CopyOnWriteArrayList<SseEmitter>();
-			target.add(emitter);
+			CopyOnWriteArrayList<EmitterEntry> target = list != null ? list : new CopyOnWriteArrayList<EmitterEntry>();
+			target.add(entry);
 			return target;
 		});
 	}
@@ -281,13 +325,31 @@ public class SseNotificationService {
 	/**
 	 * 사용자 연결 목록에서 해당 연결만 제거하고, 목록이 비면 키까지 제거
 	 * @param userKey 사용자ID
-	 * @param emitter 제거할 연결
+	 * @param entry 제거할 연결 래퍼
 	 */
-	private void removeEmitter(String userKey, SseEmitter emitter) {
+	private void removeEmitter(String userKey, EmitterEntry entry) {
 		emitters.computeIfPresent(userKey, (k, list) -> {
-			list.remove(emitter);
+			list.remove(entry);
 			return list.isEmpty() ? null : list;
 		});
+	}
+
+	/**
+	 * 연결 종료 상태를 1회만 원자적으로 마킹하고 목록에서 제거하며, 필요 시 emitter.complete()를 안전하게 호출
+	 * @param userKey 사용자ID
+	 * @param entry 대상 연결 래퍼
+	 * @param completeEmitter 정상 만료/타임아웃 등 complete() 호출이 필요한 경우 true
+	 */
+	private void closeAndRemove(String userKey, EmitterEntry entry, boolean completeEmitter) {
+		boolean firstClose = entry.closed.compareAndSet(false, true);
+		removeEmitter(userKey, entry);
+		if (firstClose && completeEmitter) {
+			try {
+				entry.emitter.complete();
+			} catch (Exception ignored) {
+				// 이미 완료/에러 전이된 연결은 무시
+			}
+		}
 	}
 
 	/**
