@@ -218,7 +218,7 @@ onkeyup="(event.keyCode == 8 || event.keyCode == 46) ? ordrsClntCd_S.value = '' 
             <input id="autoZoomChk" type="checkbox" checked />
           </label>
           <label style="font-size:11px;color:#64748b;white-space:nowrap;">줌(px/day):</label>
-          <input id="zoomSlider" type="range" min="2" max="40" value="10" style="width: 90px;" />
+          <input id="zoomSlider" type="range" min="0.2" max="40" step="0.05" value="10" style="width: 90px;" />
           <span id="zoomVal" style="display:inline-block; min-width:30px;">10</span>
         </div>
 
@@ -1060,12 +1060,14 @@ onkeyup="(event.keyCode == 8 || event.keyCode == 46) ? ordrsClntCd_S.value = '' 
     	$canvas.find(".bar").remove();
 
     	segments.forEach(seg=>{
-    	    const left = daysBetween(STATE.viewStart, seg.wbsPlansDtFm) * CELL_W;
-    	    const w = (daysBetween(seg.wbsPlansDtFm, seg.wbsPlaneDtFm) + 1) * CELL_W;
+    	    const startOffset = daysBetween(STATE.viewStart, seg.wbsPlansDtFm);
+    	    const daysLen = daysBetween(seg.wbsPlansDtFm, seg.wbsPlaneDtFm) + 1;
+    	    const left = startOffset * CELL_W;
+    	    const w = daysLen * CELL_W;
     	    const cls = deptClass(seg.deptCd || seg.deptNm);
     	    const $bar = $(`
-    	      <div class="bar ${cls}" style="left:${left}px;width:${w}px; cursor:default;">
-    	        <div class="txt">${seg.deptNm}</div>
+    	      <div class="bar ${cls}" data-start="${escapeHtml(seg.wbsPlansDtFm)}" data-end="${escapeHtml(seg.wbsPlaneDtFm)}" data-start-offset="${startOffset}" data-days-len="${daysLen}" style="left:${left}px;width:${w}px; cursor:default;">
+    	        <div class="txt">${escapeHtml(seg.deptNm)}</div>
     	      </div>
     	    `);
     	    $bar.attr("data-summary", "1");
@@ -1783,11 +1785,13 @@ onkeyup="(event.keyCode == 8 || event.keyCode == 46) ? ordrsClntCd_S.value = '' 
             }
 
             (r.segments || []).forEach(seg => {
-                const left = daysBetween(STATE.viewStart, seg.wbsPlansDtFm) * CELL_W;
-                const w = (daysBetween(seg.wbsPlansDtFm, seg.wbsPlaneDtFm) + 1) * CELL_W;
+                const startOffset = daysBetween(STATE.viewStart, seg.wbsPlansDtFm);
+                const daysLen = daysBetween(seg.wbsPlansDtFm, seg.wbsPlaneDtFm) + 1;
+                const left = startOffset * CELL_W;
+                const w = daysLen * CELL_W;
                 const cls = deptClass(seg.deptCd || seg.deptNm);
                 const $bar = $(`
-                  <div class="bar ${cls}" data-start="${escapeHtml(seg.wbsPlansDtFm)}" data-end="${escapeHtml(seg.wbsPlaneDtFm)}" style="left:${left}px;width:${w}px; cursor:default;">
+                  <div class="bar ${cls}" data-start="${escapeHtml(seg.wbsPlansDtFm)}" data-end="${escapeHtml(seg.wbsPlaneDtFm)}" data-start-offset="${startOffset}" data-days-len="${daysLen}" style="left:${left}px;width:${w}px; cursor:default;">
                     <div class="txt">${escapeHtml(seg.deptNm)}</div>
                   </div>
                 `);
@@ -1824,11 +1828,13 @@ onkeyup="(event.keyCode == 8 || event.keyCode == 46) ? ordrsClntCd_S.value = '' 
             }
 
             (r.segments || []).forEach(seg => {
-                const left = daysBetween(STATE.viewStart, seg.wbsPlansDtFm) * CELL_W;
-                const w = (daysBetween(seg.wbsPlansDtFm, seg.wbsPlaneDtFm) + 1) * CELL_W;
+                const startOffset = daysBetween(STATE.viewStart, seg.wbsPlansDtFm);
+                const daysLen = daysBetween(seg.wbsPlansDtFm, seg.wbsPlaneDtFm) + 1;
+                const left = startOffset * CELL_W;
+                const w = daysLen * CELL_W;
                 const cls = deptClass(seg.deptCd);
                 const $bar = $(`
-                  <div class="bar ${cls}" data-start="${escapeHtml(seg.wbsPlansDtFm)}" data-end="${escapeHtml(seg.wbsPlaneDtFm)}" style="left:${left}px;width:${w}px; cursor:default;">
+                  <div class="bar ${cls}" data-start="${escapeHtml(seg.wbsPlansDtFm)}" data-end="${escapeHtml(seg.wbsPlaneDtFm)}" data-start-offset="${startOffset}" data-days-len="${daysLen}" style="left:${left}px;width:${w}px; cursor:default;">
                     <div class="txt">${escapeHtml(seg.deptNm)}</div>
                 </div>
                 `);
@@ -2206,6 +2212,7 @@ onkeyup="(event.keyCode == 8 || event.keyCode == 46) ? ordrsClntCd_S.value = '' 
         (function () {
             const rootEl = $(":root").get(0);
             if (rootEl && rootEl.style) rootEl.style.setProperty("--timelineW", head.totalWidth + "px");
+            if (typeof updateZoomSliderBounds === "function") updateZoomSliderBounds();
         })();
 
         const built = buildRenderRows(STATE.rows);
@@ -2251,16 +2258,8 @@ onkeyup="(event.keyCode == 8 || event.keyCode == 46) ? ordrsClntCd_S.value = '' 
             $headerRow.find(".pane-timeline").append(
                 `<div class="today-line" style="left:${todayOffset * CELL_W}px; top:0; bottom:0; position:absolute;"></div>`
             );
+            positionTodayBadge();
         }
-
-      if(showToday){
-        const $badge = $(`<div class="today-badge">TODAY</div>`);
-        $badge.css("left", (todayOffset*CELL_W) + "px");
-        $headerRow.find(".pane-timeline").append($badge);
-        $headerRow.find(".pane-timeline").append(
-          `<div class="today-line" style="left:${todayOffset*CELL_W}px; top:0; bottom:0; position:absolute;"></div>`
-        );
-      }
 
       // same-machine cell merge
       applyClntPjtNmMerge(spans);
@@ -2695,6 +2694,9 @@ onkeyup="(event.keyCode == 8 || event.keyCode == 46) ? ordrsClntCd_S.value = '' 
     }
 
     let EXTRA_TUI_GRID = null;
+    let EXTRA_TUI_BASE_COL_WIDTHS = [];
+    let EXTRA_TUI_BASE_COLUMNS = [];
+    let lastExtraAppliedWidth = -1;
 
     function initExtraTuiGrid(){
       if(EXTRA_TUI_GRID) return;
@@ -2748,6 +2750,12 @@ onkeyup="(event.keyCode == 8 || event.keyCode == 46) ? ordrsClntCd_S.value = '' 
         }
       });
 
+      EXTRA_TUI_BASE_COLUMNS = columns.map(c => Object.assign({}, c));
+      EXTRA_TUI_BASE_COL_WIDTHS = columns
+        .filter(c => !c.hidden && Number(c.width) > 0)
+        .map(c => ({ name: c.name, baseWidth: Number(c.width) }));
+      lastExtraAppliedWidth = -1;
+
       EXTRA_TUI_GRID = GridAdapter.create(el, columns, {
         scrollX: true,
         scrollY: true,
@@ -2758,6 +2766,8 @@ onkeyup="(event.keyCode == 8 || event.keyCode == 46) ? ordrsClntCd_S.value = '' 
       // IIFE 외부의 window.wbsPlanInsertModal / window.mindMapInquiryModal 에서 접근 가능하도록 노출
       window.EXTRA_TUI_GRID = EXTRA_TUI_GRID;
       window.EXTRA_TUI_LAST_ROW_KEY = null;
+
+      bindExtraGridResizeHandler();
 
       let selectedRowKey = null;
       EXTRA_TUI_GRID.grid.on("focusChange", function(ev){
@@ -2859,7 +2869,7 @@ onkeyup="(event.keyCode == 8 || event.keyCode == 46) ? ordrsClntCd_S.value = '' 
       const list = EXTRA_GRID_ROWS || [];
       if(!EXTRA_TUI_GRID) return;
       EXTRA_TUI_GRID.setData(buildProjectRowSpanData(list));
-      EXTRA_TUI_GRID.refreshLayout();
+      syncExtraGridLayout();
 
       // class re-apply (row-dirty, row-conflict, tui-grid-row-delay 수동 관리)
       // TUI Grid의 내부 렌더링 완료 후 안정적으로 클래스를 부여하기 위해 setTimeout 사용
@@ -3265,17 +3275,174 @@ onkeyup="(event.keyCode == 8 || event.keyCode == 46) ? ordrsClntCd_S.value = '' 
       }
     }
 
+    let extraGridResizeTimer = null;
+    let extraGridResizeObserver = null;
+    let ganttResizeTimer = null;
+    let ganttResizeObserver = null;
+
+    function getMinGanttTimelineWidth(){
+      const scrollEl = document.getElementById("wbsScroll");
+      if(!scrollEl || $(".wbs-card").hasClass("overlay-grid-mode")) return 0;
+      const rootEl = document.documentElement;
+      const cs = rootEl ? getComputedStyle(rootEl) : null;
+      const leftW = cs ? (parseFloat(cs.getPropertyValue("--leftW")) || 350) : 350;
+      const rightW = cs ? (parseFloat(cs.getPropertyValue("--rightW")) || 140) : 140;
+      return Math.max(0, Math.floor(scrollEl.clientWidth - leftW - rightW - 52));
+    }
+
+    function getFitZoomMin(){
+      const scrollEl = document.getElementById("wbsScroll");
+      if(!scrollEl) return 2;
+      const availTimelineW = getMinGanttTimelineWidth();
+      const totalDays = TOTAL_TIMELINE_DAYS > 0 ? TOTAL_TIMELINE_DAYS : (STATE.viewStart && STATE.viewEnd ? getWorkdays(STATE.viewStart, STATE.viewEnd).length : 0);
+      if(availTimelineW <= 0 || totalDays <= 0) return 2;
+      const fit = Math.floor((availTimelineW / totalDays) * 100) / 100;
+      return Math.max(0.1, Math.min(2, fit));
+    }
+
+    function updateZoomSliderBounds(){
+      const $slider = $("#zoomSlider");
+      if(!$slider.length) return;
+      const minZoom = getFitZoomMin();
+      $slider.attr("min", minZoom);
+      if(CELL_W < minZoom){
+        setZoom(minZoom);
+      }
+    }
+
+    function syncGanttLayout(){
+      const $card = $(".wbs-card");
+      if($card.hasClass("overlay-grid-mode")) return;
+      const scrollEl = document.getElementById("wbsScroll");
+      if(!scrollEl) return;
+
+      const rect = scrollEl.getBoundingClientRect();
+      if(rect.top > 0){
+        const targetHeight = Math.max(260, Math.floor(window.innerHeight - rect.top - 12));
+        scrollEl.style.height = targetHeight + "px";
+      }
+
+      updateZoomSliderBounds();
+
+      const availTimelineW = getMinGanttTimelineWidth();
+      const totalDays = TOTAL_TIMELINE_DAYS > 0 ? TOTAL_TIMELINE_DAYS : (STATE.viewStart && STATE.viewEnd ? getWorkdays(STATE.viewStart, STATE.viewEnd).length : 0);
+      if(availTimelineW > 0 && totalDays > 0){
+        const currentTimelineW = totalDays * CELL_W;
+        const rootEl = document.documentElement;
+        if(rootEl && rootEl.style){
+          rootEl.style.setProperty("--timelineW", Math.max(currentTimelineW, availTimelineW) + "px");
+        }
+      }
+    }
+
+    function scheduleGanttLayout(){
+      if(ganttResizeTimer) clearTimeout(ganttResizeTimer);
+      ganttResizeTimer = setTimeout(syncGanttLayout, 50);
+    }
+
+    function bindGanttResizeHandler(){
+      $(window).off("resize.wbsGanttLayout").on("resize.wbsGanttLayout", scheduleGanttLayout);
+      if(typeof ResizeObserver !== "undefined" && !ganttResizeObserver){
+        const scrollEl = document.getElementById("wbsScroll");
+        if(scrollEl){
+          ganttResizeObserver = new ResizeObserver(function(){
+            scheduleGanttLayout();
+          });
+          ganttResizeObserver.observe(scrollEl);
+        }
+      }
+    }
+
+    function applyExtraGridColumnWidthsByRatio(){
+      if(!EXTRA_TUI_GRID || !EXTRA_TUI_GRID.grid || EXTRA_TUI_BASE_COL_WIDTHS.length === 0 || EXTRA_TUI_BASE_COLUMNS.length === 0) return;
+      const wrapEl = document.querySelector("#extraGridOverlay .extra-grid-wrap");
+      if(!wrapEl) return;
+      const availWidth = Math.max(0, Math.floor(wrapEl.clientWidth - 18));
+      if(availWidth <= 0 || availWidth === lastExtraAppliedWidth) return;
+      lastExtraAppliedWidth = availWidth;
+
+      const baseTotal = EXTRA_TUI_BASE_COL_WIDTHS.reduce((sum, c) => sum + c.baseWidth, 0);
+      if(baseTotal <= 0) return;
+
+      const scale = (availWidth > baseTotal) ? (availWidth / baseTotal) : 1;
+      const widthMap = {};
+      let used = 0;
+      EXTRA_TUI_BASE_COL_WIDTHS.forEach((col, idx) => {
+        let targetW;
+        if(scale <= 1){
+          targetW = col.baseWidth;
+        } else if(idx === EXTRA_TUI_BASE_COL_WIDTHS.length - 1){
+          targetW = Math.max(col.baseWidth, availWidth - used);
+        } else {
+          targetW = Math.max(col.baseWidth, Math.floor(col.baseWidth * scale));
+          used += targetW;
+        }
+        widthMap[col.name] = targetW;
+      });
+
+      const updatedCols = EXTRA_TUI_BASE_COLUMNS.map(col => {
+        const cloned = Object.assign({}, col);
+        if(widthMap[cloned.name]){
+          cloned.width = widthMap[cloned.name];
+        }
+        return cloned;
+      });
+      try{
+        if(typeof EXTRA_TUI_GRID.grid.setColumns === "function"){
+          EXTRA_TUI_GRID.grid.setColumns(updatedCols);
+        } else if(typeof EXTRA_TUI_GRID.grid.resetColumnWidths === "function"){
+          const widths = updatedCols.filter(c => !c.hidden).map(c => c.width);
+          EXTRA_TUI_GRID.grid.resetColumnWidths(widths);
+        }
+      }catch(e){}
+    }
+
+    function syncExtraGridLayout(){
+      const $card = $(".wbs-card");
+      if(!$card.hasClass("overlay-grid-mode")) return;
+      const cardEl = $card[0];
+      if(cardEl){
+        const rect = cardEl.getBoundingClientRect();
+        const targetHeight = Math.max(260, Math.floor(window.innerHeight - rect.top - 12));
+        cardEl.style.height = targetHeight + "px";
+      }
+      applyExtraGridColumnWidthsByRatio();
+      try{
+        if(EXTRA_TUI_GRID){
+          EXTRA_TUI_GRID.refreshLayout();
+        }
+      }catch(e){}
+    }
+
+    function scheduleExtraGridLayout(){
+      if(extraGridResizeTimer) clearTimeout(extraGridResizeTimer);
+      extraGridResizeTimer = setTimeout(syncExtraGridLayout, 50);
+    }
+
+    function bindExtraGridResizeHandler(){
+      $(window).off("resize.extraTuiGrid").on("resize.extraTuiGrid", scheduleExtraGridLayout);
+      if(typeof ResizeObserver !== "undefined" && !extraGridResizeObserver){
+        const wrapEl = document.querySelector("#extraGridOverlay .extra-grid-wrap");
+        if(wrapEl){
+          extraGridResizeObserver = new ResizeObserver(function(){
+            scheduleExtraGridLayout();
+          });
+          extraGridResizeObserver.observe(wrapEl);
+        }
+      }
+    }
+
     function openExtraGridOverlay(){
       pendingScrollToSalesCd = getTopSalesCdFromGantt();
 
+      $(".page").addClass("extra-full-width");
       const $card = $(".wbs-card");
       $card.removeClass("max-gantt-mode").addClass("overlay-grid-mode");
+      lastExtraAppliedWidth = -1;
       initExtraTuiGrid();
       loadExtraGridData();
       setOverlayToggleButtonText(true);
-      setTimeout(function(){
-        try{ if(EXTRA_TUI_GRID) EXTRA_TUI_GRID.refreshLayout(); }catch(e){}
-      }, 0);
+      setTimeout(syncExtraGridLayout, 0);
     }
 
     function closeExtraGridOverlay(){
@@ -3283,11 +3450,14 @@ onkeyup="(event.keyCode == 8 || event.keyCode == 46) ? ordrsClntCd_S.value = '' 
 
       closeMemoHistoryPopover();
 
+      $(".page").removeClass("extra-full-width");
       const $card = $(".wbs-card");
       $card.removeClass("overlay-grid-mode").addClass("max-gantt-mode");
+      $card.css("height", "");
       CURRENT_HEADER_MODE = HEADER_MODE.MAX;
       applyHeaderModeUI();
       setOverlayToggleButtonText(false);
+      setTimeout(syncGanttLayout, 0);
 
       if(topSalesCd) {
          setTimeout(function() {
@@ -4817,12 +4987,26 @@ onkeyup="(event.keyCode == 8 || event.keyCode == 46) ? ordrsClntCd_S.value = '' 
       });
     }
 
+    function restoreZoomAfterPrint(originalCellW, originalZoomVal){
+      setZoom(originalCellW);
+      const val = (typeof originalZoomVal === "number" && !isNaN(originalZoomVal)) ? originalZoomVal : originalCellW;
+      $('#zoomSlider').val(val);
+      $('#zoomVal').text(Number.isInteger(val) ? val : val.toFixed(2).replace(/\.?0+$/, ''));
+    }
+
     function doPrint(){
       const page = $(".page").get(0);
       if(!page){ toast("출력할 페이지 영역을 찾지 못했습니다."); return; }
 
       const originalCellW = CELL_W;
-      const originalZoomVal = parseInt($('#zoomSlider').val(), 10);
+      const parsedZoom = parseFloat($('#zoomSlider').val());
+      const originalZoomVal = isNaN(parsedZoom) ? originalCellW : parsedZoom;
+
+      const isOverlay = $(".wbs-card").hasClass("overlay-grid-mode");
+      if(isOverlay){
+        captureAndPrint(page, originalCellW, originalZoomVal);
+        return;
+      }
 
       const startDate = parseYMD(STATE.viewStart || VIEW_START);
       const endDate = parseYMD(STATE.viewEnd || VIEW_END);
@@ -4833,12 +5017,11 @@ onkeyup="(event.keyCode == 8 || event.keyCode == 46) ? ordrsClntCd_S.value = '' 
       const totalDays = head.totalDays;
       const currentTimelineWidth = totalDays * originalCellW;
 
-      const pane = $(".pane-timeline").get(0);
-      const paneWidth = pane ? pane.clientWidth : (window.innerWidth - 350 - 180);
-      const availableWidth = Math.min(paneWidth, 1900);
+      const minTimelineW = getMinGanttTimelineWidth();
+      const availableWidth = minTimelineW > 0 ? minTimelineW : Math.max(400, window.innerWidth - 540);
 
       if(currentTimelineWidth > availableWidth && totalDays > 0){
-        const printCellW = Math.max(4, Math.floor(availableWidth / totalDays));
+        const printCellW = Math.max(0.1, Math.floor((availableWidth / totalDays) * 100) / 100);
         setZoom(printCellW);
         setTimeout(() => {
           captureAndPrint(page, originalCellW, originalZoomVal);
@@ -4862,12 +5045,14 @@ onkeyup="(event.keyCode == 8 || event.keyCode == 46) ? ordrsClntCd_S.value = '' 
         scrollEl.style.overflow = "visible";
       }
 
+      const captureW = Math.max(page.scrollWidth || 0, page.clientWidth || 0);
       html2canvas(page, {
         scale: window.devicePixelRatio || 2,
         useCORS: true,
         scrollX: 0,
         scrollY: 0,
-        windowWidth: $(window).width(),
+        width: captureW,
+        windowWidth: Math.max($(window).width(), captureW),
         windowHeight: $(window).height()
       }).then(canvas => {
         if(scrollEl && prev){
@@ -4876,10 +5061,7 @@ onkeyup="(event.keyCode == 8 || event.keyCode == 46) ? ordrsClntCd_S.value = '' 
           scrollEl.style.overflow = prev.overflow;
         }
 
-        // restore
-        setZoom(originalCellW);
-        $('#zoomSlider').val(originalZoomVal);
-        $('#zoomVal').text(originalZoomVal);
+        restoreZoomAfterPrint(originalCellW, originalZoomVal);
 
         const dataUrl = canvas.toDataURL("image/png");
         const w = window.open("", "_blank");
@@ -4894,19 +5076,29 @@ onkeyup="(event.keyCode == 8 || event.keyCode == 46) ? ordrsClntCd_S.value = '' 
    img{max-width:100%;height:auto;}
    @media print{ body{margin:0;padding:0;} img{max-width:100%;height:auto;} }
  </style>
- </head><body><img src="${dataUrl}"></body></html>`);
+ </head><body><img id="printImg" src="${dataUrl}"></body></html>`);
         doc.close();
-        w.focus();
-        w.onload = ()=> { w.print(); w.close(); };
+        const printImg = doc.getElementById("printImg");
+        let printed = false;
+        const runPrint = function(){
+          if(printed) return;
+          printed = true;
+          w.focus();
+          w.onafterprint = function(){ try{ w.close(); }catch(e){} };
+          w.print();
+        };
+        if(printImg && !printImg.complete){
+          printImg.onload = runPrint;
+        } else {
+          setTimeout(runPrint, 50);
+        }
       }).catch(err => {
         if(scrollEl && prev){
           scrollEl.style.height = prev.height;
           scrollEl.style.maxHeight = prev.maxHeight;
           scrollEl.style.overflow = prev.overflow;
         }
-        setZoom(originalCellW);
-        $('#zoomSlider').val(originalZoomVal);
-        $('#zoomVal').text(originalZoomVal);
+        restoreZoomAfterPrint(originalCellW, originalZoomVal);
         console.error(err);
         toast("출력 이미지 생성 중 오류가 발생했습니다.");
       });
@@ -4945,6 +5137,23 @@ onkeyup="(event.keyCode == 8 || event.keyCode == 46) ? ordrsClntCd_S.value = '' 
 
 
 
+    function positionTodayBadge(){
+      const $badge = $(".today-badge");
+      if(!$badge.length) return;
+      const todayOffset = daysBetween(STATE.viewStart, STATE.today);
+      const todayX = todayOffset * CELL_W;
+      const rootEl = document.documentElement;
+      const cs = rootEl ? getComputedStyle(rootEl) : null;
+      const timelineW = cs ? (parseFloat(cs.getPropertyValue("--timelineW")) || 0) : 0;
+      let tx = "-50%";
+      if(todayX < 30){
+        tx = "0%";
+      } else if(timelineW > 0 && todayX > timelineW - 30){
+        tx = "-100%";
+      }
+      $badge.css({ "left": todayX + "px", "transform": "translateX(" + tx + ")" });
+    }
+
     function applyZoomOnly(v){
       const rootEl = $(":root").get(0);
       if(rootEl && rootEl.style){
@@ -4956,7 +5165,9 @@ onkeyup="(event.keyCode == 8 || event.keyCode == 46) ? ordrsClntCd_S.value = '' 
 
       // Timeline total width 통일: 안정적인 전역 변수 참조
       const totalDays = TOTAL_TIMELINE_DAYS > 0 ? TOTAL_TIMELINE_DAYS : getWorkdays(STATE.viewStart, STATE.viewEnd).length;
-      const totalWidth = totalDays * CELL_W;
+      const computedWidth = totalDays * CELL_W;
+      const minTimelineW = getMinGanttTimelineWidth();
+      const totalWidth = Math.max(computedWidth, minTimelineW);
 
       if(rootEl && rootEl.style){
         rootEl.style.setProperty("--timelineW", totalWidth + "px");
@@ -4974,6 +5185,7 @@ onkeyup="(event.keyCode == 8 || event.keyCode == 46) ? ordrsClntCd_S.value = '' 
       const todayLeft = (todayOffset * CELL_W) + "px";
       $(".today-line").css("left", todayLeft);
       $(".today-badge").css("left", todayLeft);
+      positionTodayBadge();
 
       // 초고속 곱셈 연산: data-start-offset 및 data-days-len 활용하여 DOM direct update (N*1 연산)
       const barElems = document.querySelectorAll(".bar[data-start-offset]");
@@ -4993,8 +5205,11 @@ onkeyup="(event.keyCode == 8 || event.keyCode == 46) ? ordrsClntCd_S.value = '' 
 
     // setZoom: apply zoom without full re-render
     function setZoom(val){
-      const v = clamp(parseInt(val,10) || 20, 2, 40);
-      $('#zoomVal').text(v);
+      const minZoom = (typeof getFitZoomMin === "function") ? getFitZoomMin() : 0.1;
+      const parsed = parseFloat(val);
+      const raw = isNaN(parsed) ? 10 : parsed;
+      const v = clamp(Math.round(raw * 100) / 100, minZoom, 40);
+      $('#zoomVal').text(Number.isInteger(v) ? v : v.toFixed(2).replace(/\.?0+$/, ''));
       $('#zoomSlider').val(v);
 
       if(v === CELL_W) return;
@@ -5019,9 +5234,12 @@ onkeyup="(event.keyCode == 8 || event.keyCode == 46) ? ordrsClntCd_S.value = '' 
       let ZOOM_LAST_REQ = null;
       let ZOOM_RAF_ID = null;
       function scheduleZoomApply(val){
-        const v = clamp(parseInt(val,10) || 20, 2, 40);
+        const minZoom = (typeof getFitZoomMin === "function") ? getFitZoomMin() : 0.1;
+        const parsed = parseFloat(val);
+        const raw = isNaN(parsed) ? 10 : parsed;
+        const v = clamp(Math.round(raw * 100) / 100, minZoom, 40);
         ZOOM_LAST_REQ = v;
-        $('#zoomVal').text(v);
+        $('#zoomVal').text(Number.isInteger(v) ? v : v.toFixed(2).replace(/\.?0+$/, ''));
         if (ZOOM_RAF_ID) cancelAnimationFrame(ZOOM_RAF_ID);
         clearTimeout(ZOOM_APPLY_TIMER);
         ZOOM_RAF_ID = requestAnimationFrame(function(){
@@ -5414,6 +5632,8 @@ onkeyup="(event.keyCode == 8 || event.keyCode == 46) ? ordrsClntCd_S.value = '' 
       toggleOrdrsDtSearch();
 
       // 최초 조회
+      bindGanttResizeHandler();
+      syncGanttLayout();
       searchData(false); // auto-Zoom 체크에 따라 내부에서 판단
 
       // auto-Zoom을 다시 켰을 때 1회 실행되게 리셋
@@ -5445,7 +5665,7 @@ onkeyup="(event.keyCode == 8 || event.keyCode == 46) ? ordrsClntCd_S.value = '' 
           clearTimeout(ZOOM_APPLY_TIMER);
 
           showZoomRenderStatus();
-          const v = parseInt(e.target.value, 10);
+          const v = parseFloat(e.target.value);
           // Ensure status paints before heavy render.
           requestAnimationFrame(function(){
             const t0 = (window.performance && typeof performance.now === "function") ? performance.now() : Date.now();
