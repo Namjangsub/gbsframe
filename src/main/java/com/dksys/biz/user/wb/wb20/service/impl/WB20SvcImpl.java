@@ -2150,6 +2150,13 @@ public class WB20SvcImpl implements WB20Svc {
 		wb20Mapper.offsetNonApprovedSanctnSn(offParam);
 
 		// PHASE B: lineList(AM 순서) 순회하며 목표 SANCTN_SN 배정. P4 백필용 results 재구성.
+		Map<String, Map<String, String>> wb20RowByKey = new HashMap<>();
+		for (Map<String, String> row : wb20Rows) {
+			Object kObj = row.get("todoKey");
+			if (kObj != null) {
+				wb20RowByKey.put(String.valueOf(kObj).trim(), row);
+			}
+		}
 		List<Map<String, Object>> reorderResults = new ArrayList<>();
 		Map<String, Integer> groupCounter = new HashMap<>();
 		for (Map<String, Object> line : lineList) {
@@ -2166,8 +2173,22 @@ public class WB20SvcImpl implements WB20Svc {
 			String div2;
 			if (isLinked) {
 				todoKey = todoKeyStr;
-				div1 = String.valueOf(line.get("wb20Div1CodeId"));
-				div2 = String.valueOf(line.get("wb20Div2CodeId"));
+				Object rawDiv1 = line.get("wb20Div1CodeId");
+				Object rawDiv2 = line.get("wb20Div2CodeId");
+				div1 = rawDiv1 != null ? String.valueOf(rawDiv1).trim() : "";
+				div2 = rawDiv2 != null ? String.valueOf(rawDiv2).trim() : "";
+				// linked 라인에 div1/div2가 누락된 경우 원본 WB20 행에서 보강해 그룹키 분리("null|null") 및 SANCTN_SN 중복(1, 1, 2, 3)을 방지
+				if (div1.isEmpty() || "null".equalsIgnoreCase(div1) || div2.isEmpty() || "null".equalsIgnoreCase(div2)) {
+					Map<String, String> origRow = wb20RowByKey.get(todoKey);
+					if (origRow != null) {
+						if (div1.isEmpty() || "null".equalsIgnoreCase(div1)) {
+							div1 = origRow.get("todoDiv1CodeId") != null ? String.valueOf(origRow.get("todoDiv1CodeId")).trim() : "";
+						}
+						if (div2.isEmpty() || "null".equalsIgnoreCase(div2)) {
+							div2 = origRow.get("todoDiv2CodeId") != null ? String.valueOf(origRow.get("todoDiv2CodeId")).trim() : "";
+						}
+					}
+				}
 			} else {
 				Map<String, Object> r = brandNewByKey.get(approverId + "|" + lineType);
 				if (r == null) {

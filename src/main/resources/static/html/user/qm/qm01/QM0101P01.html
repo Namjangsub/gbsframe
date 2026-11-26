@@ -650,7 +650,26 @@
 								};
 				postAjax("/user/wb/wb20/selectSignResUserlstInit", paramObj, null, function(data){
 					try {
-						var list = data.result;
+						var list = data.result || [];
+						var apprSn = 0;
+						var shareSn = 0;
+						$.each(list, function(idx, item) {
+							if (item.gb === "공유") {
+								shareSn += 1;
+								item.sanctnSn = shareSn;
+								item.lineType = "REF";
+								item.lineTypeNm = "참조";
+							} else {
+								apprSn += 1;
+								item.sanctnSn = apprSn;
+								if (!item.lineType) {
+									item.lineType = "AGREE";
+									item.lineTypeNm = "합의";
+								} else if (!item.lineTypeNm) {
+									item.lineTypeNm = (item.lineType === "AGREE" ? "합의" : item.lineType === "COOP" ? "협조" : item.lineType === "POST" ? "후결" : "결재");
+								}
+							}
+						});
 						targetObj.setData({
 							list : list,
 							page : { totalElements : list.length }
@@ -1001,14 +1020,13 @@ var ModalApp = (function() {
 							gb: "결재"
 						, lineType: lType
 						, lineTypeNm: lTypeNm
-						, id: item.usrNm
+						, id: item.usrNm || item.todoId
 						, text: item.name
 						, parent: item.jik
 						, deptNm: item.dtNm
 						, telNo: item.telNo
 						, offTelNo: item.offTelNo
 						, email: item.email
-						, id: item.todoId
 						, todoKey: item.todoKey
 						, sanctnSn: item.sanctnSn
 						, sanctnSttus: item.sanctnSttus
@@ -1024,14 +1042,13 @@ var ModalApp = (function() {
 						gb: "공유"
 						, lineType: "REF"
 						, lineTypeNm: "참조"
-						, id: item.usrNm
+						, id: item.usrNm || item.todoId
 						, text: item.name
 						, parent: item.jik
 						, deptNm: item.dtNm
 						, telNo: item.telNo
 						, offTelNo: item.offTelNo
 						, email: item.email
-						, id: item.todoId
 						, todoKey: item.todoKey
 						, sanctnSn: item.sanctnSn
 						, sanctnSttus: item.sanctnSttus
@@ -1062,7 +1079,7 @@ var ModalApp = (function() {
 					, email: item.email
 					, todoId: item.id
 					, todoKey: item.todoKey
-					, sanctnSn: item.sanctnSn || (idx + 1)
+					, sanctnSn: idx + 1
 					, sanctnSttus: 'N'	//신규 등록은 무조건 미결상태임
 					, todoCfDt: item.todoCfDt
 					, todoCfOpn: item.todoCfOpn
@@ -1084,7 +1101,7 @@ var ModalApp = (function() {
 					, email: item.email
 					, todoId: item.id
 					, todoKey: item.todoKey
-					, sanctnSn: item.sanctnSn || (idx + 1)
+					, sanctnSn: idx + 1
 					, sanctnSttus: 'N'	//신규 등록은 무조건 미결상태임
 					, todoCfDt: item.todoCfDt
 					, todoCfOpn: item.todoCfOpn
@@ -2196,10 +2213,10 @@ var ModalApp = (function() {
 		} else {
 			if (!$(currFormId + ' #ordrgId').val().includes('gyrsult') && $(currFormId + ' #regId').val() != $(currFormId + ' #ordrgId').val()) {
 
-				// 이미 발행자가 결재로 추가되었을 경우 공유 결재 추가 방지
+				// 이미 발행자가 결재 또는 공유로 추가되었을 경우 중복 공유 추가 방지
 				var ordrgIdKey = String($(currFormId + ' #ordrgId').val() || '').trim().toLowerCase();
 				var existsApproval = approvalArr.some(function(item) {
-					return (String(item.todoId || item.usrNm || '').trim().toLowerCase() === ordrgIdKey) && item.gb === '결재';
+					return (String(item.todoId || item.usrNm || '').trim().toLowerCase() === ordrgIdKey) && (item.gb === '결재' || item.gb === '공유');
 				});
 				if (!existsApproval) {
 					addParam["todoId"] = $(currFormId + ' #ordrgId').val();
@@ -2633,10 +2650,38 @@ var ModalApp = (function() {
 		return !!a && a === b;
 	}
 
+	function isRegisteredApprovalOrShare(appArray, shaArray, targetId) {
+		if (appArray && appArray.some(function(item) { return isSameApprovalUserId(item, targetId); })) {
+			return true;
+		}
+		if (shaArray && shaArray.some(function(item) { return isSameApprovalUserId(item, targetId); })) {
+			return true;
+		}
+		return false;
+	}
+
+	function renumberApprovalAndShare(appArray, shaArray) {
+		var apprSn = 0;
+		var shareSn = 0;
+		$.each(appArray || [], function(idx, item) {
+			if (item.gb === "공유") {
+				shareSn += 1;
+				item.sanctnSn = shareSn;
+			} else {
+				apprSn += 1;
+				item.sanctnSn = apprSn;
+			}
+		});
+		$.each(shaArray || [], function(idx, item) {
+			shareSn += 1;
+			item.sanctnSn = shareSn;
+		});
+	}
+
 	//조치담당자 팀장 정보 가져오기
 	function selectTeamManagerInfo(paramUserId) {
 		//결자자 정보 가져오기//결자자 정보 가져오기 gridViewPop2
-		// 기존 행의 lineType/lineTypeNm(합의·협조 등) 및 메타 필드를 그대로 보존한다.
+		// 기존 행의 lineType/lineTypeNm(결재·합의·협조·공유 등) 및 메타 필드를 그대로 보존한다.
 		var appshaList = (gridViewPop.target.list || []).map(function(item) {
 						return $.extend({}, item);
 					});
@@ -2652,12 +2697,16 @@ var ModalApp = (function() {
 			if (data.result != '' && data.result!=null) {
 				//결자자 정보 가져오기
 				let list = data.result;
-				if (appArray.some(function(item) { return isSameApprovalUserId(item, list.id); })) {
-					//동일 아이디가 이미 결재(결재/합의/협조 등)로 등록된 경우 기존 결재구분 유지
+				if (isRegisteredApprovalOrShare(appArray, shaArray, list.id)) {
+					//동일 아이디가 이미 결재(결재/합의/협조 등) 또는 공유로 등록된 경우 기존 구분 유지
 				} else {
+					//QM 자동 등록 기본 결재는 병렬결재(합의: AGREE)로 적용
 					appArray.push({
 								gb: "결재",
+								lineType: "AGREE",
+								lineTypeNm: "합의",
 								usrNm: list.id,
+								todoId: list.id,
 								name: list.name,
 								jik: list.levelNm,
 								dtNm: list.deptNm,
@@ -2665,10 +2714,10 @@ var ModalApp = (function() {
 								offTelNo: list.offTelNo,
 								email: list.email,
 //								todoNo: $('#rsltNo').val(),		//발주요청서 결과동시 처리가 아니면 공백임.(결과 등록전)
-								sanctnSn: 1,
 							});
 				}
 
+				renumberApprovalAndShare(appArray, shaArray);
 				gridViewPop.setData2(appArray.concat(shaArray));
 			}
 		});
@@ -2705,10 +2754,7 @@ var ModalApp = (function() {
 				if (item.gb === "결재") {
 					appArray.push(item);
 				} else {
-					//공유일경우 조치담당자가 공유에 있으면 제외처리함.
-					if (item.usrNm != tempActId) {
-						shaArray.push(item);
-					}
+					shaArray.push(item);
 				}
 			}
 		});
@@ -2717,41 +2763,42 @@ var ModalApp = (function() {
 		//------------------------------------------------
 		// 중요도가 최상(비용상, 빈도상)이면 사장님 결재라인에 자동 등록
 		if ($('#importantCdReq').val() == 'IMPORTCD01') {
-			appArray = approvalTeamManagerSpecialInfoData('ceo', appArray);
+			appArray = approvalTeamManagerSpecialInfoData('ceo', appArray, shaArray);
 		}
 		// 발주요청서 등록 시 영업 및 연구소가 등록 시 해당 특정 유저 결재권자 자동 추가
 		// if (jwt.deptId.slice(0, 5) == 'GUN30') {
 		if (userDept == 'GUN30' && ordrsDiv3Chk == false) {
-			appArray = approvalTeamManagerSpecialInfoData('EMJ8105', appArray);		// 영업이 등록 시 김태호 부사장님 추가
+			appArray = approvalTeamManagerSpecialInfoData('EMJ8105', appArray, shaArray);		// 영업이 등록 시 김태호 부사장님 추가
 		} else if (userDept == 'GUN40') {
-			appArray = approvalTeamManagerSpecialInfoData('kimjhv', appArray);		// 연구소가 등록 시 김재현 전무님 추가
+			appArray = approvalTeamManagerSpecialInfoData('kimjhv', appArray, shaArray);		// 연구소가 등록 시 김재현 전무님 추가
 		}
 
 		if (ordrsDiv3Chk) {
-			appArray = approvalTeamManagerSpecialInfoData('EMJ8105', appArray);
+			appArray = approvalTeamManagerSpecialInfoData('EMJ8105', appArray, shaArray);
 			ordrsDiv3Chk = false;
 		}
 
 		//발행자의 팀장 정보 가져오기
-//		appArray = approvalUserInfoData(tempActId, appArray);
-		appArray = approvalTeamManagerInfoData(tempActId, appArray);
+//		appArray = approvalUserInfoData(tempActId, appArray, shaArray);
+		appArray = approvalTeamManagerInfoData(tempActId, appArray, shaArray);
 		if (userDept == 'GUN40') {
-			appArray = approvalTeamManagerSpecialInfoData('shjung', appArray);		//특정유저 추가하기(설계이면 정상훈차장 추가)
+			appArray = approvalTeamManagerSpecialInfoData('shjung', appArray, shaArray);		//특정유저 추가하기(설계이면 정상훈차장 추가)
 		}
 
 		
-		appArray = approvalTeamManagerSpecialInfoData('h4ng10', appArray);		//특정유저 추가하기(허상렬팀장 추가)
-//		appArray = approvalTeamManagerInfoData(jwt.userId, appArray);
+		appArray = approvalTeamManagerSpecialInfoData('h4ng10', appArray, shaArray);		//특정유저 추가하기(허상렬팀장 추가)
+//		appArray = approvalTeamManagerInfoData(jwt.userId, appArray, shaArray);
 
 		// 공유자 중 결재자와 동일한 사람이 있으면 결재자만 남기고 공유에서 제외
 		var approvalIds = appArray.map(function(item) { return String(item.usrNm || item.todoId || '').trim().toLowerCase(); });
 		shaArray = shaArray.filter(function(item) { return !approvalIds.includes(String(item.usrNm || item.todoId || '').trim().toLowerCase()); });
 
+		renumberApprovalAndShare(appArray, shaArray);
 		gridViewPop.setData2(appArray.concat(shaArray));
 	}
 
 	//조치담당자정보 자동 추가하기
-	function approvalUserInfoData (appUserId, appArray) {
+	function approvalUserInfoData (appUserId, appArray, shaArray) {
 		var formData = {
 			"userId" : appUserId,
 		}
@@ -2759,12 +2806,15 @@ var ModalApp = (function() {
 			if (data.resultList != '' && data.resultList!=null) {
 				//조치결과 결자자 정보 가져오기
 				let list = data.resultList[0];
-				if (appArray.some(function(item) { return isSameApprovalUserId(item, list.usrNm); })) {
-					//동일 아이디가 이미 등록된 경우 기존 결재구분 유지
+				if (isRegisteredApprovalOrShare(appArray, shaArray, list.usrNm)) {
+					//동일 아이디가 이미 등록된 경우 기존 결재/공유 구분 유지
 				} else {
 					appArray.push({
 								gb: "공유",
+								lineType: "REF",
+								lineTypeNm: "참조",
 								usrNm: list.usrNm,
+								todoId: list.usrNm,
 								name: list.name,
 								jik: list.jik,
 								dtNm: list.deptNm,
@@ -2781,7 +2831,7 @@ var ModalApp = (function() {
 
 
 	//담당자 팀장 정보 가져오기
-	function approvalTeamManagerInfoData(appUserId, appArray) {
+	function approvalTeamManagerInfoData(appUserId, appArray, shaArray) {
 		var formData = {
 				"userId" : appUserId,
 		}
@@ -2789,12 +2839,16 @@ var ModalApp = (function() {
 			if (data.result != '' && data.result!=null) {
 				//결자자 정보 가져오기
 				let list = data.result;
-				if (appArray.some(function(item) { return isSameApprovalUserId(item, list.id); })) {
-					//동일 아이디가 이미 결재(결재/합의/협조 등)로 등록된 경우 기존 결재구분 유지
+				if (isRegisteredApprovalOrShare(appArray, shaArray, list.id)) {
+					//동일 아이디가 이미 결재(결재/합의/협조 등) 또는 공유로 등록된 경우 기존 구분 유지
 				} else {
+					//QM 자동 등록 기본 결재는 병렬결재(합의: AGREE)로 적용
 					appArray.push({
 								gb: "결재",
+								lineType: "AGREE",
+								lineTypeNm: "합의",
 								usrNm: list.id,
+								todoId: list.id,
 								name: list.name,
 								jik: list.levelNm,
 								dtNm: list.deptNm,
@@ -2811,7 +2865,7 @@ var ModalApp = (function() {
 
 
 	//특정담당자 정보 가져오기
-	function approvalTeamManagerSpecialInfoData(appUserId, appArray) {
+	function approvalTeamManagerSpecialInfoData(appUserId, appArray, shaArray) {
 		var formData = {
 				"userId" : appUserId,
 		}
@@ -2819,12 +2873,16 @@ var ModalApp = (function() {
 			if (data.result != '' && data.result!=null) {
 				//결자자 정보 가져오기
 				let list = data.result;
-				if (appArray.some(function(item) { return isSameApprovalUserId(item, list.id); })) {
-					//동일 아이디가 이미 결재(결재/합의/협조 등)로 등록된 경우 기존 결재구분 유지
+				if (isRegisteredApprovalOrShare(appArray, shaArray, list.id)) {
+					//동일 아이디가 이미 결재(결재/합의/협조 등) 또는 공유로 등록된 경우 기존 구분 유지
 				} else {
+					//QM 자동 등록 기본 결재는 병렬결재(합의: AGREE)로 적용
 					appArray.push({
 								gb: "결재",
+								lineType: "AGREE",
+								lineTypeNm: "합의",
 								usrNm: list.id,
+								todoId: list.id,
 								name: list.name,
 								jik: list.levelNm,
 								dtNm: list.deptNm,
