@@ -1617,6 +1617,7 @@ var actionType = null;
         if(rowSharngList.length > 0) {
             var rowSharngListArr = []; //공유정보
             var rowApprovalListArr = []; //결재정보
+            var appSeq = 0;
 
             $.each(rowSharngList, function(idx, elem) {
                 var rowSharngListObj = elem;
@@ -1624,6 +1625,8 @@ var actionType = null;
 
                 if (elem.gb == '공유') {
                     rowSharngListObj["gb"] = elem.gb;
+                    rowSharngListObj["lineType"] = "REF";
+                    rowSharngListObj["lineTypeNm"] = "참조";
                     rowSharngListObj["coCd"] = coCd;
                     rowSharngListObj["salesCd"] = salesCd;
                     rowSharngListObj["todoDiv1CodeId"] = "TODODIV10";
@@ -1638,7 +1641,14 @@ var actionType = null;
                     rowSharngListArr.push(rowSharngListObj);
                 }
                 else if (elem.gb == '결재') {
+                    appSeq++;
+                    elem.sanctnSn = appSeq;
+                    var curLineType = elem.lineType || "APPR";
                     rowApprovalListObj["gb"] = elem.gb;
+                    rowApprovalListObj["lineType"] = curLineType;
+                    rowApprovalListObj["lineTypeNm"] = elem.lineTypeNm || (curLineType === "AGREE" ? "합의" : curLineType === "COOP" ? "협조" : curLineType === "POST" ? "후결" : "결재");
+                    rowApprovalListObj["sanctnSn"] = String(appSeq);
+                    rowApprovalListObj["sanCtnSn"] = String(appSeq);
                     rowApprovalListObj["coCd"] = coCd;
                     rowApprovalListObj["salesCd"] = salesCd;
                     rowApprovalListObj["todoDiv1CodeId"] = "TODODIV20";
@@ -1663,6 +1673,7 @@ var actionType = null;
         if(rowSharngList2.length > 0) {
             var rowSharngListArr2 = []; //공유정보
             var rowApprovalListArr2 = []; //결재정보
+            var appSeq2 = 0;
 
             $.each(rowSharngList2, function(idx, elem) {
                 var rowSharngListObj2 = elem;
@@ -1670,6 +1681,8 @@ var actionType = null;
 
                 if (elem.gb == '공유') {
                     rowSharngListObj2["gb"] = elem.gb;
+                    rowSharngListObj2["lineType"] = "REF";
+                    rowSharngListObj2["lineTypeNm"] = "참조";
                     rowSharngListObj2["coCd"] = coCd;
                     rowSharngListObj2["salesCd"] = salesCd;
                     rowSharngListObj2["todoDiv1CodeId"] = "TODODIV10";
@@ -1684,7 +1697,14 @@ var actionType = null;
                     rowSharngListArr2.push(rowSharngListObj2);
                 }
                 else if (elem.gb == '결재') {
+                    appSeq2++;
+                    elem.sanctnSn = appSeq2;
+                    var curLineType2 = elem.lineType || "APPR";
                     rowApprovalListObj2["gb"] = elem.gb;
+                    rowApprovalListObj2["lineType"] = curLineType2;
+                    rowApprovalListObj2["lineTypeNm"] = elem.lineTypeNm || (curLineType2 === "AGREE" ? "합의" : curLineType2 === "COOP" ? "협조" : curLineType2 === "POST" ? "후결" : "결재");
+                    rowApprovalListObj2["sanctnSn"] = String(appSeq2);
+                    rowApprovalListObj2["sanCtnSn"] = String(appSeq2);
                     rowApprovalListObj2["coCd"] = coCd;
                     rowApprovalListObj2["salesCd"] = salesCd;
                     rowApprovalListObj2["todoDiv1CodeId"] = "TODODIV20";
@@ -1733,16 +1753,21 @@ var actionType = null;
             postAjaxSync("/user/wb/wb24/selectRsltsMemberList", paramObj, null, function(data) {
                 var chk = false;
                 var rowList = gridViewApprovalSP11.target.getList();
+                var targetUsrId = String((data.resultList && data.resultList[0] && data.resultList[0].usrNm) || '').trim().toLowerCase();
                 $.each(rowList, function(idx, elem) {
-                    if (elem.usrNm == data.resultList[0].usrNm) {
+                    if (String(elem.usrNm || elem.todoId || '').trim().toLowerCase() === targetUsrId) {
                         chk = true;
                     }
                 });
 
                 if (chk == false) {
+                    var apprSn = rowList.filter(function(item) { return item.gb === '결재'; }).length + 1;
                     gridViewApprovalSP11.target.addRow($.extend({}, "last", false));
                     var row = gridViewApprovalSP11.target.getList().length - 1;
                     gridViewApprovalSP11.target.setValue(row, "gb", '결재');
+                    gridViewApprovalSP11.target.setValue(row, "lineType", 'AGREE');
+                    gridViewApprovalSP11.target.setValue(row, "lineTypeNm", '합의');
+                    gridViewApprovalSP11.target.setValue(row, "sanctnSn", apprSn);
                     gridViewApprovalSP11.target.setValue(row, "wbsPlancoCdNm", data.resultList[0].wbsPlancoCdNm);
                     gridViewApprovalSP11.target.setValue(row, "usrNm", data.resultList[0].usrNm); //ID
                     gridViewApprovalSP11.target.setValue(row, "empNo", data.resultList[0].empNo); // 사원번호
@@ -1790,8 +1815,12 @@ var actionType = null;
         paramObj["userId"] =  $(currFormId + ' #ordrgId').val();
         paramObj["userNm"] =  $(currFormId + ' #ordrgNm').val();
         paramObj["approvalGrid"] = $.grep(appshaList, function(item) { return item.gb === "결재"; }).map(function(item) {
+            var lType = item.lineType || "APPR";
+            var lTypeNm = item.lineTypeNm || (lType === "AGREE" ? "합의" : lType === "COOP" ? "협조" : lType === "POST" ? "후결" : lType === "REF" ? "참조" : "결재");
             return {
                 gb: "결재",
+                lineType: lType,
+                lineTypeNm: lTypeNm,
                 id: item.usrNm,
                 text: item.name,
                 parent: item.jik,
@@ -1804,6 +1833,8 @@ var actionType = null;
         paramObj["shareGrid"] =  $.grep(appshaList, function(item) { return item.gb === "공유"; }).map(function(item) {
             return {
                 gb: "공유",
+                lineType: "REF",
+                lineTypeNm: "참조",
                 id: item.usrNm,
                 text: item.name,
                 parent: item.jik,
@@ -1817,9 +1848,14 @@ var actionType = null;
 //             console.log('결재라인 : ', approvalGrid.target.list);
 //             console.log('공유라인 : ', shareGrid.target.list);
 
-            var appArray = approvalGrid.target.list.map(function(item) {
+            var appArray = approvalGrid.target.list.map(function(item, idx) {
+                var lType = item.lineType || "APPR";
+                var lTypeNm = item.lineTypeNm || (lType === "AGREE" ? "합의" : lType === "COOP" ? "협조" : lType === "POST" ? "후결" : lType === "REF" ? "참조" : "결재");
                 return {
                     gb: "결재",
+                    lineType: lType,
+                    lineTypeNm: lTypeNm,
+                    sanctnSn: (idx + 1),
                     usrNm: item.id,
                     name: item.text,
                     jik: item.parent,
@@ -1833,6 +1869,9 @@ var actionType = null;
             var shaArray = shareGrid.target.list.map(function(item) {
                 return {
                     gb: "공유",
+                    lineType: "REF",
+                    lineTypeNm: "참조",
+                    sanctnSn: "",
                     usrNm: item.id,
                     name: item.text,
                     jik: item.parent,
@@ -1887,8 +1926,12 @@ var actionType = null;
         paramObj["userId"] =  $(currFormId + ' #ordrgId').val();
         paramObj["userNm"] =  $(currFormId + ' #ordrgNm').val();
         paramObj["approvalGrid"] = $.grep(appshaList, function(item) {return item.gb === "결재"; }).map(function(item) {
+            var lType = item.lineType || "APPR";
+            var lTypeNm = item.lineTypeNm || (lType === "AGREE" ? "합의" : lType === "COOP" ? "협조" : lType === "POST" ? "후결" : lType === "REF" ? "참조" : "결재");
             return {
                 gb: "결재",
+                lineType: lType,
+                lineTypeNm: lTypeNm,
                 id: item.usrNm,
                 text: item.name,
                 parent: item.jik,
@@ -1901,6 +1944,8 @@ var actionType = null;
         paramObj["shareGrid"] =  $.grep(appshaList, function(item) { return item.gb === "공유"; }).map(function(item) {
             return {
                 gb: "공유",
+                lineType: "REF",
+                lineTypeNm: "참조",
                 id: item.usrNm,
                 text: item.name,
                 parent: item.jik,
@@ -1914,9 +1959,14 @@ var actionType = null;
 //             console.log('결재라인 : ', approvalGrid.target.list);
 //             console.log('공유라인 : ', shareGrid.target.list);
 
-            var appArray = approvalGrid.target.list.map(function(item) {
+            var appArray = approvalGrid.target.list.map(function(item, idx) {
+                var lType = item.lineType || "APPR";
+                var lTypeNm = item.lineTypeNm || (lType === "AGREE" ? "합의" : lType === "COOP" ? "협조" : lType === "POST" ? "후결" : lType === "REF" ? "참조" : "결재");
                 return {
                     gb: "결재",
+                    lineType: lType,
+                    lineTypeNm: lTypeNm,
+                    sanctnSn: (idx + 1),
                     usrNm: item.id,
                     name: item.text,
                     jik: item.parent,
@@ -1930,6 +1980,9 @@ var actionType = null;
             var shaArray = shareGrid.target.list.map(function(item) {
                 return {
                     gb: "공유",
+                    lineType: "REF",
+                    lineTypeNm: "참조",
+                    sanctnSn: "",
                     usrNm: item.id,
                     name: item.text,
                     jik: item.parent,
@@ -2579,17 +2632,14 @@ var actionType = null;
 		let tempCreatId = $(currFormId + ' #creatId').val() || jwt.userId;	//문제 등록담당 ID
 
         $.each(appshaList, function(idx, item){
-        	if (item.usrNm.includes('gyrsult') || item.usrNm == tempCreatId) {
+        	if (item.usrNm.includes('gyrsult') || (item.usrNm == tempCreatId && item.usrNm != tempActId)) {
         		//퇴사자인경우 제외 처리함
-        		//작성자는 결제 제외처리
+        		//작성자는 결제 제외처리 (단, 조치담당자인 경우 유지)
         	} else {
 	            if (item.gb === "결재") {
 	            	appArray.push(item);
 	            } else {
-	            	//공유일경우 조치담당자가 공유에 있으면 제외처리함.
-	            	if (item.usrNm != tempActId) {
-	            		shaArray.push(item);
-	            	}
+	            	shaArray.push(item);
 	            }
         	}
         });
@@ -2597,22 +2647,43 @@ var actionType = null;
 		//문제등록, 조치결과 등록시 결재자 정보를 메모리에 가져오기  end
 		//------------------------------------------------
 
-		//조치결과자 결재정보 추가
+		//조치결과자 결재정보 추가 (미존재 시 병렬결재(합의)로 추가, 이미 결재/공유 등록 시 기존 구분 유지)
 		if ($(currFormId + ' #issSts').val() != 'ISSSTS03') {  //결과처리인지? 확인
-			appArray = approvalUserInfoData(tempActId, appArray);
+			appArray = approvalUserInfoData(tempActId, appArray, shaArray);
 		}
 		//조치자, 등록자 팀장 결재추가하기
-		appArray = approvalTeamManagerInfoData(tempActId, appArray);
+		appArray = approvalTeamManagerInfoData(tempActId, appArray, shaArray);
 		if (!$(currFormId + ' #creatId').val() || $(currFormId + ' #creatId').val() == jwt.userId) {
-			appArray = approvalTeamManagerInfoData(jwt.userId, appArray);
+			appArray = approvalTeamManagerInfoData(jwt.userId, appArray, shaArray);
 		}
 
 		// 실적 문제 등록 시 영업 및 연구소가 등록 시 해당 특정 유저 결재권자 자동 추가
 		if (jwt.deptId.slice(0, 5) == 'GUN30') {
-			appArray = approvalTeamManagerSpecialInfoData('EMJ8105', appArray);		// 영업이 등록 시 김태호 부사장님 추가
+			appArray = approvalTeamManagerSpecialInfoData('EMJ8105', appArray, shaArray);		// 영업이 등록 시 김태호 부사장님 추가
 		} else if (jwt.deptId.slice(0, 5) == 'GUN40') {
-			appArray = approvalTeamManagerSpecialInfoData('kimjhv', appArray);		// 연구소가 등록 시 김재현 전무님 추가
+			appArray = approvalTeamManagerSpecialInfoData('kimjhv', appArray, shaArray);		// 연구소가 등록 시 김재현 전무님 추가
 		}
+
+		// 공유자 중 결재자와 동일한 사람이 있으면 결재자만 남기고 공유에서 제외
+		var approvalIds = appArray.map(function(item) { return String(item.usrNm || item.todoId || '').trim().toLowerCase(); });
+		shaArray = shaArray.filter(function(item) { return !approvalIds.includes(String(item.usrNm || item.todoId || '').trim().toLowerCase()); });
+
+		// 조치담당자(tempActId)가 결재선 최우선(순번 1번)에 오도록 정렬 보장
+		if (tempActId) {
+			var actIdx = appArray.findIndex(function(item) { return isSameApprovalUserId(item, tempActId); });
+			if (actIdx > -1) {
+				var actItem = appArray.splice(actIdx, 1)[0];
+				appArray.unshift(actItem);
+			}
+		}
+
+		// 결재자 순번(sanctnSn) 재부여 및 공유자 빈값 처리
+		$.each(appArray, function(idx, item) {
+			item.sanctnSn = idx + 1;
+		});
+		$.each(shaArray, function(idx, item) {
+			item.sanctnSn = "";
+		});
 
 		//문제생성시 조치자 팀장추가 정보 refresh
 		if ($(currFormId + ' #issSts').val() != 'ISSSTS03') {
@@ -2628,8 +2699,18 @@ var actionType = null;
 		return !!a && a === b;
 	}
 
+	function isRegisteredApprovalOrShare(appArray, shaArray, targetId) {
+		if (appArray && appArray.some(function(item) { return isSameApprovalUserId(item, targetId); })) {
+			return true;
+		}
+		if (shaArray && shaArray.some(function(item) { return isSameApprovalUserId(item, targetId); })) {
+			return true;
+		}
+		return false;
+	}
+
     //조치담당자정보 자동 추가하기
-	function approvalUserInfoData (appUserId, appArray) {
+	function approvalUserInfoData (appUserId, appArray, shaArray) {
 	    var formData = {
 	        "userId" : appUserId,
 	    }
@@ -2637,11 +2718,14 @@ var actionType = null;
 	    	if (data.resultList != '' && data.resultList!=null) {
 	    		//조치결과 결자자 정보 가져오기
 	    		let list = data.resultList[0];
-	    		if (appArray.some(function(item) { return isSameApprovalUserId(item, list.usrNm); })) {
-	    			//동일 아이디가 이미 결재(결재/합의/협조 등)로 등록된 경우 기존 결재구분 유지
+	    		if (isRegisteredApprovalOrShare(appArray, shaArray, list.usrNm)) {
+	    			//동일 아이디가 이미 결재(결재/합의/협조 등) 또는 공유로 등록된 경우 기존 구분 유지
 	    		} else {
-	    			appArray.push({
+	    			//WB24 자동 등록 기본 결재는 병렬결재(합의: AGREE)로 적용
+	    			appArray.unshift({
 		                        gb: "결재",
+		                        lineType: "AGREE",
+		                        lineTypeNm: "합의",
 		                        usrNm: list.usrNm,
 		                        name: list.name,
 		                        jik: list.jik,
@@ -2657,7 +2741,7 @@ var actionType = null;
 	}
 
 	//특정담당자 정보 가져오기
-	function approvalTeamManagerSpecialInfoData(appUserId, appArray) {
+	function approvalTeamManagerSpecialInfoData(appUserId, appArray, shaArray) {
 		var formData = {
 				"userId" : appUserId,
 		}
@@ -2665,11 +2749,14 @@ var actionType = null;
 			if (data.result != '' && data.result!=null) {
 				//결자자 정보 가져오기
 				let list = data.result;
-				if (appArray.some(function(item) { return isSameApprovalUserId(item, list.id); })) {
-					//동일 아이디가 이미 결재(결재/합의/협조 등)로 등록된 경우 기존 결재구분 유지
+				if (isRegisteredApprovalOrShare(appArray, shaArray, list.id)) {
+					//동일 아이디가 이미 결재(결재/합의/협조 등) 또는 공유로 등록된 경우 기존 구분 유지
 				} else {
+					//WB24 자동 등록 기본 결재는 병렬결재(합의: AGREE)로 적용
 					appArray.push({
 								gb: "결재",
+								lineType: "AGREE",
+								lineTypeNm: "합의",
 								usrNm: list.id,
 								name: list.name,
 								jik: list.levelNm,
@@ -2686,7 +2773,7 @@ var actionType = null;
 	}
 
     //담당자 팀장 정보 가져오기
-	function approvalTeamManagerInfoData(appUserId, appArray) {
+	function approvalTeamManagerInfoData(appUserId, appArray, shaArray) {
 	    var formData = {
 		        "userId" : appUserId,
 		}
@@ -2694,11 +2781,14 @@ var actionType = null;
         	if (data.result != '' && data.result!=null) {
         		//결자자 정보 가져오기
         		let list = data.result;
-        		if (appArray.some(function(item) { return isSameApprovalUserId(item, list.id); })) {
-        			//동일 아이디가 이미 결재(결재/합의/협조 등)로 등록된 경우 기존 결재구분 유지
+        		if (isRegisteredApprovalOrShare(appArray, shaArray, list.id)) {
+        			//동일 아이디가 이미 결재(결재/합의/협조 등) 또는 공유로 등록된 경우 기존 구분 유지
         		} else {
+        			//WB24 자동 등록 기본 결재는 병렬결재(합의: AGREE)로 적용
         			appArray.push({
 		                        gb: "결재",
+		                        lineType: "AGREE",
+		                        lineTypeNm: "합의",
 		                        usrNm: list.id,
 		                        name: list.name,
 		                        jik: list.levelNm,

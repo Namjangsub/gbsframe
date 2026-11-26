@@ -1783,16 +1783,21 @@
             postAjaxSync("/user/wb/wb24/selectRsltsMemberList", paramObj, null, function(data) {
                 var chk = false;
                 var rowList = gridViewApprovalSP11.target.getList();
+                var targetUsrId = String((data.resultList && data.resultList[0] && data.resultList[0].usrNm) || '').trim().toLowerCase();
                 $.each(rowList, function(idx, elem) {
-                    if (elem.usrNm == data.resultList[0].usrNm) {
+                    if (String(elem.usrNm || elem.todoId || '').trim().toLowerCase() === targetUsrId) {
                         chk = true;
                     }
                 });
 
                 if (chk == false) {
+                    var apprSn = rowList.filter(function(item) { return item.gb === '결재'; }).length + 1;
                     gridViewApprovalSP11.target.addRow($.extend({}, "last", false));
                     var row = gridViewApprovalSP11.target.getList().length - 1;
                     gridViewApprovalSP11.target.setValue(row, "gb", '결재');
+                    gridViewApprovalSP11.target.setValue(row, "lineType", 'AGREE');
+                    gridViewApprovalSP11.target.setValue(row, "lineTypeNm", '합의');
+                    gridViewApprovalSP11.target.setValue(row, "sanctnSn", apprSn);
                     gridViewApprovalSP11.target.setValue(row, "wbsPlancoCdNm", data.resultList[0].wbsPlancoCdNm);
                     gridViewApprovalSP11.target.setValue(row, "usrNm", data.resultList[0].usrNm); //ID
                     gridViewApprovalSP11.target.setValue(row, "empNo", data.resultList[0].empNo); // 사원번호
@@ -2762,31 +2767,28 @@
             if (item.gb === "결재") {
             	appArray.push(item);
             } else {
-            	//공유일경우 조치담당자가 공유에 있으면 제외처리함.
-            	if (item.usrNm != tempActId) {
-            		shaArray.push(item);
-            	}
+            	shaArray.push(item);
             }
         });
 		//------------------------------------------------
 		//문제등록, 조치결과 등록시 결재자 정보를 메모리에 가져오기  end
 		//------------------------------------------------
 
-		//조치결과자 결재정보 추가 (미존재 시 결재선 최우선(맨 앞)에 추가)
+		//조치결과자 결재정보 추가 (미존재 시 결재선 최우선(맨 앞)에 병렬결재(합의)로 추가, 이미 결재/공유 등록 시 기존 구분 유지)
 		if ($(currFormId + ' #issSts').val() != 'ISSSTS03') {  //결과처리인지? 확인
-			appArray = approvalUserInfoData(tempActId, appArray);
+			appArray = approvalUserInfoData(tempActId, appArray, shaArray);
 		}
 				//조치자, 등록자 팀장 결재추가하기
-		appArray = approvalTeamManagerInfoData(tempActId, appArray);
+		appArray = approvalTeamManagerInfoData(tempActId, appArray, shaArray);
 		if (!$(currFormId + ' #creatId').val() || $(currFormId + ' #creatId').val() == jwt.userId) {
-			appArray = approvalTeamManagerInfoData(jwt.userId, appArray);
+			appArray = approvalTeamManagerInfoData(jwt.userId, appArray, shaArray);
 		}
 
 		// 실적 문제 등록 시 영업 및 연구소가 등록 시 해당 특정 유저 결재권자 자동 추가
 		if (jwt.deptId.slice(0, 5) == 'GUN30') {
-			appArray = approvalTeamManagerSpecialInfoData('EMJ8105', appArray);		// 영업이 등록 시 김태호 부사장님 추가
+			appArray = approvalTeamManagerSpecialInfoData('EMJ8105', appArray, shaArray);		// 영업이 등록 시 김태호 부사장님 추가
 		} else if (jwt.deptId.slice(0, 5) == 'GUN40') {
-			appArray = approvalTeamManagerSpecialInfoData('kimjhv', appArray);		// 연구소가 등록 시 김재현 전무님 추가
+			appArray = approvalTeamManagerSpecialInfoData('kimjhv', appArray, shaArray);		// 연구소가 등록 시 김재현 전무님 추가
 		}
 		//문제생성시 조치자 팀장추가 정보 refresh
 		// 공유자 중 결재자와 동일한 사람이 있으면 결재자만 남기고 공유에서 제외
@@ -2823,8 +2825,18 @@
 		return !!a && a === b;
 	}
 
+	function isRegisteredApprovalOrShare(appArray, shaArray, targetId) {
+		if (appArray && appArray.some(function(item) { return isSameApprovalUserId(item, targetId); })) {
+			return true;
+		}
+		if (shaArray && shaArray.some(function(item) { return isSameApprovalUserId(item, targetId); })) {
+			return true;
+		}
+		return false;
+	}
+
     //조치담당자정보 자동 추가하기
-	function approvalUserInfoData (appUserId, appArray) {
+	function approvalUserInfoData (appUserId, appArray, shaArray) {
 	    var formData = {
 	        "userId" : appUserId,
 	    }
@@ -2832,11 +2844,14 @@
 	    	if (data.resultList != '' && data.resultList!=null) {
 	    		//조치결과 결자자 정보 가져오기
 	    		let list = data.resultList[0];
-	    		if (appArray.some(function(item) { return isSameApprovalUserId(item, list.usrNm); })) {
-	    			//동일 아이디가 이미 결재(결재/합의/협조 등)로 등록된 경우 기존 결재구분 유지
+	    		if (isRegisteredApprovalOrShare(appArray, shaArray, list.usrNm)) {
+	    			//동일 아이디가 이미 결재(결재/합의/협조 등) 또는 공유로 등록된 경우 기존 구분 유지
 	    		} else {
+	    			//WB24 자동 등록 기본 결재는 병렬결재(합의: AGREE)로 적용
 	    			appArray.unshift({
 		                        gb: "결재",
+		                        lineType: "AGREE",
+		                        lineTypeNm: "합의",
 		                        usrNm: list.usrNm,
 		                        name: list.name,
 		                        jik: list.jik,
@@ -2852,7 +2867,7 @@
 	}
 
 	//특정담당자 정보 가져오기
-	function approvalTeamManagerSpecialInfoData(appUserId, appArray) {
+	function approvalTeamManagerSpecialInfoData(appUserId, appArray, shaArray) {
 		var formData = {
 				"userId" : appUserId,
 		}
@@ -2860,11 +2875,14 @@
 			if (data.result != '' && data.result!=null) {
 				//결자자 정보 가져오기
 				let list = data.result;
-				if (appArray.some(function(item) { return isSameApprovalUserId(item, list.id); })) {
-					//동일 아이디가 이미 결재(결재/합의/협조 등)로 등록된 경우 기존 결재구분 유지
+				if (isRegisteredApprovalOrShare(appArray, shaArray, list.id)) {
+					//동일 아이디가 이미 결재(결재/합의/협조 등) 또는 공유로 등록된 경우 기존 구분 유지
 				} else {
+					//WB24 자동 등록 기본 결재는 병렬결재(합의: AGREE)로 적용
 					appArray.push({
 								gb: "결재",
+								lineType: "AGREE",
+								lineTypeNm: "합의",
 								usrNm: list.id,
 								name: list.name,
 								jik: list.levelNm,
@@ -2881,7 +2899,7 @@
 	}
 
     //담당자 팀장 정보 가져오기
-	function approvalTeamManagerInfoData(appUserId, appArray) {
+	function approvalTeamManagerInfoData(appUserId, appArray, shaArray) {
 	    var formData = {
 		        "userId" : appUserId,
 		}
@@ -2889,11 +2907,14 @@
         	if (data.result != '' && data.result!=null) {
         		//결자자 정보 가져오기
         		let list = data.result;
-        		if (appArray.some(function(item) { return isSameApprovalUserId(item, list.id); })) {
-        			//동일 아이디가 이미 결재(결재/합의/협조 등)로 등록된 경우 기존 결재구분 유지
+        		if (isRegisteredApprovalOrShare(appArray, shaArray, list.id)) {
+        			//동일 아이디가 이미 결재(결재/합의/협조 등) 또는 공유로 등록된 경우 기존 구분 유지
         		} else {
+        			//WB24 자동 등록 기본 결재는 병렬결재(합의: AGREE)로 적용
         			appArray.push({
 		                        gb: "결재",
+		                        lineType: "AGREE",
+		                        lineTypeNm: "합의",
 		                        usrNm: list.id,
 		                        name: list.name,
 		                        jik: list.levelNm,
