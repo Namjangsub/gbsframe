@@ -112,8 +112,58 @@
 
 .status-icons {
     display: flex;
-    gap: 4px;
+    gap: 6px;
+    align-items: flex-end;
+    margin: 2px 0;
+}
+.status-gauge-col {
+    display: flex;
+    flex-direction: column;
     align-items: center;
+    gap: 2px;
+    cursor: default;
+}
+.status-gauge-title {
+    font-size: 9px;
+    font-weight: 700;
+    color: #475569;
+    line-height: 1;
+    letter-spacing: -0.5px;
+}
+.status-icons .exact-gauge {
+    display: flex;
+    flex-direction: column-reverse;
+    justify-content: space-between;
+    width: 8px;
+    height: 15px;
+    box-sizing: border-box;
+}
+.status-icons .exact-gauge .seg {
+    width: 100%;
+    height: 4px;
+    border-radius: 1px;
+    background-color: #e2e8f0;
+}
+.status-icons .exact-gauge.lvl-1 .seg:nth-child(1) { background-color: #16a34a; }
+.status-icons .exact-gauge.lvl-2 .seg:nth-child(1),
+.status-icons .exact-gauge.lvl-2 .seg:nth-child(2) { background-color: #f5b800; }
+.status-icons .exact-gauge.lvl-3 .seg:nth-child(1),
+.status-icons .exact-gauge.lvl-3 .seg:nth-child(2),
+.status-icons .exact-gauge.lvl-3 .seg:nth-child(3) { background-color: #ef4444; }
+.popup-status-icons {
+    display: inline-flex;
+    gap: 10px;
+    padding: 4px 10px;
+    border: 1px solid #cbd5e1;
+    border-radius: 10px;
+    background-color: #f8fafc;
+}
+.popup-status-icons .exact-gauge {
+    width: 10px;
+    height: 18px;
+}
+.popup-status-icons .exact-gauge .seg {
+    height: 4.5px;
 }
 .popup-trigger {
     color: blue;
@@ -187,7 +237,7 @@
 		          <col width="58%">
 		        </colgroup>
 	        	<tr>
-	        		<td rowspan="4" style="padding-right:10px; vertical-align:middle;">
+	        		<td rowspan="5" style="padding-right:10px; vertical-align:middle;">
                         <!-- Image Element -->
 			            <img id="image1" src="" class="popup-img" alt="User Image">
                         <!-- Placeholder Element (Hidden by default) -->
@@ -214,6 +264,11 @@
 			        </td>
 	        	</tr>
 	        	<tr>
+	        		<td style="padding: 4px 0;">
+	        		    <div id="popupStatusGauges" class="status-icons popup-status-icons"></div>
+			        </td>
+	        	</tr>
+	        	<tr>
 	        		<td style="padding: 3px 0;">
 	        		    <div class="popup-text" style="font-size:12px; color:#718096;">
 			                <p id="message"></p>
@@ -235,40 +290,51 @@ $(document).ready(function() {
     // Popup Trigger Hover Events (MouseEnter / MouseLeave)
     $(document).on('mouseenter', '.popup-trigger', function (event) {
         const $popup = $('#popup');
-        let $card = $(this);
-        
+        const $card = $(this);
+        const $container = $('#userStatusPopup');
+        const modalPosition = $container.offset();
+
+        imageFileChk($card);
+
         let mouseX = event.pageX;
         let mouseY = event.pageY;
-        
-        let $container = $('#userStatusPopup');
-        let modalPosition = $container.offset();
-        
         if (modalPosition) {
             mouseX -= modalPosition.left;
             mouseY -= modalPosition.top;
         }
 
-        let width = $container.width();
-        let height = $container.height();
-        
-        const popupWidth = 370;
-        const popupHeight = 200;
+        const containerW = $container.innerWidth() || $(window).width();
+        const containerH = $container.innerHeight() || $(window).height();
+        const popupWidth = $popup.outerWidth() || 370;
+        const popupHeight = $popup.outerHeight() || 240;
+        const margin = 10;
 
-        if ((mouseX + popupWidth) > width) {
-            mouseX = width - popupWidth;
-            if (mouseX < 0) mouseX = 0; 
+        let left = mouseX + 10;
+        if (left + popupWidth > containerW - margin) {
+            left = Math.max(margin, mouseX - popupWidth - 10);
+            if (left + popupWidth > containerW - margin) {
+                left = Math.max(margin, containerW - popupWidth - margin);
+            }
         }
 
-        if ((mouseY + popupHeight) > height) {
-            mouseY = height - popupHeight;
-            if (mouseY < 0) mouseY = 0;
+        let top = mouseY + 10;
+        if (top + popupHeight > containerH - margin) {
+            top = mouseY - popupHeight - 10;
         }
-        
-        imageFileChk($card);	
+        if (top + popupHeight > containerH - margin) {
+            top = containerH - popupHeight - margin;
+        }
+        if (modalPosition) {
+            const winBottom = $(window).scrollTop() + $(window).height();
+            if (modalPosition.top + top + popupHeight > winBottom - margin) {
+                top = (winBottom - margin) - modalPosition.top - popupHeight;
+            }
+        }
+        if (top < margin) top = margin;
 
         $popup.stop(true, true).css({
-            top: mouseY + 10,
-            left: mouseX + 10
+            top: Math.round(top),
+            left: Math.round(left)
         }).fadeIn(150);
     });
 
@@ -377,6 +443,10 @@ function createEmployeeList() {
                                           'data-workrmk': item.workRptRmk || item.message || '',
                                           'data-is-accident': isAccident ? 'Y' : 'N',
                                           'data-is-loa': isLoa ? 'Y' : 'N',
+                                          'data-scdload': item.scdLoad || '',
+                                          'data-qcload': item.qcLoad || '',
+                                          'data-jobload': item.jobLoad || '',
+                                          'data-commload': item.commLoad || '',
                                           'title': txtTitle,
                                           'data-has-image': (item.userImg && item.userImg.length > 0) ? 'Y' : 'N'
                                       });
@@ -431,10 +501,10 @@ function createEmployeeList() {
             }
 
             const statusIcons = $('<span>').addClass('status-icons').html(
-                `<i class="fa fa-calendar" style="color:${!isAccident ? setStatus(item.scdLoad) : 'gray'}"></i>` +
-                `<i class="fa fa-cog" style="color:${!isAccident ? setStatus(item.qcLoad) : 'gray'}"></i>` +
-                `<i class="fa fa-user-cog" style="color:${!isAccident ? setStatus(item.jobLoad) : 'gray'}"></i>` +
-                `<i class="fa fa-hands-helping" style="color:${!isAccident ? setStatus(item.commLoad) : 'gray'}"></i>`
+                buildStatusGaugeHtml('일정', '일정, Capa 관리 부하 정도', item.scdLoad, isAccident) +
+                buildStatusGaugeHtml('품질', '품질 관련 부하 정도', item.qcLoad, isAccident) +
+                buildStatusGaugeHtml('역량', '업무역량. 업무부하 정도', item.jobLoad, isAccident) +
+                buildStatusGaugeHtml('소통', '지시. 보고. 소통. 협력 부하 정도', item.commLoad, isAccident)
             );
             infoDiv.append(statusIcons);
             infoDiv.append(`<span style="color:gray">${item.telNo || ''}</span>`);
@@ -453,6 +523,21 @@ function createEmployeeList() {
             }
         }
     });
+}
+
+function buildStatusGaugeHtml(shortLabel, fullLabel, set, isAccident) {
+    if (isAccident) {
+        return `<div class="status-gauge-col" title="${fullLabel} : 부재중">`
+             + `<span class="status-gauge-title">${shortLabel}</span>`
+             + `<div class="exact-gauge"><span class="seg"></span><span class="seg"></span><span class="seg"></span></div>`
+             + `</div>`;
+    }
+    const lvlClass = (set === "COMM3") ? "lvl-3" : (set === "COMM2") ? "lvl-2" : "lvl-1";
+    const lvlLabel = (set === "COMM3") ? "아주강함" : (set === "COMM2") ? "약한강도" : "보통";
+    return `<div class="status-gauge-col" title="${fullLabel} : ${lvlLabel}">`
+         + `<span class="status-gauge-title">${shortLabel}</span>`
+         + `<div class="exact-gauge ${lvlClass}"><span class="seg"></span><span class="seg"></span><span class="seg"></span></div>`
+         + `</div>`;
 }
 
 function setStatus(set) {
@@ -493,6 +578,12 @@ function imageFileChk($element) {
 	$('#name').text($element.data('name') || ''); 
 	$('#telNo').text('H. ' + ($element.data('telno') || ''));
 	$('#offTelNo').text('O. ' + ($element.data('offtelno') || ''));
+	$('#popupStatusGauges').html(
+		buildStatusGaugeHtml('일정', '일정, Capa 관리 부하 정도', $element.data('scdload'), isAccident) +
+		buildStatusGaugeHtml('품질', '품질 관련 부하 정도', $element.data('qcload'), isAccident) +
+		buildStatusGaugeHtml('역량', '업무역량. 업무부하 정도', $element.data('jobload'), isAccident) +
+		buildStatusGaugeHtml('소통', '지시. 보고. 소통. 협력 부하 정도', $element.data('commload'), isAccident)
+	);
 
     // 사고자인 경우 가독성 있는 경고/안내 박스로 사고내용 및 사유 표출
     var $msgElem = $('#message');
