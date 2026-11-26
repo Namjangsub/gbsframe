@@ -31,6 +31,10 @@ public class PM51Ctr {
 	@Autowired
 	PM51Svc pm51Svc;
 
+	// TB_WB20M03 채번(SELECT MAX(TODO_KEY)+1)이 커밋 전 타 요청과 겹쳐 PK 대기/교착되는 것을 막기 위해
+	// @Transactional 경계 밖(Controller)에서 결재선 등록 포함 저장 요청을 직렬화한다.
+	private static final Object WB20_WRITE_LOCK = new Object();
+
 	@PostMapping("/selectTripReqList")
 	public String selectTripReqList(@RequestBody Map<String, String> paramMap, ModelMap model) {
 		int totalCnt = pm51Svc.selectTripReqListCount(paramMap);
@@ -68,7 +72,11 @@ public class PM51Ctr {
 	@PostMapping("/insertTripReq")
 	public String insertTripReq(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) {
 		try {
-			if (pm51Svc.insertTripReq(paramMap, mRequest) != 0) {
+			int saved;
+			synchronized (WB20_WRITE_LOCK) {
+				saved = pm51Svc.insertTripReq(paramMap, mRequest);
+			}
+			if (saved != 0) {
 				model.addAttribute("resultCode", 200);
 				model.addAttribute("resultMessage", messageUtils.getMessage("save"));
 				model.addAttribute("tripReqNo", paramMap.get("tripReqNo"));
@@ -86,7 +94,11 @@ public class PM51Ctr {
 	@PostMapping("/updateTripReq")
 	public String updateTripReq(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) {
 		try {
-			if (pm51Svc.updateTripReq(paramMap, mRequest) != 0) {
+			int saved;
+			synchronized (WB20_WRITE_LOCK) {
+				saved = pm51Svc.updateTripReq(paramMap, mRequest);
+			}
+			if (saved != 0) {
 				model.addAttribute("resultCode", 200);
 				model.addAttribute("resultMessage", messageUtils.getMessage("save"));
 			} else {
@@ -217,7 +229,11 @@ public class PM51Ctr {
 	@PostMapping("/insertTripRpt")
 	public String insertTripRpt(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) {
 		try {
-			if (pm51Svc.insertTripRpt(paramMap, mRequest) != 0) {
+			int saved;
+			synchronized (WB20_WRITE_LOCK) {
+				saved = pm51Svc.insertTripRpt(paramMap, mRequest);
+			}
+			if (saved != 0) {
 				model.addAttribute("resultCode", 200);
 				model.addAttribute("resultMessage", messageUtils.getMessage("save"));
 				model.addAttribute("tripRptNo", paramMap.get("tripRptNo"));
@@ -235,7 +251,11 @@ public class PM51Ctr {
 	@PostMapping("/updateTripRpt")
 	public String updateTripRpt(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) {
 		try {
-			if (pm51Svc.updateTripRpt(paramMap, mRequest) != 0) {
+			int saved;
+			synchronized (WB20_WRITE_LOCK) {
+				saved = pm51Svc.updateTripRpt(paramMap, mRequest);
+			}
+			if (saved != 0) {
 				model.addAttribute("resultCode", 200);
 				model.addAttribute("resultMessage", messageUtils.getMessage("save"));
 			} else {

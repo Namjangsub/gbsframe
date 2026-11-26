@@ -378,6 +378,9 @@ public class PM51SvcImpl implements PM51Svc {
 		if (hasText(orgMap.get("payDt"))) {
 			throw new RuntimeException("지급완료된 출장신청서는 수정할 수 없습니다.");
 		}
+		if (pm51Mapper.selectTripRptExists(paramMap) > 0) {
+			throw new RuntimeException("출장복명서가 이미 작성되어 출장신청서의 자금 내역을 수정할 수 없습니다.");
+		}
 
 		String aprvStsCd = orgMap.get("aprvStsCd");
 		boolean salesDept = isSalesDept(paramMap.get("deptId"));
@@ -1029,26 +1032,38 @@ public class PM51SvcImpl implements PM51Svc {
 		}
 	}
 
+	// 출장자 등록 검증 (업무규칙 변경: 1인 1출장신청서 → 동일기간·동일장소 동행 직원을 한 신청서에 함께 등록)
+	// - 직원 출장자는 신청인을 포함해 1명 이상, 같은 직원은 중복 등록 불가
+	// - 외주 인력은 기존과 같이 추가 등록 가능
 	private void validateTravelerRegistration(Map<String, String> paramMap, List<Map<String, String>> travelerArr) {
 		if (travelerArr == null || travelerArr.isEmpty()) {
-			throw new RuntimeException("출장자는 신청인 1명을 반드시 등록해야 합니다.");
+			throw new RuntimeException("출장자에 신청인이 포함되어야 합니다.");
 		}
 
-		int employeeCount = 0;
 		String applicantId = paramMap.get("reqId");
+		boolean hasApplicant = false;
+		int employeeCount = 0;
+		Set<String> employeeIds = new HashSet<>();
 		for (Map<String, String> traveler : travelerArr) {
+			String userId = traveler.get("userId") == null ? "" : traveler.get("userId").trim();
 			boolean isOutSrc = "외주".equals(traveler.get("outSrcYn"))
 					|| "Y".equalsIgnoreCase(traveler.get("outSrcYn"))
-					|| "외주".equals(traveler.get("deptNm"));
-			if (!isOutSrc) {
-				employeeCount++;
-				if (hasText(applicantId) && !applicantId.equals(traveler.get("userId"))) {
-					throw new RuntimeException("출장자는 신청인만 등록할 수 있습니다.");
-				}
+					|| "외주".equals(traveler.get("deptNm"))
+					|| userId.startsWith("OUTSRC");
+			if (isOutSrc) {
+				continue;
+			}
+			employeeCount++;
+			if (hasText(userId) && !employeeIds.add(userId)) {
+				String travelerNm = hasText(traveler.get("userNm")) ? traveler.get("userNm") : userId;
+				throw new RuntimeException(travelerNm + "님이 출장자에 중복 등록되어 있습니다.");
+			}
+			if (hasText(applicantId) && applicantId.equals(userId)) {
+				hasApplicant = true;
 			}
 		}
-		if (employeeCount != 1) {
-			throw new RuntimeException("출장자는 신청인 1명만 등록할 수 있습니다. 외주 인력은 추가 등록할 수 있습니다.");
+		if (employeeCount == 0 || (hasText(applicantId) && !hasApplicant)) {
+			throw new RuntimeException("출장자에 신청인이 포함되어야 합니다.");
 		}
 	}
 
@@ -1070,6 +1085,9 @@ public class PM51SvcImpl implements PM51Svc {
 		}
 		if (hasText(orgMap.get("payDt"))) {
 			throw new RuntimeException("이미 지급완료 처리된 출장신청서입니다.");
+		}
+		if (pm51Mapper.selectTripRptExists(paramMap) > 0) {
+			throw new RuntimeException("출장복명서가 이미 작성된 출장신청서는 지급완료 처리할 수 없습니다.");
 		}
 		validateTripReqGeneralApprovalDone(paramMap.get("tripReqNo"));
 		return pm51Mapper.updateTripReqPayDone(paramMap);
@@ -1190,6 +1208,9 @@ public class PM51SvcImpl implements PM51Svc {
 		if (!hasText(orgMap.get("payDt"))) {
 			throw new RuntimeException("지급완료 처리된 출장신청서가 아닙니다.");
 		}
+		if (pm51Mapper.selectTripRptExists(paramMap) > 0) {
+			throw new RuntimeException("출장복명서가 이미 작성된 출장신청서는 지급완료를 취소할 수 없습니다.");
+		}
 		int result = pm51Mapper.updateTripReqPayCancel(paramMap);
 		// 지급취소는 지급만 취소하고 관리부서 결재선은 유지
 		// pm51Mapper.updateTripReqPayCancelMngApproval(paramMap);
@@ -1247,6 +1268,7 @@ public class PM51SvcImpl implements PM51Svc {
 		List<Map<String, String>> rptProjectList = pm51Mapper.selectTripRptD03(paramMap);
 		List<Map<String, String>> rptCardList = pm51Mapper.selectTripRptD04(paramMap);
 		List<Map<String, String>> rptDailyList = pm51Mapper.selectTripRptD05(paramMap);
+		List<Map<String, String>> rptActualList = pm51Mapper.selectTripRptD06(paramMap);
 
 		result.put("m02", m02);
 		result.put("d02", d02);
@@ -1258,6 +1280,7 @@ public class PM51SvcImpl implements PM51Svc {
 		result.put("rptProjectList", rptProjectList);
 		result.put("rptCardList", rptCardList);
 		result.put("rptDailyList", rptDailyList);
+		result.put("rptActualList", rptActualList);
 
 		if (m02 != null && hasText(m02.get("tripRptNo"))) {
 			try {
@@ -1331,6 +1354,16 @@ public class PM51SvcImpl implements PM51Svc {
 				dailyMap.put("creatId", paramMap.get("userId"));
 				dailyMap.put("pgmId", "PM5102P01");
 				pm51Mapper.insertTripRptD05(dailyMap);
+			}
+		}
+
+		List<Map<String, String>> rptActualArr = gsonDtl.fromJson(paramMap.get("rptActualArr"), dtlMap);
+		if (rptActualArr != null && !rptActualArr.isEmpty()) {
+			for (Map<String, String> actualMap : rptActualArr) {
+				actualMap.put("tripRptNo", paramMap.get("tripRptNo"));
+				actualMap.put("creatId", paramMap.get("userId"));
+				actualMap.put("pgmId", "PM5102P01");
+				pm51Mapper.insertTripRptD06(actualMap);
 			}
 		}
 
@@ -1485,6 +1518,10 @@ public class PM51SvcImpl implements PM51Svc {
 		if (paramMap.get("rptDailyArr") != null) {
 			pm51Mapper.deleteTripRptD05(delParam);
 		}
+		// 실비정산 상세는 요청에 전송된 경우에만 삭제한다
+		if (paramMap.get("rptActualArr") != null) {
+			pm51Mapper.deleteTripRptD06(delParam);
+		}
 
 		List<Map<String, String>> rptTravelerArr = gsonDtl.fromJson(paramMap.get("rptTravelerArr"), dtlMap);
 		if (rptTravelerArr != null && !rptTravelerArr.isEmpty()) {
@@ -1521,6 +1558,16 @@ public class PM51SvcImpl implements PM51Svc {
 				dailyMap.put("creatId", paramMap.get("userId"));
 				dailyMap.put("pgmId", "PM5102P01");
 				pm51Mapper.insertTripRptD05(dailyMap);
+			}
+		}
+
+		List<Map<String, String>> rptActualArr = gsonDtl.fromJson(paramMap.get("rptActualArr"), dtlMap);
+		if (rptActualArr != null && !rptActualArr.isEmpty()) {
+			for (Map<String, String> actualMap : rptActualArr) {
+				actualMap.put("tripRptNo", paramMap.get("tripRptNo"));
+				actualMap.put("creatId", paramMap.get("userId"));
+				actualMap.put("pgmId", "PM5102P01");
+				pm51Mapper.insertTripRptD06(actualMap);
 			}
 		}
 
@@ -1737,7 +1784,36 @@ public class PM51SvcImpl implements PM51Svc {
 			throw new RuntimeException("결재 대상으로 등록되어 있지 않아 수정할 수 없습니다.");
 		}
 
+		String tripCondCd = paramMap.get("tripCondCd");
+		if (hasText(tripCondCd)) {
+			for (String code : tripCondCd.split(",")) {
+				if ("TRIPCOND99".equals(code.trim()) && !hasText(paramMap.get("etc"))) {
+					throw new RuntimeException("출장조건 기타 내용을 입력해주세요.");
+				}
+			}
+		}
+
 		int result = pm51Mapper.updateTripReqSalesInfo(paramMap);
+
+		// 영업PM 결재 시 프로젝트별 출장조건 수정 내용 저장 (TB_PM51D03.TRIP_COND_CD)
+		if (hasText(paramMap.get("projectArr"))) {
+			Gson gsonDtl = new GsonBuilder().disableHtmlEscaping().create();
+			Type dtlMap = new TypeToken<ArrayList<Map<String, String>>>() {
+			}.getType();
+			List<Map<String, String>> projectArr = gsonDtl.fromJson(paramMap.get("projectArr"), dtlMap);
+			if (projectArr != null && !projectArr.isEmpty()) {
+				for (Map<String, String> projectMap : projectArr) {
+					if (projectMap == null || !hasText(projectMap.get("seq"))) {
+						continue;
+					}
+					Map<String, String> updParam = new HashMap<>();
+					updParam.put("tripReqNo", paramMap.get("tripReqNo"));
+					updParam.put("seq", projectMap.get("seq"));
+					updParam.put("tripCondCd", projectMap.get("tripCondCd"));
+					pm51Mapper.updateTripReqD03TripCond(updParam);
+				}
+			}
+		}
 
 		Map<String, String> approveParam = new HashMap<>(myPendingLine);
 		approveParam.put("todoCfOpn", "");
@@ -1795,6 +1871,8 @@ public class PM51SvcImpl implements PM51Svc {
 		pm51Mapper.deleteTripRptD02(delParam);
 		pm51Mapper.deleteTripRptD03(delParam);
 		pm51Mapper.deleteTripRptD04(delParam);
+		pm51Mapper.deleteTripRptD05(delParam);
+		pm51Mapper.deleteTripRptD06(delParam);
 		pm51Mapper.deleteTripRptD01(delParam);
 
 		// 첨부파일 CASCADE 삭제 (FILE_TRGT_TYP = 'PM5102P01')
@@ -2059,20 +2137,16 @@ public class PM51SvcImpl implements PM51Svc {
 		return false;
 	}
 
-	private static final Object APPROVAL_LOCK = new Object();
-
+	// WB20(TB_WB20M03) MAX(TODO_KEY)+1 동시성 직렬화는 트랜잭션 경계 밖(PM51Ctr)에서 보장한다.
+	// 트랜잭션 내부 synchronized는 커밋 전 락 해제로 인해 동일 TODO_KEY 채번 및 Java-DB 교착(Deadlock)을 유발한다.
 	private void insertWbsApprovalListSync(Map<String, String> approvalMap) {
-		synchronized (APPROVAL_LOCK) {
-			fillApprovalBaseParam(approvalMap, null);
-			qm01Mapper.insertWbsApprovalList(approvalMap);
-		}
+		fillApprovalBaseParam(approvalMap, null);
+		qm01Mapper.insertWbsApprovalList(approvalMap);
 	}
 
 	private void insertWbsSharngListSync(Map<String, String> approvalMap) {
-		synchronized (APPROVAL_LOCK) {
-			fillApprovalBaseParam(approvalMap, null);
-			qm01Mapper.insertWbsSharngList(approvalMap);
-		}
+		fillApprovalBaseParam(approvalMap, null);
+		qm01Mapper.insertWbsSharngList(approvalMap);
 	}
 
 	// 관리부서결재선(mngApprovalArr) 행 생성 시 CREAT_ID로 쓸 "최초 신청자" ID를 구한다.
@@ -2989,6 +3063,21 @@ public class PM51SvcImpl implements PM51Svc {
 					dailyMap.put("creatId", userId);
 					dailyMap.put("pgmId", "PM5102P01");
 					pm51Mapper.insertTripRptD05(dailyMap);
+				}
+			}
+		}
+
+		// 실비정산 상세 (요청에 전송된 경우에만 처리, "[]"는 전체 삭제)
+		if (paramMap.get("rptActualArr") != null) {
+			pm51Mapper.deleteTripRptD06(delParam);
+
+			List<Map<String, String>> rptActualArr = gsonDtl.fromJson((String) paramMap.get("rptActualArr"), dtlMap);
+			if (rptActualArr != null && !rptActualArr.isEmpty()) {
+				for (Map<String, String> actualMap : rptActualArr) {
+					actualMap.put("tripRptNo", tripRptNo);
+					actualMap.put("creatId", userId);
+					actualMap.put("pgmId", "PM5102P01");
+					pm51Mapper.insertTripRptD06(actualMap);
 				}
 			}
 		}
