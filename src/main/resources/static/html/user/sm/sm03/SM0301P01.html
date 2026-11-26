@@ -30,6 +30,9 @@
 * input[comma] {
   text-align: right;
  }
+.datepicker.datepicker-dropdown {
+  z-index: 99999 !important;
+}
 </style>
 
 <div class="popup_area of_a" style="width: 100%; height: 100%;">
@@ -345,7 +348,9 @@ var gridViewPop = {
 						}
 					},
 					onDBLClick: function() {
-						
+						if (this.column && this.column.key === "inDt") {
+							openGridInDtDatepicker(this.dindex, this.item, this.colIndex);
+						}
 					},
 				},
 				footSum: [
@@ -401,15 +406,7 @@ var gridViewPop = {
 										}
 						} 
 						/* display & edit */
-						,{key: "inDt", 		label: "입고일자", 			width:  80,		align: "center"
-							, editor: {type: "date"
-										, config: {
-													content: {
-					                            				config: { mode: "day", selectMode: "day" }
-					                        				  }
-					                    			}
-									  }
-						}					
+						,{key: "inDt", 		label: "입고일자", 			width:  80,		align: "center"}					
 						,{key: "inQty", 			label: "합격수량", 			width: 60,		align: "right", formatter: "money"
 							, editor: {type:"number" 
 										, attributes: { 'maxlength': 13, 'data-maxlength': 15}
@@ -1410,6 +1407,56 @@ function commKaKaoSendOrder(param) {
 }
 
 //제한일자 체크
+function openGridInDtDatepicker(dindex, item, colIndex) {
+	if (!item) return;
+	var $cell = (window.event && window.event.target) ? $(window.event.target).closest("td") : $();
+	if (!$cell.length && gridViewPop && gridViewPop.target && gridViewPop.target.$target) {
+		var $tr = $(gridViewPop.target.$target).find('[data-ax5grid-panel="body"] tr[data-ax5grid-tr-data-index="' + dindex + '"]');
+		if ($tr.length && typeof colIndex === "number") {
+			$cell = $tr.find('td[data-ax5grid-column-index="' + colIndex + '"], td[data-ax5grid-col-index="' + colIndex + '"]');
+		}
+	}
+	var rect = ($cell.length > 0 && $cell[0].getBoundingClientRect) ? $cell[0].getBoundingClientRect() : null;
+
+	var $proxy = $("#gridInDtPickerProxy");
+	if ($proxy.length === 0) {
+		$proxy = $('<input type="text" id="gridInDtPickerProxy" readonly="readonly" style="position:absolute; opacity:0; border:0; padding:0; margin:0; pointer-events:none; z-index:99999;">');
+		$("body").append($proxy);
+	}
+	if (rect) {
+		$proxy.css({
+			left: Math.round(rect.left + $(window).scrollLeft()) + "px",
+			top: Math.round(rect.top + $(window).scrollTop()) + "px",
+			width: Math.round(rect.width) + "px",
+			height: Math.round(rect.height) + "px"
+		});
+	}
+
+	$proxy.datepicker("destroy");
+	$proxy.off("changeDate.gridInDt");
+	$proxy.val(item.inDt || "");
+	$proxy.datepicker({
+		format: "yyyy-mm-dd",
+		language: "ko",
+		autoclose: true,
+		todayHighlight: true,
+		orientation: "bottom left"
+	}).on("changeDate.gridInDt", function(e) {
+		var selectedDt = e.format("yyyy-mm-dd");
+		if (item.ordrgDt && selectedDt < item.ordrgDt) {
+			customAlert("발주일자 이전날자로 입고 처리 할 수 없습니다.");
+			return;
+		}
+		if (item.arrDttm && selectedDt < item.arrDttm) {
+			customAlert("입고확인일자 이전날자로 입고 처리 할 수 없습니다.");
+			return;
+		}
+		gridViewPop.target.setValue(dindex, "inDt", selectedDt);
+		limit_date_chk(selectedDt);
+	});
+	$proxy.datepicker("show");
+}
+
 function limit_date_chk(chkValue) {
 	//debugger;
 	if (limitDate != null) {
