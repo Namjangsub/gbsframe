@@ -19,6 +19,7 @@
 	<link rel="stylesheet" href="/static/css/main.css" />
 	<link rel="stylesheet" href="/static/css/sub.css" />
 	<link rel="stylesheet" href="/static/css/common.css" />
+	<link rel="stylesheet" href="/static/css/taskFlowWidget.css" />
 
 	<script src="/static/js/jquery-latest.min.js"></script>
 	<script src="/static/js/jquery.serializeObject.js"></script>
@@ -36,6 +37,7 @@
 	<script src="/static/js/fileTree.js"></script>
     <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
 	<script src="/static/js/jquery.blockUI.js"></script>
+	<script src="/static/js/common/taskFlowWidget.js"></script>
 </head>
 
 <body>
@@ -44,6 +46,8 @@
 	<div id="main_area">
 		<!-- 콘텐츠 -->
 		<div class="contents">
+			<!-- [POC 1단계] 업무 플로우형 네비게이터 (공통 위젯) -->
+			<div id="taskFlowWidgetMount"></div>
 			<div style="text-align:right">
 			</div>
 			<!-- 리스트 -->
@@ -403,58 +407,8 @@
 							}
 
 						});
-						google.charts.setOnLoadCallback(function drawChart(){
-							var chartData1 = new google.visualization.DataTable(data.chartData1);  // 수주실적(확정)
-							var chartData2 = new google.visualization.DataTable(data.chartData2);  // 매출실적(계산서)
-							var chartData3 = new google.visualization.DataTable(data.chartData3);  // 구매실적
-							var chartData4 = new google.visualization.DataTable(data.chartData4);  // 업무현황
-							var chartData5 = new google.visualization.DataTable(data.chartData5);   // 매출/매입실적(월별)
-							var chart1 = new google.visualization.ColumnChart(document.getElementById("chart_div1"));    // 수주실적(확정)
-							var chart2 = new google.visualization.ColumnChart(document.getElementById("chart_div2"));    // 매출실적(계산서)
-							var chart3 = new google.visualization.PieChart(document.getElementById("chart_div3"));    // 구매실적
-							var chart4 = new google.visualization.ColumnChart(document.getElementById("chart_div4"));    // 업무현황
-							var chart5 = new google.visualization.LineChart(document.getElementById("chart_div5"));     // 매출/매입실적(월별)
-
-							var options = {
-									height : 300,
-									fontSize: '10',
-									//curveType: 'function',
-									animation: { //차트가 뿌려질때 실행될 애니메이션 효과
-										startup: true,
-										duration: 1000,
-										easing: 'linear' }
-							}
-							var options2 = {
-									title : "수주/매출/매입실적 (월별)",
-									fontSize: '10',
-	// 								width : 1750,
-									height : 300,
-									pointSize: 5,
-									series: {
-										0: { pointShape: 'circle' ,			color: 'red'},
-										1: { pointShape: 'triangle' ,		color: 'blue'},
-										2: { pointShape: 'square' , 		color: 'purple'},
-										3: { pointShape: 'diamond' ,		color: 'green'},
-										4: { pointShape: 'star', sides: 5, dent: 0.5 , color: 'orange'},
-										5: { pointShape: 'polygon' ,		color: 'yellow'}
-									},
-									chartArea : { left: 80, right: 110},
-									backgroundColor: {
-										'fill': '(00)#F4F4F4',
-										'opacity': 100
-									},
-									curveType: 'function',
-									animation: { //차트가 뿌려질때 실행될 애니메이션 효과
-										startup: true,
-										duration: 1000,
-										easing: 'linear' }
-							}
-							chart1.draw(chartData1, options); // 수주실적(확정)
-							chart2.draw(chartData2, options); // 매출실적(계산서)
-							chart3.draw(chartData3, options); // 구매실적
-							chart4.draw(chartData4, options); // 업무현황
-							chart5.draw(chartData5, options2); // 매출/매입실적(월별)
-						});
+						cm1101LastChartData = data;
+						drawCm1101Charts(true);
 					} catch (error) {
 // 						alert("오류 발생!! 전산실 연락 바랍니다", error.message);
 						return null; // 오류 발생 시 null 반환
@@ -465,8 +419,96 @@
 			}
 		}
 
+	var cm1101LastChartData = null;
+	var cm1101LayoutHeights = { gridH: 236, chartRowH: 300, bottomChartH: 300 };
+	var cm1101ResizeTimer = null;
+
+	function calcCm1101LayoutHeights() {
+		var winHeight = $(window).height() || 900;
+		var scndTop = ($('#scndTable').length && $('#scndTable').offset()) ? $('#scndTable').offset().top : 100;
+		var theadH = ($('#scndTable thead').outerHeight(true) || 32);
+		var availH = winHeight - scndTop - theadH - 16;
+		if (availH < 390) availH = 390;
+
+		// 기존 비율(236 : 300 : 300 ≈ 0.28 : 0.36 : 0.36) 유지로 세로 스크롤 방지
+		var gridH = Math.max(120, Math.floor(availH * 0.28));
+		var chartRowH = Math.max(130, Math.floor(availH * 0.36));
+		var bottomChartH = Math.max(130, availH - gridH - chartRowH);
+		cm1101LayoutHeights = { gridH: gridH, chartRowH: chartRowH, bottomChartH: bottomChartH };
+		return cm1101LayoutHeights;
+	}
+
+	function drawCm1101Charts(withAnimation) {
+		if (!cm1101LastChartData || typeof google === 'undefined' || !google.charts) return;
+		var data = cm1101LastChartData;
+		var h = cm1101LayoutHeights;
+		google.charts.setOnLoadCallback(function drawChart() {
+			if (!google.visualization || !google.visualization.DataTable) return;
+			var chartData1 = new google.visualization.DataTable(data.chartData1);  // 수주실적(확정)
+			var chartData2 = new google.visualization.DataTable(data.chartData2);  // 매출실적(계산서)
+			var chartData3 = new google.visualization.DataTable(data.chartData3);  // 구매실적
+			var chartData4 = new google.visualization.DataTable(data.chartData4);  // 업무현황
+			var chartData5 = new google.visualization.DataTable(data.chartData5);  // 매출/매입실적(월별)
+			var chart1 = new google.visualization.ColumnChart(document.getElementById("chart_div1"));
+			var chart2 = new google.visualization.ColumnChart(document.getElementById("chart_div2"));
+			var chart3 = new google.visualization.PieChart(document.getElementById("chart_div3"));
+			var chart4 = new google.visualization.ColumnChart(document.getElementById("chart_div4"));
+			var chart5 = new google.visualization.LineChart(document.getElementById("chart_div5"));
+
+			var animOpt = withAnimation ? { startup: true, duration: 1000, easing: 'linear' } : null;
+			var options = {
+				height: h.chartRowH,
+				fontSize: '10'
+			};
+			if (animOpt) options.animation = animOpt;
+
+			var options2 = {
+				title: "수주/매출/매입실적 (월별)",
+				fontSize: '10',
+				height: h.bottomChartH,
+				pointSize: 5,
+				series: {
+					0: { pointShape: 'circle',   color: 'red' },
+					1: { pointShape: 'triangle', color: 'blue' },
+					2: { pointShape: 'square',   color: 'purple' },
+					3: { pointShape: 'diamond',  color: 'green' },
+					4: { pointShape: 'star', sides: 5, dent: 0.5, color: 'orange' },
+					5: { pointShape: 'polygon',  color: 'yellow' }
+				},
+				chartArea: { left: 80, right: 110, top: 28, bottom: 28 },
+				backgroundColor: {
+					'fill': '(00)#F4F4F4',
+					'opacity': 100
+				},
+				curveType: 'function'
+			};
+			if (animOpt) options2.animation = animOpt;
+
+			chart1.draw(chartData1, options);
+			chart2.draw(chartData2, options);
+			chart3.draw(chartData3, options);
+			chart4.draw(chartData4, options);
+			chart5.draw(chartData5, options2);
+		});
+	}
+
+	function adjustGridHeight() {
+		var h = calcCm1101LayoutHeights();
+		if (gridView && gridView.target) gridView.target.setHeight(h.gridH);
+		if (gridView2 && gridView2.target) gridView2.target.setHeight(h.gridH);
+		if (gridView3 && gridView3.target) gridView3.target.setHeight(h.gridH);
+		if (gridView4 && gridView4.target) gridView4.target.setHeight(h.gridH);
+		$('#chart_div1, #chart_div2, #chart_div3, #chart_div4').css('height', h.chartRowH + 'px');
+		$('#chart_div5').css('height', h.bottomChartH + 'px');
+
+		if (cm1101ResizeTimer) clearTimeout(cm1101ResizeTimer);
+		cm1101ResizeTimer = setTimeout(function() {
+			drawCm1101Charts(false);
+		}, 60);
+	}
+
 	$(document).ready(function() {
-		//메인 화면영역 세로 스크롤 생기지 않게 함
+		//메인 화면영역 세로 스크롤 생기지 않게 함 (상단 ETO 카드 높이에 맞춰 하단 그리드/차트 비율 축소)
 		$('#main_area').css('overflow-y', 'hidden');
 
 		// 패스워드 유효기간 체크
@@ -503,6 +545,10 @@
 		}, 600000);
 
 		authChk();
+		initTaskFlowNavigator();
+		adjustGridHeight();
+		$(window).off('resize.cm1101').on('resize.cm1101', adjustGridHeight);
+		setTimeout(adjustGridHeight, 150);
 	});
 
 	function SetYm(){
