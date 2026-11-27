@@ -96,6 +96,65 @@ public class PM51SvcImpl implements PM51Svc {
 		}
 	}
 
+	/**
+	 * 출장신청서/출장복명서 일반 저장 시 공용 CM08Svc.fileUpload 호출 래퍼.
+	 * - paramMap의 fileTrgtKey/pgmId를 기존 계약대로 세팅한다.
+	 * - 업로드/삭제 대상 파일이 모두 비어 있으면 불필요한 공용 파일 권한 조회를 생략한다.
+	 * - 파일이 있는 경우 실제 작업자(fileUserId/loginUserId), 파일트리 회사코드(fileCoCd/coCd),
+	 *   첨부 대상 폴더(nodeId/comonCd)를 누락 없이 채워 공용 API(CM08Svc.fileUpload) 규격을 충족한다.
+	 */
+	private void uploadTripFiles(Map<String, String> paramMap, MultipartHttpServletRequest mRequest,
+			String fileTrgtKey, String pgmId) throws Exception {
+		paramMap.put("fileTrgtKey", fileTrgtKey);
+		paramMap.put("pgmId", pgmId);
+
+		Gson gson = new GsonBuilder().disableHtmlEscaping().create();
+		Type mapListType = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
+
+		String uploadArrJson = hasText(paramMap.get("uploadFileArr")) ? paramMap.get("uploadFileArr") : "[]";
+		String deleteArrJson = hasText(paramMap.get("deleteFileArr")) ? paramMap.get("deleteFileArr") : "[]";
+
+		List<Map<String, String>> uploadFileList = gson.fromJson(uploadArrJson, mapListType);
+		String[] deleteFileArr = gson.fromJson(deleteArrJson, String[].class);
+
+		boolean hasUpload = uploadFileList != null && !uploadFileList.isEmpty();
+		boolean hasDelete = deleteFileArr != null && deleteFileArr.length > 0;
+		if (!hasUpload && !hasDelete) {
+			return;
+		}
+
+		Map<String, String> fileParam = new HashMap<>(paramMap);
+		fileParam.put("fileTrgtKey", fileTrgtKey);
+		fileParam.put("pgmId", pgmId);
+		fileParam.put("uploadFileArr", uploadArrJson);
+		fileParam.put("deleteFileArr", deleteArrJson);
+
+		String fileUserId = paramMap.get("fileUserId");
+		if (!hasText(fileUserId)) fileUserId = paramMap.get("loginUserId");
+		if (!hasText(fileUserId)) fileUserId = paramMap.get("userId");
+		if (hasText(fileUserId)) {
+			fileParam.put("userId", fileUserId.trim());
+		}
+
+		String fileCoCd = paramMap.get("fileCoCd");
+		if (!hasText(fileCoCd) && hasUpload) {
+			fileCoCd = uploadFileList.get(0).get("coCd");
+		}
+		if (!hasText(fileCoCd)) fileCoCd = paramMap.get("coCd");
+		if (!hasText(fileCoCd)) fileCoCd = "GUN";
+		fileParam.put("coCd", fileCoCd.trim());
+
+		String comonCd = null;
+		if (hasUpload) {
+			comonCd = uploadFileList.get(0).get("nodeId");
+		}
+		if (!hasText(comonCd)) comonCd = paramMap.get("comonCd");
+		if (!hasText(comonCd)) comonCd = "FILETREE";
+		fileParam.put("comonCd", comonCd.trim());
+
+		cm08Svc.fileUpload(fileParam, mRequest);
+	}
+
 	@Override
 	public Map<String, Object> selectTripReqDtl(Map<String, String> paramMap) {
 		String tripReqNo = paramMap.get("tripReqNo");
@@ -228,9 +287,7 @@ public class PM51SvcImpl implements PM51Svc {
 		}
 
 		// 4. 파일 업로드
-		paramMap.put("fileTrgtKey", paramMap.get("tripReqNo"));
-		paramMap.put("pgmId", "PM5101P01");
-		cm08Svc.fileUpload(paramMap, mRequest);
+		uploadTripFiles(paramMap, mRequest, paramMap.get("tripReqNo"), "PM5101P01");
 
 		return 1;
 	}
@@ -283,9 +340,7 @@ public class PM51SvcImpl implements PM51Svc {
 			}
 		}
 
-		paramMap.put("fileTrgtKey", paramMap.get("tripReqNo"));
-		paramMap.put("pgmId", "PM5101P01");
-		cm08Svc.fileUpload(paramMap, mRequest);
+		uploadTripFiles(paramMap, mRequest, paramMap.get("tripReqNo"), "PM5101P01");
 
 		if (paramMap.containsKey("approvalArr")) {
 			List<Map<String, String>> approvalArr = gsonDtl.fromJson(paramMap.get("approvalArr"), dtlMap);
@@ -378,7 +433,11 @@ public class PM51SvcImpl implements PM51Svc {
 		if (hasText(orgMap.get("payDt"))) {
 			throw new RuntimeException("지급완료된 출장신청서는 수정할 수 없습니다.");
 		}
-		if (pm51Mapper.selectTripRptExists(paramMap) > 0) {
+		if ("Y".equals(paramMap.get("payMode"))) {
+			if (pm51Mapper.selectTripRptPaidExists(paramMap) > 0) {
+				throw new RuntimeException("출장복명서가 지급완료(자금처리)되어 출장신청서의 자금 내역을 수정할 수 없습니다.");
+			}
+		} else if (pm51Mapper.selectTripRptExists(paramMap) > 0) {
 			throw new RuntimeException("출장복명서가 이미 작성되어 출장신청서의 자금 내역을 수정할 수 없습니다.");
 		}
 
@@ -491,9 +550,7 @@ public class PM51SvcImpl implements PM51Svc {
 			}
 		}
 
-		paramMap.put("fileTrgtKey", paramMap.get("tripReqNo"));
-		paramMap.put("pgmId", "PM5101P01");
-		cm08Svc.fileUpload(paramMap, mRequest);
+		uploadTripFiles(paramMap, mRequest, paramMap.get("tripReqNo"), "PM5101P01");
 
 		if (!hasCompletedApproval && !payMode && paramMap.containsKey("approvalArr")) {
 			List<Map<String, String>> approvalArr = gsonDtl.fromJson(paramMap.get("approvalArr"), dtlMap);
@@ -1086,8 +1143,8 @@ public class PM51SvcImpl implements PM51Svc {
 		if (hasText(orgMap.get("payDt"))) {
 			throw new RuntimeException("이미 지급완료 처리된 출장신청서입니다.");
 		}
-		if (pm51Mapper.selectTripRptExists(paramMap) > 0) {
-			throw new RuntimeException("출장복명서가 이미 작성된 출장신청서는 지급완료 처리할 수 없습니다.");
+		if (pm51Mapper.selectTripRptPaidExists(paramMap) > 0) {
+			throw new RuntimeException("출장복명서가 지급완료(자금처리)되어 출장신청서를 지급완료 처리할 수 없습니다.");
 		}
 		validateTripReqGeneralApprovalDone(paramMap.get("tripReqNo"));
 		return pm51Mapper.updateTripReqPayDone(paramMap);
@@ -1208,8 +1265,8 @@ public class PM51SvcImpl implements PM51Svc {
 		if (!hasText(orgMap.get("payDt"))) {
 			throw new RuntimeException("지급완료 처리된 출장신청서가 아닙니다.");
 		}
-		if (pm51Mapper.selectTripRptExists(paramMap) > 0) {
-			throw new RuntimeException("출장복명서가 이미 작성된 출장신청서는 지급완료를 취소할 수 없습니다.");
+		if (pm51Mapper.selectTripRptPaidExists(paramMap) > 0) {
+			throw new RuntimeException("출장복명서가 지급완료(자금처리)되어 출장신청서의 지급완료를 취소할 수 없습니다.");
 		}
 		int result = pm51Mapper.updateTripReqPayCancel(paramMap);
 		// 지급취소는 지급만 취소하고 관리부서 결재선은 유지
@@ -1367,9 +1424,7 @@ public class PM51SvcImpl implements PM51Svc {
 			}
 		}
 
-		paramMap.put("fileTrgtKey", paramMap.get("tripRptNo"));
-		paramMap.put("pgmId", "PM5102P01");
-		cm08Svc.fileUpload(paramMap, mRequest);
+		uploadTripFiles(paramMap, mRequest, paramMap.get("tripRptNo"), "PM5102P01");
 
 		paramMap.put("salesCd", pm51Mapper.selectTripRptSalesCd(paramMap));
 
@@ -1571,9 +1626,7 @@ public class PM51SvcImpl implements PM51Svc {
 			}
 		}
 
-		paramMap.put("fileTrgtKey", paramMap.get("tripRptNo"));
-		paramMap.put("pgmId", "PM5102P01");
-		cm08Svc.fileUpload(paramMap, mRequest);
+		uploadTripFiles(paramMap, mRequest, paramMap.get("tripRptNo"), "PM5102P01");
 
 		if (!paramMap.containsKey("approvalArr")) {
 			paramMap.put("approvalArr", "[]");

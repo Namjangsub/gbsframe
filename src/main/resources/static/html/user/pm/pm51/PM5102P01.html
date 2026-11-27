@@ -1,4 +1,4 @@
-<script src="/static/js/pm51TravelExpense.js"></script>
+<script src="/static/js/pm51TravelExpense.js?v=20261127_6"></script>
 <div class="popup_area of_a" style="width: 100%; height: 100%;">
 	<style>
 		.final-settlement-row { background-color: #f4cccc !important; }
@@ -89,6 +89,20 @@
 			cursor: default !important;
 		}
 
+		/* 파일첨부 공통 영역(#fileList_area): 내부 Bootstrap float(col-xs-2/10) 해제로 sticky footer 겹침·짤림 방지 */
+		#fileList_area {
+			width: 100%;
+			display: flow-root;
+		}
+		#fileList_area::after,
+		#fileList_area #fileAttachCnts::after {
+			content: "";
+			display: block;
+			clear: both;
+		}
+		#fileList_area #fileAttachCnts > .col-xs-2:last-child:empty {
+			display: none;
+		}
 		/* 파일첨부 공통 영역(#fileList_area)의 버튼은 공통 기본 소형 크기 유지 */
 		#fileList_area .add_btn_small {
 			display: inline-block !important;
@@ -157,6 +171,7 @@
 			position: sticky;
 			bottom: 0;
 			z-index: 20;
+			clear: both;
 			background: #fff;
 			padding: 8px 0;
 			border-top: 1px solid #ddd;
@@ -739,7 +754,7 @@
 		</div>
 	</form>
 
-	<div class="contents">
+	<div class="contents" style="padding-bottom: 8px;">
 		<!-- 공통 파일 영역 -->
 		<div id="fileList_area" style="width: 100%;"></div>
 	</div>
@@ -747,7 +762,7 @@
 	<br>
 	<!-- 하단 버튼 -->
 	<div class="popup_bottom_btn pm5102-footer">
-		<button type="button" id="fileUpBtn" form="popForm" onclick="fileUpload($(this.form));" authchk style="display:none; background-color: #f0ad4e; color: white; border-color: #eea236;">첨부파일저장</button>
+		<button type="button" id="fileUpBtn" form="popForm" onclick="saveFileOnlyPM5102();" authchk style="display:none; background-color: #f0ad4e; color: white; border-color: #eea236;">첨부파일저장</button>
 		<button type="button" id="saveBtn" onclick="saveTripRpt();" authchk>저장</button>
 		<button type="button" id="lineApproveBtn" onclick="approvePm51Line();" authchk style="display:none; background-color: #337ab7; color: white; border-color: #2e6da4;">결재</button>
 		<button type="button" id="financeSaveBtn" onclick="saveFinanceOnly();" authchk style="display:none; background-color: #337ab7; color: white; border-color: #2e6da4;">자금·정산 저장</button>
@@ -951,9 +966,47 @@
 	var actualDbOnlyMode = false; // 저장된 D06이 있으면 DB 저장행 기준으로 표시/편집
 	var savedActualDbRows = [];
 	var actualDbSeedRendered = false; // D06 시드가 그리드에 최초 렌더되기 전 임시행으로 덮어쓰는 것 방지
+	var actualExpenseLoaded = false; // 경비현황 조회 완료 전(빈 그리드) 재집계로 D06 저장행이 0으로 덮이는 것 방지
 
-	// 근태마감년월 (PM30 관리 값)
+	// 근태마감년월 (PM30 관리 값) 및 동적 모달 로딩 안전을 위한 상단 상태 변수 선언
 	var pm51AttendanceCloseYm = null;
+	var pm51SequentialBlocked = false;
+	var rptCurrUnit = 'USD';
+	var rptTravelerGridColumnSig = '';
+	var CARD_MATCH_DATE_TOLERANCE_DAYS = 0;
+	var pm52ApplicantIsTeamMgr = false;
+	var pm52TeamMgrId = '';
+	var rptTeamMgrCacheKey = null;
+	var kakaoCnt = 0;
+	var kakaoErr = [];
+
+	function getPm5102FinancePolicy() {
+		var actionType = (popParam && popParam.actionType) || $('#actionType').val() || '';
+		var ctx = {
+			actionType: actionType,
+			paid: isRptPaid(),
+			isAccounting: isAccountingUser(),
+			isMyPending: isMyApprovalPending(),
+			generalApprovalDone: isRptGeneralApprovalFullyDone(),
+			sequentialBlocked: !!pm51SequentialBlocked
+		};
+		if (typeof window.pm51EvalRptFinancePolicy === 'function') {
+			return window.pm51EvalRptFinancePolicy(ctx);
+		}
+		var canFinanceManage = ctx.isAccounting && !ctx.paid && actionType !== 'C';
+		return {
+			actionType: actionType,
+			paid: ctx.paid,
+			isAccounting: ctx.isAccounting,
+			generalApprovalDone: ctx.generalApprovalDone,
+			sequentialBlocked: ctx.sequentialBlocked,
+			canFinanceManage: canFinanceManage,
+			canEditArea2: canFinanceManage,
+			canShowFinanceSaveBtn: canFinanceManage,
+			canShowPayBtn: canFinanceManage && ctx.generalApprovalDone && !ctx.sequentialBlocked,
+			canShowLineApproveBtn: ctx.isMyPending && !ctx.sequentialBlocked
+		};
+	}
 
 	$(document).ready(function () {
 		setTimeout(function () {
@@ -983,26 +1036,45 @@
 		initRptCardGrid();
 		initDailySettlementGrid();
 		initActualSettlementGrid();
-		initFileTree();
 
 		gridViewApprovalMng = createApprovalGrid('[data-ax5grid="approval_grid_mng_modal"]');
 
-		// SPECRTS15(회계담당자) 등록 아이디는 공통 fileTree.js가 동적으로 추가하는 결재/공유 처리 버튼
-		// (callApprovalWorking)을 노출하지 않는다. 회계담당자는 저장버튼("지급완료처리")으로만 정산 확정과
-		// 결재처리를 함께 진행해야 하기 때문 (PM5101P01.html의 영업PM 예외 처리와 동일 패턴).
-		// 공통모듈은 수정하지 않고, 버튼이 popup_bottom_btn에 추가되는 시점을 감지해 즉시 숨긴다.
+		// 전용 '결재'와 공통 '결재처리'가 동시에 표시되면 전용 버튼을 우선한다.
+		// 순차결재 차단 상태이거나 전용 버튼이 표시 중인 경우 공통 결재처리 버튼 중복 노출을 방지한다.
 		(function() {
 			var $popBottomBtn = $('#popForm').closest('.popup_area').find('.popup_bottom_btn');
 			if ($popBottomBtn.length && window.MutationObserver) {
-				var callApprovalBtnObserver = new MutationObserver(function() {
-					// 회계담당자는 '지급완료처리' 저장버튼으로 정산 확정과 결재처리를 함께 진행하므로 결재처리 버튼을 숨긴다.
-					// 단 이미 지급완료된 건은 지급완료처리 버튼이 없으므로, 회계팀장/부사장처럼 지급 이후에 결재해야 하는
-					// 관리부서 결재자가 결재를 진행할 수 없게 된다. 지급완료 이후에는 결재처리 버튼을 그대로 노출한다.
-					if (isAccountingUser() && !isRptPaid()) {
-						$popBottomBtn.find('.callApprovalWorking').hide();
+				function syncPm5102ApprovalButtons() {
+					var $nativeApproveButton = $popBottomBtn.find('#lineApproveBtn');
+					var nativeApproveVisible = $nativeApproveButton.length > 0
+						&& $nativeApproveButton.css('display') !== 'none';
+					var $commonApproveButtons = $popBottomBtn.find('.callApprovalWorking');
+
+					if (pm51SequentialBlocked || nativeApproveVisible || (isAccountingUser() && !isRptPaid())) {
+						$commonApproveButtons.each(function() {
+							var $button = $(this);
+							if ($button.attr('data-pm51-hidden-by-native') !== 'Y') {
+								$button.attr('data-pm51-hidden-by-native', 'Y').hide();
+							}
+						});
+					} else {
+						$commonApproveButtons.filter('[data-pm51-hidden-by-native="Y"]')
+							.removeAttr('data-pm51-hidden-by-native')
+							.show();
 					}
+				}
+
+				window.syncPm5102ApprovalButtons = syncPm5102ApprovalButtons;
+				syncPm5102ApprovalButtons();
+				var callApprovalBtnObserver = new MutationObserver(function() {
+					syncPm5102ApprovalButtons();
 				});
-				callApprovalBtnObserver.observe($popBottomBtn[0], { childList: true });
+				callApprovalBtnObserver.observe($popBottomBtn[0], {
+					childList: true,
+					subtree: true,
+					attributes: true,
+					attributeFilter: ['style']
+				});
 			}
 		})();
 
@@ -1024,6 +1096,9 @@
 		$(document).off('click.pm5102FileOnly').on('click.pm5102FileOnly', '#fileList_area button, #fileList_area a, [data-ax5grid="file-grid"] button', function() {
 			setTimeout(checkFileOnlyChangePM5102, 300);
 		});
+		if (typeof window.pm51BindFileAreaAutoScroll === 'function') {
+			window.pm51BindFileAreaAutoScroll($('#popForm').closest('.popup_area'));
+		}
 		var _pm5102FileCheckInterval = setInterval(function() {
 			if (!$('#popForm').length) {
 				clearInterval(_pm5102FileCheckInterval);
@@ -1143,6 +1218,7 @@
 			$('#actionType').val('C');
 			loadTripReqCitation(popParam.tripReqNo);
 			setApplicantDefaultApprovalLineMng();
+			initFileTree();
 		}
 		}, 0);
 	});
@@ -1204,8 +1280,6 @@
 			]
 		});
 	}
-
-	var rptTravelerGridColumnSig = '';
 
 	function isRptTravelerAmountEditBlocked() {
 		if (!isRptTravelerGridEditBlocked()) return false;
@@ -1761,8 +1835,7 @@
 	// ══════════════════════════════════════════════════
 
 	// 카드사 명세는 승인일자, 경비 그리드의 유일한 일자는 작업일보 작성일자(workRptDt)라 어긋날 수 있다.
-	// 실데이터 확인 후 이 값만 조정하면 허용오차가 반영된다 (0 = 완전일치).
-	var CARD_MATCH_DATE_TOLERANCE_DAYS = 0;
+	// 실데이터 확인 후 상단 CARD_MATCH_DATE_TOLERANCE_DAYS 값만 조정하면 허용오차가 반영된다 (0 = 완전일치).
 
 	function isRptCardGridEditBlocked() {
 		return !(isAccountingUser() && !isRptPaid());
@@ -2112,9 +2185,68 @@
 		return duplicated;
 	}
 
+	// 수동행 배열에 newRow를 선택행 바로 아래 위치로 삽입. 자동행 아래 위치는 _anchorKey(자동행 키)로 기억해 재집계 후에도 유지한다.
+	function insertManualRowBelow(manualRows, selectedRow, selectedAutoKey, newRow) {
+		var insertAt = -1;
+		if (selectedRow._manualRow) {
+			newRow._anchorKey = selectedRow._anchorKey;
+			$.each(manualRows, function(idx, row) {
+				if (row._mid && row._mid === selectedRow._mid) { insertAt = idx + 1; return false; }
+			});
+		} else {
+			newRow._anchorKey = selectedAutoKey;
+			$.each(manualRows, function(idx, row) {
+				if (row._anchorKey === selectedAutoKey) { insertAt = idx; return false; }
+			});
+		}
+		if (insertAt < 0) manualRows.push(newRow);
+		else manualRows.splice(insertAt, 0, newRow);
+	}
+
+	// 자동행 뒤에 _anchorKey가 일치하는 수동행을 배치. _anchorKey ''는 맨 앞, 미지정·자동행 소멸 시 맨 뒤(기존 동작).
+	function placeAnchoredManualRows(autoRows, manualRows, keyFn) {
+		var autoKeys = {};
+		$.each(autoRows, function(idx, row) { autoKeys[keyFn(row)] = true; });
+		var head = [], tail = [], anchored = {};
+		$.each(manualRows || [], function(idx, row) {
+			var anchor = row._anchorKey;
+			if (anchor === '') head.push(row);
+			else if (anchor === undefined || anchor === null || !autoKeys[anchor]) tail.push(row);
+			else (anchored[anchor] = anchored[anchor] || []).push(row);
+		});
+		var result = head;
+		$.each(autoRows, function(idx, row) {
+			result.push(row);
+			var key = keyFn(row);
+			if (anchored[key]) {
+				result = result.concat(anchored[key]);
+				delete anchored[key];
+			}
+		});
+		return result.concat(tail);
+	}
+
 	function addManualDailyRow() {
 		if (isDailyGridEditBlocked()) return;
 		if (!dailySettlementGridView || !dailySettlementGridView.target) return;
+		// 선택행이 있으면 식별 컬럼만 복사(금액 0)한 수동행을 선택행 바로 아래에 추가
+		var selectedDaily = (dailySettlementGridView.target.getList('selected') || [])[0];
+		if (selectedDaily) {
+			insertManualRowBelow(manualDailyRows, selectedDaily, getDailySettleKey(selectedDaily.userId, selectedDaily.userNm, selectedDaily.currNm), {
+				userId: selectedDaily.userId || '',
+				userNm: selectedDaily.userNm || '',
+				firstSchedule: selectedDaily.firstSchedule || '',
+				actualSchedule: selectedDaily.actualSchedule || '',
+				currNm: selectedDaily.currNm || 'CURR01',
+				dailyAdvance: 0,
+				dailyFinal: 0,
+				dailyDiff: 0,
+				_manualRow: true,
+				_mid: Date.now() + '_' + Math.random().toString(36).slice(2)
+			});
+			refreshSettlementSummaryGrids();
+			return;
+		}
 		// 바로 전 행(그리드 마지막 행)의 내용을 복사하고 일비_최종확정만 0으로 초기화
 		var list = dailySettlementGridView.target.getList() || [];
 		var prev = list.length ? list[list.length - 1] : null;
@@ -2244,6 +2376,89 @@
 		].join('|');
 	}
 
+	function sortActualSettleRows(rows) {
+		rows.sort(function(a, b) {
+			var payRank = function(value) { return String(value || '').indexOf('현금') > -1 ? 0 : 1; };
+			var roundRank = function(value) {
+				var index = $.inArray(String(value || ''), $.map(comboTripRptRound || [], function(item) { return item.NM; }));
+				return index < 0 ? 999 : index;
+			};
+			var currRank = function(value) {
+				var text = String(value || '').toUpperCase();
+				return text === 'CURR01' || text.indexOf('WON') > -1 || text.indexOf('KRW') > -1 || text.indexOf('원') > -1 ? 0 : 1;
+			};
+			return payRank(a.payMthdNm) - payRank(b.payMthdNm)
+				|| String(a.cardNo || '').localeCompare(String(b.cardNo || ''))
+				|| roundRank(a.roundNo) - roundRank(b.roundNo)
+				|| currRank(a.currNm) - currRank(b.currNm);
+		});
+		return rows;
+	}
+
+	// 현전도금 이월/정산은 현금만 대상 (통화별 1차→...→최종 순서로 이전 정산후금액을 이월). 카드는 집계(사용금액)만 표시하고 이월·정산하지 않는다.
+	function applyActualCashCarry(rows) {
+		var cashBalances = {};
+		$.each(rows, function(idx, row) {
+			if (String(row.payMthdNm || '').indexOf('현금') < 0) {
+				row.firstAdvance = 0;
+				row.currentAdvance = 0;
+				row.afterSettle = 0;
+				return true;
+			}
+			var currencyKey = String(row.currNm || '').toUpperCase();
+			var balance = cashBalances[currencyKey];
+			if (balance === undefined) {
+				balance = row.firstAdvance || 0;
+				row.currentAdvance = 0;
+			} else {
+				row.firstAdvance = 0;
+				row.currentAdvance = balance;
+			}
+			row.afterSettle = (row.firstAdvance || 0) + (row.currentAdvance || 0) - row.usedAmt;
+			cashBalances[currencyKey] = row.afterSettle;
+		});
+		return rows;
+	}
+
+	// TB_PM52D06 저장행 + 선택 경비 재집계 병합: 자동행 사용금액은 항상 선택 경비 기준, 최초전도금·비고는 저장값 유지, 수동행은 그대로 유지
+	function mergeActualDbRowsWithAggregate(savedRows, aggregatedRows) {
+		var aggByKey = {};
+		$.each(aggregatedRows || [], function(idx, row) { aggByKey[getActualSettleKey(row)] = row; });
+		var usedKeys = {};
+		var autoRows = [];
+		var manualRows = [];
+		var prevAutoKey = '';
+		$.each(savedRows || [], function(idx, saved) {
+			if (saved._manualRow) {
+				manualRows.push($.extend({}, saved, { _anchorKey: prevAutoKey }));
+				return true;
+			}
+			var key = getActualSettleKey(saved);
+			var row = $.extend({}, saved);
+			if (aggByKey[key] && !usedKeys[key]) {
+				row.usedAmt = getSettlementNumber(aggByKey[key].usedAmt || 0);
+				usedKeys[key] = true;
+			} else {
+				row.usedAmt = 0;
+				if (!getSettlementNumber(row.firstAdvance || 0) && !getSettlementNumber(row.currentAdvance || 0) && !$.trim(row.remark || '')) return true;
+			}
+			prevAutoKey = key;
+			autoRows.push(row);
+		});
+		$.each(aggregatedRows || [], function(idx, agg) {
+			var key = getActualSettleKey(agg);
+			if (usedKeys[key] || suppressedActualKeys[key]) return true;
+			if (!getSettlementNumber(agg.usedAmt || 0) && !getSettlementNumber(agg.firstAdvance || 0)) return true;
+			usedKeys[key] = true;
+			autoRows.push($.extend({}, agg, { _mid: Date.now() + '_' + idx + '_' + Math.random().toString(36).slice(2) }));
+		});
+		if (autoRows.length === 0 && manualRows.length === 0) {
+			return $.map(aggregatedRows || [], function(row) { return $.extend({}, row); });
+		}
+		applyActualCashCarry(sortActualSettleRows(autoRows));
+		return placeAnchoredManualRows(autoRows, manualRows, getActualSettleKey);
+	}
+
 	function getActualSettleSaveList() {
 		if (!actualSettlementGridView || !actualSettlementGridView.target) return [];
 		return $.map(actualSettlementGridView.target.getList() || [], function(row) {
@@ -2327,7 +2542,9 @@
 		if (!actualSettlementGridView || !actualSettlementGridView.target) return;
 		syncLiveActualGridToState();
 		var list = actualSettlementGridView.target.getList() || [];
-		var prev = list.length ? list[list.length - 1] : null;
+		// 선택행이 있으면 식별 컬럼(회차·결제방법·카드번호·통화)만 복사하고 금액은 0으로 선택행 바로 아래에 추가
+		var selected = (actualSettlementGridView.target.getList('selected') || [])[0] || null;
+		var prev = selected || (list.length ? list[list.length - 1] : null);
 		var newRow = {
 			roundNo: prev ? (prev.roundNo || '최종') : '최종',
 			payMthdNm: prev ? (prev.payMthdNm || '현금') : '현금',
@@ -2343,11 +2560,14 @@
 			_mid: Date.now() + '_' + Math.random().toString(36).slice(2)
 		};
 		if (actualDbOnlyMode) {
-			savedActualDbRows.push(newRow);
+			var selectedIdx = selected ? $.inArray(selected, list) : -1;
+			if (selectedIdx > -1 && selectedIdx < savedActualDbRows.length) savedActualDbRows.splice(selectedIdx + 1, 0, newRow);
+			else savedActualDbRows.push(newRow);
 			actualSettlementGridView.target.setData({ list: savedActualDbRows, page: { totalElements: savedActualDbRows.length } });
 			resizeSettlementSummaryGrid(actualSettlementGridView, 'actualSettlementGrid', savedActualDbRows.length);
 		} else {
-			manualActualRows.push(newRow);
+			if (selected) insertManualRowBelow(manualActualRows, selected, selected._origKey || getActualSettleKey(selected), newRow);
+			else manualActualRows.push(newRow);
 			refreshSettlementSummaryGrids();
 		}
 		calcSettlementKrw();
@@ -2366,7 +2586,10 @@
 		syncLiveActualGridToState();
 		if (actualDbOnlyMode) {
 			var delMids = {};
-			$.each(selected, function(_, row) { if (row._mid) delMids[row._mid] = true; });
+			$.each(selected, function(_, row) {
+				if (row._mid) delMids[row._mid] = true;
+				if (!row._manualRow) suppressedActualKeys[getActualSettleKey(row)] = true;
+			});
 			savedActualDbRows = $.grep(savedActualDbRows, function(r) { return !delMids[r._mid]; });
 			actualSettlementGridView.target.setData({ list: savedActualDbRows, page: { totalElements: savedActualDbRows.length } });
 			resizeSettlementSummaryGrid(actualSettlementGridView, 'actualSettlementGrid', savedActualDbRows.length);
@@ -2408,9 +2631,9 @@
 					var item = this.item;
 					var colKey = this.key;
 					if (!item) return;
-					if (colKey === 'firstAdvance' || colKey === 'currentAdvance' || colKey === 'usedAmt') {
+					if (colKey === 'firstAdvance' || colKey === 'currentAdvance' || colKey === 'usedAmt' || (item._manualRow && colKey === 'payMthdNm')) {
 						var payMthd = String(item.payMthdNm || '');
-						if (!payMthd || payMthd.indexOf('현금') > -1) {
+						if (item._manualRow || !payMthd || payMthd.indexOf('현금') > -1) {
 							item.afterSettle = pm51RoundFx(
 								getSettlementNumber(item.firstAdvance || 0)
 								+ getSettlementNumber(item.currentAdvance || 0)
@@ -2772,60 +2995,30 @@
 				afterSettle: 0
 			});
 		}
-		actualRows.sort(function(a, b) {
-			var payRank = function(value) { return String(value || '').indexOf('현금') > -1 ? 0 : 1; };
-			var roundRank = function(value) {
-				var index = $.inArray(String(value || ''), $.map(comboTripRptRound || [], function(item) { return item.NM; }));
-				return index < 0 ? 999 : index;
-			};
-			var currRank = function(value) {
-				var text = String(value || '').toUpperCase();
-				return text === 'CURR01' || text.indexOf('WON') > -1 || text.indexOf('KRW') > -1 || text.indexOf('원') > -1 ? 0 : 1;
-			};
-			return payRank(a.payMthdNm) - payRank(b.payMthdNm)
-				|| String(a.cardNo || '').localeCompare(String(b.cardNo || ''))
-				|| roundRank(a.roundNo) - roundRank(b.roundNo)
-				|| currRank(a.currNm) - currRank(b.currNm);
-		});
-		// 현전도금 이월/정산은 현금만 대상 (통화별 1차→...→최종 순서로 이전 정산후금액을 이월). 카드는 집계(사용금액)만 표시하고 이월·정산하지 않는다.
-		var cashBalances = {};
-		$.each(actualRows, function(idx, row) {
-			if (String(row.payMthdNm || '').indexOf('현금') < 0) {
-				row.firstAdvance = 0;
-				row.currentAdvance = 0;
-				row.afterSettle = 0;
-				return true;
-			}
-			var currencyKey = String(row.currNm || '').toUpperCase();
-			var balance = cashBalances[currencyKey];
-			if (balance === undefined) {
-				balance = row.firstAdvance || 0;
-				row.currentAdvance = 0;
-			} else {
-				row.firstAdvance = 0;
-				row.currentAdvance = balance;
-			}
-			row.afterSettle = (row.firstAdvance || 0) + (row.currentAdvance || 0) - row.usedAmt;
-			cashBalances[currencyKey] = row.afterSettle;
-		});
-		// 실비정산 수동 편집/추가/삭제 반영 (TB_PM52D06 저장건은 DB 저장행 유지)
+		applyActualCashCarry(sortActualSettleRows(actualRows));
+		// 실비정산 수동 편집/추가/삭제 반영 (TB_PM52D06 저장건: 자동행 사용금액만 선택 경비로 재집계, 지급완료·경비 미조회 시 DB 저장행 유지)
 		syncLiveActualGridToState();
 		if (actualDbOnlyMode) {
-			actualRows = savedActualDbRows.slice();
+			actualRows = (isRptPaid() || !actualExpenseLoaded) ? savedActualDbRows.slice() : mergeActualDbRowsWithAggregate(savedActualDbRows, actualRows);
 		} else {
 			actualRows = $.grep(actualRows, function(row) {
 				var key = getActualSettleKey(row);
 				row._origKey = key;
 				if (suppressedActualKeys[key]) return false;
 				if (savedActualByKey[key]) {
+					var aggUsedAmt = row.usedAmt;
 					$.extend(row, savedActualByKey[key]);
+					row.usedAmt = aggUsedAmt;
+					if (String(row.payMthdNm || '').indexOf('현금') > -1) {
+						row.afterSettle = pm51RoundFx(getSettlementNumber(row.firstAdvance || 0) + getSettlementNumber(row.currentAdvance || 0) - getSettlementNumber(row.usedAmt || 0));
+					}
 				}
 				return true;
 			});
-			actualRows = actualRows.concat(manualActualRows || []);
+			actualRows = placeAnchoredManualRows(actualRows, manualActualRows, function(row) { return row._origKey || getActualSettleKey(row); });
 		}
 		// 자동행 생성 후 수동행 append
-		dailyRows = dailyRows.concat(manualDailyRows || []);
+		dailyRows = placeAnchoredManualRows(dailyRows, manualDailyRows, function(row) { return getDailySettleKey(row.userId, row.userNm, row.currNm); });
 		// 초기 조회/재집계 시에도 차이 컬럼을 항상 선지급분 - 최종확정으로 보정
 		$.each(dailyRows, function(idx, row) {
 			row.dailyDiff = getSettlementNumber(row.dailyAdvance || 0) - getSettlementNumber(row.dailyFinal || 0);
@@ -3034,6 +3227,7 @@
 				}
 			});
 			calculateTripExpenseStatusKrw();
+			actualExpenseLoaded = true;
 			refreshSettlementSummaryGrids();
 			resizeTripExpenseStatusGrid(rows.length);
 			syncTripExpenseStatusHeaderCheckbox();
@@ -3090,40 +3284,21 @@
 
 	// 파일트리 초기화
 	function initFileTree() {
-		if (window.modalStack && modalStack.last() && modalStack.last().paramObj) {
-			modalStack.last().paramObj.gridObj = undefined;
-		}
-		var fileTrgtKey = $('#fileTrgtKey').val();
-		if (!fileTrgtKey) {
-			fileTrgtKey = 'PM51R_' + moment().format('YYYYMMDDHHmmss');
-			$('#fileTrgtKey').val(fileTrgtKey);
-		}
-
-		$('#fileList_area').empty();
-		var fileParam = {
+		var $popForm = $('#popForm');
+		window.pm51InitFileTree({
+			$form: $popForm,
 			fileTrgtTyp: 'PM5102P01',
-			fileTrgtKey: fileTrgtKey,
-			todoNo: $('#tripRptNo').val() || fileTrgtKey,
-			coCd: jwt.coCd || "",
-			userId: jwt.userId || "",
-			comonCd: 'FILETREE'
-		};
-		treeModule.initAll('deptTreeOrdars', 'file-grid', 'FILETREE', fileParam, 'fileList_area', jwt.coCd);
+			tempPrefix: 'PM51R_',
+			docNo: $popForm.find('#tripRptNo').val() || (currentTripRptMaster && currentTripRptMaster.tripRptNo) || '',
+			coCd: (currentTripRptMaster && currentTripRptMaster.coCd)
+				|| (currentTripReqMaster && currentTripReqMaster.coCd)
+				|| (popParam && popParam.coCd)
+				|| jwt.coCd || 'GUN'
+		});
 	}
 
 	function appendFileUploadData(formData) {
-		var fileUploadArr = [];
-		formData.append('comonCd', safeGetFileNodeId() || 'FILETREE');
-		$.each(treeModule.getFileArr(), function (idx, obj) {
-			if (obj.fileKey == 0) {
-				formData.append('files', obj.file);
-				var cloneObj = $.extend({}, obj);
-				cloneObj.file = '';
-				fileUploadArr.push(cloneObj);
-			}
-		});
-		formData.append('uploadFileArr', JSON.stringify(fileUploadArr));
-		formData.append('deleteFileArr', JSON.stringify(treeModule.getDeleteFileArr()));
+		return window.pm51AppendFileUploadData(formData, { getComonCd: safeGetFileNodeId });
 	}
 
 	// 결재선 그리드 정의
@@ -3227,26 +3402,22 @@
 		};
 	}
 
-	// PM52 전용 결재선 순서 재구성 관련 전역변수
-	var pm52ApplicantIsTeamMgr = false;
-	var pm52TeamMgrId = '';
-	var rptTeamMgrCacheKey = null;
-
+	// PM52 전용 결재선 순서 재구성 관련 전역변수는 상단 선언
 	// 복명서 관리(자금)결재선 고정 순서 ID 목록 (공통코드 CODE_ID='SPECRTS14'의 CODE_ETC, 콤마 구분 순서가 곧 결재 순번)
-	var rptMngFixedOrderUserIdsCache = null;
 	function getMngFixedOrderUserIds() {
-		if (rptMngFixedOrderUserIdsCache !== null) return rptMngFixedOrderUserIdsCache;
+		if (typeof window.pm51GetSpecrtsUserIds === 'function') {
+			return window.pm51GetSpecrtsUserIds('SPECRTS14');
+		}
 		var ids = [];
 		postAjaxSync("/admin/cm/cm05/selectChildCodeList", { codeId: 'SPECRTS14' }, null, function(data) {
 			var list = data.childCodeList || data.resultList || data.result || [];
 			$.each(list, function(idx, item) {
-				var codeEtc = item.codeEtc || '';
+				var codeEtc = item.codeEtc || item.CODE_ETC || '';
 				if (codeEtc) {
 					ids = ids.concat(codeEtc.replace(/\s/g, '').split(',').filter(function(v) { return !!v; }));
 				}
 			});
 		});
-		rptMngFixedOrderUserIdsCache = ids;
 		return ids;
 	}
 
@@ -3499,6 +3670,10 @@
 
 			var m01 = data.result.m01 || {};
 			currentTripReqMaster = m01;
+			// 신규 작성 시 출장신청서가 아직 회계 자금지급 확정(PAY_DT) 전이면 안내 후 작성 계속
+			if ($('#actionType').val() === 'C' && !$.trim(m01.payDt || '')) {
+				alert("출장신청서가 회계 자금지급 확정 전이므로 지급금액 확인이 불일치할 수 있습니다.");
+			}
 			var d01 = data.result.d01 || [];
 			var d02 = data.result.d02 || [];
 			currentReqExpItems = d02;
@@ -3511,6 +3686,7 @@
 			savedActualDbRows = [];
 			actualDbOnlyMode = false;
 			actualDbSeedRendered = false;
+			actualExpenseLoaded = false;
 			bindTripReqView(m01, d01);
 			if (popParam.actionType !== 'U') {
 				setApplicantDefaultApprovalLine(m01.userId || jwt.userId, m01.userNm || m01.userId || jwt.userNm);
@@ -4104,6 +4280,7 @@
 			savedActualByKey = {};
 			savedActualDbRows = [];
 			actualDbSeedRendered = false;
+			actualExpenseLoaded = false;
 			var rptActualList = data.result.rptActualList || [];
 			actualDbOnlyMode = rptActualList.length > 0;
 			$.each(rptActualList, function(idx, item) {
@@ -4202,7 +4379,7 @@
 			resizeAutoTextareas();
 
 			// 파일 및 결재선
-			$('#fileTrgtKey').val(m02.fileTrgtKey);
+			$('#popForm #fileTrgtKey').val(m02.fileTrgtKey || m02.tripRptNo || '');
 			initFileTree();
 
 			applyRptEditPolicy();
@@ -4347,27 +4524,43 @@
 		$('[data-ax5grid="rptTravelerGrid"]').removeClass('error-outline');
 	}
 
-	// 회계팀 자금담당자 판정 (SPECRTS15 기준)
-	var isUserAccountingAuthCached = null;
+	// 회계팀 자금담당자 판정 (SPECRTS15 기준 - 공용 pm51CheckAccountingAuth 위임)
 	function isAccountingUser() {
-		if (isUserAccountingAuthCached !== null) return isUserAccountingAuthCached;
-
+		if (typeof window.pm51CheckAccountingAuth === 'function') {
+			return window.pm51CheckAccountingAuth();
+		}
 		var auth = false;
-		postAjaxSync("/admin/cm/cm05/selectChildCodeList", { codeId: 'SPECRTS15' }, null, function(data) {
-			var list = data.childCodeList || data.resultList || data.result || [];
-			var allUserIds = [];
-			$.each(list, function(idx, item) {
-				var codeEtc = item.codeEtc || '';
-				if (codeEtc) {
-					var splitIds = codeEtc.replace(/\s/g, '').split(',');
-					allUserIds = allUserIds.concat(splitIds);
+		var loginId = String((typeof jwt !== 'undefined' && jwt && jwt.userId) || '').trim().toLowerCase();
+		if (!loginId) return false;
+		postAjaxSync("/admin/cm/cm05/selectCodeInfo", { codeId: 'SPECRTS15' }, null, function(data) {
+			var info = data && (data.codeInfo || data.result);
+			var codeEtc = (info && (info.codeEtc || info.CODE_ETC)) || '';
+			if (codeEtc) {
+				var splitIds = codeEtc.replace(/\s/g, '').split(',');
+				if ($.grep(splitIds, function(id) {
+					return String(id || '').trim().toLowerCase() === loginId;
+				}).length > 0) {
+					auth = true;
 				}
-			});
-			if ($.inArray(jwt.userId, allUserIds) > -1) {
-				auth = true;
 			}
 		});
-		isUserAccountingAuthCached = auth;
+		if (!auth) {
+			postAjaxSync("/admin/cm/cm05/selectChildCodeList", { codeId: 'SPECRTS15' }, null, function(data) {
+				var list = data.childCodeList || data.resultList || data.result || [];
+				var allUserIds = [];
+				$.each(list, function(idx, item) {
+					var codeEtc = item.codeEtc || item.CODE_ETC || '';
+					if (codeEtc) {
+						allUserIds = allUserIds.concat(codeEtc.replace(/\s/g, '').split(','));
+					}
+				});
+				if ($.grep(allUserIds, function(id) {
+					return String(id || '').trim().toLowerCase() === loginId;
+				}).length > 0) {
+					auth = true;
+				}
+			});
+		}
 		return auth;
 	}
 
@@ -5233,9 +5426,9 @@
 		formData.append('reqNm', applicantNm);
 		formData.append('loginUserId', jwt.userId); // 실제 작업 등록자
 		formData.append('loginUserNm', jwt.userNm);
-		formData.append('coCd', (reqApplicantInfo && reqApplicantInfo.coCd) || jwt.coCd);
+		formData.append('coCd', (reqApplicantInfo && reqApplicantInfo.coCd) || jwt.coCd || $('#popForm #coCd').val() || 'GUN');
 		formData.append('todoDiv2CodeId', 'TODODIV2200');
-		appendFileUploadData(formData);
+		if (appendFileUploadData(formData) === false) return;
 
 		var url = $('#actionType').val() === 'C' ? '/user/pm/pm51/insertTripRpt' : '/user/pm/pm51/updateTripRpt';
 
@@ -5609,7 +5802,8 @@
 
 		if (!confirm("삭제하시겠습니까?")) return;
 
-		postAjax("/user/pm/pm51/deleteTripRpt", { tripRptNo: tripRptNo }, null, function (data) {
+		// 백엔드 PM51Ctr.deleteTripRpt는 @PutMapping — POST 호출 시 405(Request method 'POST' not supported)
+		putAjax("/user/pm/pm51/deleteTripRpt", { tripRptNo: tripRptNo }, null, function (data) {
 			if (data.resultCode === 200) {
 				alert(data.resultMessage);
 				if (modalStack.last() && typeof modalStack.last().callback === 'function') {
@@ -5969,7 +6163,7 @@
 	function setFormDisabled(disabled) {
 		var $popForm = $('#popForm');
 		if (disabled) {
-			$popForm.find('input[type="text"], input[type="hidden"], select, textarea').prop('disabled', true);
+			$popForm.find('input[type="text"], select, textarea').prop('disabled', true);
 			$popForm.find('input[type="checkbox"], input[type="radio"]').addClass('readonly-check').css('pointer-events', 'none');
 		} else {
 			$popForm.find('input, select, textarea').prop('disabled', false);
@@ -5977,8 +6171,7 @@
 		}
 	}
 
-	// 순차결재 차단 상태 여부 (alertPm51SequentialPending에서 판정)
-	var pm51SequentialBlocked = false;
+	// 순차결재 차단 상태 여부 (pm51SequentialBlocked 상단 선언)
 
 	// 공통 fileTree.js 확장점: 순차상 본인 차례가 아니면 '결재처리' 버튼을 아예 생성하지 않도록 거부한다.
 	// 이 함수를 정의하지 않은 화면은 공통 모듈이 항상 생성하므로 타 화면에는 영향이 없다.
@@ -5991,19 +6184,19 @@
 		return !pm51SequentialBlocked;
 	};
 
-	// 순차결재상 본인 차례가 아니면 결재로 이어지는 버튼은 노출하지 않는다.
-	// 편집정책(applyRptEditPolicy)이 버튼을 다시 노출할 수 있으므로 정책 적용이 끝난 뒤 실행되도록 지연 처리한다.
+	// 순차결재상 본인 차례가 아니면 결재·지급완료로 이어지는 버튼은 노출하지 않는다.
 	function applyPm51SequentialBlock() {
 		if (!pm51SequentialBlocked) return;
-		setTimeout(function() {
-			$('#popForm').closest('.popup_area').find('#saveBtn').hide();
-			// 판정보다 먼저 생성된 버튼이 있으면 함께 정리한다(첨부파일 트리 로딩 순서에 따른 예외 대비).
-			$('.popup_bottom_btn').find('.callApprovalWorking').remove();
-		}, 0);
+		var $popArea = $('#popForm').closest('.popup_area');
+		$popArea.find('#saveBtn, #payBtn, #lineApproveBtn').hide();
+		// 판정보다 먼저 생성된 버튼이 있으면 함께 정리한다(첨부파일 트리 로딩 순서에 따른 예외 대비).
+		$popArea.find('.popup_bottom_btn .callApprovalWorking').remove();
+		if (typeof window.syncPm5102ApprovalButtons === 'function') {
+			window.syncPm5102ApprovalButtons();
+		}
 	}
 
 	function applyRptEditPolicy() {
-		applyPm51SequentialBlock();
 		var actionType = $('#actionType').val();
 		var applicantId = $('#reqViewReqId').val() || jwt.userId;
 		var isTeamManager = isApplicantTeamManager(applicantId);
@@ -6031,11 +6224,12 @@
 		}
 
 		var isApproverTeamManager = isCurrentApproverTeamManager(applicantId); // 결재자 팀장 여부
-		var isAccounting = isAccountingUser(); // 회계 담당자 여부
+		var financePolicy = getPm5102FinancePolicy();
+		var isAccounting = financePolicy.isAccounting; // 회계 담당자 여부
 		var applicant = isRptApplicant(); // 신청인 여부
 		var canEditApplicantArea = canEditRptApplicantArea();
-		// 회계담당자가 실제로 정산 확정(=지급완료 처리)을 진행할 수 있는 상태인지
-		var isAccountingActive = isAccounting && !isRptPaid();
+		// 회계담당자가 실제로 정산 편집/확정을 진행할 수 있는 상태인지
+		var isAccountingActive = financePolicy.canEditArea2;
 
 		// 결재 진입 상태 시 락 판정 (기본적으로 결재선 승인이 완료되었거나 회계 지급 완료된 경우 하드 락)
 		// 예외: 신청인 본인이고 아직 아무도 승인/지급하지 않았다면, 결재함 등 결재 진입 경로(isApprovalEntryMode)로
@@ -6056,10 +6250,9 @@
 			} else {
 				$popArea.find('#fileUpBtn').hide();
 			}
-			// 회계담당자 예외: locked 상태에서도 영역 2 활성화
+			// 회계담당자 예외: locked 상태에서도 영역 2(경비/카드/일비·실비 정산 그리드 포함) 활성화
 			if (isAccountingActive) {
 				setArea2Enabled(true);
-				$popArea.find('#saveBtn').show();
 			}
 		} else {
 			setFormDisabled(false);
@@ -6088,24 +6281,14 @@
 		// 버튼 초기화
 		$popArea.find('#lineApproveBtn, #financeSaveBtn, #payBtn').hide();
 
-		// 결재 버튼: 로그인 사용자가 결재선(일반/관리) 미결 결재자이면 노출 (PM5101P01 동일)
-		$popArea.find('#lineApproveBtn').toggle(isMyApprovalPending());
+		// 결재 버튼: 로그인 사용자가 결재선(일반/관리) 미결 결재자이고 순차차단이 아니면 노출 (PM5101P01 동일)
+		$popArea.find('#lineApproveBtn').toggle(financePolicy.canShowLineApproveBtn);
 
 		// 회계담당자(SPECRTS15) 분리 정책: 자금·정산 저장, 결재, 지급완료처리 완전 분리
 		if (isAccounting) {
 			$popArea.find('#saveBtn').hide();
-			if (!isRptPaid()) {
-				// 미지급 건이면 자금·정산 저장 언제든 가능
-				$popArea.find('#financeSaveBtn').show();
-				// 일반결재(신청부서)가 모두 완료된 건에 한하여 정산저장+지급완료 버튼 노출
-				if (isRptGeneralApprovalFullyDone()) {
-					$popArea.find('#payBtn').show();
-				} else {
-					$popArea.find('#payBtn').hide();
-				}
-			} else {
-				$popArea.find('#financeSaveBtn, #payBtn').hide();
-			}
+			$popArea.find('#financeSaveBtn').toggle(financePolicy.canShowFinanceSaveBtn);
+			$popArea.find('#payBtn').toggle(financePolicy.canShowPayBtn);
 		} else {
 			$popArea.find('#saveBtn').text('저장');
 		}
@@ -6113,18 +6296,24 @@
 		// PAY 모드(목록 등에서 지급처리 진입) 전용 정책
 		if (popParam && popParam.actionType === 'PAY') {
 			setFormDisabled(true);
-			setArea2Enabled(true);
-			$popArea.find('#saveBtn').hide();
-			if (!isRptPaid()) {
-				$popArea.find('#financeSaveBtn').show();
-				if (isRptGeneralApprovalFullyDone()) {
-					$popArea.find('#payBtn').show();
-				}
+			$popArea.find('#saveBtn, #deleteBtn').hide();
+			$popArea.find('.add_btn_small a').hide();
+			setRptGridEditable(false);
+			if (financePolicy.canEditArea2) {
+				setArea2Enabled(true);
+				$popArea.find('#financeSaveBtn').toggle(financePolicy.canShowFinanceSaveBtn);
+				$popArea.find('#payBtn').toggle(financePolicy.canShowPayBtn);
+				$('#popTitle').text('출장복명서 수정 [지급처리]');
+			} else {
+				setArea2Disabled(true);
+				$popArea.find('#financeSaveBtn, #payBtn').hide();
+				$('#popTitle').text('출장복명서 [조회]');
 			}
-			if (isMyApprovalPending()) {
-				$popArea.find('#lineApproveBtn').show();
+			$popArea.find('#lineApproveBtn').toggle(financePolicy.canShowLineApproveBtn);
+			applyPm51SequentialBlock();
+			if (typeof window.syncPm5102ApprovalButtons === 'function') {
+				window.syncPm5102ApprovalButtons();
 			}
-			$('#popTitle').text('출장복명서 수정 [지급처리]');
 			refreshRptProjectTripCondSelectState();
 			return;
 		}
@@ -6164,6 +6353,10 @@
 		} else {
 			$popArea.find('#printBtn').hide();
 		}
+		applyPm51SequentialBlock();
+		if (typeof window.syncPm5102ApprovalButtons === 'function') {
+			window.syncPm5102ApprovalButtons();
+		}
 		refreshRptProjectTripCondSelectState();
 	}
 
@@ -6186,13 +6379,15 @@
 	// 영역 2 (회계팀 자금담당자 영역) 요소 활성화/비활성화
 	function setArea2Enabled(enabled) {
 		if (enabled) {
-			$('#tripExpenseStatusArea').find('.add_btn_small').show();
-			// locked 분기에서 '.add_btn_small a'가 개별로 숨겨지므로, 카드사 명세 버튼은 a까지 함께 되살린다
+			// locked 분기에서 '.add_btn_small a'가 개별로 숨겨지므로 경비내역 반영·카드사 명세·일비/실비정산 모두 a까지 함께 되살린다
+			$('#tripExpenseStatusArea').find('.add_btn_small, .add_btn_small a').show();
 			$('#rptCardArea').find('.add_btn_small, .add_btn_small a').show();
 			// 일비정산·실비정산 버튼도 함께 되살린다
 			$('#dailySettleBtnArea, #dailySettleBtnArea a').show();
 			$('#actualSettleBtnArea, #actualSettleBtnArea a').show();
-			// 그리드 편집 가능 여부는 각 컬럼의 editor.disabled(isAccountingUser/isRptPaid 기준)가 실시간으로 반영
+			// locked 분기의 setRptGridEditable(false)로 잠긴 그리드 편집 옵션을 되살린다
+			// (비자금 컬럼은 각 컬럼 editor.disabled 콜백이 계속 잠금 유지)
+			setRptGridEditable(true);
 			$('#advRcvAmtKrw, #advRcvAmtUsd, #advRcvAmtUsd2, #acctEatCnt').prop('disabled', false);
 			$('#acctNightCnt, #acctDayCnt').prop('disabled', false).prop('readonly', true).css('background', '#fafafa');
 			$('[data-ax5grid="tripExpenseStatusGrid"]').removeClass('readonly-grid-selector');
@@ -6205,7 +6400,7 @@
 
 	function setArea2Disabled(disabled) {
 		if (disabled) {
-			$('#tripExpenseStatusArea').find('.add_btn_small').hide();
+			$('#tripExpenseStatusArea').find('.add_btn_small, .add_btn_small a').hide();
 			$('#rptCardArea').find('.add_btn_small, .add_btn_small a').hide();
 			// 일비정산·실비정산 버튼도 함께 숨긴다
 			$('#dailySettleBtnArea, #dailySettleBtnArea a').hide();
@@ -6242,8 +6437,7 @@
 		return getComboName(comboCurrCd, value) || value;
 	}
 
-	// 복명서 기준 통화단위 (우측 정산표 입력 차단 판정용)
-	var rptCurrUnit = 'USD';
+	// 복명서 기준 통화단위 (rptCurrUnit 상단 선언)
 
 	function updateRptCurrCdLabel(currCd) {
 		rptCurrUnit = getCurrUnitLabel(currCd);
@@ -6314,18 +6508,28 @@
 
 		var myReqRow = null;
 		var myMngRow = null;
+		var loginUserId = String(jwt.userId || '').trim().toLowerCase();
 		$.each(reqRows, function(idx, row) {
-			if (row.todoId === jwt.userId) { myReqRow = row; return false; }
+			if (String(row.todoId || '').trim().toLowerCase() === loginUserId) { myReqRow = row; return false; }
 		});
 		$.each(mngRows, function(idx, row) {
-			if (row.todoId === jwt.userId) { myMngRow = row; return false; }
+			if (String(row.todoId || '').trim().toLowerCase() === loginUserId) { myMngRow = row; return false; }
 		});
+
+		var isRejected = false;
+		$.each(reqRows.concat(mngRows), function(idx, row) {
+			if (row.apprRejectYn === 'Y' || row.APPR_REJECT_YN === 'Y' || row.sanctnSttusNm === '반려') {
+				isRejected = true;
+				return false;
+			}
+		});
+		if (isRejected) return;
 
 		// 본인의 미결 결재행 기준으로 판정 (신청부서 우선)
 		var isMngApprover = false;
-		if (myReqRow && myReqRow.sanctnSttus !== 'Y') {
+		if (myReqRow && String(myReqRow.sanctnSttus || '').trim().toUpperCase() !== 'Y') {
 			isMngApprover = false;
-		} else if (myMngRow && myMngRow.sanctnSttus !== 'Y') {
+		} else if (myMngRow && String(myMngRow.sanctnSttus || '').trim().toUpperCase() !== 'Y') {
 			isMngApprover = true;
 		} else {
 			return;	// 결재 대상이 아니거나 본인 결재가 이미 완료된 경우
@@ -6484,10 +6688,8 @@
 	}
 
 	/*
-	#	KAKAO 알림톡 발송 (저장 시 결재요청) - PM5001P01/CR1003P01 예제 패턴
+	#	KAKAO 알림톡 발송 (저장 시 결재요청) - PM5001P01/CR1003P01 예제 패턴 (kakaoCnt/kakaoErr 상단 선언)
 	*/
-	var kakaoCnt = 0;
-	var kakaoErr = [];
 
 	// 저장(insertTripRpt/updateTripRpt) 시 서버가 1번 결재자=제출자 본인이면 자동으로 자체승인 처리하는데,
 	// 화면에 남아있는 결재선 데이터는 이 처리 결과를 아직 반영하지 못한다. 공유 알림이 결재 완료 여부를 정확히 판단할 수 있도록
@@ -6816,6 +7018,20 @@
 		} else {
 			$('#fileUpBtn').hide();
 		}
+	}
+
+	// 첨부파일만 저장 (수정 불가 상태나 결재/지급 완료 상태에서도 별도 처리 가능하도록 보장)
+	function saveFileOnlyPM5102() {
+		window.pm51SaveFileOnly({
+			$form: $('#popForm'),
+			docNo: $('#popForm #tripRptNo').val() || $('#popForm #fileTrgtKey').val(),
+			emptyDocMsg: '출장복명서 번호가 없습니다.',
+			defaultPgmId: 'PM5102P01',
+			getComonCd: safeGetFileNodeId,
+			onSuccess: function () {
+				initFileTree();
+			}
+		});
 	}
 
 	// 프로젝트 그리드 컬럼 설정 재적용 (TRN 판정에 따라 외주계약 컬럼 표시/숨김)

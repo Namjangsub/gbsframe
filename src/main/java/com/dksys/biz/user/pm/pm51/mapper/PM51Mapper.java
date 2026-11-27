@@ -152,6 +152,8 @@ public interface PM51Mapper {
 
 	int selectTripRptExists(Map<String, String> paramMap);
 
+	int selectTripRptPaidExists(Map<String, String> paramMap);
+
 	List<Map<String, Object>> selectTripExpenseStatusList(Map<String, Object> paramMap);
 
 	List<Map<String, Object>> selectTripExpenseOccupiedByOther(Map<String, Object> paramMap);

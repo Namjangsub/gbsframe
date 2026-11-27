@@ -47,6 +47,7 @@
 <script src="/static/js/jquery.blockUI.js"></script>
 <script src="/static/js/manualPopup.js"></script>
 <script src="/static/js/common/GridColumnConfig.js"></script>
+<script src="/static/js/pm51TravelExpense.js?v=20261127_6"></script>
 	<!-- 공통결재 -->
 	<script src="/static/js/commApproval.js"></script>
 	<!-- 도움말 팝업 -->
@@ -497,7 +498,12 @@
 
 		var row = selectedRows[0];
 
-		if (row.appDoneCnt > 0) {
+		// 팝업(PM5102P01) 삭제 기준과 동일: 신청자 본인 결재는 제외하고 타인 결재 진행/완료 또는 지급완료 시 차단
+		if (row.payDt) {
+			alert("지급완료 처리된 복명서는 삭제할 수 없습니다.");
+			return;
+		}
+		if (Number(row.appOtherDoneCnt || 0) > 0) {
 			alert("결재처리가 이미 진행중이거나 완료된 복명서는 삭제할 수 없습니다.");
 			return;
 		}
@@ -520,20 +526,24 @@
 		});
 	}
 
-	// 회계담당자 판정 (공통코드 SPECRTS15 등록 여부 기준 - PM5102P01.html의 isAccountingUser()와 동일 로직)
+	// 회계담당자 판정 (공통코드 SPECRTS15 등록 여부 기준 - 공용 pm51CheckAccountingAuth 위임)
 	function isAccountingUserM01() {
+		if (typeof window.pm51CheckAccountingAuth === 'function') {
+			return window.pm51CheckAccountingAuth();
+		}
 		var auth = false;
-		postAjaxSync("/admin/cm/cm05/selectChildCodeList", { codeId: 'SPECRTS15' }, null, function(data) {
-			var list = data.childCodeList || data.resultList || data.result || [];
-			var allUserIds = [];
-			$.each(list, function(idx, item) {
-				var codeEtc = item.codeEtc || '';
-				if (codeEtc) {
-					allUserIds = allUserIds.concat(codeEtc.replace(/\s/g, '').split(','));
+		var loginId = String((typeof jwt !== 'undefined' && jwt && jwt.userId) || '').trim().toLowerCase();
+		if (!loginId) return false;
+		postAjaxSync("/admin/cm/cm05/selectCodeInfo", { codeId: 'SPECRTS15' }, null, function(data) {
+			var info = data && (data.codeInfo || data.result);
+			var codeEtc = (info && (info.codeEtc || info.CODE_ETC)) || '';
+			if (codeEtc) {
+				var splitIds = codeEtc.replace(/\s/g, '').split(',');
+				if ($.grep(splitIds, function(id) {
+					return String(id || '').trim().toLowerCase() === loginId;
+				}).length > 0) {
+					auth = true;
 				}
-			});
-			if ($.inArray(jwt.userId, allUserIds) > -1) {
-				auth = true;
 			}
 		});
 		return auth;
