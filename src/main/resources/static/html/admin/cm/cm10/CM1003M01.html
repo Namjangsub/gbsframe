@@ -1195,10 +1195,10 @@ body {
 				<span class="eto-ctrl-label"><i class="fa fa-filter"></i> 기준 프로젝트:</span>
 				<div class="eto-rich-select" id="etoProjectRichSelect" data-target-select="#etoProjectSelect" style="flex: 1.2 1 220px; min-width: 210px; max-width: 390px;">
 					<select id="etoProjectSelect" class="form-control input-sm" onchange="onEtoProjectChange(this.value)" style="display: none;">
-						<option value="">수주 프로젝트를 불러오는 중...</option>
+						<option value="">선택</option>
 					</select>
 					<button type="button" class="eto-rich-trigger" aria-haspopup="listbox" aria-expanded="false">
-						<span class="eto-rich-label">수주 프로젝트를 불러오는 중...</span>
+						<span class="eto-rich-label">선택</span>
 						<span class="eto-rich-badges"></span>
 						<i class="fa fa-caret-down" style="color: #64748b; flex-shrink: 0;"></i>
 					</button>
@@ -2509,9 +2509,10 @@ body {
 			}
 
 			$sel.empty();
+			$sel.append($('<option></option>').val('').text('선택').data('baseText', '선택'));
 			if (list.length === 0) {
 				projectSummaryBatchSeq++;
-				$sel.append('<option value="">조회 가능한 수주 프로젝트가 없습니다.</option>');
+				$sel.val('');
 				syncSelectControlColor($sel);
 				clearEtoProjectInfo();
 				$('#etoSalesCdSelect').empty().append('<option value="">전체 설비 (프로젝트 기준)</option>');
@@ -2519,7 +2520,7 @@ body {
 				return;
 			}
 
-			// URL 파라미터/세션 스토리지에서 이전 선택 복원 시도
+			// URL 파라미터/세션 스토리지에서 이전 선택 복원 시도 (미선택 시 기본 "선택" 유지)
 			var lastKey = sessionStorage.getItem('lastSelectedOrdrsKey');
 			var lastSalesCd = sessionStorage.getItem('lastSelectedSalesCd') || "";
 			var selectedIdx = 0;
@@ -2548,18 +2549,23 @@ body {
 				}
 				if (preferredOrdrsNo && String(item.ordrsNo) === String(preferredOrdrsNo)) {
 					if (preferredHistNo !== undefined && preferredHistNo !== null && preferredHistNo !== '' && String(item.histNo) === String(preferredHistNo)) {
-						selectedIdx = idx;
+						selectedIdx = idx + 1;
 						matchPriority = 3;
 					} else if (matchPriority < 2) {
-						selectedIdx = idx;
+						selectedIdx = idx + 1;
 						matchPriority = 2;
 					}
 				} else if (matchPriority < 1 && lastKey && lastKey === key) {
-					selectedIdx = idx;
+					selectedIdx = idx + 1;
 					matchPriority = 1;
 				}
 				$sel.append($opt);
 			});
+
+			// 키워드 직접 검색 시에는 첫 번째 검색 결과 자동 선택, 일반 로드는 미선택("선택") 유지
+			if (selectedIdx === 0 && searchValue && list.length > 0) {
+				selectedIdx = 1;
+			}
 
 			$sel.prop('selectedIndex', selectedIdx);
 			syncSelectControlColor($sel);
@@ -2570,6 +2576,10 @@ body {
 					restoreSalesCd = (lastKey === selVal) ? lastSalesCd : "";
 				}
 				onEtoProjectChange(selVal, restoreSalesCd);
+			} else {
+				clearEtoProjectInfo();
+				$('#etoSalesCdSelect').empty().append('<option value="">전체 설비 (프로젝트 기준)</option>');
+				syncSelectControlColor($('#etoSalesCdSelect'));
 			}
 			preloadAllProjectDropdownSummaries(list, selVal);
 		});
@@ -2595,7 +2605,13 @@ body {
 			sessionStorage.removeItem('etoPinnedSearchKeyword');
 			sessionStorage.removeItem('lastSelectedOrdrsKey');
 			sessionStorage.removeItem('lastSelectedSalesCd');
+			sessionStorage.removeItem('GBS:taskFlowContext');
+			var userIdKey = 'lastSelectedOrdrsKey_' + ((typeof jwt !== 'undefined' && jwt && jwt.userId) ? jwt.userId : 'USER');
+			localStorage.removeItem(userIdKey);
 		} catch (e) {}
+		if (typeof clearFlowContext === 'function') {
+			clearFlowContext();
+		}
 		initEtoSearchFilters();
 		loadEtoProjectList("", "", false, false);
 	}
@@ -2625,7 +2641,25 @@ body {
 
 	// 수주 프로젝트 변경 시 요약 바 및 설비(SalesCd) 목록 갱신
 	function onEtoProjectChange(val, targetSalesCd) {
-		if (!val) return;
+		if (!val) {
+			salesDropdownLoadSeq++;
+			try {
+				sessionStorage.removeItem('lastSelectedOrdrsKey');
+				sessionStorage.removeItem('lastSelectedSalesCd');
+				sessionStorage.removeItem('etoPinnedSearchKeyword');
+				sessionStorage.removeItem('GBS:taskFlowContext');
+				var userIdKey = 'lastSelectedOrdrsKey_' + ((typeof jwt !== 'undefined' && jwt && jwt.userId) ? jwt.userId : 'USER');
+				localStorage.removeItem(userIdKey);
+			} catch (e) {}
+			if (typeof clearFlowContext === 'function') {
+				clearFlowContext();
+			}
+			syncSelectControlColor($('#etoProjectSelect'));
+			clearEtoProjectInfo();
+			$('#etoSalesCdSelect').empty().append('<option value="">전체 설비 (프로젝트 기준)</option>');
+			syncSelectControlColor($('#etoSalesCdSelect'));
+			return;
+		}
 		var tokens = val.split('|');
 		var ordrsNo = tokens[0];
 		var histNo = tokens[1];
