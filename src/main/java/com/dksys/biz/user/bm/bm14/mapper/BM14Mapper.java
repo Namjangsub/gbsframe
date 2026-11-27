@@ -23,6 +23,8 @@ public interface BM14Mapper {
 	int insertBomTree(Map<String, String> paramMap);
 
 	int updateBom(Map<String, String> paramMap);
+
+	int updateChildUpperCd(Map<String, String> paramMap);
 	
 	int moveBom(Map<String, String> paramMap);
 	

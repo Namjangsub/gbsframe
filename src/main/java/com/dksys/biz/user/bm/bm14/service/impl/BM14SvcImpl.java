@@ -96,6 +96,9 @@ public class BM14SvcImpl implements BM14Svc {
 					} else if ("U".equals(updChk)) {
 						if (bm14Mapper.selectPchsBomCheck(dtl) == 0) {
 							result += bm14Mapper.updateBom(dtl);
+							if (dtl.get("lowerCd") != null && !dtl.get("lowerCd").isEmpty()) {
+								bm14Mapper.updateChildUpperCd(dtl);
+							}
 						} else {
 							//error 구매BOM 작업완료 수정 불가
 							throw new IllegalArgumentException("구매BOM 작업완료 수정 불가");
