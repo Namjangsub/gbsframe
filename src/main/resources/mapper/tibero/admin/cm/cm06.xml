@@ -602,6 +602,9 @@
 		<result property="workRptS" column="WORK_RPT_S" jdbcType="VARCHAR"/>
 		<result property="workHolyNm" column="WORK_HOLY_NM" jdbcType="VARCHAR"/>
 		<result property="workRptRmk" column="WORK_RPT_RMK" jdbcType="VARCHAR"/>
+		<result property="tripYn" column="TRIP_YN" jdbcType="VARCHAR"/>
+		<result property="tripPlace" column="TRIP_PLACE" jdbcType="VARCHAR"/>
+		<result property="tripPeriod" column="TRIP_PERIOD" jdbcType="VARCHAR"/>
 		<result property="loaCd" column="LOA_CD" jdbcType="VARCHAR"/>
 		<result property="loaNm" column="LOA_NM" jdbcType="VARCHAR"/>
 		<result property="userImg" column="USER_IMG" jdbcType="BLOB" javaType="byte[]"/>
@@ -620,22 +623,41 @@
 	),
 	WORK_HOLY AS 
 	(
-			SELECT WORK_RPT_ID, MIN(WORK_RPT_S) AS WORK_RPT_S, MIN(WORK_RPT_RMK) AS WORK_RPT_RMK
+			SELECT WORK_RPT_ID,
+				   MIN(WORK_RPT_S) AS WORK_RPT_S,
+				   MIN(WORK_RPT_RMK) AS WORK_RPT_RMK,
+				   MAX(TRIP_YN) AS TRIP_YN,
+				   MIN(TRIP_PLACE) AS TRIP_PLACE,
+				   MIN(TRIP_PERIOD) AS TRIP_PERIOD
 			  FROM (
 					SELECT REQ_ID AS WORK_RPT_ID,
 						   VAC_TYPE_CD AS WORK_RPT_S,
-						   REQ_RMK AS WORK_RPT_RMK
+						   REQ_RMK AS WORK_RPT_RMK,
+						   'N' AS TRIP_YN,
+						   NULL AS TRIP_PLACE,
+						   NULL AS TRIP_PERIOD
 					  FROM TB_PM07M01
 					 WHERE ST_DT &lt;= TO_CHAR(SYSDATE, 'YYYYMMDD')
 					   AND ED_DT &gt;= TO_CHAR(SYSDATE, 'YYYYMMDD')
 					UNION ALL
 					SELECT D.USER_ID AS WORK_RPT_ID,
 						   M.TRIP_DIV AS WORK_RPT_S,
-						   NVL(M.TRIP_PLACE, M.TRIP_PURPOSE) AS WORK_RPT_RMK
+						   NVL(M.TRIP_PLACE, M.TRIP_PURPOSE) AS WORK_RPT_RMK,
+						   'Y' AS TRIP_YN,
+						   CASE WHEN M.TRIP_NATION_NM IS NOT NULL AND M.TRIP_PLACE IS NOT NULL AND INSTR(M.TRIP_PLACE, M.TRIP_NATION_NM) = 0
+						        THEN M.TRIP_NATION_NM || ' ' || M.TRIP_PLACE
+						        ELSE NVL(M.TRIP_PLACE, NVL(M.TRIP_NATION_NM, FN_CM05M01_CD_TO_NM(M.TRIP_AREA_DIV)))
+						   END AS TRIP_PLACE,
+						   SUBSTR(REPLACE(NVL(D.TRIP_ST_DTM, M.TRIP_ST_DTM), '-', ''), 1, 4) || '-' ||
+						   SUBSTR(REPLACE(NVL(D.TRIP_ST_DTM, M.TRIP_ST_DTM), '-', ''), 5, 2) || '-' ||
+						   SUBSTR(REPLACE(NVL(D.TRIP_ST_DTM, M.TRIP_ST_DTM), '-', ''), 7, 2) || ' ~ ' ||
+						   SUBSTR(REPLACE(NVL(D.TRIP_ED_DTM, M.TRIP_ED_DTM), '-', ''), 1, 4) || '-' ||
+						   SUBSTR(REPLACE(NVL(D.TRIP_ED_DTM, M.TRIP_ED_DTM), '-', ''), 5, 2) || '-' ||
+						   SUBSTR(REPLACE(NVL(D.TRIP_ED_DTM, M.TRIP_ED_DTM), '-', ''), 7, 2) AS TRIP_PERIOD
 					  FROM TB_PM51D01 D
 					 INNER JOIN TB_PM51M01 M ON D.TRIP_REQ_NO = M.TRIP_REQ_NO
-					 WHERE SUBSTR(NVL(D.TRIP_ST_DTM, M.TRIP_ST_DTM), 1, 8) &lt;= TO_CHAR(SYSDATE, 'YYYYMMDD')
-					   AND SUBSTR(NVL(D.TRIP_ED_DTM, M.TRIP_ED_DTM), 1, 8) &gt;= TO_CHAR(SYSDATE, 'YYYYMMDD')
+					 WHERE SUBSTR(REPLACE(NVL(D.TRIP_ST_DTM, M.TRIP_ST_DTM), '-', ''), 1, 8) &lt;= TO_CHAR(SYSDATE, 'YYYYMMDD')
+					   AND SUBSTR(REPLACE(NVL(D.TRIP_ED_DTM, M.TRIP_ED_DTM), '-', ''), 1, 8) &gt;= TO_CHAR(SYSDATE, 'YYYYMMDD')
 			  ) T
 			 GROUP BY WORK_RPT_ID
 	) 
@@ -660,6 +682,9 @@
 			WORK_RPT_S,
 			FN_CM05M01_CD_TO_NM(WORK_RPT_S) AS WORK_HOLY_NM,
 			WORK_RPT_RMK,
+			G.TRIP_YN,
+			G.TRIP_PLACE,
+			G.TRIP_PERIOD,
 			ST.LOA_CD,
 			FN_CM05M01_CD_TO_NM(ST.LOA_CD)   AS LOA_NM,
 	        A.USER_IMG,
