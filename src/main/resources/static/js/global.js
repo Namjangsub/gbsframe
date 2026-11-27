@@ -5623,8 +5623,18 @@ function setFlowContext(ordrsNo, histNo, clntNm, coCd) {
 	updateTopFlowBarUI(ctx);
 }
 
+function clearFlowContext() {
+	try {
+		sessionStorage.removeItem('GBS_FLOW_CONTEXT');
+	} catch (e) {}
+	try {
+		localStorage.removeItem(getFlowStorageKey());
+	} catch (e) {}
+	updateTopFlowBarUI(null);
+}
+
 function updateTopFlowBarUI(ctx) {
-	ctx = ctx || getFlowContext();
+	ctx = (ctx === undefined) ? getFlowContext() : ctx;
 	var $bar = $('#topProcessFlowBar');
 	if (!$bar.length) return;
 	$bar.css('display', 'inline-flex');
@@ -5633,9 +5643,11 @@ function updateTopFlowBarUI(ctx) {
 		var fullText = shortText + (ctx.clntNm ? ' (' + ctx.clntNm + ')' : '');
 		$('#topFlowPjtLabel').text(shortText);
 		$('#topFlowPjtText').attr('title', fullText + ' [클릭 시 전체 ETO 맵 열기]');
+		$('#topFlowPjtClearBtn').css('display', 'inline-flex');
 	} else {
-		$('#topFlowPjtLabel').text('PJT 미선택');
-		$('#topFlowPjtText').attr('title', '프로젝트 미선택 [클릭 시 전체 ETO 맵 열기]');
+		$('#topFlowPjtLabel').text('선택');
+		$('#topFlowPjtText').attr('title', '프로젝트 선택 [클릭 시 전체 ETO 맵 열기]');
+		$('#topFlowPjtClearBtn').css('display', 'none');
 	}
 	var curPgm = getCurrentFlowPgmId();
 	if (curPgm) {
@@ -5675,9 +5687,12 @@ function initTopFlowBar() {
 			if (evt.newValue) {
 				sessionStorage.setItem('GBS_FLOW_CONTEXT', evt.newValue);
 				nextCtx = JSON.parse(evt.newValue);
+			} else {
+				sessionStorage.removeItem('GBS_FLOW_CONTEXT');
+				nextCtx = null;
 			}
 		} catch (err) {}
-		updateTopFlowBarUI(nextCtx || getFlowContext());
+		updateTopFlowBarUI(nextCtx);
 	});
 }
 

@@ -1392,10 +1392,10 @@ body {
 				<span class="eto-ctrl-label"><i class="fa fa-building"></i> 기준 고객사:</span>
 				<div class="eto-rich-select" id="etoCustomerRichSelect" data-target-select="#etoCustomerSelect" style="flex: 1 1 200px; min-width: 190px; max-width: 380px;">
 					<select id="etoCustomerSelect" class="form-control input-sm" onchange="onCustomerSelectChange(this.value)" style="display: none;">
-						<option value="">고객사 목록을 불러오는 중...</option>
+						<option value="">선택</option>
 					</select>
 					<button type="button" class="eto-rich-trigger" aria-haspopup="listbox" aria-expanded="false">
-						<span class="eto-rich-label">고객사 목록을 불러오는 중...</span>
+						<span class="eto-rich-label">선택</span>
 						<span class="eto-rich-badges"></span>
 						<i class="fa fa-caret-down" style="color: #64748b; flex-shrink: 0;"></i>
 					</button>
@@ -2488,8 +2488,9 @@ body {
 			updateCustomerFilterCounts(list);
 
 			$sel.empty();
+			$sel.append($('<option></option>').val('').text('선택'));
 			if (list.length === 0) {
-				$sel.append('<option value="">조회 가능한 고객사가 없습니다.</option>');
+				$sel.val('');
 				renderCustomerRichDropdown();
 				$('#customerCardGrid').html('<div style="padding:20px; color:#6b7280; font-size:12px;">조건에 해당하는 고객사가 없습니다.</div>');
 				$('#customerBoardCountText').text('(0개 고객사)');
@@ -2507,18 +2508,30 @@ body {
 				var meta = buildCustomerBadgeMeta(item);
 				var $opt = $('<option></option>').val(key).text(meta.baseText).data('item', item).data('badgeMeta', meta);
 				if (targetClntCd && item.ordrsClntCd === targetClntCd) {
-					selectedIdx = idx;
+					selectedIdx = idx + 1;
 				} else if (!targetClntCd && !searchValue && lastClntKey && lastClntKey === key) {
-					selectedIdx = idx;
+					selectedIdx = idx + 1;
 				}
 				$sel.append($opt);
 			});
+
+			// 키워드 직접 검색 시에는 첫 번째 검색 결과 자동 선택, 일반 로드는 미선택("선택") 유지
+			if (selectedIdx === 0 && searchValue && list.length > 0) {
+				selectedIdx = 1;
+			}
 
 			$sel.prop('selectedIndex', selectedIdx);
 			renderCustomerRichDropdown();
 			renderCustomerCardBoard();
 			var selVal = $sel.val();
-			onCustomerSelectChange(selVal);
+			if (selVal) {
+				onCustomerSelectChange(selVal);
+			} else {
+				$('.customer-card').removeClass('is-selected');
+				$('#customerOrderSection').hide();
+				clearCustomerContextInfo();
+				clearWbsScheduleIndicators();
+			}
 			preloadCustomerSummaryBatches(list, selVal);
 		});
 	}
@@ -2667,6 +2680,18 @@ body {
 	function resetCustomerSearch() {
 		customerSummaryCache = {};
 		wbIssueCache = {};
+		try {
+			sessionStorage.removeItem('lastSelectedClntKey');
+			sessionStorage.removeItem('lastSelectedOrdrsKey');
+			sessionStorage.removeItem('lastSelectedSalesCd');
+			sessionStorage.removeItem('etoPinnedSearchKeyword');
+			sessionStorage.removeItem('GBS:taskFlowContext');
+			var userIdKey = 'lastSelectedOrdrsKey_' + ((typeof jwt !== 'undefined' && jwt && jwt.userId) ? jwt.userId : 'USER');
+			localStorage.removeItem(userIdKey);
+		} catch (e) {}
+		if (typeof clearFlowContext === 'function') {
+			clearFlowContext();
+		}
 		clearCustomerContextInfo();
 		$('#customerSearchInput').val('');
 		initCustomerSearchFilters();
@@ -2675,7 +2700,26 @@ body {
 	}
 
 	function onCustomerSelectChange(val) {
-		if (!val) return;
+		if (!val) {
+			try {
+				sessionStorage.removeItem('lastSelectedClntKey');
+				sessionStorage.removeItem('lastSelectedOrdrsKey');
+				sessionStorage.removeItem('lastSelectedSalesCd');
+				sessionStorage.removeItem('etoPinnedSearchKeyword');
+				sessionStorage.removeItem('GBS:taskFlowContext');
+				var userIdKey = 'lastSelectedOrdrsKey_' + ((typeof jwt !== 'undefined' && jwt && jwt.userId) ? jwt.userId : 'USER');
+				localStorage.removeItem(userIdKey);
+			} catch (e) {}
+			if (typeof clearFlowContext === 'function') {
+				clearFlowContext();
+			}
+			renderCustomerRichDropdown();
+			$('.customer-card').removeClass('is-selected');
+			$('#customerOrderSection').hide();
+			clearCustomerContextInfo();
+			clearWbsScheduleIndicators();
+			return;
+		}
 		var tokens = val.split('|');
 		var ordrsClntCd = tokens[0];
 		var coCd = tokens[1] || getSelectedEtoCoCd();

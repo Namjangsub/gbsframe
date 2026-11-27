@@ -39,10 +39,10 @@ function getTaskFlowWidgetTemplateHtml() {
 		+ '			<span class="tf-ctrl-label"><i class="fa fa-filter"></i> 기준 프로젝트:</span>'
 		+ '			<div class="eto-rich-select" id="taskFlowProjectRichSelect" data-target-select="#taskFlowProjectSelect" style="width: 390px; max-width: 100%;">'
 		+ '				<select id="taskFlowProjectSelect" class="form-control input-sm" onchange="onTaskFlowProjectChange(this.value)" style="display: none;">'
-		+ '					<option value="">수주 프로젝트를 불러오는 중...</option>'
+		+ '					<option value="">선택</option>'
 		+ '				</select>'
 		+ '				<button type="button" class="eto-rich-trigger" aria-haspopup="listbox" aria-expanded="false">'
-		+ '					<span class="eto-rich-label">수주 프로젝트를 불러오는 중...</span>'
+		+ '					<span class="eto-rich-label">선택</span>'
 		+ '					<span class="eto-rich-badges"></span>'
 		+ '					<i class="fa fa-caret-down" style="color: #64748b; flex-shrink: 0;"></i>'
 		+ '				</button>'
@@ -432,21 +432,22 @@ function loadTaskFlowProjectList() {
 		var list = (data && data.resultList) ? data.resultList : [];
 		var $sel = $('#taskFlowProjectSelect');
 		$sel.empty();
+		$sel.append($('<option></option>').val('').text('선택').data('baseText', '선택'));
 
 		if (list.length === 0) {
-			$sel.append('<option value="">조회 가능한 수주 프로젝트가 없습니다.</option>');
+			$sel.val('');
 			renderTaskFlowRichDropdown($sel);
 			clearTaskFlowSummaryView();
 			return;
 		}
 
-		// 이전에 보던 수주번호 복원 시도 (세션 -> 공용 로컬스토리지 컨텍스트 순)
+		// 이전에 사용자가 선택한 수주번호 복원 시도 (미선택 시 기본 "선택" 유지)
 		var lastKey = sessionStorage.getItem('lastSelectedOrdrsKey');
 		if (!lastKey) {
 			try {
 				var flowCtx = (typeof getFlowContext === 'function') ? getFlowContext() : null;
 				if (flowCtx && flowCtx.ordrsNo) {
-					lastKey = flowCtx.ordrsNo + '|' + (flowCtx.histNo || '0') + '|' + (cond.coCd || '');
+					lastKey = flowCtx.ordrsNo + '|' + (flowCtx.histNo || '0') + '|' + (flowCtx.coCd || cond.coCd || '');
 				} else {
 					var userIdKey = 'lastSelectedOrdrsKey_' + ((typeof jwt !== 'undefined' && jwt && jwt.userId) ? jwt.userId : 'USER');
 					lastKey = localStorage.getItem(userIdKey);
@@ -474,7 +475,7 @@ function loadTaskFlowProjectList() {
 				applyTaskFlowOptionBadgeStyle($opt, baseText, { type: stType, text: stText }, item.issUncompCnt, item.issTotCnt);
 			}
 			if (lastKey && lastKey === key) {
-				selectedIdx = idx;
+				selectedIdx = idx + 1;
 			}
 			$sel.append($opt);
 		});
@@ -484,13 +485,30 @@ function loadTaskFlowProjectList() {
 		var selVal = $sel.val();
 		if (selVal) {
 			onTaskFlowProjectChange(selVal);
+		} else {
+			clearTaskFlowSummaryView();
 		}
 	});
 }
 
 // 수주 프로젝트 변경 이벤트
 function onTaskFlowProjectChange(val) {
-	if (!val) return;
+	if (!val) {
+		renderTaskFlowRichDropdown($('#taskFlowProjectSelect'));
+		try {
+			sessionStorage.removeItem('lastSelectedOrdrsKey');
+			sessionStorage.removeItem('lastSelectedSalesCd');
+			sessionStorage.removeItem('etoPinnedSearchKeyword');
+			sessionStorage.removeItem('GBS:taskFlowContext');
+			var userIdKey = 'lastSelectedOrdrsKey_' + ((typeof jwt !== 'undefined' && jwt && jwt.userId) ? jwt.userId : 'USER');
+			localStorage.removeItem(userIdKey);
+		} catch (e) {}
+		clearTaskFlowSummaryView();
+		if (typeof clearFlowContext === 'function') {
+			clearFlowContext();
+		}
+		return;
+	}
 	var tokens = val.split('|');
 	var ordrsNo = tokens[0];
 	var histNo = tokens[1];
